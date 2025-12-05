@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Tuple
 
 import json
+import math
 import numpy as np
 
 from dataclasses import dataclass, field
@@ -22,9 +23,105 @@ from typing import List
 from modules_local import input_modes_core  # or: from . import input_modes_core
 
 
+# ===================================================================
+# ====================================================================
+# Core data structure
+# ====================================================================
+# ===================================================================
+
+@dataclass
+class GroupInputs:
+    """
+    Final per-group inputs structure produced by generate_inputs and
+    consumed by the synapse-building step (2.4).
+
+    For now we keep it minimal: name, mode, and spike trains (in ms,
+    in simulation time). Later we can add timing/meta fields as needed.
+    """
+    name: str
+    mode: str
+    spike_trains: List[np.ndarray] = field(default_factory=list)
+    meta: Dict[str, Any] = field(default_factory=dict)
+
+
+# ====================================================================
+# ====================================================================
+# 2.3 Top-level API
+# ====================================================================
+# ====================================================================
+
+def generate_inputs(
+    syn_config_path: Path | str,
+    geometry: Optional[Any] = None,
+    rng: Optional[np.random.Generator] = None,
+    mode_registry: Optional[Mapping[str, Any]] = None,
+) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]], Dict[str, GroupInputs]]:
+    """
+    Top-level entry point for Step 2.3.
+
+    Parameters
+    ----------
+    syn_config_path
+        Path to the synapse configuration JSON (e.g. TUNE_DIR / "syn_config.json").
+    geometry
+        Geometry/segment-group information from Step 2.2 (optional for now).
+    rng
+        Optional NumPy random number generator for reproducible inputs.
+        If None, an internal generator will be created.
+    mode_registry
+        Optional mapping from mode names (str) to handler callables.
+        For now we build this from the core modes, optionally extended
+        by user-defined modes.
+
+    Returns
+    -------
+    sim_cfg : dict
+        Normalized simulation-level config (tstart, tstop, dt, etc.).
+    groups_cfg : dict[str, dict]
+        Normalized per-group configs.
+    inputs_by_group : dict[str, GroupInputs]
+        Final per-group input object, one entry per active synapse group.
+    """
+    syn_config_path = Path(syn_config_path)
+    
+    # 2.3.0 – Lightweight input checker (pre-2.3/initial sanity check)
+    sim_cfg_preview, groups_cfg_preview = check_inputs(syn_config_path)
+
+    # 2.3.1 – Load and split raw JSON config
+    sim_cfg_raw, groups_cfg_raw = _load_and_split_syn_config(syn_config_path)
+
+    # 2.3.2 – Normalize configs
+    sim_cfg = _normalize_sim_config(sim_cfg_raw)
+    groups_cfg = _normalize_group_configs(groups_cfg_raw)
+
+    # 2.3.3 – Shared resources: RNG and mode registry
+    rng = _init_rng(rng)
+    if mode_registry is None:
+        mode_registry = _build_default_mode_registry()
+
+    # 2.3.4 – Per-group processing
+    inputs_by_group = _process_all_groups(
+        sim_cfg=sim_cfg,
+        groups_cfg=groups_cfg,
+        geometry=geometry,
+        mode_registry=mode_registry,
+        rng=rng,
+    )
+
+    # 2.3.5 – Final sanity checks
+    _finalize_inputs(sim_cfg, groups_cfg, inputs_by_group)
+
+    return sim_cfg, groups_cfg, inputs_by_group
+
+
+# ====================================================================
+# ====================================================================
+# 2.3 Helper functions
+# ====================================================================
+# ====================================================================
 
 # ---------------------------------------------------------------------
-# Lightweight input checker (pre-2.3)
+# 2.3.1 - Check source inputs
 # ---------------------------------------------------------------------
 
 def check_inputs(
@@ -37,16 +134,23 @@ def check_inputs(
 
     - Loads syn_config.json
     - Runs the same normalization as generate_inputs
-    - Prints a compact summary of groups (state, mode, source.path, N_syn)
-    - Returns (sim_cfg, groups_cfg) in normalized form for inspection.
+    - Prints a concise summary of sim + per-group configs
+
+    Returns
+    -------
+    sim_cfg : dict
+    groups_cfg : dict[str, dict]
     """
+    syn_config_path = Path(syn_config_path)
+    if not syn_config_path.is_file():
+        raise FileNotFoundError(f"check_inputs: syn_config_path not found: {syn_config_path}")
 
-    path = Path(syn_config_path)
-    if not path.exists():
-        raise FileNotFoundError(f"syn_config.json not found at: {path}")
+    with syn_config_path.open("r") as f:
+        cfg_raw = json.load(f)
 
-    # Reuse the existing internal machinery
-    sim_raw, groups_raw = _load_and_split_syn_config(path)
+    sim_raw = cfg_raw.get("sim", {})
+    groups_raw = cfg_raw.get("synapse_groups", {})
+
     sim_cfg = _normalize_sim_config(sim_raw)
     groups_cfg = _normalize_group_configs(groups_raw)
 
@@ -64,226 +168,91 @@ def check_inputs(
             n_syn = syns.get("N_syn")
 
             print(
-                f"  - {gname:15s} state={state!r:5}  "
-                f"mode={mode!r:18}  "
-                f"source.path={src_path!r:25}  "
-                f"N_syn={n_syn!r}"
+                f"  - {gname:<12}  state={state!r:5}  mode={mode!r:<18}  "
+                f"source.path={repr(src_path) if src_path is not None else 'None':<30}  "
+                f"N_syn={n_syn}"
             )
-
-            if mode is None and state not in (False, "off", 0):
-                raise ValueError(f"Active group '{gname}' is missing a 'mode'.")
 
     return sim_cfg, groups_cfg
 
-# ---------------------------------------------------------------------
-# Data structure for per-group inputs
-# ---------------------------------------------------------------------
-
-@dataclass
-class GroupInputs:
-    """
-    Final per-group inputs structure produced by generate_inputs and
-    consumed by the synapse-building step (2.4).
-
-    For now we keep it minimal: name, mode, and spike trains (in ms,
-    in simulation time). Later we can add timing/meta fields as needed.
-    """
-    name: str
-    mode: str
-    spike_trains: List[np.ndarray] = field(default_factory=list)
-    meta: Dict[str, Any] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------
-# Top-level API
+# 2.3.2 – Configure all groups
 # ---------------------------------------------------------------------
 
-
-def generate_inputs(
-    syn_config_path: Path | str,
-    geometry: Optional[Any] = None,
-    rng: Optional[np.random.Generator] = None,
-    mode_registry: Optional[Mapping[str, Any]] = None,
-# ) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]], Dict[str, Any]]:
-) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]], Dict[str, GroupInputs]]:
-    """
-    Top-level entry point for Step 2.3.
-
-    Parameters
-    ----------
-    syn_config_path
-        Path to the synapse configuration JSON (e.g. TUNE_DIR / "syn_config.json").
-    geometry
-        Geometry/segment-group information from Step 2.2 (optional for now).
-    rng
-        Optional NumPy random number generator for reproducible inputs.
-        If None, an internal generator will be created.
-    mode_registry
-        Optional mapping from mode names (str) to handler callables.
-        For now we will support three default modes (precomputed, homogeneous, inhomogeneous),
-        but the design is intended to allow user-defined modes later.
-
-    Returns
-    -------
-    sim_cfg, groups_cfg, inputs
-        sim_cfg:   normalized simulation config dict
-        groups_cfg:normalized per-group config dict
-        inputs:    dict of per-group input objects (exact structure to be
-                   defined as we implement later steps).
-    """
-
-    # 2.3.1 – Load and split config
-    sim_cfg_raw, groups_cfg_raw = _load_and_split_syn_config(syn_config_path)
-
-    # 2.3.2 – Normalize configs
-    sim_cfg = _normalize_sim_config(sim_cfg_raw)
-    groups_cfg = _normalize_group_configs(groups_cfg_raw)
-
-    # 2.3.3 – Set up shared objects/resources
-    rng = _init_rng(rng)
-    default_registry = _build_default_mode_registry()
-    if mode_registry is None:
-        mode_registry = default_registry
-
-    # 2.3.4 – Loop over groups and generate per-group inputs
-    inputs = _process_all_groups(
-        sim_cfg=sim_cfg,
-        groups_cfg=groups_cfg,
-        geometry=geometry,
-        mode_registry=mode_registry,
-        rng=rng,
-    )
-
-    # 2.3.5 – Finalize and sanity-check
-    _finalize_inputs(sim_cfg, groups_cfg, inputs)
-
-    return sim_cfg, groups_cfg, inputs
-        
-
-
-
-#######################################################################
-#######################################################################
-# Helper stubs for 2.3.1–2.3.5
-#######################################################################
-#######################################################################
-
-# ---------------------------------------------------------------------
-# 2.3.1
-# ---------------------------------------------------------------------
-
+# 2.3.2.1 – Load and split syn_config.json
 def _load_and_split_syn_config(
-    syn_config_path: Path | str,
+    syn_config_path: Path,
 ) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]]]:
     """
-    2.3.1 – Load syn_config.json and split into:
-        sim_cfg_raw, groups_cfg_raw
+    2.3.1 – Load syn_config.json and split into sim + synapse_groups.
 
-    Inputs
-    ------
-    syn_config_path: Path | str
-        Path to JSON with top-level keys "sim" and "synapse_groups".
-
-    Outputs
-    -------
-    sim_cfg_raw: dict
-    groups_cfg_raw: dict[str, dict]
-
-    Raises
-    ------
-    FileNotFoundError
-        If the JSON file does not exist.
-    ValueError
-        If required top-level keys are missing or of the wrong type.
+    The JSON is expected to have top-level keys:
+      - "sim"            : dict
+      - "synapse_groups" : dict[str, dict]
     """
-    syn_config_path = Path(syn_config_path)
+    if not syn_config_path.is_file():
+        raise FileNotFoundError(f"Synapse config JSON not found: {syn_config_path}")
 
-    # Load the JSON
-    with syn_config_path.open("r", encoding="utf-8") as f:
+    with syn_config_path.open("r") as f:
         cfg = json.load(f)
 
-    # Basic structure checks
-    if "sim" not in cfg or "synapse_groups" not in cfg:
-        raise ValueError(
-            f"syn_config.json must contain top-level keys 'sim' and "
-            f"'synapse_groups' (got keys: {list(cfg.keys())})"
-        )
+    sim_cfg_raw = cfg.get("sim")
+    groups_cfg_raw = cfg.get("synapse_groups")
 
-    sim_cfg_raw = cfg["sim"]
-    groups_cfg_raw = cfg["synapse_groups"]
+    if sim_cfg_raw is None or groups_cfg_raw is None:
+        raise ValueError(
+            f"Synapse config {syn_config_path} must define 'sim' and 'synapse_groups' keys."
+        )
 
     if not isinstance(sim_cfg_raw, dict):
-        raise ValueError(
-            f"'sim' block must be a dict (got {type(sim_cfg_raw)!r})"
-        )
+        raise TypeError(f"'sim' block must be a dict (got {type(sim_cfg_raw)!r})")
 
     if not isinstance(groups_cfg_raw, dict):
-        raise ValueError(
-            "'synapse_groups' block must be a dict mapping group_name -> group_cfg "
-            f"(got {type(groups_cfg_raw)!r})"
+        raise TypeError(
+            f"'synapse_groups' block must be a dict (got {type(groups_cfg_raw)!r})"
         )
-
-    # Optional: enforce that each group config is a dict
-    for gname, gcfg in groups_cfg_raw.items():
-        if not isinstance(gcfg, dict):
-            raise ValueError(
-                f"Group '{gname}' in 'synapse_groups' must be a dict "
-                f"(got {type(gcfg)!r})"
-            )
 
     return sim_cfg_raw, groups_cfg_raw
 
-
-# ---------------------------------------------------------------------
-# 2.3.2
-# ---------------------------------------------------------------------
-
+# 2.3.2.2 – Normalize configs
 def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
     """
-    2.3.2 – Normalize/validate the simulation config.
+    2.3.2 – Normalize/validate simulation-level config.
 
-    Inputs
-    ------
-    sim_cfg_raw: dict
-        Raw sim config from JSON.
-
-    Outputs
-    -------
-    sim_cfg: dict
-        Normalized config (required keys, types, defaults).
+    Ensures keys:
+      - cell (string, optional)
+      - tune (string, optional)
+      - dt, tstart, tstop (floats)
+      - jitter (float or None)
     """
-    if not isinstance(sim_cfg_raw, dict):
-        raise ValueError(f"'sim' block must be a dict (got {type(sim_cfg_raw)!r})")
-
-    sim_cfg: Dict[str, Any] = dict(sim_cfg_raw)  # shallow copy
+    sim_cfg = dict(sim_cfg_raw)
 
     # Required numeric fields
-    for key in ("tstart", "tstop", "dt"):
+    for key in ("dt", "tstart", "tstop"):
         if key not in sim_cfg:
-            raise ValueError(f"sim config missing required key '{key}'")
+            raise ValueError(f"sim config missing required key {key!r}")
         try:
             sim_cfg[key] = float(sim_cfg[key])
-        except (TypeError, ValueError):
-            raise ValueError(f"sim['{key}'] must be numeric (got {sim_cfg[key]!r})")
+        except Exception as exc:
+            raise ValueError(
+                f"sim[{key!r}] must be convertible to float (got {sim_cfg[key]!r})"
+            ) from exc
 
-    if sim_cfg["tstop"] <= sim_cfg["tstart"]:
-        raise ValueError(
-            f"sim['tstop']={sim_cfg['tstop']} must be > sim['tstart']={sim_cfg['tstart']}"
-        )
-
-    # Optional jitter
-    if "jitter" not in sim_cfg or sim_cfg["jitter"] is None:
+    # jitter is optional
+    jitter = sim_cfg.get("jitter", None)
+    if jitter is None:
         sim_cfg["jitter"] = None
     else:
-        try:
-            sim_cfg["jitter"] = float(sim_cfg["jitter"])
-        except (TypeError, ValueError):
-            raise ValueError(f"sim['jitter'] must be numeric or null (got {sim_cfg['jitter']!r})")
+        sim_cfg["jitter"] = float(jitter)
 
-    # Leave other keys (e.g. 'cell', 'tune') as-is
+    # Cell and tune labels are just passed through if present
+    for key in ("cell", "tune"):
+        if key in sim_cfg and sim_cfg[key] is not None:
+            sim_cfg[key] = str(sim_cfg[key])
+
     return sim_cfg
-    # raise NotImplementedError
-
 
 def _normalize_group_configs(
     groups_cfg_raw: Dict[str, Dict[str, Any]],
@@ -302,12 +271,11 @@ def _normalize_group_configs(
     Outputs
     -------
     groups_cfg: dict[str, dict]
-        Normalized group configs, ready for per-group processing.
+        Normalized per-group configs.
     """
     if not isinstance(groups_cfg_raw, dict):
-        raise ValueError(
-            f"'synapse_groups' must be a dict mapping group_name -> group_cfg "
-            f"(got {type(groups_cfg_raw)!r})"
+        raise TypeError(
+            f"'synapse_groups' must be a dict (got {type(groups_cfg_raw)!r})"
         )
 
     groups_cfg: Dict[str, Dict[str, Any]] = {}
@@ -333,15 +301,22 @@ def _normalize_group_configs(
 
     for gname, gcfg_raw in groups_cfg_raw.items():
         if not isinstance(gcfg_raw, dict):
-            raise ValueError(
-                f"Group '{gname}' in 'synapse_groups' must be a dict "
-                f"(got {type(gcfg_raw)!r})"
+            raise TypeError(
+                f"Each synapse group config must be a dict (got {type(gcfg_raw)!r}) "
+                f"for group {gname!r}"
             )
 
-        gcfg: Dict[str, Any] = dict(gcfg_raw)  # shallow copy
+        gcfg = dict(gcfg_raw)
 
-        # state: default to True if missing
+        # state: default to True
         state = gcfg.get("state", True)
+        if state is None:
+            # None → treated as inactive for now (legacy scratch groups, etc.)
+            state = False
+        if not isinstance(state, bool):
+            raise ValueError(
+                f"Group '{gname}': 'state' must be a bool (got {type(state)!r})"
+            )
         gcfg["state"] = state
 
         # mode: required
@@ -376,7 +351,7 @@ def _normalize_group_configs(
             timing.setdefault(key, None)
         gcfg["timing"] = timing
 
-        # syns block (keep this light; we mainly ensure dict shape)
+        # syns block
         syns_raw = gcfg.get("syns", {})
         if not isinstance(syns_raw, dict):
             raise ValueError(
@@ -394,39 +369,31 @@ def _normalize_group_configs(
 
     return groups_cfg
 
-
-# ---------------------------------------------------------------------
-# 2.3.3 – Mode registry and built-in mode stubs
-# ---------------------------------------------------------------------
-
+# 2.3.2.3 – Initialize RNG
 def _init_rng(
     rng: Optional[np.random.Generator],
 ) -> np.random.Generator:
     """
-    2.3.3 – Ensure we have a NumPy Generator.
+    2.3.3 – Initialize RNG.
 
-    Inputs
-    ------
-    rng: np.random.Generator | None
-
-    Outputs
-    -------
-    rng: np.random.Generator
+    If rng is provided, use it as-is; otherwise create a fresh Generator.
     """
-    if rng is not None:
-        return rng
-    return np.random.default_rng()
+    if rng is None:
+        rng = np.random.default_rng()
+    return rng
 
+# 2.3.2.4 – Build default mode registry
 def _build_default_mode_registry() -> Dict[str, Any]:
     """
-    Build the default mode registry by delegating to input_modes_core.
+    2.3.3 – Build the default mode registry from the core module.
+
+    This can be extended by user-defined modes at the notebook level.
     """
     return input_modes_core.get_default_mode_registry()
 
 
-
 # ---------------------------------------------------------------------
-# 2.3.4 – Process all groups in synapse_groups
+# 2.3.3 – Per-group processing
 # ---------------------------------------------------------------------
 
 def _process_all_groups(
@@ -437,33 +404,25 @@ def _process_all_groups(
     rng: np.random.Generator,
 ) -> Dict[str, GroupInputs]:
     """
-    2.3.4 – Loop over all groups and generate per-group inputs.
+    2.3.3 – Loop over all groups and generate per-group inputs.
 
     High-level steps (per group):
-      2.3.4.1 – decide whether to skip the group (inactive / invalid)
-      2.3.4.2 – resolve N_syn (including geometry/density when needed)
-      2.3.4.3 – compute time window for this group
-      2.3.4.4 – resolve the mode handler from mode_registry
-      2.3.4.5 – run the handler to obtain spike trains
-      2.3.4.6 – package into a GroupInputs object
-
-    Returns
-    -------
-    inputs: dict[str, GroupInputs]
-        Mapping from group name to the final per-group inputs structure.
+      2.3.3.1 – decide whether to skip the group (inactive / invalid)
+      2.3.3.2 – resolve N_syn (including geometry/density when needed)
+      2.3.3.3 – compute time window for this group
+      2.3.3.4 – resolve the mode handler from mode_registry
+      2.3.3.5 – run the handler to obtain spike trains
+      2.3.3.6 – package into GroupInputs
     """
     inputs: Dict[str, GroupInputs] = {}
 
     for gname, gcfg in groups_cfg.items():
-        # 2.3.4.1 – Skip inactive or invalid groups
+        # 2.3.3.1 – Skip inactive or invalid groups
         if _should_skip_group(gname, gcfg):
             continue
 
-        # 2.3.4.2 – Resolve N_syn using geometry/density rules
-        # This helper should:
-        #   - compute N_syn_resolved according to the contract
-        #   - write it into gcfg["syns"]["N_syn_resolved"]
-        #   - return the resolved integer
+        # 2.3.3.2 – Resolve number of synapses for this group
+        # This also stashes syns["N_syn_resolved"] into the group config.
         n_syn_resolved = _resolve_n_syn(
             sim_cfg=sim_cfg,
             group_cfg=gcfg,
@@ -476,22 +435,22 @@ def _process_all_groups(
                 f"Group '{gname}': resolved N_syn_resolved < 0 ({n_syn_resolved})."
             )
 
-        # 2.3.4.3 – Compute this group’s effective time window
-        t_start_ms, t_end_ms = _get_group_time_window(sim_cfg, gcfg)
+        # 2.3.3.3 – Generate timing configuration for this group
+        time_cfg = _calculate_timing(sim_cfg, gcfg)
+        # t_start_ms, t_end_ms = _get_group_time_window(sim_cfg, gcfg)
 
-        # 2.3.4.4 – Resolve mode handler
+
+        # 2.3.3.4 – Resolve mode handler
         handler = _resolve_mode_handler(gname, gcfg, mode_registry)
 
-        # 2.3.4.5 – Run handler to get spike trains
-        # _run_mode_handler should:
-        #   - call the handler(sim_cfg, gcfg, geometry, rng)
-        #   - ensure the result is a list[np.ndarray]
+        # 2.3.3.5 – Run handler to get spike trains
         spike_trains = _run_mode_handler(
             handler=handler,
             sim_cfg=sim_cfg,
             group_name=gname,
             group_cfg=gcfg,
             geometry=geometry,
+            time_cfg=time_cfg,
             rng=rng,
         )
 
@@ -504,12 +463,11 @@ def _process_all_groups(
                 f"but N_syn_resolved={n_syn_resolved}."
             )
 
-        # 2.3.4.6 – Package into GroupInputs
-        # You may need to update _build_group_inputs to accept t_window if it
-        # doesn’t already.
+        # 2.3.3.6 – Package into GroupInputs
         group_inputs = _build_group_inputs(
             group_name=gname,
             group_cfg=gcfg,
+            time_cfg=time_cfg,
             spike_trains=spike_trains,
             t_window=(t_start_ms, t_end_ms),
         )
@@ -518,48 +476,374 @@ def _process_all_groups(
 
     return inputs
 
+# 2.3.3 Helper functions
+# -----------------------
+
+# 2.3.3.1 – Decide whether to skip this group
 def _should_skip_group(
     group_name: str,
     group_cfg: Dict[str, Any],
 ) -> bool:
     """
-    2.3.4.1 – Decide whether to skip this group.
+    2.3.3.1 – Decide whether to skip this group.
 
     Rules:
-      - If state is explicitly in {False, 0, "off", None} → skip.
-      - Otherwise, treat as active and require a valid mode.
+      - If group_cfg['state'] is explicitly False, skip it;
+      - If 'mode' is missing or empty, skip it;
+      - Otherwise, keep it.
     """
     state = group_cfg.get("state", True)
-    if state in (False, 0, "off", None):
+    if state is False:
         return True
 
-    # Active group must have a mode
-    if group_cfg.get("mode") is None:
-        raise ValueError(
-            f"Group '{group_name}' is active (state={state!r}) "
-            f"but has no 'mode' specified."
-        )
+    mode = group_cfg.get("mode")
+    if mode is None or (isinstance(mode, str) and mode.strip() == ""):
+        return True
+
     return False
 
+
+# 2.3.3.2 - Resolve N_syn for this group
+def _compile_density_from_spec(dist_spec: Any):
+    """Convert a 'dist_func' spec from JSON into a callable density function.
+
+    The returned function dens(dist_um) should yield synapses-per-µm at that distance.
+
+    Supported forms:
+      - None          → dens(d) = 1.0
+      - number        → dens(d) = const
+      - callable      → dens(d) used as-is
+      - dict          → {"kind": "uniform", "params": {"c": float, "multi": optional}}
+    """
+    # None → uniform density 1.0
+    if dist_spec is None:
+        return lambda d: 1.0
+
+    # Already a callable or a simple numeric constant
+    if callable(dist_spec):
+        return dist_spec
+    if isinstance(dist_spec, (int, float)):
+        const = float(dist_spec)
+        return lambda d, c=const: c
+
+    # JSON-style spec
+    if isinstance(dist_spec, dict):
+        kind = dist_spec.get("kind") or "uniform"
+        params = dist_spec.get("params", {}) or {}
+
+        if kind == "uniform":
+            c = float(params.get("c", 1.0))
+            multi = float(params.get("multi", 1.0))
+            const = c * multi
+            return lambda d, c=const: c
+
+        # Placeholder for future shapes (linear, gaussian, etc.)
+        raise ValueError(f"dist_func spec with kind={kind!r} is not yet supported for N_syn resolution")
+
+    raise TypeError(
+        f"dist_func must be None, number, callable, or dict-spec; got {type(dist_spec)!r}"
+    )
+
+def _resolve_n_syn(
+    sim_cfg: Dict[str, Any],
+    group_cfg: Dict[str, Any],
+    geometry: Optional[Any],
+) -> int:
+    """Resolve the effective N_syn for a group, including geometry/density.
+
+    Logic:
+      1. If syns["N_syn"] is an explicit integer ≥ 0, use it.
+      2. If N_syn is None:
+         - Require geometry and a valid dist_func spec.
+         - Use the selected geometry group (from syns["segs"]) and the
+           density function to compute a deterministic synapse count via:
+
+               n_seg = floor( density(dist_um) * seg_length_um )
+
+           summed over all segments.
+    """
+    syns = group_cfg.get("syns", {}) or {}
+    n_syn_raw = syns.get("N_syn", None)
+
+    # Case 1: explicit N_syn
+    if n_syn_raw is not None:
+        try:
+            n_syn = int(n_syn_raw)
+        except Exception as exc:  # pragma: no cover
+            raise ValueError(
+                f"Group {group_cfg.get('name', '<unnamed>')!r}: syns['N_syn'] must be int or None, "
+                f"got {n_syn_raw!r} of type {type(n_syn_raw)!r}."
+            ) from exc
+        if n_syn < 0:
+            raise ValueError(
+                f"Group {group_cfg.get('name', '<unnamed>')!r}: syns['N_syn'] must be ≥ 0, got {n_syn}."
+            )
+        # Stash resolved value for downstream consumers (e.g. 2.4)
+        syns["N_syn_resolved"] = n_syn
+        group_cfg["syns"] = syns
+        return n_syn
+
+    # Case 2: N_syn is None → geometry/density-based count
+    if geometry is None:
+        raise ValueError(
+            "_resolve_n_syn: geometry is required when syns['N_syn'] is None; "
+            f"group={group_cfg.get('name', '<unnamed>')!r}"
+        )
+
+    # Select segment group from geometry based on syns['segs']
+    segs_key = syns.get("segs") or "all"
+    group_map = {
+        "all": "all_dend",
+        "proximal": "proximal",
+        "distal": "distal",
+        "soma": "soma",
+    }
+    geom_group_name = group_map.get(segs_key)
+    if geom_group_name is None:
+        raise ValueError(
+            f"_resolve_n_syn: unknown segs selector {segs_key!r} for group {group_cfg.get('name', '<unnamed>')!r}."
+        )
+
+    geom_groups = geometry.get("groups", {})
+    seg_refs = geom_groups.get(geom_group_name, [])
+    if not seg_refs:
+        # No segments available in this geometry group
+        syns["N_syn_resolved"] = 0
+        group_cfg["syns"] = syns
+        return 0
+
+    # Build density function
+    dens_eq = _compile_density_from_spec(syns.get("dist_func"))
+
+    # Deterministic density-based count, mirroring _gen_distr_synlocs
+    total_n_syn = 0
+    for ref in seg_refs:
+        sec = ref.sec
+        seg_len = float(sec.L) / float(sec.nseg or 1)
+        dens = float(dens_eq(ref.dist_um))
+        if dens <= 0.0:
+            continue
+        n_seg = math.floor(dens * seg_len)
+        if n_seg <= 0:
+            continue
+        total_n_syn += n_seg
+
+    if total_n_syn < 0:
+        raise ValueError(
+            f"_resolve_n_syn: computed negative synapse count ({total_n_syn}) for group "
+            f"{group_cfg.get('name', '<unnamed>')!r}."
+        )
+
+    syns["N_syn_resolved"] = int(total_n_syn)
+    group_cfg["syns"] = syns
+    return int(total_n_syn)
+
+
+# 2.3.3.3 – Generate timing configuration for this group
+def _calculate_timing(
+    sim_cfg: Dict[str, Any],
+    group_cfg: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Compute resolved timing information for a single synapse group.
+
+    High-level:
+      1) Derive concrete time anchors (ms) for this group from sim_cfg
+         and group_cfg (tstart/tstop, onset, source start/stop, baseline).
+      2) Build an ordered, non-overlapping list of time blocks of three kinds:
+           - "quiescent" : no spikes should be generated.
+           - "baseline"  : constant-rate (homogeneous) baseline spikes.
+           - "source"    : main source-driven spikes (mode-specific).
+
+    This function is mode-agnostic: it does not generate any spikes and
+    does not depend on which mode (homogeneous, precomputed, etc.) is used.
+
+    Returns
+    -------
+    time_cfg : dict
+        {
+          "anchors": {
+              "sim_tstart": float,
+              "sim_tstop": float,
+              "onset": float | None,
+              "source_tstart": float | None,
+              "source_tstop": float | None,
+              "baseline_rate_hz": float | None,
+          },
+          "blocks": [
+              {
+                  "kind": "quiescent" | "baseline" | "source",
+                  "t_start": float,
+                  "t_end": float,
+              },
+              ...
+          ],
+        }
+
+    Notes
+    -----
+    - The actual derivation of anchors from the raw cfg fields is delegated
+      to _compute_time_anchors(...), which is intentionally kept as the
+      only place where the detailed timing semantics live.
+    - This makes it easy to refine timing rules later without touching
+      modes or the overall 2.3 pipeline.
+    """
+    anchors = _compute_time_anchors(sim_cfg, group_cfg)
+    blocks = _build_time_blocks_from_anchors(anchors)
+
+    time_cfg = {
+        "anchors": anchors,
+        "blocks": blocks,
+    }
+
+    return time_cfg
+
+def _compute_time_anchors(
+    sim_cfg: Dict[str, Any],
+    group_cfg: Dict[str, Any],
+) -> Dict[str, Optional[float]]:
+    """
+    Placeholder: derive concrete time anchors for this group.
+
+    Expected output keys (all in ms, floats or None where applicable):
+        "sim_tstart"      : simulation start time (usually sim_cfg["tstart"])
+        "sim_tstop"       : simulation stop time  (sim_cfg["tstop"])
+        "onset"           : first time this group is allowed to produce spikes
+                           (may be None to mean "sim_tstart").
+        "source_tstart"   : start of main source-driven input segment
+                           (e.g. aligned bio curve start; may be None).
+        "source_tstop"    : end of main source-driven input segment
+                           (may be None if no dedicated source window).
+        "baseline_rate_hz": resolved baseline rate in Hz for this group,
+                           or None if there is no baseline.
+
+    For now, this is the only place where we will later use the raw cfg
+    timing fields:
+        sim_cfg["tstart"], sim_cfg["tstop"],
+        group_cfg["timing"][...],
+        group_cfg["source"]["baseline"], etc.
+
+    Implementation of the actual timing math is deferred on purpose and
+    will be filled in next; for now this function is a stub.
+    """
+    raise NotImplementedError(
+        "_compute_time_anchors is not yet implemented; "
+        "timing semantics are still being finalized."
+    )
+
+def _build_time_blocks_from_anchors(
+    anchors: Dict[str, Optional[float]],
+) -> List[Dict[str, Any]]:
+    """
+    Build an ordered, non-overlapping list of time blocks from anchors.
+
+    Inputs (anchors):
+        sim_tstart, sim_tstop, onset,
+        source_tstart, source_tstop, baseline_rate_hz
+
+    Rules (conceptual):
+      - All times are first clamped to [sim_tstart, sim_tstop].
+      - Blocks are created in temporal order, skipping zero/negative-length
+        intervals:
+          1) [sim_tstart, onset)        → "quiescent"
+          2) [onset, source_tstart)     → "baseline" if baseline_rate_hz>0,
+                                          otherwise "quiescent"
+          3) [source_tstart, source_tstop) → "source"
+          4) [source_tstop, sim_tstop)  → "baseline" if baseline_rate_hz>0,
+                                          otherwise "quiescent"
+      - If source_tstart/source_tstop are None or invalid (e.g. no source
+        segment), we collapse to just:
+          a) [sim_tstart, onset)   → "quiescent"
+          b) [onset, sim_tstop)    → "baseline" if baseline_rate_hz>0,
+                                     otherwise "quiescent".
+
+    This function assumes anchors are already self-consistent; any
+    higher-level validation or corrections should happen in
+    _compute_time_anchors.
+    """
+    sim_tstart = float(anchors.get("sim_tstart", 0.0))
+    sim_tstop = float(anchors.get("sim_tstop", sim_tstart))
+    onset = anchors.get("onset")
+    source_tstart = anchors.get("source_tstart")
+    source_tstop = anchors.get("source_tstop")
+    baseline_rate = anchors.get("baseline_rate_hz")
+
+    # Clamp helpers
+    def _clamp(t: Optional[float]) -> Optional[float]:
+        if t is None:
+            return None
+        t_f = float(t)
+        if t_f < sim_tstart:
+            return sim_tstart
+        if t_f > sim_tstop:
+            return sim_tstop
+        return t_f
+
+    onset = _clamp(onset) or sim_tstart
+    source_tstart = _clamp(source_tstart)
+    source_tstop = _clamp(source_tstop)
+
+    blocks: List[Dict[str, Any]] = []
+
+    def _add_block(kind: str, t0: float, t1: float) -> None:
+        if t1 <= t0:
+            return
+        blocks.append({"kind": kind, "t_start": float(t0), "t_end": float(t1)})
+
+    # Case: no valid source window → only quiescent + baseline/quiescent
+    if source_tstart is None or source_tstop is None or source_tstop <= source_tstart:
+        # 1) steady-state / quiescent before onset
+        _add_block("quiescent", sim_tstart, onset)
+        # 2) from onset to end: baseline or quiescent
+        kind = "baseline" if (baseline_rate is not None and baseline_rate > 0.0) else "quiescent"
+        _add_block(kind, onset, sim_tstop)
+        return blocks
+
+    # Ensure ordering for source anchors
+    src_start = max(min(source_tstart, sim_tstop), sim_tstart)
+    src_stop = max(min(source_tstop, sim_tstop), sim_tstart)
+    if src_stop <= src_start:
+        # Degenerate; fall back to no-source case
+        _add_block("quiescent", sim_tstart, onset)
+        kind = "baseline" if (baseline_rate is not None and baseline_rate > 0.0) else "quiescent"
+        _add_block(kind, onset, sim_tstop)
+        return blocks
+
+    # 1) steady-state / quiescent before onset
+    _add_block("quiescent", sim_tstart, min(onset, src_start))
+
+    # 2) pre-source baseline or quiescent
+    pre_start = max(onset, sim_tstart)
+    pre_end = min(src_start, sim_tstop)
+    pre_kind = "baseline" if (baseline_rate is not None and baseline_rate > 0.0) else "quiescent"
+    _add_block(pre_kind, pre_start, pre_end)
+
+    # 3) main source window
+    _add_block("source", src_start, src_stop)
+
+    # 4) post-source baseline or quiescent
+    post_start = max(src_stop, sim_tstart)
+    post_end = sim_tstop
+    post_kind = "baseline" if (baseline_rate is not None and baseline_rate > 0.0) else "quiescent"
+    _add_block(post_kind, post_start, post_end)
+
+    return blocks
+
+
+# 2.3.3.4 – Look up the mode handler for this group
 def _resolve_mode_handler(
     group_name: str,
     group_cfg: Dict[str, Any],
     mode_registry: Mapping[str, Any],
 ) -> Any:
     """
-    2.3.4.4 – Look up the mode handler for this group.
+    2.3.3.4 – Look up the mode handler for this group.
 
     - Reads group_cfg['mode'] (must be a string).
     - Looks up mode_registry[mode_name].
     - Raises a clear error if the mode is unknown.
     """
     mode_name = group_cfg.get("mode")
-    if not isinstance(mode_name, str):
-        raise ValueError(
-            f"Group '{group_name}' has invalid mode {mode_name!r}; "
-            f"'mode' must be a non-empty string."
-        )
-
     handler = mode_registry.get(mode_name)
     if handler is None:
         raise ValueError(
@@ -568,6 +852,8 @@ def _resolve_mode_handler(
         )
     return handler
 
+
+# 2.3.3.5 – Run handler to get spike trains
 def _run_mode_handler(
     handler: Any,
     sim_cfg: Dict[str, Any],
@@ -577,7 +863,7 @@ def _run_mode_handler(
     rng: np.random.Generator,
 ) -> List[np.ndarray]:
     """
-    2.3.4.5 – Call the mode handler to obtain spike trains.
+    2.3.3.5 – Call the mode handler to obtain spike trains.
 
     Contract:
       - handler(sim_cfg, group_cfg, geometry, rng) -> list[np.ndarray]
@@ -587,11 +873,11 @@ def _run_mode_handler(
 
     if not isinstance(spike_trains, list):
         raise TypeError(
-            f"Mode handler for group '{group_name}' must return a list of "
-            f"np.ndarray, got {type(spike_trains)!r}"
+            f"Mode handler for group '{group_name}' must return a list of np.ndarray, "
+            f"got {type(spike_trains)!r}"
         )
 
-    # Optional: light type check on elements
+    # Basic sanity on each element
     for i, arr in enumerate(spike_trains):
         if not isinstance(arr, np.ndarray):
             raise TypeError(
@@ -601,6 +887,7 @@ def _run_mode_handler(
 
     return spike_trains
 
+# 2.3.3.6 – Package per-group data into a GroupInputs object
 def _build_group_inputs(
     group_name: str,
     group_cfg: Dict[str, Any],
@@ -608,23 +895,25 @@ def _build_group_inputs(
     t_window: Tuple[float, float],
 ) -> GroupInputs:
     """
-    2.3.4.6 – Package per-group data into a GroupInputs object.
+    2.3.3.6 – Package per-group data into a GroupInputs object.
 
     Stores:
       - name
       - mode
       - spike_trains
-      - meta: cfg, t_window, N_syn_resolved, etc.
+      - meta: timing window and possibly other useful snapshot info.
     """
     mode = group_cfg.get("mode", "unknown")
-    syn_cfg = group_cfg.get("syns", {})
-    n_syn_resolved = syn_cfg.get("N_syn_resolved", len(spike_trains))
+    meta: Dict[str, Any] = {}
 
-    meta: Dict[str, Any] = {
-        "cfg": group_cfg,
-        "t_window": t_window,
-        "N_syn": n_syn_resolved,
+    # Stash timing window and resolved N_syn for reference
+    meta["t_window_ms"] = {
+        "t_start": float(t_window[0]),
+        "t_end": float(t_window[1]),
     }
+    syns = group_cfg.get("syns", {}) or {}
+    if "N_syn_resolved" in syns:
+        meta["N_syn_resolved"] = int(syns["N_syn_resolved"])
 
     return GroupInputs(
         name=group_name,
@@ -636,8 +925,9 @@ def _build_group_inputs(
 
 
 # ---------------------------------------------------------------------
-# 2.3.5 – Process all groups in synapse_groups
+# 2.3.4 – Final sanity checks
 # ---------------------------------------------------------------------
+
 
 def _finalize_inputs(
     sim_cfg: Dict[str, Any],
@@ -645,7 +935,7 @@ def _finalize_inputs(
     inputs: Dict[str, GroupInputs],
 ) -> None:
     """
-    2.3.5 – Final sanity checks / adjustments on assembled inputs.
+    2.3.4 – Final sanity checks / adjustments on assembled inputs.
 
     Big picture: make sure every active group has a GroupInputs entry and
     that spike times (if any) live inside the global simulation window.
@@ -654,36 +944,22 @@ def _finalize_inputs(
     ------
     sim_cfg: dict
     groups_cfg: dict[str, dict]
-    inputs: dict[str, Any]
-
-    Outputs
-    -------
-    None
-        May raise if inconsistencies are detected; otherwise does nothing.
+    inputs: dict[str, GroupInputs]
     """
-    
-    tstart = float(sim_cfg["tstart"])
-    tstop = float(sim_cfg["tstop"])
+    tstart = float(sim_cfg.get("tstart", 0.0))
+    tstop = float(sim_cfg.get("tstop", 0.0))
 
     for gname, gcfg in groups_cfg.items():
-        state = gcfg.get("state", True)
-        if not state:
-            # Inactive groups are allowed to be absent from 'inputs'
+        if _should_skip_group(gname, gcfg):
             continue
 
         if gname not in inputs:
             raise ValueError(
-                f"Active group '{gname}' has no entry in inputs; "
-                f"check _process_all_groups implementation."
+                f"Active synapse group '{gname}' has no generated inputs. "
+                "Check its 'mode', 'source', and mode handler implementation."
             )
 
         gin = inputs[gname]
-        # Optional: basic consistency check on mode name
-        if gin.mode != gcfg.get("mode"):
-            raise ValueError(
-                f"Group '{gname}': mode mismatch between config ({gcfg.get('mode')!r}) "
-                f"and inputs ({gin.mode!r})."
-            )
 
         # Optional: check spike times lie within [tstart, tstop]
         for idx, train in enumerate(gin.spike_trains):
