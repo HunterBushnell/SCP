@@ -6,7 +6,6 @@ from typing import Any, Dict, Mapping, Optional, Tuple, List
 import json
 import math
 import numpy as np
-import hashlib
 
 from dataclasses import dataclass, field
 
@@ -41,7 +40,6 @@ def generate_inputs(
     geometry: Optional[Any] = None,
     rng: Optional[np.random.Generator] = None,
     mode_registry: Optional[Mapping[str, Any]] = None,
-    cache: Optional[Dict[str, GroupInputs]] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]], Dict[str, GroupInputs]]:
     """
     Top-level entry point for Step 2.3.
@@ -59,15 +57,11 @@ def generate_inputs(
         Optional mapping from mode names (str) to handler callables.
         For now we build this from the core modes, optionally extended
         by user-defined modes.
-    cache
-        Optional dictionary used to cache GroupInputs objects keyed by a
-        stable signature of (sim_cfg, group_cfg). If provided and a matching
-        entry is found, inputs for that group are reused instead of regenerated.
 
     Returns
     -------
     sim_cfg : dict
-        Normalized simulation-level config (tstart, tstop, dt, seed, etc.).
+        Normalized simulation-level config (tstart, tstop, dt, etc.).
     groups_cfg : dict[str, dict]
         Normalized per-group configs.
     inputs_by_group : dict[str, GroupInputs]
@@ -83,7 +77,7 @@ def generate_inputs(
     groups_cfg = _normalize_group_configs(groups_cfg_raw)
 
     # 2.3.3 – Shared resources: RNG and mode registry
-    rng = _init_rng(rng, sim_cfg)
+    rng = _init_rng(rng)
     if mode_registry is None:
         mode_registry = _build_default_mode_registry()
 
@@ -94,7 +88,6 @@ def generate_inputs(
         geometry=geometry,
         mode_registry=mode_registry,
         rng=rng,
-        cache=cache,
     )
 
     # 2.3.5 – Final sanity checks
@@ -207,7 +200,6 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
       - tune (string, optional)
       - dt, tstart, tstop (floats)
       - jitter (float or None)
-      - seed (int or None)
     """
     sim_cfg = dict(sim_cfg_raw)
 
@@ -233,18 +225,6 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
     for key in ("cell", "tune"):
         if key in sim_cfg and sim_cfg[key] is not None:
             sim_cfg[key] = str(sim_cfg[key])
-
-    # seed is optional
-    seed_raw = sim_cfg.get("seed", None)
-    if seed_raw is None:
-        sim_cfg["seed"] = None
-    else:
-        try:
-            sim_cfg["seed"] = int(seed_raw)
-        except Exception as exc:
-            raise ValueError(
-                f"sim['seed'] must be integer-like or null (got {seed_raw!r})"
-            ) from exc
 
     return sim_cfg
 
@@ -357,65 +337,15 @@ def _normalize_group_configs(
 
 def _init_rng(
     rng: Optional[np.random.Generator],
-    sim_cfg: Dict[str, Any],
 ) -> np.random.Generator:
     """
     Initialize RNG.
 
-    Priority:
-      1) If an explicit Generator is passed in, use it as-is.
-      2) Else, if sim_cfg['seed'] is not None, use it to seed a new Generator.
-      3) Else, create an unseeded Generator (non-deterministic).
+    If rng is provided, use it as-is; otherwise create a fresh Generator.
     """
-    if rng is not None:
-        return rng
-
-    seed = sim_cfg.get("seed", None)
-    if seed is None:
-        return np.random.default_rng()
-    return np.random.default_rng(int(seed))
-
-
-# NOTE: The cache key currently ignores cell geometry. This is fine as long
-# as each run uses a single morphology, but if we ever reuse the same
-# synapse config across different geometries, the cache must be extended
-# to include a geometry identifier to avoid reusing mismatched inputs.
-def _make_group_signature(
-    sim_cfg: Dict[str, Any],
-    group_name: str,
-    group_cfg: Dict[str, Any],
-) -> str:
-    """
-    Build a stable signature string for a (sim_cfg, group_cfg) pair.
-
-    Used as a key into an inputs cache so that if the sim/group
-    parameters are unchanged, we can reuse previously generated
-    spike trains instead of regenerating.
-
-    Notes:
-      - We include only JSON-serializable pieces; anything non-serializable
-        is converted via str(...).
-      - Geometry is deliberately NOT included here; if you want geometry-
-        specific caching later, you can add a geometry identifier.
-    """
-    # Keep only the sim fields that actually affect inputs
-    sim_subset = {
-        "tstart": sim_cfg.get("tstart"),
-        "tstop": sim_cfg.get("tstop"),
-        "dt": sim_cfg.get("dt"),
-        "seed": sim_cfg.get("seed"),
-        "jitter": sim_cfg.get("jitter"),
-    }
-
-    payload = {
-        "sim": sim_subset,
-        "group_name": group_name,
-        "group_cfg": group_cfg,
-    }
-
-    # JSON with sorted keys for stability; default=str to survive odd types
-    blob = json.dumps(payload, sort_keys=True, default=str)
-    return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+    if rng is None:
+        rng = np.random.default_rng()
+    return rng
 
 
 def _build_default_mode_registry() -> Dict[str, Any]:
@@ -437,7 +367,6 @@ def _process_all_groups(
     geometry: Optional[Any],
     mode_registry: Mapping[str, Any],
     rng: np.random.Generator,
-    cache: Optional[Dict[str, GroupInputs]] = None,
 ) -> Dict[str, GroupInputs]:
     """
     Loop over all groups and generate per-group inputs.
@@ -447,7 +376,7 @@ def _process_all_groups(
       2) resolve N_syn (including geometry/density when needed)
       3) compute timing configuration for this group
       4) resolve the mode handler from mode_registry
-      5) run the handler to obtain spike trains (or reuse from cache)
+      5) run the handler to obtain spike trains
       6) package into GroupInputs
     """
     inputs: Dict[str, GroupInputs] = {}
@@ -457,15 +386,6 @@ def _process_all_groups(
         if _should_skip_group(gname, gcfg):
             continue
 
-        # OPTIONAL: cache lookup before doing any heavy work
-        sig: Optional[str] = None
-        if cache is not None:
-            sig = _make_group_signature(sim_cfg, gname, gcfg)
-            cached = cache.get(sig)
-            if cached is not None:
-                inputs[gname] = cached
-                continue
-
         # 2) Resolve number of synapses for this group
         #    This also stashes syns["N_syn_resolved"] into the group config.
         n_syn_resolved = _resolve_n_syn(
@@ -473,6 +393,7 @@ def _process_all_groups(
             group_cfg=gcfg,
             geometry=geometry,
         )
+
         if n_syn_resolved < 0:
             raise ValueError(
                 f"Group '{gname}': resolved N_syn_resolved < 0 ({n_syn_resolved})."
@@ -480,7 +401,8 @@ def _process_all_groups(
 
         # 3) Generate timing configuration for this group
         time_cfg = _calculate_timing(sim_cfg, gcfg)
-        gcfg["time_cfg"] = time_cfg  # Attach for modes and downstream consumers
+        # Attach for modes and downstream consumers
+        gcfg["time_cfg"] = time_cfg
 
         # 4) Resolve mode handler
         handler = _resolve_mode_handler(gname, gcfg, mode_registry)
@@ -492,6 +414,7 @@ def _process_all_groups(
             group_name=gname,
             group_cfg=gcfg,
             geometry=geometry,
+            time_cfg=time_cfg,
             rng=rng,
         )
 
@@ -510,10 +433,6 @@ def _process_all_groups(
         )
 
         inputs[gname] = group_inputs
-
-        # Store into cache if enabled
-        if cache is not None and sig is not None:
-            cache[sig] = group_inputs
 
     return inputs
 
@@ -689,7 +608,7 @@ def _resolve_n_syn(
 
 
 # ====================================================================
-# 2.3.3.3 – Timing configuration
+# 2.3.3.3 – Timing configuration scaffold
 # ====================================================================
 
 def _calculate_timing(
@@ -726,111 +645,27 @@ def _compute_time_anchors(
     group_cfg: Dict[str, Any],
 ) -> Dict[str, Optional[float]]:
     """
-    Derive concrete time anchors for this group.
+    Placeholder: derive concrete time anchors for this group.
 
-    Output keys (all in ms, floats or None where applicable):
-        "sim_tstart"      : simulation start time (sim_cfg["tstart"])
+    Expected output keys (all in ms, floats or None where applicable):
+        "sim_tstart"      : simulation start time (usually sim_cfg["tstart"])
         "sim_tstop"       : simulation stop time  (sim_cfg["tstop"])
         "onset"           : first time this group is allowed to produce spikes
-                           (defaults to sim_tstart).
+                           (may be None to mean "sim_tstart").
         "source_tstart"   : start of main source-driven input segment
-                           (aligned to stim_tstart_ms and input_stim_tstart_ms).
-        "source_tstop"    : end of main source-driven input segment.
+                           (e.g. aligned bio curve start; may be None).
+        "source_tstop"    : end of main source-driven input segment
+                           (may be None if no dedicated source window).
         "baseline_rate_hz": resolved baseline rate in Hz for this group,
                            or None if there is no baseline.
+
+    Timing semantics (how to compute these from cfg fields) will be
+    filled in later.
     """
-    tstart = float(sim_cfg["tstart"])
-    tstop = float(sim_cfg["tstop"])
-
-    timing = group_cfg.get("timing", {}) or {}
-    source = group_cfg.get("source", {}) or {}
-
-    def _as_float_or_none(val: Any, label: str) -> Optional[float]:
-        if val is None:
-            return None
-        try:
-            return float(val)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"{label} must be numeric or null (got {val!r})") from exc
-
-    onset_raw = _as_float_or_none(timing.get("onset_ms"), "timing['onset_ms']")
-    stim_tstart_raw = _as_float_or_none(timing.get("stim_tstart_ms"), "timing['stim_tstart_ms']")
-    duration_raw = _as_float_or_none(timing.get("duration_ms"), "timing['duration_ms']")
-    input_stim_raw = _as_float_or_none(
-        timing.get("input_stim_tstart_ms"), "timing['input_stim_tstart_ms']"
+    raise NotImplementedError(
+        "_compute_time_anchors is not yet implemented; "
+        "timing semantics are still being finalized."
     )
-    input_duration_raw = _as_float_or_none(
-        timing.get("input_duration_ms"), "timing['input_duration_ms']"
-    )
-    baseline_raw = _as_float_or_none(source.get("baseline"), "source['baseline']")
-
-    # Onset: default to sim start, clamped into [tstart, tstop]
-    if onset_raw is None:
-        onset = tstart
-    else:
-        onset = max(min(onset_raw, tstop), tstart)
-
-    # stim_tstart: if not specified, and we have a source stim delay,
-    # default it to onset; otherwise leave None.
-    if stim_tstart_raw is None:
-        stim_tstart = onset if input_stim_raw is not None else None
-    else:
-        stim_tstart = max(min(stim_tstart_raw, tstop), tstart)
-
-    # Source start: align source data so that its own stim event occurs
-    # at stim_tstart in the simulation.
-    source_tstart: Optional[float] = None
-    if input_stim_raw is not None:
-        # If stim_tstart is still None here, fall back to onset as a last resort
-        if stim_tstart is None:
-            stim_tstart = onset
-        source_tstart = stim_tstart - input_stim_raw
-
-    # Clamp source_tstart into the simulation window (but do not force it
-    # to be >= onset; that interaction is handled by the block builder).
-    if source_tstart is not None:
-        if source_tstart < tstart:
-            source_tstart = tstart
-        if source_tstart > tstop:
-            source_tstart = tstop
-
-    # Source stop: choose a duration for the main source segment.
-    source_tstop: Optional[float] = None
-    if source_tstart is not None:
-        remaining = max(0.0, tstop - source_tstart)
-        if remaining <= 0.0:
-            source_tstop = source_tstart
-        else:
-            if duration_raw is not None:
-                dur = max(0.0, duration_raw)
-                dur = min(dur, remaining)
-            elif input_duration_raw is not None:
-                dur = max(0.0, input_duration_raw)
-                dur = min(dur, remaining)
-            else:
-                # No explicit duration → run until the end of the simulation window
-                dur = remaining
-
-            if dur <= 0.0:
-                source_tstop = source_tstart
-            else:
-                source_tstop = source_tstart + dur
-
-    anchors: Dict[str, Optional[float]] = {
-        "sim_tstart": tstart,
-        "sim_tstop": tstop,
-        "onset": onset,
-        "source_tstart": source_tstart,
-        "source_tstop": source_tstop,
-        "baseline_rate_hz": baseline_raw,
-        # Extra fields for debugging / inspection (not used by block builder):
-        "stim_tstart_ms": stim_tstart,
-        "input_stim_tstart_ms": input_stim_raw,
-        "duration_ms": duration_raw,
-        "input_duration_ms": input_duration_raw,
-    }
-
-    return anchors
 
 
 def _build_time_blocks_from_anchors(
@@ -941,21 +776,21 @@ def _run_mode_handler(
     group_name: str,
     group_cfg: Dict[str, Any],
     geometry: Optional[Any],
+    time_cfg: Dict[str, Any],
     rng: np.random.Generator,
 ) -> List[np.ndarray]:
     """
     Call the mode handler to obtain spike trains.
 
     Contract:
-      - handler(sim_cfg, group_cfg, geometry, rng) -> list[np.ndarray]
+      - handler(sim_cfg, group_cfg, geometry, time_cfg, rng) -> list[np.ndarray]
       - each array is 1D spike times in ms, in simulation time.
 
     Note:
-      - group_cfg may contain a 'time_cfg' key if timing has been
-        resolved upstream; modes are encouraged to use it instead of
-        reinterpreting the raw timing fields.
+      - group_cfg may also contain a 'time_cfg' key if timing has been
+        resolved upstream; time_cfg is passed explicitly for clarity.
     """
-    spike_trains = handler(sim_cfg, group_cfg, geometry, rng)
+    spike_trains = handler(sim_cfg, group_cfg, geometry, time_cfg, rng)
 
     if not isinstance(spike_trains, list):
         raise TypeError(

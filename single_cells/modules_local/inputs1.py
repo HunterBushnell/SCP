@@ -24,7 +24,7 @@ class GroupInputs:
     consumed by the synapse-building step (2.4).
 
     For now we keep it minimal: name, mode, and spike trains (in ms,
-    in simulation time). meta can hold timing and other snapshot info.
+    in simulation time). Later we can add timing/meta fields as needed.
     """
     name: str
     mode: str
@@ -59,15 +59,11 @@ def generate_inputs(
         Optional mapping from mode names (str) to handler callables.
         For now we build this from the core modes, optionally extended
         by user-defined modes.
-    cache
-        Optional dictionary used to cache GroupInputs objects keyed by a
-        stable signature of (sim_cfg, group_cfg). If provided and a matching
-        entry is found, inputs for that group are reused instead of regenerated.
 
     Returns
     -------
     sim_cfg : dict
-        Normalized simulation-level config (tstart, tstop, dt, seed, etc.).
+        Normalized simulation-level config (tstart, tstop, dt, etc.).
     groups_cfg : dict[str, dict]
         Normalized per-group configs.
     inputs_by_group : dict[str, GroupInputs]
@@ -233,7 +229,7 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
     for key in ("cell", "tune"):
         if key in sim_cfg and sim_cfg[key] is not None:
             sim_cfg[key] = str(sim_cfg[key])
-
+            
     # seed is optional
     seed_raw = sim_cfg.get("seed", None)
     if seed_raw is None:
@@ -376,10 +372,6 @@ def _init_rng(
     return np.random.default_rng(int(seed))
 
 
-# NOTE: The cache key currently ignores cell geometry. This is fine as long
-# as each run uses a single morphology, but if we ever reuse the same
-# synapse config across different geometries, the cache must be extended
-# to include a geometry identifier to avoid reusing mismatched inputs.
 def _make_group_signature(
     sim_cfg: Dict[str, Any],
     group_name: str,
@@ -416,6 +408,7 @@ def _make_group_signature(
     # JSON with sorted keys for stability; default=str to survive odd types
     blob = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+
 
 
 def _build_default_mode_registry() -> Dict[str, Any]:
@@ -456,13 +449,14 @@ def _process_all_groups(
         # 1) Skip inactive or invalid groups
         if _should_skip_group(gname, gcfg):
             continue
-
+        
         # OPTIONAL: cache lookup before doing any heavy work
         sig: Optional[str] = None
         if cache is not None:
             sig = _make_group_signature(sim_cfg, gname, gcfg)
             cached = cache.get(sig)
             if cached is not None:
+                # Reuse existing GroupInputs
                 inputs[gname] = cached
                 continue
 
@@ -510,7 +504,7 @@ def _process_all_groups(
         )
 
         inputs[gname] = group_inputs
-
+        
         # Store into cache if enabled
         if cache is not None and sig is not None:
             cache[sig] = group_inputs
@@ -689,7 +683,7 @@ def _resolve_n_syn(
 
 
 # ====================================================================
-# 2.3.3.3 – Timing configuration
+# 2.3.3.3 – Timing configuration scaffold
 # ====================================================================
 
 def _calculate_timing(
@@ -726,111 +720,33 @@ def _compute_time_anchors(
     group_cfg: Dict[str, Any],
 ) -> Dict[str, Optional[float]]:
     """
-    Derive concrete time anchors for this group.
+    Placeholder: derive concrete time anchors for this group.
 
-    Output keys (all in ms, floats or None where applicable):
-        "sim_tstart"      : simulation start time (sim_cfg["tstart"])
+    Expected output keys (all in ms, floats or None where applicable):
+        "sim_tstart"      : simulation start time (usually sim_cfg["tstart"])
         "sim_tstop"       : simulation stop time  (sim_cfg["tstop"])
         "onset"           : first time this group is allowed to produce spikes
-                           (defaults to sim_tstart).
+                           (may be None to mean "sim_tstart").
         "source_tstart"   : start of main source-driven input segment
-                           (aligned to stim_tstart_ms and input_stim_tstart_ms).
-        "source_tstop"    : end of main source-driven input segment.
+                           (e.g. aligned bio curve start; may be None).
+        "source_tstop"    : end of main source-driven input segment
+                           (may be None if no dedicated source window).
         "baseline_rate_hz": resolved baseline rate in Hz for this group,
                            or None if there is no baseline.
+
+    For now, this is the only place where we will later use the raw cfg
+    timing fields:
+        sim_cfg["tstart"], sim_cfg["tstop"],
+        group_cfg["timing"][...],
+        group_cfg["source"]["baseline"], etc.
+
+    Implementation of the actual timing math is deferred on purpose and
+    will be filled in next; for now this function is a stub.
     """
-    tstart = float(sim_cfg["tstart"])
-    tstop = float(sim_cfg["tstop"])
-
-    timing = group_cfg.get("timing", {}) or {}
-    source = group_cfg.get("source", {}) or {}
-
-    def _as_float_or_none(val: Any, label: str) -> Optional[float]:
-        if val is None:
-            return None
-        try:
-            return float(val)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"{label} must be numeric or null (got {val!r})") from exc
-
-    onset_raw = _as_float_or_none(timing.get("onset_ms"), "timing['onset_ms']")
-    stim_tstart_raw = _as_float_or_none(timing.get("stim_tstart_ms"), "timing['stim_tstart_ms']")
-    duration_raw = _as_float_or_none(timing.get("duration_ms"), "timing['duration_ms']")
-    input_stim_raw = _as_float_or_none(
-        timing.get("input_stim_tstart_ms"), "timing['input_stim_tstart_ms']"
+    raise NotImplementedError(
+        "_compute_time_anchors is not yet implemented; "
+        "timing semantics are still being finalized."
     )
-    input_duration_raw = _as_float_or_none(
-        timing.get("input_duration_ms"), "timing['input_duration_ms']"
-    )
-    baseline_raw = _as_float_or_none(source.get("baseline"), "source['baseline']")
-
-    # Onset: default to sim start, clamped into [tstart, tstop]
-    if onset_raw is None:
-        onset = tstart
-    else:
-        onset = max(min(onset_raw, tstop), tstart)
-
-    # stim_tstart: if not specified, and we have a source stim delay,
-    # default it to onset; otherwise leave None.
-    if stim_tstart_raw is None:
-        stim_tstart = onset if input_stim_raw is not None else None
-    else:
-        stim_tstart = max(min(stim_tstart_raw, tstop), tstart)
-
-    # Source start: align source data so that its own stim event occurs
-    # at stim_tstart in the simulation.
-    source_tstart: Optional[float] = None
-    if input_stim_raw is not None:
-        # If stim_tstart is still None here, fall back to onset as a last resort
-        if stim_tstart is None:
-            stim_tstart = onset
-        source_tstart = stim_tstart - input_stim_raw
-
-    # Clamp source_tstart into the simulation window (but do not force it
-    # to be >= onset; that interaction is handled by the block builder).
-    if source_tstart is not None:
-        if source_tstart < tstart:
-            source_tstart = tstart
-        if source_tstart > tstop:
-            source_tstart = tstop
-
-    # Source stop: choose a duration for the main source segment.
-    source_tstop: Optional[float] = None
-    if source_tstart is not None:
-        remaining = max(0.0, tstop - source_tstart)
-        if remaining <= 0.0:
-            source_tstop = source_tstart
-        else:
-            if duration_raw is not None:
-                dur = max(0.0, duration_raw)
-                dur = min(dur, remaining)
-            elif input_duration_raw is not None:
-                dur = max(0.0, input_duration_raw)
-                dur = min(dur, remaining)
-            else:
-                # No explicit duration → run until the end of the simulation window
-                dur = remaining
-
-            if dur <= 0.0:
-                source_tstop = source_tstart
-            else:
-                source_tstop = source_tstart + dur
-
-    anchors: Dict[str, Optional[float]] = {
-        "sim_tstart": tstart,
-        "sim_tstop": tstop,
-        "onset": onset,
-        "source_tstart": source_tstart,
-        "source_tstop": source_tstop,
-        "baseline_rate_hz": baseline_raw,
-        # Extra fields for debugging / inspection (not used by block builder):
-        "stim_tstart_ms": stim_tstart,
-        "input_stim_tstart_ms": input_stim_raw,
-        "duration_ms": duration_raw,
-        "input_duration_ms": input_duration_raw,
-    }
-
-    return anchors
 
 
 def _build_time_blocks_from_anchors(
@@ -997,14 +913,13 @@ def _build_group_inputs(
 
     time_cfg = group_cfg.get("time_cfg")
     if isinstance(time_cfg, dict):
-        anchors = time_cfg.get("anchors", {}) or {}
+        anchors = time_cfg.get("anchors", {})
         meta["time_anchors_ms"] = {
-            "sim_tstart": float(anchors["sim_tstart"]) if "sim_tstart" in anchors and anchors["sim_tstart"] is not None else None,
-            "sim_tstop": float(anchors["sim_tstop"]) if "sim_tstop" in anchors and anchors["sim_tstop"] is not None else None,
+            "sim_tstart": float(anchors.get("sim_tstart")) if "sim_tstart" in anchors and anchors.get("sim_tstart") is not None else None,
+            "sim_tstop": float(anchors.get("sim_tstop")) if "sim_tstop" in anchors and anchors.get("sim_tstop") is not None else None,
             "onset": anchors.get("onset"),
             "source_tstart": anchors.get("source_tstart"),
             "source_tstop": anchors.get("source_tstop"),
-            "baseline_rate_hz": anchors.get("baseline_rate_hz"),
         }
         meta["time_blocks"] = time_cfg.get("blocks", [])
 
