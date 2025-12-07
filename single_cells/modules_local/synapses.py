@@ -6,6 +6,8 @@ from typing import Any, Dict, List
 import math
 import numpy as np
 
+from modules_local.inputs import _compile_density_from_spec
+
 
 @dataclass
 class SynapseRecord:
@@ -165,30 +167,52 @@ def _gen_syn_mech(h, rng: np.random.Generator, syn_loc, syn_params: Dict[str, An
 def add_synapses(
     cell: Any,
     geom: Dict[str, Any],
-    syn_params: Dict[str, Dict[str, Any]],
-    sim_params: Dict[str, Any],
-    inputs: Dict[str, Dict[str, Any]],
+    sim_cfg: Dict[str, Any],
+    groups_cfg: Dict[str, Dict[str, Any]],
+    inputs_by_group: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
     Step 2.4 — Add Synapses
 
-    Given:
-    - cell: LoadedCell (or similar) from load_cell(...)
-    - geom: geometry dict from define_geometry(...)
-    - syn_params: per-group synapse configuration (as in original notebook)
-    - sim_params: simulation configuration (currently only used for RNG seed)
-    - inputs: dict of spike trains per synapse group, shape:
+    New 2.3→2.4 contract:
 
-        inputs = {
-            "syn_group": {
-                "trains": [np.array([...]), np.array([...]), ...],
-                "meta": {...},   # optional
-            },
-            ...
-        }
+    Parameters
+    ----------
+    cell : Any
+        Loaded cell object (e.g. from load_cell.load_cell); must expose `cell.h`.
+    geom : dict
+        Geometry dict from Step 2.2, with `geom["groups"]` containing segment refs
+        for keys like "soma", "proximal", "distal", "all_dend".
+    sim_cfg : dict
+        Simulation configuration from Step 2.3 (normalized "sim" block).
+        Used here primarily for RNG seeding via sim_cfg["seed"].
+    groups_cfg : dict
+        Per-group configs from Step 2.3 (normalized "synapse_groups" block),
+        keyed by group name. For each synapse group `g` that appears in
+        `inputs_by_group`, we expect:
 
-      If len(trains) == 1, the single train is reused for all synapses in that group.
-      If len(trains) == N_syn, each synapse uses its own train.
+            groups_cfg[g]["syns"] = {
+                "type": str,
+                "N_syn_resolved": int,  # preferred
+                "N_syn": Optional[int], # optional fallback
+                "segs": str,
+                "dist_func": Any,       # dist_func spec (None/number/callable/dict)
+                "params": dict,         # mech + weight/delay params
+                ...
+            }
+
+    inputs_by_group : dict
+        Per-group inputs from Step 2.3, keyed by group name. Values are
+        GroupInputs-like objects with at least:
+
+            gi.mode: str
+            gi.spike_trains: List[np.ndarray]
+            gi.meta: dict
+
+        For each group g:
+          - len(gi.spike_trains) must be either:
+              * 1 (broadcast to all synapses), or
+              * N_syn_resolved (1:1 mapping to synapses).
 
     Returns
     -------
@@ -204,12 +228,19 @@ def add_synapses(
     Side effects
     ------------
     - Attaches lists `synapses`, `netcons`, `stims`, `vecs` to the `cell` object
-      (creating them if missing) so that objects are kept alive.
+      (creating them if missing) so that NEURON objects are kept alive.
+
+    Notes
+    -----
+    - For now, this function trusts `syns["N_syn_resolved"]` as the canonical
+      synapse count for each group. A future extension could allow alternative
+      N_syn schemes (e.g. driven directly by spike-train count) in a controlled
+      way; that should be implemented explicitly rather than inferred.
     """
     h = cell.h
 
-    # RNG (reproducible if user sets sim_params["seed"])
-    seed = sim_params.get("seed") if isinstance(sim_params, dict) else None
+    # RNG (reproducible if user sets sim_cfg["seed"])
+    seed = sim_cfg.get("seed") if isinstance(sim_cfg, dict) else None
     rng = np.random.default_rng(seed)
 
     # Persistent lists on cell
@@ -232,7 +263,7 @@ def add_synapses(
 
     syn_id = 0
 
-    # Map old 'segs' keys to geometry groups
+    # Map 'segs' keys to geometry groups
     group_map = {
         "all": "all_dend",
         "proximal": "proximal",
@@ -240,10 +271,44 @@ def add_synapses(
         "soma": "soma",
     }
 
-    for syn_group, syn_cfg in syn_params.items():
-        # Skip if N_syn < 1
-        n_syn = syn_cfg.get("N_syn", None)
-        if n_syn is not None and n_syn < 1:
+    # Loop over groups that actually have inputs
+    for syn_group, group_inputs in inputs_by_group.items():
+        # Look up corresponding group_cfg
+        group_cfg = groups_cfg.get(syn_group)
+        if group_cfg is None:
+            raise ValueError(
+                f"add_synapses: group {syn_group!r} present in inputs_by_group "
+                "but missing from groups_cfg."
+            )
+
+        # Respect group "state" flag if present
+        if not group_cfg.get("state", True):
+            continue
+
+        syn_cfg = group_cfg.get("syns")
+        if not syn_cfg:
+            raise ValueError(
+                f"add_synapses: group {syn_group!r} has no 'syns' config in groups_cfg."
+            )
+
+        # Resolve N_syn (prefer N_syn_resolved; fallback N_syn with explicit comment)
+        n_syn = syn_cfg.get("N_syn_resolved", None)
+        if n_syn is None:
+            # Fallback path – primarily for testing / non-geometry uses.
+            # NOTE: For the standard 2.3 pipeline, N_syn_resolved should be set;
+            # if you rely on this fallback in production, consider updating the
+            # pipeline to handle that case explicitly.
+            n_syn = syn_cfg.get("N_syn", None)
+
+        if n_syn is None:
+            raise ValueError(
+                f"add_synapses: neither 'N_syn_resolved' nor 'N_syn' set for "
+                f"group {syn_group!r}; ensure Step 2.3 resolved syn counts."
+            )
+
+        n_syn = int(n_syn)
+        if n_syn < 1:
+            # Nothing to attach for this group
             continue
 
         # Target segments from geometry
@@ -258,20 +323,18 @@ def add_synapses(
         seg_refs = geom["groups"].get(geom_group_name, [])
         seg_list = [ref.sec(ref.x) for ref in seg_refs]
 
-        dens_eq = syn_cfg.get("dist_func", None)
+        # Compile dist_func spec into a density function, as in Step 2.3
+        dist_spec = syn_cfg.get("dist_func", None)
+        dens_eq = _compile_density_from_spec(dist_spec)
+
+        # Density-aware placement, mirroring Step 2.2/2.3 semantics
         all_syn_locs = _gen_syn_locs(h, rng, n_syn, dens_eq, seg_list)
 
         # Inputs for this group
-        group_input = inputs.get(syn_group)
-        if group_input is None:
-            raise ValueError(
-                f"add_synapses: no inputs provided for synapse group {syn_group!r}."
-            )
-
-        trains = group_input.get("trains", [])
+        trains = list(group_inputs.spike_trains)
         if not trains:
             raise ValueError(
-                f"add_synapses: empty 'trains' list for synapse group {syn_group!r}."
+                f"add_synapses: empty spike_trains for synapse group {syn_group!r}."
             )
 
         # Map trains → synapses
@@ -285,7 +348,7 @@ def add_synapses(
             raise ValueError(
                 f"add_synapses: mismatch between number of trains ({len(trains)}) "
                 f"and synapse locations ({len(all_syn_locs)}) for group {syn_group!r}. "
-                "Provide either 1 train or N_syn trains."
+                "Provide either 1 train or N_syn_resolved trains."
             )
 
         group_syns: List[Any] = []

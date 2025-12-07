@@ -285,6 +285,23 @@ def normalize(data,
 #                      "('distance',), ('distance_density',), "
 #                      "('weight',), or ('weight','distance')")
 
+def _auto_edges(data, bw):
+    """
+    Compute histogram bin edges given data and bin width bw.
+    """
+    data = np.asarray(data, dtype=float)
+    if data.size == 0:
+        return np.array([0.0, bw])
+
+    lo, hi = data.min(), data.max()
+    if lo == hi:
+        # Expand a degenerate range slightly so we get at least one bin.
+        lo -= 0.5 * bw
+        hi += 0.5 * bw
+
+    return np.arange(lo, hi + bw, bw)
+
+
 def plot_syn_records(
         cell,
         syn_records,
@@ -292,12 +309,17 @@ def plot_syn_records(
         plotted_props=('distance',),    # 'distance', 'distance_count',
                                         # 'distance_probability', 'distance_density'/'density',
                                         # 'weight', 'weight_count', 'weight_probability',
-                                        # or ('weight','distance')
         color = None,
         plot_type='both',               # 'hist' | 'line' | 'both'
         bins=10.0,                      # bin width (µm or weight units)
         win_size=25,                    # moving-average window (same units as `bins`)
         fig_sizes=(6, 4)):
+
+    # helper to access fields from either dict or SynapseRecord dataclass
+    def _rec_field(rec, key):
+        if isinstance(rec, dict):
+            return rec.get(key)
+        return getattr(rec, key)
 
     # collect records and labels
     if plotted_groups == ['all']:
@@ -309,16 +331,15 @@ def plot_syn_records(
     COLOR_CYCLER = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     alpha = 0.6
 
+    # support both old direct-hoc cells and new LoadedCell wrapper
+    hoc_cell = getattr(cell, "h", cell)
+
     # normalise prop names
     def _norm(s):
         return s.strip().lower().replace(' ', '_')
     props = tuple(_norm(p) for p in plotted_props)
     if props == ('density_count',):     # alias
         props = ('distance_count',)
-
-    def _auto_edges(data, bw):
-        lo, hi = data.min(), data.max()
-        return np.arange(lo, hi + bw, bw)
 
     if plot_type not in ('hist', 'line', 'both'):
         raise ValueError("plot_type must be 'hist', 'line', or 'both'")
@@ -334,43 +355,38 @@ def plot_syn_records(
         ylab = ""   # set per-loop; used after loop
 
         for recs, lab in zip(record_sets, labels):
-            dist  = np.asarray([r['distance'] for r in recs])
+            dist  = np.asarray([_rec_field(r, 'distance') for r in recs])
+            sects = np.asarray([_rec_field(r, 'section')  for r in recs])
             if not dist.size:
                 continue
 
             if color is not None:
                 col = color
             else:
-                col    = next(COLOR_CYCLER)
-            edges  = _auto_edges(dist, bins)
+                col = next(COLOR_CYCLER)
+
+            edges   = _auto_edges(dist, bins)
             centers = (edges[:-1] + edges[1:]) * 0.5
 
             if use_density_mode:
                 # ---- per-µm exposure in each distance bin ----
                 len_exposure = np.zeros(len(edges) - 1)  # total dendritic length (µm) in each bin
-                h.distance(0, cell.soma[0](0.5))
-                for sec in cell.dend:
+                h.distance(0, hoc_cell.soma[0](0.5))
+                for sec in hoc_cell.dend:
                     for seg in sec:
-                        seg_dist = h.distance(seg)
-                        seg_len  = sec.L / sec.nseg
-                        i = np.digitize(seg_dist, edges) - 1
-                        if 0 <= i < len(len_exposure):
-                            len_exposure[i] += seg_len
+                        d = h.distance(seg.x)
+                        idx = np.searchsorted(edges, d) - 1
+                        if 0 <= idx < len_exposure:
+                            len_exposure[idx] += sec.L / sec.nseg
 
-                # synapse counts per bin
                 counts, _ = np.histogram(dist, bins=edges)
-
-                # density: synapses per µm of dendrite in that bin
                 with np.errstate(divide='ignore', invalid='ignore'):
-                    yvals = np.divide(counts, len_exposure, where=len_exposure > 0)
+                    yvals = np.where(len_exposure > 0, counts / len_exposure, 0.0)  # Hz per µm
 
-                ylab = f"Synapses / µm (bin = {bins} µm)"
-
-                # histogram
+                ylab = 'Count per µm'
                 if plot_type in ('hist', 'both'):
-                    plt.bar(centers, yvals, width=bins, alpha=alpha, color=col)
+                    plt.bar(centers, yvals, width=bins, alpha=alpha, color=col, label=f'{lab} (per µm)')
 
-                # smoothed line (moving average)
                 if plot_type in ('line', 'both'):
                     y_line = moving_average(yvals, win_size=win_size, bin_width=bins, mode='center')
                     x_line = _align_centers(centers, y_line, mode='center')
@@ -379,136 +395,170 @@ def plot_syn_records(
             else:
                 # plain distance: counts or probability
                 if use_prob_mode:
-                    # probability density (1/µm)
-                    dens, _ = np.histogram(dist, bins=edges, density=True)
-                    yvals = dens
-                    ylab  = "Probability density (1/µm)"
-
-                    if plot_type in ('hist', 'both'):
-                        plt.bar(centers, yvals, width=bins, alpha=alpha, color=col)
-                    if plot_type in ('line', 'both'):
-                        y_line = moving_average(yvals, win_size=win_size, bin_width=bins, mode='center')
-                        x_line = _align_centers(centers, y_line, mode='center')
-                        plt.plot(x_line, y_line, lw=1.8, color=col, label=f'{lab} (smoothed)')
+                    yvals, edges = np.histogram(dist, bins=edges, density=True)
+                    ylab = 'Probability density (1/µm)'
                 else:
-                    # counts per bin
-                    counts, _ = np.histogram(dist, bins=edges, density=False)
-                    yvals = counts
-                    ylab  = f"Synapse count (bin = {bins} µm)"
+                    yvals, edges = np.histogram(dist, bins=edges)
+                    ylab = 'Count'
 
-                    if plot_type in ('hist', 'both'):
-                        plt.bar(centers, yvals, width=bins, alpha=alpha, color=col)
-                    if plot_type in ('line', 'both'):
-                        y_line = moving_average(yvals, win_size=win_size, bin_width=bins, mode='center')
-                        x_line = _align_centers(centers, y_line, mode='center')
-                        plt.plot(x_line, y_line, lw=1.8, color=col, label=f'{lab} (smoothed)')
+                centers = (edges[:-1] + edges[1:]) * 0.5
 
-        plt.xlabel("Distance from soma (µm)")
+                if plot_type in ('hist', 'both'):
+                    plt.bar(centers, yvals, width=bins, alpha=alpha, color=col, label=f'{lab}')
+
+                if plot_type in ('line', 'both'):
+                    y_line = moving_average(yvals, win_size=win_size, bin_width=bins, mode='center')
+                    x_line = _align_centers(centers, y_line, mode='center')
+                    plt.plot(x_line, y_line, lw=1.8, color=col, label=f'{lab} (smoothed)')
+
+        plt.xlabel('Distance from soma (µm)')
         plt.ylabel(ylab)
-        plt.title("Distance distribution")
-        # plt.legend()
-        plt.tight_layout()
+        plt.legend()
+        plt.grid(True)
+        plt.title('Synapse distance distribution')
         plt.show()
-        return
 
-    # ================================= Weight only =================================
-    if props in (('weight',), ('weight_count',), ('weight_probability',)):
+    # =============================== Weight distributions ===============================
+    elif props in (('weight',), ('weight_count',), ('weight_probability',)):
+
         use_prob_mode = props[0] == 'weight_probability'
 
         plt.figure(figsize=fig_sizes)
         ylab = ""
 
         for recs, lab in zip(record_sets, labels):
-            w = np.asarray([r['weight'] for r in recs])
+            w = np.asarray([_rec_field(r, 'weight') for r in recs])
             if not w.size:
                 continue
 
             if color is not None:
                 col = color
             else:
-                col    = next(COLOR_CYCLER)
-            edges  = _auto_edges(w, bins)
+                col = next(COLOR_CYCLER)
+
+            edges   = _auto_edges(w, bins)
             centers = (edges[:-1] + edges[1:]) * 0.5
 
             if use_prob_mode:
-                dens, _ = np.histogram(w, bins=edges, density=True)
-                yvals = dens
-                ylab  = "Probability density"
-
-                if plot_type in ('hist', 'both'):
-                    plt.bar(centers, yvals, width=bins, alpha=alpha, color=col)
-                if plot_type in ('line', 'both'):
-                    y_line = moving_average(yvals, win_size=win_size, bin_width=bins, mode='center')
-                    x_line = _align_centers(centers, y_line, mode='center')
-                    plt.plot(x_line, y_line, color=col, lw=1.8, label=f'{lab} (smoothed)')
+                yvals, edges = np.histogram(w, bins=edges, density=True)
+                ylab = 'Probability density (1/weight)'
             else:
-                cnts, _ = np.histogram(w, bins=edges, density=False)
-                yvals = cnts
-                ylab  = f"Synapse count (bin = {bins})"
+                yvals, edges = np.histogram(w, bins=edges)
+                ylab = 'Count'
 
-                if plot_type in ('hist', 'both'):
-                    plt.bar(centers, yvals, width=bins, alpha=alpha, color=col)
-                if plot_type in ('line', 'both'):
-                    y_line = moving_average(yvals, win_size=win_size, bin_width=bins, mode='center')
-                    x_line = _align_centers(centers, y_line, mode='center')
-                    plt.plot(x_line, y_line, color=col, lw=1.8, label=f'{lab} (smoothed)')
+            centers = (edges[:-1] + edges[1:]) * 0.5
 
-        plt.xlabel("Synaptic weight")
+            if plot_type in ('hist', 'both'):
+                plt.bar(centers, yvals, width=bins, alpha=alpha, color=col, label=f'{lab}')
+
+            if plot_type in ('line', 'both'):
+                y_line = moving_average(yvals, win_size=win_size, bin_width=bins, mode='center')
+                x_line = _align_centers(centers, y_line, mode='center')
+                plt.plot(x_line, y_line, lw=1.8, color=col, label=f'{lab} (smoothed)')
+
+        plt.xlabel('Synaptic weight')
         plt.ylabel(ylab)
-        plt.title("Weight distribution")
-        # plt.legend()
-        plt.tight_layout()
-        plt.show()
-        return
-
-    # ============================ Weight vs distance ============================
-    if set(props) == {'weight', 'distance'}:
-        plt.figure(figsize=fig_sizes)
-        for recs, lab in zip(record_sets, labels):
-            w = [r['weight']  for r in recs]
-            d = [r['distance'] for r in recs]
-            plt.scatter(d, w, s=5, alpha=1.0, label=lab)
-
-        plt.xlabel("Distance (µm)")
-        plt.ylabel("Weight (max) (nS)")
-        plt.title("Weight vs Distance")
         plt.legend()
-        plt.tight_layout()
+        plt.grid(True)
+        plt.title('Synaptic weight distribution')
         plt.show()
-        return
 
-    raise ValueError("plotted_props must be "
-                     "('distance',), ('distance_count',), ('distance_probability',), "
-                     "('distance_density',), ('density',), "
-                     "('weight',), ('weight_count',), ('weight_probability',), "
-                     "or ('weight','distance')")
+    # =============================== Joint (weight vs distance) ===============================
+    elif props in (('weight', 'distance'), ('distance', 'weight')):
+
+        plt.figure(figsize=fig_sizes)
+
+        for recs, lab in zip(record_sets, labels):
+            dist = np.asarray([_rec_field(r, 'distance') for r in recs])
+            w    = np.asarray([_rec_field(r, 'weight')   for r in recs])
+            if not dist.size or not w.size:
+                continue
+
+            if color is not None:
+                col = color
+            else:
+                col = next(COLOR_CYCLER)
+
+            plt.scatter(dist, w, alpha=alpha, color=col, label=lab)
+
+        plt.xlabel('Distance from soma (µm)')
+        plt.ylabel('Synaptic weight')
+        plt.legend()
+        plt.grid(True)
+        plt.title('Synaptic weight vs distance')
+        plt.show()
+
+    else:
+        raise ValueError(f"Unsupported plotted_props: {plotted_props!r}")
+
 
 # ────────────────────────────────────────────────────────────────────────────
 #  Single-simulation plot (Vm, raster, rates)
 # ────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
+#  Single-simulation plot (Vm, raster, rates) — new pipeline interface
+# ────────────────────────────────────────────────────────────────────────────
 def plot_single_run(
-        T, V,
+        sim_traces,
         syn_records,
-        sim_params,
+        sim_cfg,
         *,
         win_size     = None,
-        rate_style      = 'line',   # 'hist' | 'line' | 'both'
-        raster_style    = 'line',   # 'line' | 'dot'
-        col = None,
-        in_vivo_curve   = None,    # (time_s, rate_hz) or None
-        plot_window = (None,None),
+        rate_style   = 'line',   # 'hist' | 'line' | 'both' | None
+        raster_style = 'line',   # 'line' | 'dot' | None
+        col          = None,
+        in_vivo_curve = None,    # (time_s, rate_hz) or None
+        plot_window   = (None, None),
+        bins          = None,    # optional override for bin width (ms)
+        delay         = None,    # optional override for stimulus delay (ms)
     ):
-
     """
-    T, V : somatic time / voltage vectors (NumPy or h.Vectors)
-    syn_records : {'bg_exc':[dict,…], 'bg_inh':[dict,…], 'stim':[dict,…], …}
-                  each dict must have 'spike_times' list
+    New interface (pipeline-friendly):
+
+    Parameters
+    ----------
+    sim_traces : dict
+        Output of run_sim.run_cell:
+          {'T': array, 'V': array, 'I': array, 'G': array, ...}
+    syn_records : dict
+        Per-group synapse records from 2.4:
+          {group_name: [SynapseRecord, ...], ...}
+        Also works if entries are dicts with a 'spike_times' key.
+    sim_cfg : dict
+        Simulation config from 2.3 (normalized "sim" block).
+        Must have 'tstop'; may optionally have 'bins' and 'delay'.
+
+    Other arguments keep the same meaning as the original version.
     """
 
-    sim_duration_ms = sim_params['tstop']
-    bin_width = sim_params['bins']
-    stim_start = sim_params['delay'] + 100 # Start/stop of stim manual for now, could be auto?
-    stim_stop = sim_params['delay'] + 550
+    # ---- unpack traces ----
+    T = np.asarray(sim_traces['T'])
+    V = np.asarray(sim_traces['V'])
+
+    # ---- simulation timing / binning ----
+    sim_duration_ms = float(sim_cfg.get('tstop', T[-1] if T.size else 0.0))
+
+    # bin width for firing-rate histograms
+    if bins is not None:
+        bin_width = float(bins)
+    else:
+        bin_width = float(sim_cfg.get('bins', 25.0))  # default 25 ms
+
+    # stimulus delay / window
+    if delay is not None:
+        delay_ms = float(delay)
+    else:
+        delay_ms = float(sim_cfg.get('delay', 0.0))
+
+    stim_start = delay_ms + 100.0  # Start/stop of stim manual for now
+    stim_stop  = delay_ms + 550.0
+
+    # ---- helper to extract spike_times from dict or SynapseRecord ----
+    def _get_spike_times(rec):
+        if isinstance(rec, dict):
+            return np.asarray(rec.get('spike_times', []), dtype=float)
+        # SynapseRecord dataclass (or similar)
+        return np.asarray(getattr(rec, 'spike_times', []), dtype=float)
 
     # Dynamically determine groups and colours
     groups = list(syn_records.keys())
@@ -517,7 +567,8 @@ def plot_single_run(
 
     # ------------------------- build raster data ---------------------------
     spikes_by_group = {
-        g: np.concatenate([r['spike_times'] for r in recs]) if recs else np.array([])
+        g: (np.concatenate([_get_spike_times(r) for r in recs])
+            if recs else np.array([], dtype=float))
         for g, recs in syn_records.items()
     }
     n_syn = {g: len(syn_records[g]) for g in groups}
@@ -535,15 +586,20 @@ def plot_single_run(
     # -------------------------- A) Vm trace --------------------------------
     peaks, _ = find_peaks(V, height=-20, distance=2)
     spike_times  = T[peaks]
-    print(f"Detected {len(spike_times)} spikes (total avg: {(len(spike_times)/((sim_duration_ms-100)/1000))}) at times (ms):", spike_times)
+    print(
+        f"Detected {len(spike_times)} spikes "
+        f"(total avg: {(len(spike_times)/((sim_duration_ms-100)/1000))}) "
+        f"at times (ms):", spike_times
+    )
 
     axV = fig.add_subplot(gs[0])
 
-    axV.plot(T, V,color = col)
+    axV.plot(T, V, color=col)
     axV.scatter(spike_times, V[peaks], s=15, color='k', zorder=5)
-    for vline in [stim_start,stim_stop]: axV.axvline(x=vline,color='k',linestyle='-',linewidth=1)
+    for vline in [stim_start, stim_stop]:
+        axV.axvline(x=vline, color='k', linestyle='-', linewidth=1)
 
-    axV.set_xlim(plot_window[0],plot_window[1])
+    axV.set_xlim(plot_window[0], plot_window[1])
     axV.set_ylabel('Vm (mV)')
     axV.set_title('Cell Output')
     axV.grid()
@@ -554,15 +610,19 @@ def plot_single_run(
     if 'R' in layout:
         axR = fig.add_subplot(gs[row_idx], sharex=axV)
         row_idx += 1
+
         def _draw(ax, recs, color, y0):
             for i, r in enumerate(recs):
                 y = y0 + i + 1
-                t = np.asarray(r['spike_times'])
+                t = _get_spike_times(r)
+                if t.size == 0:
+                    continue
                 if raster_style == 'line':
                     ax.vlines(t, y - .4, y + .4, color=color, lw=0.8)
                 else:
                     ax.scatter(t, np.full_like(t, y), s=18, marker='.',
                                color=color)
+
         y0 = 0
         legend_elems = []
         for g in groups:
@@ -572,13 +632,14 @@ def plot_single_run(
                                        ms=8, label=g))
             y0 += n_syn[g]
 
-        # plot vertical lines for spike times
+        # plot vertical lines for somatic spikes
         for spk in spike_times:
-            axR.axvline(x=spk, color = 'k', linestyle = '--', linewidth = 1)
+            axR.axvline(x=spk, color='k', linestyle='--', linewidth=1)
 
-        for vline in [stim_start,stim_stop]: axR.axvline(x=vline,color='k',linestyle='-',linewidth=1)
+        for vline in [stim_start, stim_stop]:
+            axR.axvline(x=vline, color='k', linestyle='-', linewidth=1)
 
-        axR.set_xlim(plot_window[0],plot_window[1])
+        axR.set_xlim(plot_window[0], plot_window[1])
         axR.set_ylim(0.5, y0 + .5)
         axR.set_ylabel('Synapse ID')
         axR.set_title('Cell Input Raster')
@@ -589,14 +650,14 @@ def plot_single_run(
     # -------------------------- C) rates -----------------------------------
     if 'F' in layout:
         axF = fig.add_subplot(gs[row_idx], sharex=axV)
-        bins    = np.arange(0, sim_duration_ms + bin_width, bin_width)
-        centers = bins[:-1] + .5 * bin_width
-        bw_sec  = bin_width / 1000
+        bins_edges = np.arange(0, sim_duration_ms + bin_width, bin_width)
+        centers    = bins_edges[:-1] + .5 * bin_width
+        bw_sec     = bin_width / 1000.0
 
         rates = {}
         for g in groups:
-            counts,_ = np.histogram(spikes_by_group[g], bins=bins)
-            rate     = counts / (max(n_syn[g], 1) * bw_sec)
+            counts, _ = np.histogram(spikes_by_group[g], bins=bins_edges)
+            rate      = counts / (max(n_syn[g], 1) * bw_sec)
             if win_size:
                 rate  = moving_average(rate, win_size=win_size,
                                        bin_width=bin_width,
@@ -615,20 +676,15 @@ def plot_single_run(
             for g in groups:
                 axF.plot(centers, rates[g], lw=1.8, color=g2col[g], label=g)
 
-        # combined
-        # print(rates)
-        # total = np.sum(list(rates.values()), axis=0)
-        # print(total)
-        # axF.plot(centers, total, lw=2, color='k', label='TOTAL')
+        # combined curve: correctly averaged across *all* synapses
+        counts_by_g = {
+            g: np.histogram(spikes_by_group[g], bins=bins_edges)[0]
+            for g in groups
+        }
 
-        # ---------- combined curve: correctly averaged across *all* synapses ---
-        # keep the per-group spike counts so we can weight by #synapses
-        counts_by_g = {g: np.histogram(spikes_by_group[g], bins=bins)[0]
-                       for g in groups}
-
-        total_syn   = sum(n_syn.values())
-        total_counts = np.sum(list(counts_by_g.values()), axis=0)       # per-bin spikes
-        total_rate   = total_counts / (max(total_syn, 1) * bw_sec)      # Hz / synapse
+        total_syn    = sum(n_syn.values())
+        total_counts = np.sum(list(counts_by_g.values()), axis=0)
+        total_rate   = total_counts / (max(total_syn, 1) * bw_sec)
 
         if win_size:
             total_rate = moving_average(total_rate,
@@ -636,33 +692,28 @@ def plot_single_run(
                                         bin_width=bin_width,
                                         mode='center')
 
-        # axF.plot(centers[:len(total_rate)], total_rate,
-        #          lw=2, color='k', label='TOTAL')
-
         # in-vivo data
         if in_vivo_curve is not None:
-            axF.plot(in_vivo_curve[0] * 1000, in_vivo_curve[1],
+            axF.plot(in_vivo_curve[0] * 1000.0, in_vivo_curve[1],
                      'k', lw=2, label='In-vivo')
-        
-        # plot vertical lines for spike times
+
+        # vertical lines for somatic spikes
         for spk in spike_times:
-            axF.axvline(x=spk, color = 'k', linestyle = '--', linewidth = 1)
-            
-        for vline in [stim_start,stim_stop]: axF.axvline(x=vline,color='k',linestyle='-',linewidth=1)
+            axF.axvline(x=spk, color='k', linestyle='--', linewidth=1)
+
+        for vline in [stim_start, stim_stop]:
+            axF.axvline(x=vline, color='k', linestyle='-', linewidth=1)
 
         axF.set_ylabel('Rate (Hz / synapse)')
         axF.set_xlabel('Time (ms)')
-        axF.set_xlim(plot_window[0],plot_window[1])
+        axF.set_xlim(plot_window[0], plot_window[1])
         axF.set_ylim(bottom=0)
         axF.set_title('Cell Input Average')
         if len(groups) > 1 or in_vivo_curve is not None:
             axF.legend()
         axF.grid()
-    
 
-    # plt.tight_layout()
     plt.show()
-
 
 
 # ────────────────────────────────────────────────────────────────────────────

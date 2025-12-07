@@ -137,18 +137,45 @@ def run_FI(cell,sim_params,amps,):
 import numpy as np
 from neuron import h, gui  # gui not needed in headless scripts
 
+
+def _get_soma_segment(cell):
+    """
+    Return a NEURON soma(0.5) segment for both the new LoadedCell
+    (which exposes `cell.h.soma`) and older cell wrappers that have
+    `cell.soma` directly.
+    """
+    # Prefer the NEURON hoc object inside LoadedCell.
+    h_obj = getattr(cell, "h", None)
+    if h_obj is not None and hasattr(h_obj, "soma") and len(h_obj.soma) > 0:
+        return h_obj.soma[0](0.5)
+
+    # Fallback to older pattern where the cell itself had `soma`.
+    if hasattr(cell, "soma") and len(cell.soma) > 0:
+        return cell.soma[0](0.5)
+
+    raise AttributeError("run_sim: could not find soma on cell or cell.h")
+
+
 def run_cell(cell,sim_params):
     
+    # sim_traces = {}
+    # # Set recording vectors
+    # tvec = h.Vector().record(h._ref_t)
+    # vvec = h.Vector().record(cell.soma[0](0.5)._ref_v)  # somatic Vm
+    # isynvec = h.Vector().record(cell.synapses[0]._ref_i)
+    # gsynvec = h.Vector().record(cell.synapses[0]._ref_g)
+
     sim_traces = {}
     # Set recording vectors
     tvec = h.Vector().record(h._ref_t)
-    vvec = h.Vector().record(cell.soma[0](0.5)._ref_v)  # somatic Vm
+    vseg = _get_soma_segment(cell)
+    vvec = h.Vector().record(vseg._ref_v)  # somatic Vm
     isynvec = h.Vector().record(cell.synapses[0]._ref_i)
     gsynvec = h.Vector().record(cell.synapses[0]._ref_g)
-
+    
     # Set initial stim
     # if sim_params['init_stim']:
-    #     stim = h.IClamp(cell.soma[0](0.5))
+    #     stim = h.IClamp(_get_soma_segment(cell))
     #     stim.amp = sim_params['init_stim']['amp']
     #     stim.delay = sim_params['init_stim']['delay']
     #     stim.dur = sim_params['init_stim']['dur']

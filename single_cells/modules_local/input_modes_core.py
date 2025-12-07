@@ -18,10 +18,11 @@ def _get_n_syn(group_cfg: Dict[str, Any]) -> int:
     Contract with inputs.py:
       - inputs._resolve_n_syn(...) runs before modes and writes
         syns["N_syn_resolved"] for active groups.
-      - Modes should use that value when present.
+      - Modes should use that value when present, via this helper.
 
     Fallback:
-      - if N_syn_resolved is absent, fall back to syns["N_syn"] as integer.
+      - If N_syn_resolved is absent, fall back to syns["N_syn"] as integer.
+        This is mainly for testing / non-geometry cases.
     """
     syns = group_cfg.get("syns", {}) or {}
 
@@ -58,17 +59,26 @@ def _get_n_syn(group_cfg: Dict[str, Any]) -> int:
 
     return n_syn_int
 
+
 def _get_active_window_from_time_cfg(time_cfg: Dict[str, Any]) -> Tuple[float, float]:
     """
     Derive an overall active window [t_start, t_end] in ms from time_cfg.
 
+    Usage:
+      - Modes obtain time_cfg from group_cfg["time_cfg"] and pass it here.
+
     Rules:
       - Use time_cfg["blocks"] if present:
           * collect all blocks with kind != "quiescent"
-          * t_start = min(t_start) over those blocks
-          * t_end   = max(t_end)   over those blocks
+          * t_start = min(block["t_start"]) over those blocks
+          * t_end   = max(block["t_end"])   over those blocks
       - If there are no non-quiescent blocks, fall back to anchors:
           [sim_tstart, sim_tstop].
+
+    Notes:
+      - This is mainly a convenience for modes (e.g. precomputed) that only
+        need a single “union” active window and don’t care about individual
+        blocks; more complex modes should work block-by-block instead.
     """
     anchors = (time_cfg or {}).get("anchors", {}) or {}
     blocks = (time_cfg or {}).get("blocks", []) or []
@@ -89,6 +99,7 @@ def _get_active_window_from_time_cfg(time_cfg: Dict[str, Any]) -> Tuple[float, f
     if sim_tstop <= sim_tstart:
         return sim_tstart, sim_tstart
     return sim_tstart, sim_tstop
+
 
 # ---------------------------------------------------------------------
 # Shared helper: homogeneous Poisson spike train generator
@@ -131,6 +142,7 @@ def _generate_homogeneous_poisson_trains(
 
     return trains
 
+
 # ---------------------------------------------------------------------
 # Shared helper: inhomogeneous Poisson spike train generator
 # ---------------------------------------------------------------------
@@ -144,6 +156,11 @@ def _generate_inhomogeneous_from_curve(
     """
     Generate inhomogeneous Poisson spike trains from a piecewise-constant
     rate curve.
+
+    This helper is mode-agnostic; modes are responsible for:
+      - choosing (rates_hz, t0_ms, bin_ms) consistent with their time_cfg,
+      - splitting/combining per-block segments as needed,
+      - stitching segments per synapse in chronological order.
     """
     rates_hz = np.asarray(rates_hz, dtype=float).ravel()
     trains: List[np.ndarray] = []
@@ -188,101 +205,46 @@ def _generate_inhomogeneous_from_curve(
 
 
 # =====================================================================
-# Default mode functions
+# Default mode functions (stubs for 2.3 contract alignment)
 # =====================================================================
 
 # ---------------------------------------------------------------------
-# Mode: precomputed
+# Mode: precomputed (STUB)
 # ---------------------------------------------------------------------
 def _mode_precomputed(
     sim_cfg: Dict[str, Any],
     group_cfg: Dict[str, Any],
     geometry: Optional[Any],
-    time_cfg: Dict[str, Any],
     rng: np.random.Generator,
 ) -> List[np.ndarray]:
     """
-    Built-in handler for mode == "precomputed".
+    Built-in handler for mode == "precomputed" (STUB for 2.3).
 
-    SOURCE CONTRACT
-    ---------------
-    Expected `group_cfg["source"]`:
-        {
-            "trains": [[...], [...], ...],         # optional inline trains (ms, sim-time)
-            "path": "pn_precomputed_trains.json"   # OR JSON file with trains
-        }
+    Canonical 2.3 handler contract:
+      - Signature: handler(sim_cfg, group_cfg, geometry, rng)
+      - Modes must:
+          * read time_cfg from group_cfg["time_cfg"],
+          * read N_syn via _get_n_syn(group_cfg),
+          * return List[np.ndarray] of length N_syn,
+          * keep all spikes within [sim_cfg["tstart"], sim_cfg["tstop"]].
 
-    The active window used for clipping is derived from time_cfg
-    via _get_active_window_from_time_cfg (non-quiescent blocks).
+    Intended SOURCE CONTRACT (to be implemented later):
+      - group_cfg["source"] may provide either:
+          * "trains": [[...], [...], ...]  (inline spike trains, ms, sim-time)
+          * "path": "file.json"            (JSON with {"trains": [...]} or raw list)
+      - time_cfg["blocks"] may be used to:
+          * clip / shift trains into the active windows,
+          * optionally insert or respect baseline segments.
+
+    For now this is a stub; the actual implementation will be added in a
+    later step.
     """
-    source = group_cfg.get("source", {}) or {}
-
-    trains_raw = source.get("trains")
-    path = source.get("path")
-
-    if trains_raw is None and path is None:
-        raise ValueError(
-            "Mode 'precomputed' requires either source['trains'] (inline) "
-            "or source['path'] (JSON file with spike trains)."
-        )
-
-    # If trains are not provided inline, load from JSON file
-    if trains_raw is None and path is not None:
-        path_obj = Path(path)
-        with path_obj.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        if isinstance(data, dict) and "trains" in data:
-            trains_raw = data["trains"]
-        elif isinstance(data, list):
-            trains_raw = data
-        else:
-            raise ValueError(
-                f"Precomputed file {path_obj} must be either "
-                f'{{"trains": [...]}} or a raw [[...], [...], ...] list.'
-            )
-
-    if not isinstance(trains_raw, list):
-        raise TypeError(
-            "source['trains'] / loaded trains must be a list of lists of spike times."
-        )
-
-    # Resolve number of synapses/trains
-    n_syn = _get_n_syn(group_cfg)
-    if n_syn <= 0:
-        return []
-
-    # Ensure we have a list-of-lists
-    trains_list: List[List[float]] = []
-    for idx, tr in enumerate(trains_raw):
-        if tr is None:
-            trains_list.append([])
-        elif isinstance(tr, (list, tuple)):
-            trains_list.append(list(tr))
-        else:
-            raise TypeError(
-                f"Train {idx} in precomputed source is not list-like; got {type(tr)!r}"
-            )
-
-    # If more trains are provided than needed, truncate
-    if len(trains_list) >= n_syn:
-        trains_list = trains_list[:n_syn]
-    # If fewer trains than N_syn are provided, we return what we have;
-    # 2.3 will raise on the length mismatch.
-
-    t_start, t_end = _get_active_window_from_time_cfg(time_cfg)
-
-    trains: List[np.ndarray] = []
-    for tr in trains_list:
-        arr = np.asarray(tr, dtype=float).ravel()
-        if arr.size == 0:
-            trains.append(arr)
-            continue
-        mask = (arr >= t_start) & (arr <= t_end)
-        arr = np.sort(arr[mask])
-        trains.append(arr)
-
-    return trains
+    # Access time_cfg for completeness; real logic will use it.
+    _ = (group_cfg or {}).get("time_cfg", {}) or {}
+    raise NotImplementedError(
+        "Mode 'precomputed' is not yet implemented in core; "
+        "stub provided for 2.3 handler contract alignment."
+    )
 
 
 # ---------------------------------------------------------------------
@@ -292,64 +254,65 @@ def _mode_homogeneous_poisson(
     sim_cfg: Dict[str, Any],
     group_cfg: Dict[str, Any],
     geometry: Optional[Any],
-    time_cfg: Dict[str, Any],
     rng: np.random.Generator,
 ) -> List[np.ndarray]:
     """
     Built-in handler for mode == "homogeneous_poisson".
 
-    SOURCE CONTRACT
-    ---------------
-    Expected `group_cfg["source"]` keys:
-        {
-            "freq": float,   # firing rate in Hz (used if no timing baseline)
-            ...
-        }
+    Semantics:
+      - Pure constant-rate Poisson drive.
+      - Uses a single rate taken from source["freq"] (Hz).
+      - Respects the onset anchor: drives from max(onset, tstart) to tstop.
+      - Does not use per-block structure (baseline/source blocks are ignored).
 
-    TIMING
-    ------
-    - Uses time_cfg["anchors"]["baseline_rate_hz"] if present.
-    - Falls back to source['freq'] if baseline_rate_hz is None.
-    - Active window is derived from time_cfg via _get_active_window_from_time_cfg.
+    Requirements:
+      - source["freq"] must be float-like; if not, raise ValueError.
+      - If freq <= 0 or effective window has no duration, return n_syn empty trains.
+      - n_syn is obtained via _get_n_syn(group_cfg).
+      - All spikes lie in [tstart, tstop] (ms).
     """
-    anchors = (time_cfg or {}).get("anchors", {}) or {}
-    baseline_rate = anchors.get("baseline_rate_hz", None)
+    # Resolve sim window
+    try:
+        sim_tstart = float(sim_cfg["tstart"])
+        sim_tstop  = float(sim_cfg["tstop"])
+    except KeyError as exc:
+        raise KeyError(
+            f"sim_cfg is missing required key {exc!r} for homogeneous_poisson mode"
+        ) from exc
 
-    source = group_cfg.get("source", {}) or {}
-    freq = source.get("freq", None)
+    # Resolve anchors from group_cfg["time_cfg"], if present
+    time_cfg = group_cfg.get("time_cfg") or {}
+    anchors  = time_cfg.get("anchors", {}) or {}
+    onset    = float(anchors.get("onset", sim_tstart))
 
-    # Resolve rate:
-    #   1) prefer timing-derived baseline_rate_hz if present,
-    #   2) else fall back to source['freq'].
-    if baseline_rate is not None:
-        try:
-            rate_hz = float(baseline_rate)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(
-                f"Mode 'homogeneous_poisson' got non-numeric baseline_rate_hz={baseline_rate!r}."
-            ) from exc
-    else:
-        if freq is None:
-            raise ValueError(
-                "Mode 'homogeneous_poisson' requires either anchors['baseline_rate_hz'] "
-                "or source['freq'] (Hz)."
-            )
-        try:
-            rate_hz = float(freq)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(
-                f"Mode 'homogeneous_poisson' expects numeric source['freq'], got {freq!r}."
-            ) from exc
+    # Effective window: from onset (clipped to sim start) to sim end
+    t_start_ms = max(onset, sim_tstart)
+    t_end_ms   = sim_tstop
 
-    # Resolve number of synapses / trains
+    # Resolve synapse count
     n_syn = _get_n_syn(group_cfg)
-    if n_syn <= 0:
-        return []
 
-    # Time window for this group from time_cfg
-    t_start_ms, t_end_ms = _get_active_window_from_time_cfg(time_cfg)
+    # Resolve constant rate from source["freq"]
+    source = (group_cfg or {}).get("source", {}) or {}
+    if "freq" not in source:
+        raise KeyError(
+            "homogeneous_poisson mode requires source['freq'] (Hz); "
+            "no 'freq' key found in source config"
+        )
 
-    # Generate Poisson trains
+    try:
+        rate_hz = float(source["freq"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"homogeneous_poisson mode requires source['freq'] to be float-like; "
+            f"got {source['freq']!r}"
+        ) from exc
+
+    # Degenerate cases: no time or no rate => n_syn empty trains
+    if n_syn <= 0 or t_end_ms <= t_start_ms or rate_hz <= 0.0:
+        return [np.array([], dtype=float) for _ in range(max(n_syn, 0))]
+
+    # Generate homogeneous Poisson trains over [t_start_ms, t_end_ms]
     trains = _generate_homogeneous_poisson_trains(
         rate_hz=rate_hz,
         t_start_ms=t_start_ms,
@@ -360,106 +323,51 @@ def _mode_homogeneous_poisson(
 
     return trains
 
-
 # ---------------------------------------------------------------------
-# Mode: inhomogeneous_poisson (stub)
+# Mode: inhomogeneous_poisson (STUB)
 # ---------------------------------------------------------------------
 def _mode_inhomogeneous_poisson(
     sim_cfg: Dict[str, Any],
     group_cfg: Dict[str, Any],
     geometry: Optional[Any],
-    time_cfg: Dict[str, Any],
     rng: np.random.Generator,
 ) -> List[np.ndarray]:
     """
-    Built-in handler for mode == "inhomogeneous_poisson".
+    Built-in handler for mode == "inhomogeneous_poisson" (STUB for 2.3).
 
-    Currently only loads and validates the rate curve; alignment + generation
-    will later be based on time_cfg (anchors + blocks).
+    Canonical 2.3 handler contract:
+      - Signature: handler(sim_cfg, group_cfg, geometry, rng)
+      - Modes must:
+          * read time_cfg from group_cfg["time_cfg"],
+          * read N_syn via _get_n_syn(group_cfg),
+          * return List[np.ndarray] of length N_syn,
+          * keep all spikes within [sim_cfg["tstart"], sim_cfg["tstop"]].
+
+    Intended SOURCE CONTRACT (for later implementation):
+      - group_cfg["source"] keys:
+          * "path": str       (CSV or JSON with rate curve),
+          * "time_col": str   (column/key name for times, ms),
+          * "rate_col": str   (column/key name for rates, Hz),
+          * "bin_ms": float   (optional; infer from time_col if missing),
+          * "baseline": float (optional; default from first rate).
+
+    Intended TIMING semantics:
+      - Combine:
+          * (times_ms, rates_hz, bin_ms, baseline) from the rate curve,
+          * group_cfg["time_cfg"]["anchors"] / ["blocks"],
+          * N_syn from group_cfg,
+        to generate inhomogeneous Poisson spike trains, typically by:
+          * restricting the rate curve to "source" blocks,
+          * using _generate_inhomogeneous_from_curve per block,
+          * stitching segments per synapse.
+
+    For now this is a stub; the actual loading and generation logic will
+    be implemented in a later step.
     """
-    source = group_cfg.get("source", {}) or {}
-    path = source.get("path")
-    time_col = source.get("time_col")
-    rate_col = source.get("rate_col")
-    bin_ms = source.get("bin_ms")
-    baseline = source.get("baseline")
-
-    if path is None:
-        raise ValueError("Mode 'inhomogeneous_poisson' requires source['path'].")
-
-    if not time_col or not rate_col:
-        raise ValueError(
-            "Mode 'inhomogeneous_poisson' requires source['time_col'] and source['rate_col'] "
-            "to identify columns/keys in the rate-curve file."
-        )
-
-    path_obj = Path(path)
-    if not path_obj.is_file():
-        raise FileNotFoundError(f"Rate curve file not found: {path_obj}")
-
-    # --- Load rate curve ---
-
-    if path_obj.suffix.lower() in {".csv", ".txt"}:
-        data = np.genfromtxt(path_obj, delimiter=",", names=True)
-        try:
-            times_ms = np.asarray(data[time_col], dtype=float)
-            rates_hz = np.asarray(data[rate_col], dtype=float)
-        except ValueError as exc:
-            raise KeyError(
-                f"Columns {time_col!r} and/or {rate_col!r} not found in CSV header of {path_obj}."
-            ) from exc
-    else:
-        with path_obj.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            raise ValueError(
-                f"Inhomogeneous rate file {path_obj} must be a dict-like JSON "
-                f"containing {time_col!r} and {rate_col!r} arrays."
-            )
-        try:
-            times_ms = np.asarray(data[time_col], dtype=float)
-            rates_hz = np.asarray(data[rate_col], dtype=float)
-        except KeyError as exc:
-            raise KeyError(
-                f"JSON in {path_obj} must contain keys {time_col!r} and {rate_col!r}."
-            ) from exc
-
-    if times_ms.ndim != 1 or rates_hz.ndim != 1 or times_ms.shape != rates_hz.shape:
-        raise ValueError(
-            "Rate curve arrays 'time_col' and 'rate_col' must be 1D and of equal length."
-        )
-
-    # Sort by time
-    order = np.argsort(times_ms)
-    times_ms = times_ms[order]
-    rates_hz = rates_hz[order]
-
-    # Infer bin width if not provided
-    if bin_ms is None:
-        if times_ms.size < 2:
-            raise ValueError(
-                "Cannot infer bin_ms from a single-point rate curve; "
-                "please specify source['bin_ms']."
-            )
-        dt = np.median(np.diff(times_ms))
-        bin_ms = float(dt)
-    else:
-        bin_ms = float(bin_ms)
-
-    # Default baseline: first rate value if not explicitly provided
-    if baseline is None:
-        baseline = float(rates_hz[0])
-    else:
-        baseline = float(baseline)
-
-    # Later we will combine:
-    #   - this curve (times_ms, rates_hz, bin_ms, baseline)
-    #   - time_cfg["anchors"] / ["blocks"]
-    #   - N_syn from group_cfg
-    # to generate inhomogeneous trains.
+    _ = (group_cfg or {}).get("time_cfg", {}) or {}
     raise NotImplementedError(
-        "Mode 'inhomogeneous_poisson' has loaded the rate curve but the "
-        "time-alignment and spike-train generation logic are not yet implemented."
+        "Mode 'inhomogeneous_poisson' is not yet implemented in core; "
+        "stub provided for 2.3 handler contract alignment."
     )
 
 
@@ -470,6 +378,11 @@ def _mode_inhomogeneous_poisson(
 def get_default_mode_registry() -> Dict[str, Any]:
     """
     Return the default mode registry for Step 2.3.
+
+    All registered handlers obey the 4-argument mode contract:
+        handler(sim_cfg, group_cfg, geometry, rng)
+    and must return List[np.ndarray] of length N_syn as resolved by
+    _get_n_syn(group_cfg).
     """
     return {
         "homogeneous_poisson": _mode_homogeneous_poisson,
