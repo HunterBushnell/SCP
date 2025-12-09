@@ -1,0 +1,271 @@
+{
+"sim": {
+    "cell": "SST2",    
+    "tune": "baseline",
+    "dt": 0.025,
+    "tstart": 0.0,
+    "tstop": 1000.0,
+    "jitter": null,
+    "seed": null
+},
+
+
+
+"synapse_groups": {
+
+    "pn_exc_trace": {
+        "state": false,
+        "mode": "inhomogeneous_poisson",
+        "source": {
+           "freq": "/home/hrbncv/PV-SST/single_cells/Madhu_Data/bio_cell_output/pyrFiringRateAvg.csv",
+           "baseline": "start",
+
+            "kind": null,
+            "path": null,
+            "time_col": null,
+            "rate_col": null,
+            "bin_ms": 5,
+            "ref": null,
+            "key": null
+        },
+        "timing": {
+            "onset_ms": null,
+            "stim_tstart_ms": 600.0,
+            "duration_ms": null,
+            "input_stim_tstart_ms": 100,
+            "input_duration_ms": 550
+        },
+        "syns": {
+            "type": "AMPA_NMDA_STP",
+            "N_syn": 50,
+            "segs": "all",
+            "dist_func": {
+                "kind": "uniform",
+                "params": {"c": 2.0}
+            },
+            "params": {
+                "wt_mean": 0.75,
+                "wt_std": 0.34}
+        }
+    },
+
+    "pn_exc": {
+        "state": false,
+        "mode": "precomputed",
+        "source": {
+            "freq": null,
+            "baseline": null,
+
+            "kind": null,
+            "path": "pn_precomputed_trains.json",
+            "time_col": null,
+            "rate_col": null,
+            "bin_ms": null,
+            "ref": null,
+            "key": null
+        },
+        "timing": {
+            "onset_ms": null,
+            "stim_tstart_ms": 600.0,
+            "duration_ms": null,
+            "input_stim_tstart_ms": 100,
+            "input_duration_ms": 550
+        },
+        "syns": {
+            "type": "AMPA_NMDA_STP",
+            "N_syn": 50,
+            "segs": "all",
+            "dist_func": {
+            "kind": "uniform",
+            "params": {"c": 2.0}
+            },
+            "params": {
+                "wt_mean": 0.75,
+                "wt_std": 0.34
+                }
+        }
+    },
+
+
+    "vip_inh_orig": {
+        "state": false,
+        "mode": "precomputed",
+        "source": {
+            "freq": "pv_input_data",
+            "baseline": 4.0,
+
+            "kind": null,
+            "path": null,
+            "time_col": null,
+            "rate_col": null,
+            "bin_ms": null,
+            "ref": null,
+            "key": null
+        },
+        "timing": {
+            "onset_ms": null,
+            "stim_tstart_ms": 650,
+            "duration_ms": null,
+            "input_stim_tstart_ms": 400,
+            "input_duration_ms": 1000
+        },
+        "syns": {
+            "type": "GABA_A",
+            "N_syn": 10,
+            "segs": "proximal",
+            "dist_func": {
+                "kind": "uniform",
+                "params": {"c": 2.0}
+            },
+            "params": {
+                "wt_mean": 2.0,
+                "wt_std": 0.34}
+        }
+    },
+
+    "vip_inh": {
+        "state": false,
+        "mode": "precomputed",
+        "source": {
+            "freq": null,
+            "baseline": null,
+
+            "kind": null,
+            "path": "vip_precomputed_trains.json",
+            "time_col": null,
+            "rate_col": null,
+            "bin_ms": null,
+            "ref": null,
+            "key": null
+        },
+        "timing": {
+            "onset_ms": null,
+            "stim_tstart_ms": 650,
+            "duration_ms": null,
+            "input_stim_tstart_ms": 400,
+            "input_duration_ms": 1000
+        },
+        "syns": {
+            "type": "GABA_A",
+            "N_syn": 10,
+            "segs": "proximal",
+            "dist_func": {"kind": "uniform", "params": {"c": 2.0}},
+            "params": {"wt_mean": 2.0, "wt_std": 0.34}
+        }
+    },
+
+
+
+    "bg_exc": {
+        "state": true,
+        "mode": "homogeneous_poisson",
+        "source": {
+            "freq": 0.05,
+            "baseline": null,
+
+            "kind": null,
+            "path": null,
+            "time_col": null,
+            "rate_col": null,
+            "bin_ms": null,
+            "ref": null,
+            "key": null
+        },
+        "timing": {
+            "onset_ms": null,
+            "stim_tstart_ms": null,
+            "duration_ms": null,
+            "input_stim_tstart_ms": null,
+            "input_duration_ms": null
+        },
+        "syns": {
+            "type": "AMPA_NMDA_STP",
+            "N_syn": null,
+            "segs": "all",
+            "dist_func": {
+            "kind": "uniform",
+            "params": {"c": 2.0,
+                        "multi": 0.8}
+            },
+            "params": {
+                "wt_mean": 0.5,
+                "wt_std": 0.34}
+        }
+    },
+
+    "bg_inh": {
+      "state": true,
+      "mode": "homogeneous_poisson",
+      "source": {
+        "freq": 0.5,
+        "baseline": null,
+
+        "kind": null,
+        "path": null,
+        "time_col": null,
+        "rate_col": null,
+        "bin_ms": null,
+        "ref": null,
+        "key": null
+      },
+      "timing": {
+        "onset_ms": null,
+        "stim_tstart_ms": null,
+        "duration_ms": null,
+        "input_stim_tstart_ms": null,
+        "input_duration_ms": null
+      },
+      "syns": {
+        "type": "GABA_A",
+        "N_syn": null,
+        "segs": "all",
+        "dist_func": {
+          "kind": "uniform",
+          "params": {"c": 2.0,
+                     "multi": 0.2}
+        },
+        "params": {
+            "wt_mean": 0.5,
+            "wt_std": 0.34}
+      }
+    },
+
+    "bg_exc_del": {
+      "state": true,
+      "mode": "homogeneous_poisson",
+      "source": {
+        "freq": 10.0,
+        "baseline": null,
+
+        "kind": null,
+        "path": null,
+        "time_col": null,
+        "rate_col": null,
+        "bin_ms": null,
+        "ref": null,
+        "key": null
+      },
+      "timing": {
+        "onset_ms": 800,
+        "stim_tstart_ms": null,
+        "duration_ms": null,
+        "input_stim_tstart_ms": null,
+        "input_duration_ms": null
+      },
+      "syns": {
+        "type": "AMPA_NMDA_STP",
+        "N_syn": 20,
+        "segs": "all",
+        "dist_func": {
+          "kind": "uniform",
+          "params": {"c": 2.0,
+                     "multi": 0.8}
+        },
+        "params": {
+            "wt_mean": 0.5,
+            "wt_std": 0.34}
+      }
+    }
+  }
+}
+

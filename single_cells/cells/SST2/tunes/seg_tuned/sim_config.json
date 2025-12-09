@@ -1,0 +1,26 @@
+{
+  "cell": "SST2",
+  "tune": "seg_tuned",
+  "color": "m",
+
+  "load": "/home/hrbncv/PV-SST/single_cells/cells/SST2/tunes/seg_tuned/output_data/SST2_seg_tuned_pipeline_test_multi.npz",
+  "output": null,
+  "n_traces_to_save": 1,
+  "output_format": "pkl",
+
+
+  "tstart": 200.0,
+  "tstop": 600.0,
+  "dt": 0.025,
+
+  "n_trials": 2,
+  "seed": null,
+  "trial_randomness": "both",
+
+  "param_study": {
+    "input_type": null,
+    "param_type": null,
+    "param_vals": [],
+    "n_trials": null
+  }
+}

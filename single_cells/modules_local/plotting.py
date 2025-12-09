@@ -493,12 +493,148 @@ def plot_syn_records(
 
 
 # ────────────────────────────────────────────────────────────────────────────
+#  Plotting wrapper for new run_sim results
+# ────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
+#  Plotting wrapper for new run_sim results
+# ────────────────────────────────────────────────────────────────────────────
+def plot_results(
+    results,
+    syn_records=None,
+    *,
+    win_size=25,
+    rate_style='line',
+    raster_style='dot',
+    plot_window=None,
+    in_vivo_curve=None,
+    plot_bio=None,
+    shade_mode=None,
+    alpha=0.6,
+    set_color=None,
+    plot_type='line',
+    plot_raster=None,
+):
+    """
+    Convenience wrapper for new run_sim results.
+
+    Parameters
+    ----------
+    results : dict
+        Output of run_sim.run_sim:
+          {
+            'mode': 'single' | 'multi' | 'param',
+            'sim_cfg': {...},
+            'traces': {...},
+            'spikes': ...,
+            'meta': {...},
+          }
+    syn_records : dict or None, optional
+        Optional per-group synapse records (for raster/rate panels in single mode).
+        For now you can pass None; voltage-only plots still work.
+    in_vivo_curve : (t_s, rate_hz) or None
+        Optional in-vivo curve to overlay in the rate panel for single-mode plots.
+    """
+    mode    = results.get("mode", "single")
+    sim_cfg = results.get("sim_cfg", {})
+
+    # ── SINGLE: dispatch to plot_single ────────────────────────────────────
+    if mode == "single":
+        sim_traces = results.get("traces", {})
+        if not sim_traces:
+            raise ValueError("plot_results(single): results['traces'] is empty.")
+
+        # Prefer explicitly passed syn_records; otherwise use what run_single stored.
+        if syn_records is None:
+            syn_records = results.get("syn_records", {}) or {}
+
+        # mode-dependent default:
+        #   None  => no raster by default
+        #   True  => enable raster with given raster_style
+        #   False => disable raster
+        if plot_raster is None:
+            rs = None          # default: no raster for single
+        else:
+            rs = raster_style if plot_raster else None
+
+        # Color: explicit override > sim_cfg["color"] > default None
+        col = set_color if set_color is not None else sim_cfg.get("color", None)
+        
+        return plot_single(
+            sim_traces,
+            syn_records,
+            sim_cfg,
+            win_size=win_size,
+            rate_style=rate_style,
+            raster_style=rs,
+            col=col,
+            in_vivo_curve=in_vivo_curve,
+            plot_window=plot_window or (None, None),
+        )
+
+    # --- MULTI: plot trials from run_sim.run_multi ---------------------------
+    if mode == "multi":
+        # all_param_data: {label -> [spikes_per_trial]}
+        spikes_by_trial = results.get("spikes", []) or []
+        all_param_data = {"multi": spikes_by_trial}
+
+        # derive basic sim_params from sim_cfg
+        sim_params = {
+            "tstop": float(sim_cfg.get("tstop", 0.0)),
+            "bins": float(sim_cfg.get("bins", 25.0)),
+            "delay": float(sim_cfg.get("delay", 0.0)),
+            "n_trials": len(spikes_by_trial),
+            "color": sim_cfg.get("color", None),
+        }
+
+        # mode-dependent default:
+        #   None  => raster ON by default for multi
+        #   True  => raster ON
+        #   False => raster OFF
+        plot_rast_flag = True if plot_raster is None else bool(plot_raster)
+
+        # color: explicit override > sim_cfg["color"] > default None
+        col = set_color if set_color is not None else sim_cfg.get("color", None)
+
+        # normalize plot_window to the dict form that plot_multi expects
+        pw = plot_window
+        if pw is not None and not isinstance(pw, dict):
+            # assume (xmin, xmax) and let y be auto
+            pw = {"x": (pw[0], pw[1]), "y": (None, None)}
+
+        # convert in_vivo_curve -> old plot_bio triple if provided
+        plot_bio = None
+        if in_vivo_curve is not None:
+            t_s, rate = in_vivo_curve
+            plot_bio = (True, np.asarray(t_s), np.asarray(rate))
+
+
+        return plot_multi(
+            all_param_data,
+            sim_params=sim_params,
+            win_size=win_size,
+            plot_type=plot_type,
+            plot_bio=plot_bio,
+            plot_raster=plot_rast_flag,
+            raster_style=raster_style,
+            alpha=alpha,
+            plot_window=pw,
+            norm_fr=None,
+            shade_mode=shade_mode,
+            set_color=col,
+            save_curve=False,
+        )
+
+ 
+    if mode == "param":
+        raise NotImplementedError("plot_results: 'param' mode wiring is pending.")
+
+    raise ValueError(f"plot_results: unsupported mode {mode!r}")
+
+
+# ────────────────────────────────────────────────────────────────────────────
 #  Single-simulation plot (Vm, raster, rates)
 # ────────────────────────────────────────────────────────────────────────────
-# ────────────────────────────────────────────────────────────────────────────
-#  Single-simulation plot (Vm, raster, rates) — new pipeline interface
-# ────────────────────────────────────────────────────────────────────────────
-def plot_single_run(
+def plot_single(
         sim_traces,
         syn_records,
         sim_cfg,
@@ -769,12 +905,172 @@ def _mean_band_stats(Y, *, shade=None, norm_fr=None, norm_scope='post_mean'):
     return mean, lo, hi
 
 
+# ────────────────────────────────────────────────────────────────────────────
+# Multi-simulation plot
+# ────────────────────────────────────────────────────────────────────────────
+def plot_multi(
+        all_param_data,
+        sim_params={},
+        win_size=25,
+        plot_type='line',       # 'hist' | 'line' | 'both'
+        plot_bio=None,
+        plot_raster=False,
+        raster_style='line',    # 'line' | 'dot'
+        alpha=0.6,
+        plot_window=None,       # {'x': (xmin,xmax), 'y': (ymin,ymax)} or None
+        norm_fr=None,
+        shade_mode=None,
+        set_color=None,
+        save_curve=False,       # or filename
+    ):
 
+    ok_rate = ('hist', 'line', 'both')
+    ok_rast = ('line', 'dot')
+    if plot_type not in ok_rate:
+        raise ValueError(f"plot_type must be {ok_rate}")
+    if raster_style not in ok_rast:
+        raise ValueError(f"raster_style must be {ok_rast}")
+
+    # basic timing params
+    sim_duration_ms = float(sim_params.get('tstop', 0.0))
+    bin_width       = float(sim_params.get('bins', 25.0))
+    delay_ms        = float(sim_params.get('delay', 0.0))
+
+    stim_start = delay_ms + 100.0  # same manual window as single
+    stim_stop  = delay_ms + 550.0
+
+    bw_s   = bin_width / 1000.0
+    bins   = np.arange(0, sim_duration_ms + bin_width, bin_width)
+    centers = bins[:-1] + 0.5 * bin_width
+
+    groups = list(all_param_data.keys())
+    colors = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+    g2col  = {g: next(colors) for g in groups}
+
+    if plot_raster:
+        fig, (axRate, axRaster) = plt.subplots(
+            2, 1, figsize=(6, 8),
+            sharex=True, gridspec_kw={'height_ratios': [1, 1]}
+        )
+    else:
+        fig, axRate = plt.subplots(figsize=(6, 4))
+
+    # ----------------------------- rate panel ------------------------------
+    n_trials_any = 0
+    for key in groups:
+        trial_spikes = all_param_data.get(key, [])
+        n_trials_any = max(n_trials_any, len(trial_spikes))
+
+        per_trial_rates = []
+        for tr in trial_spikes:
+            tr = np.asarray(tr)
+            counts, _ = np.histogram(tr, bins=bins)
+            rate = counts / bw_s  # Hz per single trial
+            per_trial_rates.append(rate)
+
+        if not per_trial_rates:
+            continue
+
+        Y = np.vstack(per_trial_rates)  # shape (N_trials, T)
+        x = centers.copy()
+
+        # Moving average
+        if win_size:
+            Y_smooth = []
+            for y in Y:
+                ys = moving_average(y, win_size=win_size,
+                                    bin_width=bin_width, mode='center')
+                Y_smooth.append(ys)
+            T_new = min(len(y) for y in Y_smooth)
+            Y = np.vstack([y[:T_new] for y in Y_smooth])
+            drop = (len(x) - T_new) // 2
+            x = x[drop: drop + T_new]
+
+        col = set_color if set_color is not None else g2col[key]
+
+        mean, lo, hi = _mean_band_stats(
+            Y, shade=shade_mode, norm_fr=norm_fr, norm_scope='post_mean'
+        )
+
+        if plot_type in ('hist', 'both'):
+            axRate.bar(x, mean, width=bin_width, color=col,
+                       alpha=alpha, label=key)
+
+        if plot_type in ('line', 'both'):
+            axRate.plot(x, mean, color=col, lw=2, label=key)
+            if (shade_mode is not None) and (lo is not None) and (hi is not None):
+                axRate.fill_between(x, lo, hi, color=col,
+                                    alpha=0.25, linewidth=0)
+
+    # optional in-vivo curve
+    if plot_bio and plot_bio[0]:
+        bio_data = plot_bio[2]
+        if norm_fr is not None:
+            bio_data = normalize(bio_data, norm_offset=-1 * bio_data[0])
+        axRate.plot(plot_bio[1] * 1000, bio_data, 'k',
+                    lw=2, label='In-Vivo Input')
+
+    axRate.set_ylabel("Avg rate (Hz)")
+    if len(groups) > 1 or (plot_bio and plot_bio[0]):
+        axRate.legend()
+    axRate.grid()
+    for vline in [stim_start, stim_stop]:
+        axRate.axvline(x=vline, color='k', linestyle='-', linewidth=1)
+
+    if plot_window is not None:
+        if plot_window.get('x') is not None:
+            axRate.set_xlim(plot_window['x'][0], plot_window['x'][1])
+        if plot_window.get('y') is not None:
+            axRate.set_ylim(plot_window['y'][0], plot_window['y'][1])
+
+    n_trials_label = sim_params.get("n_trials", n_trials_any)
+    axRate.set_title(
+        f"Multi-Trial Average Firing Rate "
+        f"(Trials: {n_trials_label} | Win. = {win_size} ms)"
+    )
+
+    # ----------------------------- raster ----------------------------------
+    if plot_raster:
+        y0 = 0
+        handles = []
+        for key in groups:
+            trial_spikes = all_param_data.get(key, [])
+
+            col = set_color if set_color is not None else g2col[key]
+
+            for tr in trial_spikes:
+                tr = np.asarray(tr)
+                if raster_style == 'line':
+                    axRaster.vlines(tr, y0 + 0.5, y0 + 1.5, color=col, lw=1.0)
+                else:
+                    axRaster.scatter(tr, np.full_like(tr, y0 + 1),
+                                     color=col, s=6, marker='.')
+                y0 += 1
+
+            handles.append(
+                Line2D(
+                    [0], [0],
+                    color=col,
+                    marker='|' if raster_style == 'line' else '.',
+                    linestyle='', markersize=8, label=key
+                )
+            )
+
+        axRaster.set_ylim(0.5, y0 + 0.5)
+        axRaster.set_xlabel("Time (ms)")
+        axRaster.set_ylabel("Trial #")
+        if len(handles) > 1:
+            axRaster.legend(handles=handles, loc='upper left')
+        axRaster.grid(axis='x')
+        for vline in [stim_start, stim_stop]:
+            axRaster.axvline(x=vline, color='k', linestyle='-', linewidth=1)
+    else:
+        axRate.set_xlabel("Time (ms)")
 
 # ────────────────────────────────────────────────────────────────────────────
-#  Param-study plotting
+#  Param-study simulation plot
 # ────────────────────────────────────────────────────────────────────────────
-def plot_param_study(all_param_data,
+def plot_param(all_param_data,
                     #  *,
                      param_study = {},
                      sim_params = {},
@@ -790,159 +1086,7 @@ def plot_param_study(all_param_data,
                      set_color = None,
                      save_curve = False, #or filename
                      ):
-
-    ok_rate  = ('hist', 'line', 'both')
-    ok_rast  = ('line', 'dot')
-    if plot_type not in ok_rate:
-        raise ValueError(f"plot_type must be {ok_rate}")
-    if raster_style not in ok_rast:
-        raise ValueError(f"raster_style must be {ok_rast}")
-
-    sim_duration_ms = sim_params['tstop']
-    bin_width = sim_params['bins']
-    stim_start = sim_params['delay'] + 100 # Start/stop of stim manual for now, could be auto?
-    stim_stop = sim_params['delay'] + 550
-
-    bw_s  = bin_width / 1000
-    bins  = np.arange(0, sim_duration_ms + bin_width, bin_width)
-    centers = bins[:-1] + .5 * bin_width
-    groups = list(all_param_data.keys())
-    colors = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
-    g2col  = {g: next(colors) for g in groups}
-
-    # ----------------------------- combined figure if raster -----------------
-    if plot_raster:
-        fig, (axRate, axRaster) = plt.subplots(
-            2, 1, figsize=(6, 8),
-            sharex=True, gridspec_kw={'height_ratios': [1, 1]}
-        )
-    else:
-        fig, axRate = plt.subplots(figsize=(6, 4))
-
-    # ----------------------------- rate panel ------------------------------
-    for key in groups:
-        trial_spikes = all_param_data.get(key, [])
-
-        # Build per-trial rate matrix (N, T)
-        per_trial_rates = []
-        for tr in trial_spikes:
-            tr = np.asarray(tr)
-            counts, _ = np.histogram(tr, bins=bins)
-            rate = counts / bw_s  # Hz per single trial
-            per_trial_rates.append(rate)
-
-        Y = np.vstack(per_trial_rates)  # shape (N_trials, T)
-        x = centers.copy()
-
-        # Moving Average
-        if win_size:
-            Y_smooth = []
-            for y in Y:
-                ys = moving_average(y, win_size=win_size, bin_width=bin_width, mode='center')
-                Y_smooth.append(ys)
-            T_new = min(len(y) for y in Y_smooth) # After smoothing, length shrinks: align x
-            Y = np.vstack([y[:T_new] for y in Y_smooth])
-            drop = (len(x) - T_new) // 2
-            x = x[drop : drop + T_new]
-
-        if (set_color is not None) and (len(param_study['param_vals'])==1):
-            col = set_color
-        else:
-            col = g2col[key]
-
-        # # Histogram (Could make only outline, with shaded sem like line)
-        # if plot_type in ('hist', 'both',): 
-        #     mean_y = Y.mean(axis=0)
-        #     axRate.bar(x, mean_y, width=bin_width, color=col, alpha=alpha, label=key)
-
-        # # Line graph
-        # if plot_type in ('line', 'both',):
-        #     if shade is not None:
-        #         _shaded_mean_band(
-        #             axRate, x, Y,
-        #             label=key, color=col,
-        #             shade=shade[0], alpha=shade[1],
-        #             norm_fr=norm_fr, norm_scope='post_mean'
-        #         )
-        #     else: # no shading: just the mean line
-        #         axRate.plot(x, Y.mean(axis=0), color=col, lw=2, label=key)
-
-        # stats (normalize or not via norm_fr; shade mode/alpha)
-        mean, lo, hi = _mean_band_stats(Y, shade=shade_mode,
-            norm_fr=norm_fr, norm_scope='post_mean')
-
-        # histogram (uses normalized mean for consistency)
-        if plot_type in ('hist', 'both'):
-            axRate.bar(x, mean, width=bin_width, color=col, alpha=alpha, label=key)
-
-        # mean line (always)
-        print(type(mean))
-        if plot_type in ('line', 'both'):
-            axRate.plot(x, mean, color=col, lw=2, label=key)
-            # optional shaded band
-            if (shade_mode is not None) and (lo is not None) and (hi is not None):
-                axRate.fill_between(x, lo, hi, color=col, alpha=0.25, linewidth=0)
-
-    # Plot additional bio curves
-    if plot_bio and plot_bio[0]:
-        bio_data = plot_bio[2]
-        if norm_fr is not None:
-            bio_data = normalize(bio_data,norm_offset=-1*bio_data[0])
-        axRate.plot(plot_bio[1] * 1000, bio_data, 'k', lw=2, label='In-Vivo Input')
-
-    # Set up fig
-    axRate.set_ylabel("Avg rate (Hz)")
-    if len(groups) > 1 or (plot_bio and plot_bio[0]):
-        axRate.legend()
-    axRate.grid()
-    for vline in [stim_start,stim_stop]: axRate.axvline(x=vline,color='k',linestyle='-',linewidth=1)
-    if plot_window is not None:
-        axRate.set_xlim(plot_window['x'][0],plot_window['x'][1])
-        axRate.set_ylim(plot_window['y'][0],plot_window['y'][1])
-
-    if len(param_study['param_vals']) > 1:
-        axRate.set_title(f"Parametric Analysis (Param: {param_study['param_type']} "
-                f"| Trials: {param_study['n_trials']})")
-    else:
-        axRate.set_title(f"Multi-Trial Average Firing Rate "
-                f"(Trials: {param_study['n_trials']} | Win. = {win_size} ms)")
-
-
-    # ----------------------------- raster ----------------------------------
-    if plot_raster:
-            y0 = 0
-            handles = []
-            for key in groups:
-
-                if (set_color is not None) and (len(param_study['param_vals'])==1):
-                    col = set_color
-                else:
-                    col = g2col[key]
-
-                for tr in all_param_data.get(key, []):
-                    if raster_style == 'line':
-                        axRaster.vlines(tr, y0 + .5, y0 + 1.5, color=col, lw=10)
-                    else:
-                        axRaster.scatter(tr, np.full_like(tr, y0 + 1),
-                                        color=col, s=6, marker='.')
-                    y0 += 1
-                handles.append(Line2D([0], [0],
-                                    color=col,
-                                    marker='|' if raster_style == 'line' else '.',
-                                    linestyle='', markersize=8, label=key))
-                
-            axRaster.set_ylim(0.5, y0 + .5)
-            axRaster.set_xlabel("Time (ms)")
-            axRaster.set_ylabel("Trial #")
-            if len(handles) > 1:
-                axRaster.legend(handles=handles, loc='upper left')
-            axRaster.grid(axis='x')
-            for vline in [stim_start,stim_stop]: axRaster.axvline(x=vline,color='k',linestyle='-',linewidth=1)
-    else:
-        axRate.set_xlabel("Time (ms)")
-        
-
-    # plt.tight_layout()
+    raise NotImplementedError("Parametric plotting from results is not implemented yet.")
 
 
 # ────────────────────────────────────────────────────────────────────────────

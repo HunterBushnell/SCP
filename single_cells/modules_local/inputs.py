@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Tuple, List
+from typing import Any, Dict, Mapping, Optional, Tuple, List, Union
+
 
 import json
 import math
@@ -36,58 +37,113 @@ class GroupInputs:
 # 2.3 Top-level API
 # ====================================================================
 
+from pathlib import Path
+from typing import Any, Dict, Optional, Union, Mapping, Tuple
+
+import json
+import numpy as np
+
+# assuming GroupInputs, _normalize_sim_config, _normalize_group_configs,
+# _init_rng, _build_default_mode_registry, _process_all_groups,
+# and _finalize_inputs are already defined above.
+
+
 def generate_inputs(
-    syn_config_path: Path | str,
+    path: Optional[Union[Path, str]] = None,
     geometry: Optional[Any] = None,
     rng: Optional[np.random.Generator] = None,
     mode_registry: Optional[Mapping[str, Any]] = None,
-    cache: Optional[Dict[str, GroupInputs]] = None,
-) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]], Dict[str, GroupInputs]]:
+    cache: Optional[Dict[str, "GroupInputs"]] = None,
+) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]], Dict[str, "GroupInputs"]]:
     """
-    Top-level entry point for Step 2.3.
+    Step 2.3 main entry point: load, normalize, and materialize synaptic inputs.
+
+    This function assumes the new split-config layout:
+      - sim_config.json: simulation-level settings (dt, tstart, tstop, seed, etc.)
+      - syn_config.json: per-group input/synapse configs (one top-level key per group)
+
+    Path resolution:
+      - If `path` is None:
+          Use the current working directory as the tune directory.
+          Expect `sim_config.json` and `syn_config.json` there.
+      - If `path` is a directory:
+          Treat it as the tune directory. Expect `sim_config.json` and `syn_config.json` inside.
+      - If `path` is a file:
+          Treat it as `syn_config.json` and use its parent directory as the tune directory.
+          Expect `sim_config.json` next to it.
 
     Parameters
     ----------
-    syn_config_path
-        Path to the synapse configuration JSON (e.g. TUNE_DIR / "syn_config.json").
+    path
+        Optional directory or file path controlling where configs are loaded from.
+        See rules above. Typical notebook usage is `path=None` with the tune
+        directory as the working directory.
     geometry
-        Geometry/segment-group information from Step 2.2 (optional for now).
+        Geometry / segment-group information from Step 2.2 (may be None if not used).
     rng
-        Optional NumPy random number generator for reproducible inputs.
-        If None, an internal generator will be created.
+        Optional NumPy random number generator. If None, a new generator is created
+        based on the seed in `sim_config.json`.
     mode_registry
-        Optional mapping from mode names (str) to handler callables.
-        For now we build this from the core modes, optionally extended
-        by user-defined modes.
+        Optional mapping from mode names (str) to handler callables. If None,
+        a default registry for core modes is constructed.
     cache
-        Optional dictionary used to cache GroupInputs objects keyed by a
-        stable signature of (sim_cfg, group_cfg). If provided and a matching
-        entry is found, inputs for that group are reused instead of regenerated.
+        Optional dictionary for caching `GroupInputs` objects keyed by a stable
+        signature of (sim_cfg, group_cfg). If provided, per-group inputs may be
+        reused instead of regenerated.
 
     Returns
     -------
     sim_cfg : dict
-        Normalized simulation-level config (tstart, tstop, dt, seed, etc.).
+        Normalized simulation-level config.
     groups_cfg : dict[str, dict]
-        Normalized per-group configs.
+        Normalized per-group configs (one entry per group name).
     inputs_by_group : dict[str, GroupInputs]
-        Final per-group input object, one entry per active synapse group.
+        Materialized per-group input objects, one entry per active synapse group.
     """
-    syn_config_path = Path(syn_config_path)
+    # ------------------------------------------------------------------
+    # Resolve the tune directory and config file paths
+    # ------------------------------------------------------------------
+    if path is None:
+        root = Path.cwd()
+    else:
+        p = Path(path)
+        if p.is_dir():
+            root = p
+        else:
+            root = p.parent
 
-    # 2.3.1 – Load and split raw JSON config
-    sim_cfg_raw, groups_cfg_raw = _load_and_split_syn_config(syn_config_path)
+    syn_path = root / "syn_config.json"
+    sim_path = root / "sim_config.json"
 
+    if not syn_path.is_file():
+        raise FileNotFoundError(f"Missing syn_config.json in {root}")
+    if not sim_path.is_file():
+        raise FileNotFoundError(f"Missing sim_config.json in {root}")
+
+    # ------------------------------------------------------------------
+    # Load raw JSON configs
+    # ------------------------------------------------------------------
+    with sim_path.open("r") as f:
+        sim_cfg_raw = json.load(f)
+    with syn_path.open("r") as f:
+        groups_cfg_raw = json.load(f)
+
+    # ------------------------------------------------------------------
     # 2.3.2 – Normalize configs
+    # ------------------------------------------------------------------
     sim_cfg = _normalize_sim_config(sim_cfg_raw)
     groups_cfg = _normalize_group_configs(groups_cfg_raw)
 
+    # ------------------------------------------------------------------
     # 2.3.3 – Shared resources: RNG and mode registry
+    # ------------------------------------------------------------------
     rng = _init_rng(rng, sim_cfg)
     if mode_registry is None:
         mode_registry = _build_default_mode_registry()
 
+    # ------------------------------------------------------------------
     # 2.3.4 – Per-group processing
+    # ------------------------------------------------------------------
     inputs_by_group = _process_all_groups(
         sim_cfg=sim_cfg,
         groups_cfg=groups_cfg,
@@ -97,45 +153,61 @@ def generate_inputs(
         cache=cache,
     )
 
+    # ------------------------------------------------------------------
     # 2.3.5 – Final sanity checks
+    # ------------------------------------------------------------------
     _finalize_inputs(sim_cfg, groups_cfg, inputs_by_group)
 
     return sim_cfg, groups_cfg, inputs_by_group
-
 
 # ====================================================================
 # Pre-2.3 preview helper (optional, not called by generate_inputs)
 # ====================================================================
 
+
 def check_inputs(
-    syn_config_path: str | Path,
+    path: Union[str, Path, None] = None,
     *,
     verbose: bool = True,
 ) -> tuple[Dict[str, Any], Dict[str, Dict[str, Any]]]:
     """
     Lightweight pre-2.3 sanity check.
 
-    - Loads syn_config.json
+    - Loads config using the same rules as generate_inputs
+      (split or combined layout)
     - Runs the same normalization as generate_inputs
     - Prints a concise summary of sim + per-group configs
-
-    Returns
-    -------
-    sim_cfg : dict
-    groups_cfg : dict[str, dict]
+    If path is None: assume current working directory and look there.
+    If path is a file: treat that as syn_config.json and look for sim_config.json next to it.
+    If path is a directory: look for syn_config.json and sim_config.json inside it.
     """
-    syn_config_path = Path(syn_config_path)
-    if not syn_config_path.is_file():
-        raise FileNotFoundError(f"check_inputs: syn_config_path not found: {syn_config_path}")
 
-    with syn_config_path.open("r") as f:
-        cfg_raw = json.load(f)
+    if path is None:
+        root = Path.cwd()
+    else:
+        p = Path(path)
+        if p.is_dir():
+            root = p
+        else:
+            # file: use its parent as root
+            root = p.parent
 
-    sim_raw = cfg_raw.get("sim", {})
-    groups_raw = cfg_raw.get("synapse_groups", {})
+    syn_path = root / "syn_config.json"
+    sim_path = root / "sim_config.json"
+
+    if not syn_path.is_file():
+        raise FileNotFoundError(f"Missing syn_config.json in {root}")
+    if not sim_path.is_file():
+        raise FileNotFoundError(f"Missing sim_config.json in {root}")
+
+    with sim_path.open("r") as f:
+        sim_raw = json.load(f)
+    with syn_path.open("r") as f:
+        groups_raw = json.load(f)
 
     sim_cfg = _normalize_sim_config(sim_raw)
     groups_cfg = _normalize_group_configs(groups_raw)
+
 
     if verbose:
         print("=== check_inputs: synapse config summary ===")
@@ -163,41 +235,6 @@ def check_inputs(
 # 2.3.2 – Configure all groups
 # ====================================================================
 
-def _load_and_split_syn_config(
-    syn_config_path: Path,
-) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]]]:
-    """
-    Load syn_config.json and split into sim + synapse_groups.
-
-    The JSON is expected to have top-level keys:
-      - "sim"            : dict
-      - "synapse_groups" : dict[str, dict]
-    """
-    if not syn_config_path.is_file():
-        raise FileNotFoundError(f"Synapse config JSON not found: {syn_config_path}")
-
-    with syn_config_path.open("r") as f:
-        cfg = json.load(f)
-
-    sim_cfg_raw = cfg.get("sim")
-    groups_cfg_raw = cfg.get("synapse_groups")
-
-    if sim_cfg_raw is None or groups_cfg_raw is None:
-        raise ValueError(
-            f"Synapse config {syn_config_path} must define 'sim' and 'synapse_groups' keys."
-        )
-
-    if not isinstance(sim_cfg_raw, dict):
-        raise TypeError(f"'sim' block must be a dict (got {type(sim_cfg_raw)!r})")
-
-    if not isinstance(groups_cfg_raw, dict):
-        raise TypeError(
-            f"'synapse_groups' block must be a dict (got {type(groups_cfg_raw)!r})"
-        )
-
-    return sim_cfg_raw, groups_cfg_raw
-
-
 def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
     """
     Normalize/validate simulation-level config.
@@ -208,6 +245,13 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
       - dt, tstart, tstop (floats)
       - jitter (float or None)
       - seed (int or None)
+      - n_trials (int >= 1)
+      - trial_randomness (one of 'inputs', 'synapses', 'both', 'none')
+      - n_traces_to_save (int >= 0)
+      - output (string or None)
+      - output_format ('npz' or 'pkl')
+      - load (string path or None)          # <-- add this line
+      - param_study (dict with standard keys)
     """
     sim_cfg = dict(sim_cfg_raw)
 
@@ -245,6 +289,95 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError(
                 f"sim['seed'] must be integer-like or null (got {seed_raw!r})"
             ) from exc
+
+    # n_trials: optional, default 1
+    n_trials_raw = sim_cfg.get("n_trials", 1)
+    try:
+        n_trials = int(n_trials_raw)
+    except Exception as exc:
+        raise ValueError(
+            f"sim['n_trials'] must be integer-like (got {n_trials_raw!r})"
+        ) from exc
+    if n_trials < 1:
+        raise ValueError("sim['n_trials'] must be >= 1")
+    sim_cfg["n_trials"] = n_trials
+
+    # trial_randomness: optional, default 'synapses'
+    tr = sim_cfg.get("trial_randomness", "synapses")
+    if tr is None:
+        tr = "synapses"
+    tr = str(tr)
+    allowed_tr = {"inputs", "synapses", "both", "none"}
+    if tr not in allowed_tr:
+        raise ValueError(
+            f"sim['trial_randomness'] must be one of {sorted(allowed_tr)} (got {tr!r})"
+        )
+    sim_cfg["trial_randomness"] = tr
+
+    # n_traces_to_save: optional, default 1
+    n_traces_raw = sim_cfg.get("n_traces_to_save", 1)
+    try:
+        n_traces = int(n_traces_raw)
+    except Exception as exc:
+        raise ValueError(
+            f"sim['n_traces_to_save'] must be integer-like (got {n_traces_raw!r})"
+        ) from exc
+    if n_traces < 0:
+        raise ValueError("sim['n_traces_to_save'] must be >= 0")
+    sim_cfg["n_traces_to_save"] = n_traces
+
+    # output + output_format
+    if "output" in sim_cfg and sim_cfg["output"] is not None:
+        sim_cfg["output"] = str(sim_cfg["output"])
+    else:
+        sim_cfg.setdefault("output", None)
+
+    ofmt = sim_cfg.get("output_format", "pkl")
+    if ofmt is None:
+        ofmt = "pkl"
+    ofmt = str(ofmt)
+    if ofmt not in {"npz", "pkl"}:
+        raise ValueError(
+            f"sim['output_format'] must be 'npz' or 'pkl' (got {ofmt!r})"
+        )
+    sim_cfg["output_format"] = ofmt
+
+    # param_study: optional
+    param_raw = sim_cfg.get("param_study", None)
+    if param_raw is None:
+        sim_cfg["param_study"] = {
+            "input_type": None,
+            "param_type": None,
+            "param_vals": [],
+            "n_trials": None,
+        }
+    else:
+        if not isinstance(param_raw, dict):
+            raise TypeError("sim['param_study'] must be a dict or null")
+        param = dict(param_raw)
+        param.setdefault("input_type", None)
+        param.setdefault("param_type", None)
+        vals = param.get("param_vals", [])
+        if vals is None:
+            vals = []
+        if not isinstance(vals, list):
+            vals = list(vals)
+        param["param_vals"] = vals
+        if "n_trials" in param and param["n_trials"] is not None:
+            try:
+                param["n_trials"] = int(param["n_trials"])
+            except Exception as exc:
+                raise ValueError(
+                    "param_study['n_trials'] must be integer-like or null"
+                ) from exc
+        sim_cfg["param_study"] = param
+
+    # --- NEW: normalize 'load' ---
+    load_raw = sim_cfg.get("load", None)
+    if load_raw in (None, "", False):
+        sim_cfg["load"] = None        # meaning: run a new simulation
+    else:
+        sim_cfg["load"] = str(load_raw)  # meaning: treat as file/path to load
 
     return sim_cfg
 
