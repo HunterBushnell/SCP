@@ -371,13 +371,16 @@ def plot_syn_records(
             if use_density_mode:
                 # ---- per-µm exposure in each distance bin ----
                 len_exposure = np.zeros(len(edges) - 1)  # total dendritic length (µm) in each bin
+                # Robust distance computation for hoc_cell (supports cell.h wrapper)
                 h.distance(0, hoc_cell.soma[0](0.5))
-                for sec in hoc_cell.dend:
+                dend_secs = getattr(hoc_cell, "dend", []) if hasattr(hoc_cell, "dend") else []
+                for sec in dend_secs:
+                    seg_len = sec.L / max(sec.nseg, 1)
                     for seg in sec:
-                        d = h.distance(seg.x)
+                        d = h.distance(seg)
                         idx = np.searchsorted(edges, d) - 1
-                        if 0 <= idx < len_exposure:
-                            len_exposure[idx] += sec.L / sec.nseg
+                        if 0 <= idx < len_exposure.size:
+                            len_exposure[idx] += seg_len
 
                 counts, _ = np.histogram(dist, bins=edges)
                 with np.errstate(divide='ignore', invalid='ignore'):
@@ -604,8 +607,19 @@ def plot_results(
         # convert in_vivo_curve -> old plot_bio triple if provided
         plot_bio = None
         if in_vivo_curve is not None:
-            t_s, rate = in_vivo_curve
-            plot_bio = (True, np.asarray(t_s), np.asarray(rate))
+            try:
+                if isinstance(in_vivo_curve, (list, tuple)):
+                    if len(in_vivo_curve) == 3:
+                        _, t_s, rate = in_vivo_curve
+                    elif len(in_vivo_curve) == 2:
+                        t_s, rate = in_vivo_curve
+                    else:
+                        raise ValueError
+                else:
+                    t_s, rate = in_vivo_curve
+                plot_bio = (True, np.asarray(t_s), np.asarray(rate))
+            except Exception:
+                plot_bio = None
 
 
         return plot_multi(
@@ -830,8 +844,13 @@ def plot_single(
 
         # in-vivo data
         if in_vivo_curve is not None:
-            axF.plot(in_vivo_curve[0] * 1000.0, in_vivo_curve[1],
-                     'k', lw=2, label='In-vivo')
+            try:
+                t_invivo = np.asarray(in_vivo_curve[0], dtype=float) * 1000.0
+                r_invivo = np.asarray(in_vivo_curve[1], dtype=float)
+                axF.plot(t_invivo, r_invivo, 'k', lw=2, label='In-vivo')
+            except Exception:
+                # fall back silently if malformed
+                pass
 
         # vertical lines for somatic spikes
         for spk in spike_times:

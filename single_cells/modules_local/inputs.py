@@ -12,6 +12,7 @@ import hashlib
 from dataclasses import dataclass, field
 
 from modules_local import input_modes_core  # or: from . import input_modes_core
+from modules_local import randomness
 
 
 # ===================================================================
@@ -51,9 +52,11 @@ import numpy as np
 def generate_inputs(
     path: Optional[Union[Path, str]] = None,
     geometry: Optional[Any] = None,
-    rng: Optional[np.random.Generator] = None,
     mode_registry: Optional[Mapping[str, Any]] = None,
-    cache: Optional[Dict[str, "GroupInputs"]] = None,
+    rng: Optional[np.random.Generator] = None,
+    seed_override: Optional[int] = None,
+    trial_rng: Optional[randomness.TrialRandomness] = None,
+    # cache: Optional[Dict[str, "GroupInputs"]] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]], Dict[str, "GroupInputs"]]:
     """
     Step 2.3 main entry point: load, normalize, and materialize synaptic inputs.
@@ -137,7 +140,10 @@ def generate_inputs(
     # ------------------------------------------------------------------
     # 2.3.3 – Shared resources: RNG and mode registry
     # ------------------------------------------------------------------
-    rng = _init_rng(rng, sim_cfg)
+    if seed_override is not None:
+        sim_cfg["seed"] = int(seed_override)
+
+    base_rng = None if trial_rng is not None else _init_rng(rng, sim_cfg)
     if mode_registry is None:
         mode_registry = _build_default_mode_registry()
 
@@ -149,8 +155,9 @@ def generate_inputs(
         groups_cfg=groups_cfg,
         geometry=geometry,
         mode_registry=mode_registry,
-        rng=rng,
-        cache=cache,
+        rng=base_rng,
+        trial_rng=trial_rng,
+        # cache=cache,
     )
 
     # ------------------------------------------------------------------
@@ -569,8 +576,9 @@ def _process_all_groups(
     groups_cfg: Dict[str, Dict[str, Any]],
     geometry: Optional[Any],
     mode_registry: Mapping[str, Any],
-    rng: np.random.Generator,
-    cache: Optional[Dict[str, GroupInputs]] = None,
+    rng: Optional[np.random.Generator],
+    trial_rng: Optional[randomness.TrialRandomness] = None,
+    # cache: Optional[Dict[str, GroupInputs]] = None,
 ) -> Dict[str, GroupInputs]:
     """
     Loop over all groups and generate per-group inputs.
@@ -591,13 +599,13 @@ def _process_all_groups(
             continue
 
         # OPTIONAL: cache lookup before doing any heavy work
-        sig: Optional[str] = None
-        if cache is not None:
-            sig = _make_group_signature(sim_cfg, gname, gcfg)
-            cached = cache.get(sig)
-            if cached is not None:
-                inputs[gname] = cached
-                continue
+        # sig: Optional[str] = None
+        # if cache is not None:
+        #     sig = _make_group_signature(sim_cfg, gname, gcfg)
+        #     cached = cache.get(sig)
+        #     if cached is not None:
+        #         inputs[gname] = cached
+        #         continue
 
         # 2) Resolve number of synapses for this group
         #    This also stashes syns["N_syn_resolved"] into the group config.
@@ -618,14 +626,33 @@ def _process_all_groups(
         # 4) Resolve mode handler
         handler = _resolve_mode_handler(gname, gcfg, mode_registry)
 
-        # 5) Run handler to get spike trains
+        # 5) Choose RNG for this group and run handler to get spike trains
+        mode_name = gcfg.get("mode")
+        setting_path = mode_name if mode_name else "inputs"
+        group_rng = rng
+        rand_meta = None
+        if trial_rng is not None:
+            group_rng = trial_rng.rng(
+                setting_path,
+                group=gname,
+                stream=mode_name or "inputs",
+            )
+            rand_meta = {
+                "trial_idx": getattr(trial_rng, "trial_idx", None),
+                "setting_path": setting_path,
+                "group": gname,
+                "stream": mode_name or "inputs",
+            }
+        elif group_rng is None:
+            group_rng = _init_rng(None, sim_cfg)
+
         spike_trains = _run_mode_handler(
             handler=handler,
             sim_cfg=sim_cfg,
             group_name=gname,
             group_cfg=gcfg,
             geometry=geometry,
-            rng=rng,
+            rng=group_rng,
         )
 
         # Optional consistency check: number of trains vs N_syn_resolved
@@ -640,13 +667,14 @@ def _process_all_groups(
             group_name=gname,
             group_cfg=gcfg,
             spike_trains=spike_trains,
+            randomness_meta=rand_meta,
         )
 
         inputs[gname] = group_inputs
 
         # Store into cache if enabled
-        if cache is not None and sig is not None:
-            cache[sig] = group_inputs
+        # if cache is not None and sig is not None:
+        #     cache[sig] = group_inputs
 
     return inputs
 
@@ -892,11 +920,60 @@ def _compute_time_anchors(
     input_stim_raw = _as_float_or_none(
         timing.get("input_stim_tstart_ms"), "timing['input_stim_tstart_ms']"
     )
-    input_duration_raw = _as_float_or_none(
-        timing.get("input_duration_ms"), "timing['input_duration_ms']"
-    )
-    baseline_raw = _as_float_or_none(source.get("baseline"), "source['baseline']")
 
+
+    def _parse_baseline_spec(
+        val: Any,
+        label: str = "source['baseline']",
+    ) -> Tuple[Dict[str, Any], Optional[float]]:
+        """
+        Parse baseline specification into:
+        - baseline_spec: rich descriptor dict
+        - baseline_hz: numeric baseline (float) or None
+
+        baseline_hz is only non-None for simple fixed numeric baselines.
+        All tokenized / curve-dependent cases return baseline_hz = None.
+        """
+        # Null → no baseline
+        if val is None:
+            return {"kind": "none"}, None
+
+        # Plain numeric → fixed Hz
+        if isinstance(val, (int, float)):
+            hz = float(val)
+            return {"kind": "fixed", "hz": hz}, hz
+
+        # String tokens
+        if isinstance(val, str):
+            v = val.strip()
+
+            if v == "start":
+                return {"kind": "from_curve", "where": "start"}, None
+
+            if v == "end":
+                return {"kind": "from_curve", "where": "end"}, None
+
+            if v == "peak":
+                return {"kind": "from_curve", "where": "peak"}, None
+
+            if v.startswith("time:"):
+                # e.g. "time: 234" → 234 ms
+                _, _, num_str = v.partition(":")
+                try:
+                    t_ms = float(num_str.strip())
+                except ValueError as exc:
+                    raise ValueError(f"{label} malformed time spec {val!r}") from exc
+                return {"kind": "from_curve_at", "t_ms": t_ms}, None
+
+        # Anything else is invalid
+        raise ValueError(
+            f"{label} must be numeric, null, or a recognized string spec (got {val!r})"
+        )
+
+    baseline_spec, baseline_hz = _parse_baseline_spec(
+        source.get("baseline"), "source['baseline']"
+    )   
+     
     # Onset: default to sim start, clamped into [tstart, tstop]
     if onset_raw is None:
         onset = tstart
@@ -937,9 +1014,6 @@ def _compute_time_anchors(
             if duration_raw is not None:
                 dur = max(0.0, duration_raw)
                 dur = min(dur, remaining)
-            elif input_duration_raw is not None:
-                dur = max(0.0, input_duration_raw)
-                dur = min(dur, remaining)
             else:
                 # No explicit duration → run until the end of the simulation window
                 dur = remaining
@@ -955,12 +1029,12 @@ def _compute_time_anchors(
         "onset": onset,
         "source_tstart": source_tstart,
         "source_tstop": source_tstop,
-        "baseline_rate_hz": baseline_raw,
+        "baseline_rate_hz": baseline_hz, #baseline_raw,
         # Extra fields for debugging / inspection (not used by block builder):
         "stim_tstart_ms": stim_tstart,
         "input_stim_tstart_ms": input_stim_raw,
         "duration_ms": duration_raw,
-        "input_duration_ms": input_duration_raw,
+        "input_duration_ms": _as_float_or_none(timing.get("input_duration_ms"), "timing['input_duration_ms']"),
     }
 
     return anchors
@@ -1110,6 +1184,7 @@ def _build_group_inputs(
     group_name: str,
     group_cfg: Dict[str, Any],
     spike_trains: List[np.ndarray],
+    randomness_meta: Optional[Dict[str, Any]] = None,
 ) -> GroupInputs:
     """
     Package per-group data into a GroupInputs object.
@@ -1140,6 +1215,9 @@ def _build_group_inputs(
             "baseline_rate_hz": anchors.get("baseline_rate_hz"),
         }
         meta["time_blocks"] = time_cfg.get("blocks", [])
+
+    if randomness_meta:
+        meta["randomness"] = randomness_meta
 
     return GroupInputs(
         name=group_name,

@@ -7,6 +7,7 @@ import math
 import numpy as np
 
 from modules_local.inputs import _compile_density_from_spec
+from modules_local import randomness
 
 
 @dataclass
@@ -36,6 +37,8 @@ def _draw_syn_weight(rng: np.random.Generator, syn_params: Dict[str, Any]) -> fl
     original AllenCell.draw_syn_wt behavior.
     """
     wt_mean = syn_params.get("wt_mean", syn_params.get("initW", 0.001))
+    # syn_params_wt_mean = syn_params.get("wt_mean", None)
+    # print(f"Weight mean: {wt_mean} | Syn params: {syn_params_wt_mean}")
     wt_std_factor = syn_params.get("wt_std", 0.0)
     wt_std = wt_std_factor * wt_mean  # scaled off mean, wt_std=0 → fixed
 
@@ -158,10 +161,23 @@ def _gen_syn_mech(h, rng: np.random.Generator, syn_loc, syn_params: Dict[str, An
     for param, val in syn_params.items():
         if hasattr(syn, param):
             setattr(syn, param, val)
+    # print(f"Created synapse of type {syn_type} at {syn_loc.sec.name()}({syn_loc.x:.3f})")
+    # print(f"  with params: {syn_params}")
 
     syn_wt = _draw_syn_weight(rng, syn_params)
+    # print(f"Generated synaptic weight: {syn_wt:.4f} for synapse type {syn_type}")
     syn.initW = syn_wt
     return syn
+
+
+def _fallback_rng_pair(seed):
+    """
+    Build placement/weight RNGs when TrialRandomness is not supplied.
+    Split a SeedSequence so streams are distinct but reproducible.
+    """
+    ss = np.random.SeedSequence() if seed is None else np.random.SeedSequence(int(seed))
+    ss_place, ss_weight = ss.spawn(2)
+    return np.random.default_rng(ss_place), np.random.default_rng(ss_weight)
 
 
 def add_synapses(
@@ -170,6 +186,8 @@ def add_synapses(
     sim_cfg: Dict[str, Any],
     groups_cfg: Dict[str, Dict[str, Any]],
     inputs_by_group: Dict[str, Any],
+    *,
+    trial_rng: randomness.TrialRandomness = None,
 ) -> Dict[str, Any]:
     """
     Step 2.4 — Add Synapses
@@ -239,10 +257,6 @@ def add_synapses(
     """
     h = cell.h
 
-    # RNG (reproducible if user sets sim_cfg["seed"])
-    seed = sim_cfg.get("seed") if isinstance(sim_cfg, dict) else None
-    rng = np.random.default_rng(seed)
-
     # Persistent lists on cell
     if not hasattr(cell, "synapses"):
         cell.synapses = []
@@ -271,6 +285,7 @@ def add_synapses(
         "soma": "soma",
     }
 
+
     # Loop over groups that actually have inputs
     for syn_group, group_inputs in inputs_by_group.items():
         # Look up corresponding group_cfg
@@ -285,11 +300,16 @@ def add_synapses(
         if not group_cfg.get("state", True):
             continue
 
-        syn_cfg = group_cfg.get("syns")
+        # syn_cfg = group_cfg.get("syns")
+        syn_cfg = group_cfg.get("syns", {})
         if not syn_cfg:
             raise ValueError(
                 f"add_synapses: group {syn_group!r} has no 'syns' config in groups_cfg."
             )
+        
+        # Build mechanism-only params from the nested "params" block
+        mech_params = dict(syn_cfg.get("params", {}))
+        mech_params["type"] = syn_cfg["type"]
 
         # Resolve N_syn (prefer N_syn_resolved; fallback N_syn with explicit comment)
         n_syn = syn_cfg.get("N_syn_resolved", None)
@@ -328,7 +348,20 @@ def add_synapses(
         dens_eq = _compile_density_from_spec(dist_spec)
 
         # Density-aware placement, mirroring Step 2.2/2.3 semantics
-        all_syn_locs = _gen_syn_locs(h, rng, n_syn, dens_eq, seg_list)
+        # RNGs: placement and weights get distinct streams
+        if trial_rng is not None:
+            placement_rng = trial_rng.rng(
+                "synapses.placement", group=syn_group, stream="placement"
+            )
+            weight_rng = trial_rng.rng(
+                "synapses.weights", group=syn_group, stream="weights"
+            )
+        else:
+            placement_rng, weight_rng = _fallback_rng_pair(
+                sim_cfg.get("seed") if isinstance(sim_cfg, dict) else None
+            )
+
+        all_syn_locs = _gen_syn_locs(h, placement_rng, n_syn, dens_eq, seg_list)
 
         # Inputs for this group
         trains = list(group_inputs.spike_trains)
@@ -358,7 +391,8 @@ def add_synapses(
         group_records: List[SynapseRecord] = []
 
         for i, syn_loc in enumerate(all_syn_locs):
-            syn = _gen_syn_mech(h, rng, syn_loc, syn_cfg)
+            syn = _gen_syn_mech(h, weight_rng, syn_loc, mech_params)
+            # syn = _gen_syn_mech(h, weight_rng, syn_loc, syn_cfg)
 
             train_arr = np.asarray(_get_train(i), dtype=float)
             spike_times = train_arr.tolist()
@@ -399,6 +433,6 @@ def add_synapses(
         syn_state["vecs"][syn_group] = group_vecs
         syn_state["records"][syn_group] = group_records
 
-        print(f"{syn_group}: generated {len(all_syn_locs)} synapses.")
+        # print(f"{syn_group}: generated {len(all_syn_locs)} synapses.")
 
     return syn_state

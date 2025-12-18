@@ -218,33 +218,132 @@ def _mode_precomputed(
     rng: np.random.Generator,
 ) -> List[np.ndarray]:
     """
-    Built-in handler for mode == "precomputed" (STUB for 2.3).
+    Precomputed spike trains sampled from stored data.
 
-    Canonical 2.3 handler contract:
-      - Signature: handler(sim_cfg, group_cfg, geometry, rng)
-      - Modes must:
-          * read time_cfg from group_cfg["time_cfg"],
-          * read N_syn via _get_n_syn(group_cfg),
-          * return List[np.ndarray] of length N_syn,
-          * keep all spikes within [sim_cfg["tstart"], sim_cfg["tstop"]].
+    Source options:
+      - source["trains"]: inline list of spike-time arrays (ms, starting at 0)
+      - source["path"]: path to file containing trains. Supported:
+          * .pkl/.p: pickled list, or pickled dict with a single key whose value is the list
+          * .json: either {"trains": [...]} or raw list
 
-    Intended SOURCE CONTRACT (to be implemented later):
-      - group_cfg["source"] may provide either:
-          * "trains": [[...], [...], ...]  (inline spike trains, ms, sim-time)
-          * "path": "file.json"            (JSON with {"trains": [...]} or raw list)
-      - time_cfg["blocks"] may be used to:
-          * clip / shift trains into the active windows,
-          * optionally insert or respect baseline segments.
-
-    For now this is a stub; the actual implementation will be added in a
-    later step.
+    Timing:
+      - Use time_cfg blocks; "source" blocks place sampled trains shifted to block start.
+      - Baseline blocks use baseline_rate_hz (anchors) to generate homogeneous Poisson if set.
+      - Quiescent blocks add nothing.
     """
-    # Access time_cfg for completeness; real logic will use it.
-    _ = (group_cfg or {}).get("time_cfg", {}) or {}
-    raise NotImplementedError(
-        "Mode 'precomputed' is not yet implemented in core; "
-        "stub provided for 2.3 handler contract alignment."
-    )
+    time_cfg = (group_cfg or {}).get("time_cfg") or {}
+    anchors = time_cfg.get("anchors", {}) or {}
+    blocks = time_cfg.get("blocks", []) or []
+
+    try:
+        sim_tstart = float(sim_cfg["tstart"])
+        sim_tstop = float(sim_cfg["tstop"])
+    except Exception as exc:
+        raise ValueError("sim_cfg must contain tstart and tstop for precomputed mode") from exc
+
+    n_syn = _get_n_syn(group_cfg)
+    if n_syn <= 0:
+        return []
+
+    source = group_cfg.get("source", {}) or {}
+
+    def _load_trains_from_path(p: Path) -> List[np.ndarray]:
+        if not p.is_file():
+            raise FileNotFoundError(f"precomputed: file not found {p}")
+        suffix = p.suffix.lower()
+        if suffix in (".pkl", ".p"):
+            import pickle
+
+            with p.open("rb") as f:
+                obj = pickle.load(f)
+            if isinstance(obj, dict) and len(obj) == 1:
+                obj = next(iter(obj.values()))
+            if isinstance(obj, list):
+                return [np.asarray(x, dtype=float) for x in obj]
+            raise ValueError(f"precomputed: unsupported pickle structure in {p}")
+        if suffix == ".json":
+            with p.open("r") as f:
+                obj = json.load(f)
+            if isinstance(obj, dict) and "trains" in obj:
+                obj = obj["trains"]
+            if isinstance(obj, list):
+                return [np.asarray(x, dtype=float) for x in obj]
+            raise ValueError(f"precomputed: unsupported JSON structure in {p}")
+        raise ValueError(f"precomputed: unsupported file type {p.suffix} for {p}")
+
+    if source.get("trains") is not None:
+        pool = [np.asarray(x, dtype=float) for x in source["trains"]]
+    elif source.get("path"):
+        pool = _load_trains_from_path(Path(source["path"]))
+    else:
+        raise ValueError("precomputed mode requires source['trains'] or source['path']")
+
+    if not pool:
+        return [np.array([], dtype=float) for _ in range(n_syn)]
+
+    # helper: sample trains for n_syn
+    pool_size = len(pool)
+    def _sample_trains():
+        if n_syn == pool_size:
+            idx = np.arange(pool_size)
+        elif n_syn < pool_size:
+            idx = rng.choice(pool_size, size=n_syn, replace=False)
+        else:
+            idx = rng.choice(pool_size, size=n_syn, replace=True)
+        return [np.asarray(pool[i], dtype=float).copy() for i in idx]
+
+    baseline_rate = anchors.get("baseline_rate_hz", None)
+    trains_accum: List[List[float]] = [[] for _ in range(n_syn)]
+
+    for block in blocks:
+        kind = block.get("kind")
+        t0 = float(block.get("t_start", sim_tstart))
+        t1 = float(block.get("t_end", t0))
+        if t1 <= t0:
+            continue
+        t0 = max(t0, sim_tstart)
+        t1 = min(t1, sim_tstop)
+        if t1 <= t0:
+            continue
+
+        if kind == "quiescent":
+            continue
+
+        if kind == "baseline":
+            rate = baseline_rate
+            if rate is None or rate <= 0.0:
+                continue
+            seg_trains = _generate_homogeneous_poisson_trains(
+                rate_hz=float(rate),
+                t_start_ms=t0,
+                t_end_ms=t1,
+                n_syn=n_syn,
+                rng=rng,
+            )
+        elif kind == "source":
+            sampled = _sample_trains()
+            seg_trains = []
+            for tr in sampled:
+                shifted = tr + t0
+                clipped = shifted[(shifted >= t0) & (shifted <= t1)]
+                seg_trains.append(clipped)
+        else:
+            continue
+
+        for i in range(n_syn):
+            trains_accum[i].extend(seg_trains[i].tolist())
+
+    out: List[np.ndarray] = []
+    for spikes in trains_accum:
+        if not spikes:
+            out.append(np.array([], dtype=float))
+            continue
+        arr = np.asarray(spikes, dtype=float)
+        arr = arr[(arr >= sim_tstart) & (arr <= sim_tstop)]
+        arr.sort()
+        out.append(arr)
+
+    return out
 
 
 # ---------------------------------------------------------------------
@@ -333,42 +432,152 @@ def _mode_inhomogeneous_poisson(
     rng: np.random.Generator,
 ) -> List[np.ndarray]:
     """
-    Built-in handler for mode == "inhomogeneous_poisson" (STUB for 2.3).
+    Inhomogeneous Poisson driven by a rate curve (CSV).
 
-    Canonical 2.3 handler contract:
-      - Signature: handler(sim_cfg, group_cfg, geometry, rng)
-      - Modes must:
-          * read time_cfg from group_cfg["time_cfg"],
-          * read N_syn via _get_n_syn(group_cfg),
-          * return List[np.ndarray] of length N_syn,
-          * keep all spikes within [sim_cfg["tstart"], sim_cfg["tstop"]].
-
-    Intended SOURCE CONTRACT (for later implementation):
-      - group_cfg["source"] keys:
-          * "path": str       (CSV or JSON with rate curve),
-          * "time_col": str   (column/key name for times, ms),
-          * "rate_col": str   (column/key name for rates, Hz),
-          * "bin_ms": float   (optional; infer from time_col if missing),
-          * "baseline": float (optional; default from first rate).
-
-    Intended TIMING semantics:
-      - Combine:
-          * (times_ms, rates_hz, bin_ms, baseline) from the rate curve,
-          * group_cfg["time_cfg"]["anchors"] / ["blocks"],
-          * N_syn from group_cfg,
-        to generate inhomogeneous Poisson spike trains, typically by:
-          * restricting the rate curve to "source" blocks,
-          * using _generate_inhomogeneous_from_curve per block,
-          * stitching segments per synapse.
-
-    For now this is a stub; the actual loading and generation logic will
-    be implemented in a later step.
+    Assumptions for this implementation (current SST2 use case):
+      - source["path"] points to a CSV with columns time_col (seconds) and rate_col (Hz).
+      - time_col defaults to "Time", rate_col defaults to "AvgFiringRate".
+      - Times < 0 are dropped; remaining times are shifted so the first sample is at 0 ms.
+      - bin_ms is taken from source["bin_ms"] if provided; otherwise inferred from median Δt.
+      - Baseline blocks use anchors["baseline_rate_hz"] (numeric) if present; otherwise quiescent.
+      - Source blocks use the rate curve, truncated/padded to the block duration
+        (padding uses baseline_rate_hz or 0.0 if absent).
     """
-    _ = (group_cfg or {}).get("time_cfg", {}) or {}
-    raise NotImplementedError(
-        "Mode 'inhomogeneous_poisson' is not yet implemented in core; "
-        "stub provided for 2.3 handler contract alignment."
-    )
+    time_cfg = (group_cfg or {}).get("time_cfg") or {}
+    anchors = time_cfg.get("anchors", {}) or {}
+    blocks = time_cfg.get("blocks", []) or []
+
+    try:
+        sim_tstart = float(sim_cfg["tstart"])
+        sim_tstop = float(sim_cfg["tstop"])
+    except Exception as exc:
+        raise ValueError("sim_cfg must contain tstart and tstop for inhomogeneous_poisson") from exc
+
+    n_syn = _get_n_syn(group_cfg)
+    if n_syn <= 0:
+        return []
+
+    source = group_cfg.get("source", {}) or {}
+    path = source.get("path")
+    if not path:
+        raise ValueError("inhomogeneous_poisson requires source['path'] to a rate curve CSV")
+
+    time_col = source.get("time_col") or "Time"
+    rate_col = source.get("rate_col") or "AvgFiringRate"
+    bin_ms_cfg = source.get("bin_ms", None)
+
+    # Load curve
+    import pandas as pd  # local import to avoid forcing pandas on import
+
+    p = Path(path)
+    if not p.is_file():
+        raise FileNotFoundError(f"Rate curve file not found: {p}")
+
+    df = pd.read_csv(p)
+    if time_col not in df or rate_col not in df:
+        raise ValueError(f"Rate curve file {p} missing required columns {time_col!r}/{rate_col!r}")
+
+    times_ms = np.asarray(df[time_col], dtype=float) * 1000.0  # seconds → ms
+    rates_hz = np.asarray(df[rate_col], dtype=float)
+
+    # Drop times < 0 and shift so first sample is at 0
+    keep = times_ms >= 0.0
+    times_ms = times_ms[keep]
+    rates_hz = rates_hz[keep]
+    if times_ms.size == 0:
+        raise ValueError(f"Rate curve {p} has no samples with time >= 0 ms after clipping.")
+    times_ms = times_ms - times_ms[0]
+
+    # Determine bin_ms
+    if bin_ms_cfg is not None:
+        try:
+            bin_ms = float(bin_ms_cfg)
+        except Exception as exc:
+            raise ValueError(f"source['bin_ms'] must be numeric (got {bin_ms_cfg!r})") from exc
+    else:
+        if times_ms.size < 2:
+            raise ValueError("Cannot infer bin_ms from a single time sample; specify source['bin_ms'].")
+        diffs = np.diff(times_ms)
+        bin_ms = float(np.median(diffs))
+    if bin_ms <= 0.0:
+        raise ValueError(f"bin_ms must be > 0 (got {bin_ms!r})")
+
+    # Build per-synapse accumulators
+    trains: List[List[float]] = [[] for _ in range(n_syn)]
+    baseline_rate = anchors.get("baseline_rate_hz", None)
+
+    # Precompute truncated/padded rate slices for any source block
+    rates_len = rates_hz.size
+
+    for block in blocks:
+        kind = block.get("kind")
+        t0 = float(block.get("t_start", sim_tstart))
+        t1 = float(block.get("t_end", t0))
+        if t1 <= t0:
+            continue
+        # Clamp to simulation window just in case
+        t0 = max(t0, sim_tstart)
+        t1 = min(t1, sim_tstop)
+        if t1 <= t0:
+            continue
+
+        if kind == "quiescent":
+            continue
+
+        if kind == "baseline":
+            rate = baseline_rate
+            if rate is None or rate <= 0.0:
+                continue
+            seg_trains = _generate_homogeneous_poisson_trains(
+                rate_hz=float(rate),
+                t_start_ms=t0,
+                t_end_ms=t1,
+                n_syn=n_syn,
+                rng=rng,
+            )
+        elif kind == "source":
+            duration = t1 - t0
+            n_bins_needed = int(np.ceil(duration / bin_ms))
+            if n_bins_needed <= 0:
+                continue
+
+            # Use available curve up to n_bins_needed bins; pad remainder with baseline or zeros
+            avail_bins = min(rates_len, n_bins_needed)
+            rates_block = rates_hz[:avail_bins]
+            if avail_bins < n_bins_needed:
+                pad_rate = float(baseline_rate) if (baseline_rate is not None) else 0.0
+                pad = np.full(n_bins_needed - avail_bins, pad_rate, dtype=float)
+                rates_block = np.concatenate([rates_block, pad])
+
+            seg_trains = _generate_inhomogeneous_from_curve(
+                rates_hz=np.asarray(rates_block, dtype=float),
+                t0_ms=t0,
+                bin_ms=bin_ms,
+                n_syn=n_syn,
+                rng=rng,
+            )
+        else:
+            continue
+
+        # Accumulate
+        for i in range(n_syn):
+            trains[i].extend(seg_trains[i].tolist())
+
+    # Finalize: clip to sim window and sort
+    out: List[np.ndarray] = []
+    for spikes in trains:
+        if not spikes:
+            out.append(np.array([], dtype=float))
+            continue
+        arr = np.asarray(spikes, dtype=float)
+        arr = arr[(arr >= sim_tstart) & (arr <= sim_tstop)]
+        if arr.size == 0:
+            out.append(np.array([], dtype=float))
+            continue
+        arr.sort()
+        out.append(arr)
+
+    return out
 
 
 # =====================================================================

@@ -221,6 +221,8 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from . import synapses  # assumes run_sim.py lives next to synapses.py
+from . import randomness
+from . import inputs as inputs_mod
 
 
 # ---------------------------------------------------------------------
@@ -286,6 +288,8 @@ def run_single(
     sim_cfg: Dict[str, Any],
     groups_cfg: Dict[str, Any],
     inputs_by_group: Dict[str, Any],
+    *,
+    rm: Optional[randomness.RandomnessManager] = None,
 ) -> Dict[str, Any]:
     """
     Run a single simulation (one trial) with the given config and inputs.
@@ -303,11 +307,14 @@ def run_single(
       }
     """
     sim_cfg_local = copy.deepcopy(sim_cfg)
+    trial_rng = rm.trial(0) if rm is not None else None
     n_traces_to_save = int(sim_cfg_local.get("n_traces_to_save", 1))
 
     # reset cell state and attach synapses
     _clear_cell_state(cell)
-    syn_state = synapses.add_synapses(cell, geom, sim_cfg_local, groups_cfg, inputs_by_group)
+    syn_state = synapses.add_synapses(
+        cell, geom, sim_cfg_local, groups_cfg, inputs_by_group, trial_rng=trial_rng
+    )
     syn_records = syn_state.get("records", {})
 
     # run the actual simulation (existing 3.1 primitive)
@@ -342,6 +349,10 @@ def run_multi(
     sim_cfg: Dict[str, Any],
     groups_cfg: Dict[str, Any],
     inputs_by_group: Dict[str, Any],
+    *,
+    rm: Optional[randomness.RandomnessManager] = None,
+    mode_registry: Optional[Dict[str, Any]] = None,
+    trial_callback: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Run multiple trials with the same config. Currently:
@@ -367,13 +378,57 @@ def run_multi(
     n_trials = int(sim_cfg_local.get("n_trials", 1))
     n_traces_to_save = int(sim_cfg_local.get("n_traces_to_save", 1))
 
+    def _as_bool(val, default=True):
+        if val is None:
+            return default
+        if isinstance(val, str):
+            v = val.strip().lower()
+            if v in ("false", "0", "no", "off", ""):
+                return False
+            if v in ("true", "1", "yes", "on"):
+                return True
+        return bool(val)
+
+    regen_inputs = _as_bool(sim_cfg_local.get("regen_inputs_each_trial", True), default=True)
+
+    # Prebuild mode registry once for per-trial input regeneration
+    if mode_registry is None:
+        mode_registry = inputs_mod._build_default_mode_registry()
+        try:
+            from modules_local import input_modes_user
+
+            user_reg = input_modes_user.get_user_mode_registry()
+            # user registry wins on name collisions
+            mode_registry = {**mode_registry, **user_reg}
+        except Exception:
+            pass
+
     spikes_by_trial: List[np.ndarray] = []
     trace_V_store: List[np.ndarray] = []
     T_ref: Optional[np.ndarray] = None
-
     for trial_idx in range(n_trials):
+        trial_rng = rm.trial(trial_idx) if rm is not None else None
+
+        # Optionally regenerate inputs per trial (fresh randomness)
+        if regen_inputs:
+            gcfg_trial = copy.deepcopy(groups_cfg)
+            inputs_trial = inputs_mod._process_all_groups(
+                sim_cfg=sim_cfg_local,
+                groups_cfg=gcfg_trial,
+                geometry=geom,
+                mode_registry=mode_registry,
+                rng=None,
+                trial_rng=trial_rng,
+            )
+            groups_cfg_for_trial = gcfg_trial
+        else:
+            inputs_trial = inputs_by_group
+            groups_cfg_for_trial = groups_cfg
+
         _clear_cell_state(cell)
-        syn_state = synapses.add_synapses(cell, geom, sim_cfg_local, groups_cfg, inputs_by_group)
+        syn_state = synapses.add_synapses(
+            cell, geom, sim_cfg_local, groups_cfg_for_trial, inputs_trial, trial_rng=trial_rng
+        )
 
         sim_traces = run_cell(cell, sim_cfg_local)
 
@@ -388,6 +443,21 @@ def run_multi(
             if T_ref is None:
                 T_ref = T
             trace_V_store.append(V)
+
+        if trial_callback is not None:
+            try:
+                trial_callback(
+                    {
+                        "trial_idx": trial_idx,
+                        "spikes": spikes,
+                        "traces": sim_traces,
+                        "sim_cfg": sim_cfg_local,
+                        "syn_records": syn_state.get("records", {}),
+                    }
+                )
+            except Exception:
+                # Do not fail the simulation because a callback failed
+                pass
 
     traces_out: Dict[str, Any] = {}
     if T_ref is not None and trace_V_store:
@@ -417,6 +487,8 @@ def run_param(
     sim_cfg: Dict[str, Any],
     groups_cfg: Dict[str, Any],
     inputs_by_group: Dict[str, Any],
+    *,
+    rm: Optional[randomness.RandomnessManager] = None,
 ) -> Dict[str, Any]:
     """
     Placeholder for parametric study mode.
@@ -446,6 +518,8 @@ def run_sim(
     sim_cfg: Dict[str, Any],
     groups_cfg: Dict[str, Any],
     inputs_by_group: Dict[str, Any],
+    mode_registry: Optional[Dict[str, Any]] = None,
+    trial_callback: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Unified entrypoint: infers mode from sim_cfg and dispatches to the
@@ -472,16 +546,30 @@ def run_sim(
         return result
     
 
+    rm = randomness.RandomnessManager(sim_cfg_local)
     mode = _infer_mode(sim_cfg_local)
 
     if mode == "single":
-        result = run_single(cell, geom, sim_cfg_local, groups_cfg, inputs_by_group)
+        result = run_single(cell, geom, sim_cfg_local, groups_cfg, inputs_by_group, rm=rm)
     elif mode == "multi":
-        result = run_multi(cell, geom, sim_cfg_local, groups_cfg, inputs_by_group)
+        result = run_multi(
+            cell,
+            geom,
+            sim_cfg_local,
+            groups_cfg,
+            inputs_by_group,
+            rm=rm,
+            mode_registry=mode_registry,
+            trial_callback=trial_callback,
+        )
     elif mode == "param":
-        result = run_param(cell, geom, sim_cfg_local, groups_cfg, inputs_by_group)
+        result = run_param(cell, geom, sim_cfg_local, groups_cfg, inputs_by_group, rm=rm)
     else:
         raise ValueError(f"run_sim: unrecognized mode '{mode}'")
+
+    # Record randomness metadata (e.g., auto-generated base seeds)
+    meta = result.setdefault("meta", {})
+    meta["randomness"] = rm.meta().as_dict()
 
     # auto-save if sim_cfg['output'] is set
     save_results(result)  # no-op if output is None/empty

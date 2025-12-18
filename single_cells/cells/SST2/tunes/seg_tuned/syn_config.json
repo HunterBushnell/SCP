@@ -1,46 +1,12 @@
 {
-"pn_exc_trace": {
-    "state": false,
+"pn_exc": {
+    "state": true,
     "mode": "inhomogeneous_poisson",
     "source": {
         "freq": null,
-        "baseline": "start",
+        "baseline": 2.0,
         "path": "/home/hrbncv/PV-SST/single_cells/Madhu_Data/bio_cell_output/pyrFiringRateAvg.csv",
         "bin_ms": 5
-    },
-    "timing": {
-        "onset_ms": null,
-        "stim_tstart_ms": 600.0,
-        "duration_ms": null,
-        "input_stim_tstart_ms": 100,
-        "input_duration_ms": 550
-    },
-    "syns": {
-        "type": "AMPA_NMDA_STP",
-        "N_syn": 50,
-        "segs": "all",
-        "dist_func": {
-            "kind": "uniform",
-            "params": {
-            "c": 2.0
-            }
-        },
-        "params": {
-            "wt_mean": 0.75,
-            "wt_std": 0.34
-        }
-    }
-},
-
-"pn_exc": {
-    "state": false,
-    "mode": "precomputed",
-    "color": null,
-    "source": {
-        "freq": null,
-        "baseline": 2.0,
-        "path": "/home/hrbncv/PV-SST/single_cells/Madhu_Data/bio_cell_output/pn_precomputed_trains.json",
-        "bin_ms": null
     },
     "timing": {
         "onset_ms": null,
@@ -81,7 +47,7 @@
         "stim_tstart_ms": 650,
         "duration_ms": null,
         "input_stim_tstart_ms": 400,
-        "input_duration_ms": 1000
+        "input_duration_ms": null
     },
     "syns": {
         "type": "GABA_A",
@@ -182,7 +148,7 @@
         "bin_ms": null
     },
     "timing": {
-        "onset_ms": 400,
+        "onset_ms": 800,
         "stim_tstart_ms": null,
         "duration_ms": null,
         "input_stim_tstart_ms": null,
