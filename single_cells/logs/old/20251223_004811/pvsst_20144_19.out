@@ -1,0 +1,14 @@
+Running: python /home/hrbncv/PV-SST/single_cells/run_pipeline.py --tune-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned --output-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/inputs_pool/parts --n-trials 4 --output-stem inputs_pool_19 --trial-offset 76 --force-save
+Loaded mechanisms from /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/modfiles/x86_64/.libs/libnrnmech.so
+Loaded Allen cell for 'PV' from manifest.json, soma_diam_multiplier=6.0, Vinit=-71.0
+Geometry defined for 'PV': 1 soma segs, 46 proximal dend segs, 41 distal dend segs, 97 total dend segs.
+[trial 1/4] input_spikes: pn_exc=236 bg_exc=45 bg_inh=1251 bg_exc_del=62
+[trial 1/4] spikes=10  rate=8.70 Hz  time=26.75s
+[trial 2/4] input_spikes: pn_exc=205 bg_exc=50 bg_inh=1215 bg_exc_del=71
+[trial 2/4] spikes=10  rate=8.70 Hz  time=26.63s
+[trial 3/4] input_spikes: pn_exc=224 bg_exc=57 bg_inh=1265 bg_exc_del=61
+[trial 3/4] spikes=9  rate=7.83 Hz  time=26.21s
+[trial 4/4] input_spikes: pn_exc=203 bg_exc=39 bg_inh=1232 bg_exc_del=53
+[trial 4/4] spikes=10  rate=8.70 Hz  time=26.50s
+Results saved to /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/inputs_pool/parts/inputs_pool_19/run_manifest.json
+Total runtime: 106.35s

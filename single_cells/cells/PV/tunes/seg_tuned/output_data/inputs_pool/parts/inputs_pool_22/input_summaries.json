@@ -1,0 +1,102 @@
+[
+  {
+    "trial_idx": 0,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 50,
+        "total_spikes": 209,
+        "sum_spike_times": 123223.33334696299
+      },
+      "bg_exc": {
+        "n_syn": 4484,
+        "total_spikes": 50,
+        "sum_spike_times": 34631.37893587371
+      },
+      "bg_inh": {
+        "n_syn": 1088,
+        "total_spikes": 1303,
+        "sum_spike_times": 828694.7942817603
+      },
+      "bg_exc_del": {
+        "n_syn": 10,
+        "total_spikes": 82,
+        "sum_spike_times": 72443.64703437727
+      }
+    }
+  },
+  {
+    "trial_idx": 1,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 50,
+        "total_spikes": 222,
+        "sum_spike_times": 136742.28054651082
+      },
+      "bg_exc": {
+        "n_syn": 4484,
+        "total_spikes": 40,
+        "sum_spike_times": 22541.445337338166
+      },
+      "bg_inh": {
+        "n_syn": 1088,
+        "total_spikes": 1248,
+        "sum_spike_times": 766621.9662037386
+      },
+      "bg_exc_del": {
+        "n_syn": 10,
+        "total_spikes": 64,
+        "sum_spike_times": 55905.39677926512
+      }
+    }
+  },
+  {
+    "trial_idx": 2,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 50,
+        "total_spikes": 202,
+        "sum_spike_times": 117383.16937866634
+      },
+      "bg_exc": {
+        "n_syn": 4484,
+        "total_spikes": 63,
+        "sum_spike_times": 40830.18439949007
+      },
+      "bg_inh": {
+        "n_syn": 1088,
+        "total_spikes": 1203,
+        "sum_spike_times": 753888.0306270712
+      },
+      "bg_exc_del": {
+        "n_syn": 10,
+        "total_spikes": 62,
+        "sum_spike_times": 55257.33865733223
+      }
+    }
+  },
+  {
+    "trial_idx": 3,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 50,
+        "total_spikes": 219,
+        "sum_spike_times": 125841.22730663956
+      },
+      "bg_exc": {
+        "n_syn": 4484,
+        "total_spikes": 56,
+        "sum_spike_times": 33808.44455700822
+      },
+      "bg_inh": {
+        "n_syn": 1088,
+        "total_spikes": 1342,
+        "sum_spike_times": 827560.0862761202
+      },
+      "bg_exc_del": {
+        "n_syn": 10,
+        "total_spikes": 62,
+        "sum_spike_times": 57610.27460903043
+      }
+    }
+  }
+]

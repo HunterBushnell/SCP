@@ -1,0 +1,10 @@
+/home/hrbncv/miniconda3/envs/BMTK/bin/nrnivmodl:10: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+  from pkg_resources import working_set
+make: *** No rule to make target 'CaDynamics.o', needed by 'mech_lib_shared'.  Stop.
+make: *** Waiting for unfinished jobs....
+Traceback (most recent call last):
+  File "/home/hrbncv/miniconda3/envs/BMTK/bin/nrnivmodl", line 114, in <module>
+    subprocess.check_call([exe, *sys.argv[1:]])
+  File "/home/hrbncv/miniconda3/envs/BMTK/lib/python3.9/subprocess.py", line 373, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '['/home/hrbncv/miniconda3/envs/BMTK/lib/python3.9/site-packages/neuron/.data/bin/nrnivmodl', 'modfiles']' returned non-zero exit status 2.

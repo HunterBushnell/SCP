@@ -56,6 +56,7 @@ def generate_inputs(
     rng: Optional[np.random.Generator] = None,
     seed_override: Optional[int] = None,
     trial_rng: Optional[randomness.TrialRandomness] = None,
+    sim_cfg_override: Optional[Dict[str, Any]] = None,
     # cache: Optional[Dict[str, "GroupInputs"]] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]], Dict[str, "GroupInputs"]]:
     """
@@ -81,6 +82,9 @@ def generate_inputs(
         Optional directory or file path controlling where configs are loaded from.
         See rules above. Typical notebook usage is `path=None` with the tune
         directory as the working directory.
+    sim_cfg_override
+        Optional simulation config dict. When provided, it replaces the contents
+        of sim_config.json while syn_config.json is still loaded from disk.
     geometry
         Geometry / segment-group information from Step 2.2 (may be None if not used).
     rng
@@ -124,10 +128,13 @@ def generate_inputs(
         raise FileNotFoundError(f"Missing sim_config.json in {root}")
 
     # ------------------------------------------------------------------
-    # Load raw JSON configs
+    # Load raw JSON configs (or use override)
     # ------------------------------------------------------------------
-    with sim_path.open("r") as f:
-        sim_cfg_raw = json.load(f)
+    if sim_cfg_override is None:
+        with sim_path.open("r") as f:
+            sim_cfg_raw = json.load(f)
+    else:
+        sim_cfg_raw = dict(sim_cfg_override)
     with syn_path.open("r") as f:
         groups_cfg_raw = json.load(f)
 
@@ -135,7 +142,8 @@ def generate_inputs(
     # 2.3.2 – Normalize configs
     # ------------------------------------------------------------------
     sim_cfg = _normalize_sim_config(sim_cfg_raw)
-    groups_cfg = _normalize_group_configs(groups_cfg_raw)
+    groups_cfg_expanded = _expand_group_includes(groups_cfg_raw, root)
+    groups_cfg = _normalize_group_configs(groups_cfg_expanded)
 
     # ------------------------------------------------------------------
     # 2.3.3 – Shared resources: RNG and mode registry
@@ -213,7 +221,8 @@ def check_inputs(
         groups_raw = json.load(f)
 
     sim_cfg = _normalize_sim_config(sim_raw)
-    groups_cfg = _normalize_group_configs(groups_raw)
+    groups_cfg_expanded = _expand_group_includes(groups_raw, root)
+    groups_cfg = _normalize_group_configs(groups_cfg_expanded)
 
 
     if verbose:
@@ -253,12 +262,18 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
       - jitter (float or None)
       - seed (int or None)
       - n_trials (int >= 1)
-      - trial_randomness (one of 'inputs', 'synapses', 'both', 'none')
+      - save_profile (optional: 'lean'|'standard'|'full')
+        - fills n_traces_to_save / n_inputs_to_save if those keys are absent
       - n_traces_to_save (int >= 0)
-      - output (string or None)
+      - n_inputs_to_save (int >= 0 or 'all')
+      - trial_randomness (one of 'inputs', 'synapses', 'both', 'none')
+      - load (string path or [enabled, path])
+      - save/output (string stem or [enabled, stem, format, full_results])
+      - append/append_to (string path or [enabled, path])
       - output_format ('npz' or 'pkl')
-      - load (string path or None)          # <-- add this line
+      - plots_profile ('off'|'basic'|'inputs'|'full')
       - param_study (dict with standard keys)
+      - snapshot (optional dict): enables full debug capture
     """
     sim_cfg = dict(sim_cfg_raw)
 
@@ -280,6 +295,16 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
     else:
         sim_cfg["jitter"] = float(jitter)
 
+    # optional stimulation markers (used for plotting or bookkeeping)
+    for key in ("stim_start_ms", "stim_stop_ms", "stim_duration_ms"):
+        if key in sim_cfg and sim_cfg[key] is not None:
+            try:
+                sim_cfg[key] = float(sim_cfg[key])
+            except Exception as exc:
+                raise ValueError(f"sim['{key}'] must be numeric or null (got {sim_cfg[key]!r})") from exc
+        else:
+            sim_cfg[key] = None
+
     # Cell and tune labels are just passed through if present
     for key in ("cell", "tune"):
         if key in sim_cfg and sim_cfg[key] is not None:
@@ -296,6 +321,14 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError(
                 f"sim['seed'] must be integer-like or null (got {seed_raw!r})"
             ) from exc
+    random_seed_raw = sim_cfg.get("random_seed", None)
+    if sim_cfg["seed"] is None and random_seed_raw not in (None, "", False):
+        try:
+            sim_cfg["seed"] = int(random_seed_raw)
+        except Exception as exc:
+            raise ValueError(
+                f"sim['random_seed'] must be integer-like or null (got {random_seed_raw!r})"
+            ) from exc
 
     # n_trials: optional, default 1
     n_trials_raw = sim_cfg.get("n_trials", 1)
@@ -308,6 +341,27 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
     if n_trials < 1:
         raise ValueError("sim['n_trials'] must be >= 1")
     sim_cfg["n_trials"] = n_trials
+
+    # save_profile: optional, defaults to None
+    save_profile = sim_cfg.get("save_profile", None)
+    raw_has_traces = "n_traces_to_save" in sim_cfg_raw
+    raw_has_inputs = "n_inputs_to_save" in sim_cfg_raw
+    if save_profile not in (None, "", False):
+        prof = str(save_profile).strip().lower()
+        defaults = {
+            "lean": {"n_traces_to_save": 1, "n_inputs_to_save": 1},
+            "standard": {"n_traces_to_save": 1, "n_inputs_to_save": 10},
+            "full": {"n_traces_to_save": 1, "n_inputs_to_save": "all"},
+        }
+        if prof not in defaults:
+            raise ValueError(
+                f"sim['save_profile'] must be one of {sorted(defaults)} (got {save_profile!r})"
+            )
+        if not raw_has_traces:
+            sim_cfg["n_traces_to_save"] = defaults[prof]["n_traces_to_save"]
+        if not raw_has_inputs:
+            sim_cfg["n_inputs_to_save"] = defaults[prof]["n_inputs_to_save"]
+        sim_cfg["save_profile"] = prof
 
     # trial_randomness: optional, default 'synapses'
     tr = sim_cfg.get("trial_randomness", "synapses")
@@ -333,11 +387,93 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("sim['n_traces_to_save'] must be >= 0")
     sim_cfg["n_traces_to_save"] = n_traces
 
-    # output + output_format
-    if "output" in sim_cfg and sim_cfg["output"] is not None:
-        sim_cfg["output"] = str(sim_cfg["output"])
+    # n_inputs_to_save: optional, default n_traces_to_save
+    n_inputs_raw = sim_cfg.get("n_inputs_to_save", n_traces)
+    if isinstance(n_inputs_raw, str):
+        if n_inputs_raw.strip().lower() in ("all",):
+            sim_cfg["n_inputs_to_save"] = "all"
+        else:
+            try:
+                sim_cfg["n_inputs_to_save"] = int(n_inputs_raw)
+            except Exception as exc:
+                raise ValueError(
+                    f"sim['n_inputs_to_save'] must be integer-like or 'all' (got {n_inputs_raw!r})"
+                ) from exc
     else:
-        sim_cfg.setdefault("output", None)
+        try:
+            sim_cfg["n_inputs_to_save"] = int(n_inputs_raw)
+        except Exception as exc:
+            raise ValueError(
+                f"sim['n_inputs_to_save'] must be integer-like or 'all' (got {n_inputs_raw!r})"
+            ) from exc
+
+    # load: allow [enabled, path] or {"enabled":..., "path":...}
+    load_raw = sim_cfg.get("load", None)
+    load_enabled = None
+    load_path = None
+    if isinstance(load_raw, (list, tuple)):
+        if len(load_raw) >= 1:
+            load_enabled = bool(load_raw[0])
+        if len(load_raw) >= 2:
+            load_path = load_raw[1]
+    elif isinstance(load_raw, dict):
+        load_enabled = bool(load_raw.get("enabled", False))
+        load_path = load_raw.get("path")
+    else:
+        if load_raw in (None, "", False):
+            load_enabled = False
+            load_path = None
+        else:
+            load_enabled = True
+            load_path = load_raw
+    sim_cfg["load_enabled"] = bool(load_enabled)
+    sim_cfg["load"] = None if load_path in (None, "", False) else str(load_path)
+
+    # save/output + output_format (allow [enabled, stem, format, full_results] or dict form)
+    if "save" in sim_cfg_raw:
+        output_raw = sim_cfg_raw.get("save")
+    else:
+        output_raw = sim_cfg.get("output")
+    output_enabled = None
+    output_stem = None
+    output_fmt = None
+    output_full = None
+    if isinstance(output_raw, (list, tuple)):
+        if len(output_raw) >= 1:
+            output_enabled = bool(output_raw[0])
+        if len(output_raw) >= 2:
+            output_stem = output_raw[1]
+        if len(output_raw) >= 3:
+            output_fmt = output_raw[2]
+        if len(output_raw) >= 4:
+            output_full = output_raw[3]
+    elif isinstance(output_raw, dict):
+        output_enabled = output_raw.get("enabled")
+        output_stem = output_raw.get("path") or output_raw.get("stem") or output_raw.get("name")
+        output_fmt = output_raw.get("format")
+        output_full = output_raw.get("full_results")
+        if output_full is None:
+            output_full = output_raw.get("save_full_results")
+    else:
+        if output_raw not in (None, "", False):
+            output_stem = output_raw
+            output_enabled = True
+        else:
+            output_stem = None
+            output_enabled = False
+
+    # save_output: optional, default True (unless output tuple/dict provided)
+    if not isinstance(output_raw, (list, tuple, dict)):
+        if "save_output" in sim_cfg:
+            output_enabled = bool(sim_cfg.get("save_output"))
+    if output_enabled is None:
+        output_enabled = True
+    sim_cfg["save_output"] = bool(output_enabled)
+    sim_cfg["output"] = None if output_stem in (None, "", False) else str(output_stem)
+    sim_cfg["save"] = sim_cfg["output"]
+
+    if output_fmt is not None:
+        sim_cfg["output_format"] = str(output_fmt)
 
     ofmt = sim_cfg.get("output_format", "pkl")
     if ofmt is None:
@@ -348,6 +484,33 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
             f"sim['output_format'] must be 'npz' or 'pkl' (got {ofmt!r})"
         )
     sim_cfg["output_format"] = ofmt
+
+    if output_full is not None:
+        sim_cfg["save_full_results"] = bool(output_full)
+        if bool(output_full) and "save_sidecars" not in sim_cfg_raw:
+            sim_cfg["save_sidecars"] = False
+
+    # plots_profile: optional presets for save_plots flags
+    plots_profile = sim_cfg.get("plots_profile", None)
+    if plots_profile not in (None, "", False):
+        prof = str(plots_profile).strip().lower()
+        defaults = {
+            "off": {"save_plots": False, "save_plots_inputs": False, "save_plots_synapses": False},
+            "basic": {"save_plots": True, "save_plots_inputs": False, "save_plots_synapses": False},
+            "inputs": {"save_plots": True, "save_plots_inputs": True, "save_plots_synapses": False},
+            "full": {"save_plots": True, "save_plots_inputs": True, "save_plots_synapses": True},
+        }
+        if prof not in defaults:
+            raise ValueError(
+                f"sim['plots_profile'] must be one of {sorted(defaults)} (got {plots_profile!r})"
+            )
+        if "save_plots" not in sim_cfg_raw:
+            sim_cfg["save_plots"] = defaults[prof]["save_plots"]
+        if "save_plots_inputs" not in sim_cfg_raw:
+            sim_cfg["save_plots_inputs"] = defaults[prof]["save_plots_inputs"]
+        if "save_plots_synapses" not in sim_cfg_raw:
+            sim_cfg["save_plots_synapses"] = defaults[prof]["save_plots_synapses"]
+        sim_cfg["plots_profile"] = prof
 
     # param_study: optional
     param_raw = sim_cfg.get("param_study", None)
@@ -379,12 +542,82 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
                 ) from exc
         sim_cfg["param_study"] = param
 
-    # --- NEW: normalize 'load' ---
-    load_raw = sim_cfg.get("load", None)
-    if load_raw in (None, "", False):
-        sim_cfg["load"] = None        # meaning: run a new simulation
+    # append/append_to: allow [enabled, path] or {"enabled":..., "path":...}
+    if "append" in sim_cfg_raw:
+        append_raw = sim_cfg_raw.get("append")
     else:
-        sim_cfg["load"] = str(load_raw)  # meaning: treat as file/path to load
+        append_raw = sim_cfg.get("append_to", None)
+    append_enabled = None
+    append_path = None
+    if isinstance(append_raw, (list, tuple)):
+        if len(append_raw) >= 1:
+            append_enabled = bool(append_raw[0])
+        if len(append_raw) >= 2:
+            append_path = append_raw[1]
+    elif isinstance(append_raw, dict):
+        append_enabled = bool(append_raw.get("enabled", False))
+        append_path = append_raw.get("path")
+    else:
+        if append_raw in (None, "", False):
+            append_enabled = False
+            append_path = None
+        else:
+            append_enabled = True
+            append_path = append_raw
+    sim_cfg["append_enabled"] = bool(append_enabled)
+    sim_cfg["append_to"] = None if append_path in (None, "", False) else str(append_path)
+    sim_cfg["append"] = sim_cfg["append_to"]
+
+    # Snapshot mode: force full capture for debugging comparisons
+    snapshot_raw = sim_cfg_raw.get("snapshot", sim_cfg.get("snapshot"))
+    snapshot_cfg = None
+    snapshot_enabled = False
+    if isinstance(snapshot_raw, dict):
+        snapshot_cfg = dict(snapshot_raw)
+        snapshot_enabled = bool(snapshot_cfg.get("enabled", False))
+    elif isinstance(snapshot_raw, str):
+        snapshot_enabled = snapshot_raw.strip().lower() in ("true", "1", "yes", "on")
+        snapshot_cfg = {}
+    elif snapshot_raw is True:
+        snapshot_enabled = True
+        snapshot_cfg = {}
+
+    if snapshot_enabled:
+        snapshot_cfg = snapshot_cfg or {}
+        snapshot_cfg["enabled"] = True
+
+        snap_trials = snapshot_cfg.get("n_trials", None)
+        if snap_trials is None:
+            snap_trials = 1
+        try:
+            snap_trials = int(snap_trials)
+        except Exception:
+            snap_trials = 1
+        if snap_trials < 1:
+            snap_trials = 1
+        sim_cfg["n_trials"] = snap_trials
+
+        if snapshot_cfg.get("save_all_inputs", True):
+            sim_cfg["n_inputs_to_save"] = "all"
+        if snapshot_cfg.get("save_all_traces", True):
+            sim_cfg["n_traces_to_save"] = snap_trials
+
+        sim_cfg["save_full_results"] = True
+        sim_cfg["save_sidecars"] = True
+        sim_cfg["save_syn_records_sidecar"] = True
+        sim_cfg["save_syn_records_by_trial"] = True
+        sim_cfg["save_input_stats"] = True
+        sim_cfg["log_input_summary"] = True
+        sim_cfg["save_output"] = True
+
+        snap_output = snapshot_cfg.get("output") or snapshot_cfg.get("output_stem")
+        if snap_output not in (None, "", False):
+            sim_cfg["output"] = str(snap_output)
+
+        sim_cfg["snapshot"] = snapshot_cfg
+
+    # Optional simplified randomness mode
+    sim_cfg = randomness.apply_randomness_mode(sim_cfg)
 
     return sim_cfg
 
@@ -495,6 +728,63 @@ def _normalize_group_configs(
     return groups_cfg
 
 
+def _expand_group_includes(
+    groups_cfg_raw: Any,
+    root: Path,
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Allow syn_config.json to point to per-group files via an include list.
+
+    Accepted forms:
+      - Plain dict of groups (legacy/normal).
+      - Dict with key "__includes__": list of relative file paths. Each file
+        must be a dict mapping group_name -> config. Any other keys in the
+        top-level dict are treated as inline group definitions and merged.
+      - Top-level list: treated as the include list (no inline groups).
+    """
+    # Legacy: already a dict of groups
+    if isinstance(groups_cfg_raw, dict) and "__includes__" not in groups_cfg_raw:
+        return groups_cfg_raw
+
+    include_list: List[str] = []
+    inline_groups: Dict[str, Any] = {}
+
+    if isinstance(groups_cfg_raw, list):
+        include_list = [str(p) for p in groups_cfg_raw]
+    elif isinstance(groups_cfg_raw, dict):
+        include_list = [str(p) for p in groups_cfg_raw.get("__includes__", []) or []]
+        inline_groups = {k: v for k, v in groups_cfg_raw.items() if k != "__includes__"}
+    else:
+        raise TypeError(
+            "syn_config must be a dict of groups, a dict with '__includes__', or a list of include paths"
+        )
+
+    merged: Dict[str, Dict[str, Any]] = {}
+
+    def _merge_from_file(rel_path: str) -> None:
+        p = (root / rel_path).expanduser()
+        if not p.is_file():
+            raise FileNotFoundError(f"Included synapse config file not found: {p}")
+        with p.open("r") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            raise TypeError(f"Included synapse config {p} must be a dict mapping group names to configs")
+        for gname, gcfg in data.items():
+            if gname in merged:
+                raise ValueError(f"Duplicate group '{gname}' found while merging {p}")
+            merged[gname] = gcfg
+
+    for rel in include_list:
+        _merge_from_file(rel)
+
+    for gname, gcfg in inline_groups.items():
+        if gname in merged:
+            raise ValueError(f"Duplicate group '{gname}' from inline groups for {gname!r}")
+        merged[gname] = gcfg
+
+    return merged
+
+
 def _init_rng(
     rng: Optional[np.random.Generator],
     sim_cfg: Dict[str, Any],
@@ -571,6 +861,16 @@ def _build_default_mode_registry() -> Dict[str, Any]:
 # 2.3.3 – Per-group processing
 # ====================================================================
 
+def _lognormal_mu_sigma(mean: float, std: float) -> Tuple[float, float]:
+    """
+    Return (mu, sigma) for np.random.lognormal given arithmetic mean & std.
+    """
+    if std <= 0 or mean <= 0:
+        return 0.0, 0.0
+    mu = math.log(mean**2 / math.sqrt(std**2 + mean**2))
+    sig = math.sqrt(math.log(1 + (std**2 / mean**2)))
+    return mu, sig
+
 def _process_all_groups(
     sim_cfg: Dict[str, Any],
     groups_cfg: Dict[str, Dict[str, Any]],
@@ -592,6 +892,33 @@ def _process_all_groups(
       6) package into GroupInputs
     """
     inputs: Dict[str, GroupInputs] = {}
+
+    # Optional: per-trial jitter of input start (global), used to delay baseline onset
+    jitter_tstart: Optional[float] = None
+    jitter_std = sim_cfg.get("jitter", None)
+    if jitter_std is not None:
+        try:
+            jitter_std = float(jitter_std)
+        except Exception as exc:
+            raise ValueError(f"sim['jitter'] must be numeric or null (got {jitter_std!r})") from exc
+        if jitter_std > 0:
+            if trial_rng is not None:
+                jitter_rng = trial_rng.rng("inputs", stream="jitter")
+            else:
+                seed = sim_cfg.get("seed", None)
+                if seed is None:
+                    jitter_rng = np.random.default_rng()
+                else:
+                    jitter_rng = np.random.default_rng(int(seed) ^ 0xA5A5A5A5)
+
+            mean = float(sim_cfg.get("tstart", 0.0))
+            mu, sig = _lognormal_mu_sigma(mean, jitter_std)
+            jitter_tstart = float(jitter_rng.lognormal(mu, sig)) if sig > 0 else mean
+            # Clamp to simulation window start
+            jitter_tstart = max(mean, jitter_tstart)
+
+    # Stash for timing calculation (used by modes)
+    sim_cfg["_jitter_tstart_ms"] = jitter_tstart
 
     for gname, gcfg in groups_cfg.items():
         # 1) Skip inactive or invalid groups
@@ -628,10 +955,15 @@ def _process_all_groups(
 
         # 5) Choose RNG for this group and run handler to get spike trains
         mode_name = gcfg.get("mode")
-        setting_path = mode_name if mode_name else "inputs"
+        setting_path = "inputs"
         group_rng = rng
         rand_meta = None
         if trial_rng is not None:
+            if mode_name:
+                sentinel = object()
+                mode_setting = trial_rng.setting(f"modes.{mode_name}", sentinel)
+                if mode_setting is not sentinel:
+                    setting_path = f"modes.{mode_name}"
             group_rng = trial_rng.rng(
                 setting_path,
                 group=gname,
@@ -716,6 +1048,7 @@ def _compile_density_from_spec(dist_spec: Any):
       - number        → dens(d) = const
       - callable      → dens(d) used as-is
       - dict          → {"kind": "uniform", "params": {"c": float, "multi": optional}}
+      - dict          → {"kind": "linear", "params": {"m": float, "b": float, "multi": optional}}
     """
     # None → uniform density 1.0
     if dist_spec is None:
@@ -739,7 +1072,15 @@ def _compile_density_from_spec(dist_spec: Any):
             const = c * multi
             return lambda d, c=const: c
 
-        # Placeholder for future shapes (linear, gaussian, etc.)
+        if kind == "linear":
+            m = params.get("m", params.get("slope", 0.0))
+            b = params.get("b", params.get("intercept", 0.0))
+            multi = float(params.get("multi", 1.0))
+            m = float(m)
+            b = float(b)
+            return lambda d, m=m, b=b, multi=multi: (m * d + b) * multi
+
+        # Placeholder for future shapes (gaussian, etc.)
         raise ValueError(f"dist_func spec with kind={kind!r} is not yet supported for N_syn resolution")
 
     raise TypeError(
@@ -920,6 +1261,7 @@ def _compute_time_anchors(
     input_stim_raw = _as_float_or_none(
         timing.get("input_stim_tstart_ms"), "timing['input_stim_tstart_ms']"
     )
+    source_tstart_raw: Optional[float] = None
 
 
     def _parse_baseline_spec(
@@ -972,7 +1314,7 @@ def _compute_time_anchors(
 
     baseline_spec, baseline_hz = _parse_baseline_spec(
         source.get("baseline"), "source['baseline']"
-    )   
+    )
      
     # Onset: default to sim start, clamped into [tstart, tstop]
     if onset_raw is None:
@@ -980,21 +1322,20 @@ def _compute_time_anchors(
     else:
         onset = max(min(onset_raw, tstop), tstart)
 
-    # stim_tstart: if not specified, and we have a source stim delay,
-    # default it to onset; otherwise leave None.
+    # stim_tstart: explicit marker in sim time for the stimulus; do not infer.
     if stim_tstart_raw is None:
-        stim_tstart = onset if input_stim_raw is not None else None
+        stim_tstart = None
     else:
         stim_tstart = max(min(stim_tstart_raw, tstop), tstart)
 
     # Source start: align source data so that its own stim event occurs
     # at stim_tstart in the simulation.
     source_tstart: Optional[float] = None
-    if input_stim_raw is not None:
-        # If stim_tstart is still None here, fall back to onset as a last resort
-        if stim_tstart is None:
-            stim_tstart = onset
-        source_tstart = stim_tstart - input_stim_raw
+    if (stim_tstart is not None) and (input_stim_raw is not None):
+        source_tstart_raw = stim_tstart - input_stim_raw
+        # Clamp to onset/sim window, but remember how much we trimmed so
+        # modes can discard the leading portion to keep stim alignment.
+        source_tstart = max(onset, tstart, source_tstart_raw)
 
     # Clamp source_tstart into the simulation window (but do not force it
     # to be >= onset; that interaction is handled by the block builder).
@@ -1023,13 +1364,30 @@ def _compute_time_anchors(
             else:
                 source_tstop = source_tstart + dur
 
+        # Clamp to sim window
+        source_tstop = min(source_tstop, tstop)
+
+    # If we ended up with an invalid source window, drop it (baseline/quiescent only)
+    if source_tstop is not None and source_tstart is not None and source_tstop <= source_tstart:
+        source_tstart = None
+        source_tstop = None
+
+    # How much of the source should be trimmed (when raw start < resolved start)
+    source_trim_ms: Optional[float] = None
+    if source_tstart is not None and source_tstart_raw is not None:
+        delta = source_tstart - source_tstart_raw
+        source_trim_ms = max(0.0, float(delta))
+
     anchors: Dict[str, Optional[float]] = {
         "sim_tstart": tstart,
         "sim_tstop": tstop,
         "onset": onset,
         "source_tstart": source_tstart,
         "source_tstop": source_tstop,
-        "baseline_rate_hz": baseline_hz, #baseline_raw,
+        "baseline_rate_hz": baseline_hz,  # numeric baseline only
+        "baseline_spec": baseline_spec,   # tokenized baseline (if any)
+        "source_trim_ms": source_trim_ms,
+        "jitter_tstart_ms": _as_float_or_none(sim_cfg.get("_jitter_tstart_ms"), "sim['_jitter_tstart_ms']"),
         # Extra fields for debugging / inspection (not used by block builder):
         "stim_tstart_ms": stim_tstart,
         "input_stim_tstart_ms": input_stim_raw,
@@ -1056,6 +1414,10 @@ def _build_time_blocks_from_anchors(
     source_tstart = anchors.get("source_tstart")
     source_tstop = anchors.get("source_tstop")
     baseline_rate = anchors.get("baseline_rate_hz")
+    baseline_spec = anchors.get("baseline_spec") or {}
+    baseline_active = (baseline_rate is not None and baseline_rate > 0.0) or (
+        baseline_spec.get("kind") not in (None, "none")
+    )
 
     # Clamp helpers
     def _clamp(t: Optional[float]) -> Optional[float]:
@@ -1082,7 +1444,7 @@ def _build_time_blocks_from_anchors(
     # Case: no valid source window → only quiescent + baseline/quiescent
     if source_tstart is None or source_tstop is None or source_tstop <= source_tstart:
         _add_block("quiescent", sim_tstart, onset)
-        kind = "baseline" if (baseline_rate is not None and baseline_rate > 0.0) else "quiescent"
+        kind = "baseline" if baseline_active else "quiescent"
         _add_block(kind, onset, sim_tstop)
         return blocks
 
@@ -1091,7 +1453,7 @@ def _build_time_blocks_from_anchors(
     src_stop = max(min(source_tstop, sim_tstop), sim_tstart)
     if src_stop <= src_start:
         _add_block("quiescent", sim_tstart, onset)
-        kind = "baseline" if (baseline_rate is not None and baseline_rate > 0.0) else "quiescent"
+        kind = "baseline" if baseline_active else "quiescent"
         _add_block(kind, onset, sim_tstop)
         return blocks
 
@@ -1101,7 +1463,7 @@ def _build_time_blocks_from_anchors(
     # 2) pre-source baseline or quiescent
     pre_start = max(onset, sim_tstart)
     pre_end = min(src_start, sim_tstop)
-    pre_kind = "baseline" if (baseline_rate is not None and baseline_rate > 0.0) else "quiescent"
+    pre_kind = "baseline" if baseline_active else "quiescent"
     _add_block(pre_kind, pre_start, pre_end)
 
     # 3) main source window
@@ -1110,7 +1472,7 @@ def _build_time_blocks_from_anchors(
     # 4) post-source baseline or quiescent
     post_start = max(src_stop, sim_tstart)
     post_end = sim_tstop
-    post_kind = "baseline" if (baseline_rate is not None and baseline_rate > 0.0) else "quiescent"
+    post_kind = "baseline" if baseline_active else "quiescent"
     _add_block(post_kind, post_start, post_end)
 
     return blocks
@@ -1213,6 +1575,8 @@ def _build_group_inputs(
             "source_tstart": anchors.get("source_tstart"),
             "source_tstop": anchors.get("source_tstop"),
             "baseline_rate_hz": anchors.get("baseline_rate_hz"),
+            "source_trim_ms": anchors.get("source_trim_ms"),
+            "jitter_tstart_ms": anchors.get("jitter_tstart_ms"),
         }
         meta["time_blocks"] = time_cfg.get("blocks", [])
 

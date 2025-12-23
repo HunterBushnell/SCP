@@ -1,0 +1,440 @@
+{
+  "cell": "PV",
+  "tune": "seg_tuned",
+  "n_trials": 4,
+  "trial_ids": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "randomness": {
+    "base_seed_used": 14599796195850805993,
+    "trials_setting": true,
+    "trial_nonces": {
+      "72": 2077268734092783963,
+      "73": 2708836746344932318,
+      "74": 8425368343937420605,
+      "75": 14341081658345240419
+    },
+    "random_seeds_used": [
+      {
+        "trial_idx": 72,
+        "setting_path": "inputs",
+        "group": null,
+        "stream": "jitter",
+        "label": "inputs",
+        "seed_used": 16710815318869619989
+      },
+      {
+        "trial_idx": 72,
+        "setting_path": "modes.inhomogeneous_poisson",
+        "group": "pn_exc",
+        "stream": "inhomogeneous_poisson",
+        "label": "modes.inhomogeneous_poisson",
+        "seed_used": 1208079312249180808
+      },
+      {
+        "trial_idx": 72,
+        "setting_path": "modes.homogeneous_poisson",
+        "group": "bg_exc",
+        "stream": "homogeneous_poisson",
+        "label": "modes.homogeneous_poisson",
+        "seed_used": 2473295659254056467
+      },
+      {
+        "trial_idx": 72,
+        "setting_path": "modes.homogeneous_poisson",
+        "group": "bg_inh",
+        "stream": "homogeneous_poisson",
+        "label": "modes.homogeneous_poisson",
+        "seed_used": 12742080660842527151
+      },
+      {
+        "trial_idx": 72,
+        "setting_path": "modes.homogeneous_poisson",
+        "group": "bg_exc_del",
+        "stream": "homogeneous_poisson",
+        "label": "modes.homogeneous_poisson",
+        "seed_used": 12160080637790295611
+      },
+      {
+        "trial_idx": 72,
+        "setting_path": "synapses.placement",
+        "group": "pn_exc",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 447004078374162622
+      },
+      {
+        "trial_idx": 72,
+        "setting_path": "synapses.weights",
+        "group": "pn_exc",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 13287251284441400349
+      },
+      {
+        "trial_idx": 72,
+        "setting_path": "synapses.placement",
+        "group": "bg_exc",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 2117653612044032993
+      },
+      {
+        "trial_idx": 72,
+        "setting_path": "synapses.weights",
+        "group": "bg_exc",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 2770029191761681278
+      },
+      {
+        "trial_idx": 72,
+        "setting_path": "synapses.placement",
+        "group": "bg_inh",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 14138626634514835771
+      },
+      {
+        "trial_idx": 72,
+        "setting_path": "synapses.weights",
+        "group": "bg_inh",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 7729502796399299536
+      },
+      {
+        "trial_idx": 72,
+        "setting_path": "synapses.placement",
+        "group": "bg_exc_del",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 9213712108876724031
+      },
+      {
+        "trial_idx": 72,
+        "setting_path": "synapses.weights",
+        "group": "bg_exc_del",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 9971766997297111578
+      },
+      {
+        "trial_idx": 73,
+        "setting_path": "inputs",
+        "group": null,
+        "stream": "jitter",
+        "label": "inputs",
+        "seed_used": 8852121342014352970
+      },
+      {
+        "trial_idx": 73,
+        "setting_path": "modes.inhomogeneous_poisson",
+        "group": "pn_exc",
+        "stream": "inhomogeneous_poisson",
+        "label": "modes.inhomogeneous_poisson",
+        "seed_used": 13568947597977947795
+      },
+      {
+        "trial_idx": 73,
+        "setting_path": "modes.homogeneous_poisson",
+        "group": "bg_exc",
+        "stream": "homogeneous_poisson",
+        "label": "modes.homogeneous_poisson",
+        "seed_used": 377191409788542681
+      },
+      {
+        "trial_idx": 73,
+        "setting_path": "modes.homogeneous_poisson",
+        "group": "bg_inh",
+        "stream": "homogeneous_poisson",
+        "label": "modes.homogeneous_poisson",
+        "seed_used": 2546753307658805830
+      },
+      {
+        "trial_idx": 73,
+        "setting_path": "modes.homogeneous_poisson",
+        "group": "bg_exc_del",
+        "stream": "homogeneous_poisson",
+        "label": "modes.homogeneous_poisson",
+        "seed_used": 17842097443447979187
+      },
+      {
+        "trial_idx": 73,
+        "setting_path": "synapses.placement",
+        "group": "pn_exc",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 717903976291296449
+      },
+      {
+        "trial_idx": 73,
+        "setting_path": "synapses.weights",
+        "group": "pn_exc",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 17093431412901207713
+      },
+      {
+        "trial_idx": 73,
+        "setting_path": "synapses.placement",
+        "group": "bg_exc",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 12558353878300009420
+      },
+      {
+        "trial_idx": 73,
+        "setting_path": "synapses.weights",
+        "group": "bg_exc",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 758478744619316827
+      },
+      {
+        "trial_idx": 73,
+        "setting_path": "synapses.placement",
+        "group": "bg_inh",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 2672254041713529357
+      },
+      {
+        "trial_idx": 73,
+        "setting_path": "synapses.weights",
+        "group": "bg_inh",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 10609486578339387691
+      },
+      {
+        "trial_idx": 73,
+        "setting_path": "synapses.placement",
+        "group": "bg_exc_del",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 7433242765407488722
+      },
+      {
+        "trial_idx": 73,
+        "setting_path": "synapses.weights",
+        "group": "bg_exc_del",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 17571015245898386760
+      },
+      {
+        "trial_idx": 74,
+        "setting_path": "inputs",
+        "group": null,
+        "stream": "jitter",
+        "label": "inputs",
+        "seed_used": 9104518201751746519
+      },
+      {
+        "trial_idx": 74,
+        "setting_path": "modes.inhomogeneous_poisson",
+        "group": "pn_exc",
+        "stream": "inhomogeneous_poisson",
+        "label": "modes.inhomogeneous_poisson",
+        "seed_used": 4956553396522750882
+      },
+      {
+        "trial_idx": 74,
+        "setting_path": "modes.homogeneous_poisson",
+        "group": "bg_exc",
+        "stream": "homogeneous_poisson",
+        "label": "modes.homogeneous_poisson",
+        "seed_used": 14135612743161435405
+      },
+      {
+        "trial_idx": 74,
+        "setting_path": "modes.homogeneous_poisson",
+        "group": "bg_inh",
+        "stream": "homogeneous_poisson",
+        "label": "modes.homogeneous_poisson",
+        "seed_used": 16654067097851049557
+      },
+      {
+        "trial_idx": 74,
+        "setting_path": "modes.homogeneous_poisson",
+        "group": "bg_exc_del",
+        "stream": "homogeneous_poisson",
+        "label": "modes.homogeneous_poisson",
+        "seed_used": 2764003950431143838
+      },
+      {
+        "trial_idx": 74,
+        "setting_path": "synapses.placement",
+        "group": "pn_exc",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 16615343033613461602
+      },
+      {
+        "trial_idx": 74,
+        "setting_path": "synapses.weights",
+        "group": "pn_exc",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 13754045641530039649
+      },
+      {
+        "trial_idx": 74,
+        "setting_path": "synapses.placement",
+        "group": "bg_exc",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 4594793126791952429
+      },
+      {
+        "trial_idx": 74,
+        "setting_path": "synapses.weights",
+        "group": "bg_exc",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 11270463341877777534
+      },
+      {
+        "trial_idx": 74,
+        "setting_path": "synapses.placement",
+        "group": "bg_inh",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 3026083420403294589
+      },
+      {
+        "trial_idx": 74,
+        "setting_path": "synapses.weights",
+        "group": "bg_inh",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 1930436425594734909
+      },
+      {
+        "trial_idx": 74,
+        "setting_path": "synapses.placement",
+        "group": "bg_exc_del",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 18210145083728212199
+      },
+      {
+        "trial_idx": 74,
+        "setting_path": "synapses.weights",
+        "group": "bg_exc_del",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 13880040373351768692
+      },
+      {
+        "trial_idx": 75,
+        "setting_path": "inputs",
+        "group": null,
+        "stream": "jitter",
+        "label": "inputs",
+        "seed_used": 4399761866029595577
+      },
+      {
+        "trial_idx": 75,
+        "setting_path": "modes.inhomogeneous_poisson",
+        "group": "pn_exc",
+        "stream": "inhomogeneous_poisson",
+        "label": "modes.inhomogeneous_poisson",
+        "seed_used": 16560500412267653537
+      },
+      {
+        "trial_idx": 75,
+        "setting_path": "modes.homogeneous_poisson",
+        "group": "bg_exc",
+        "stream": "homogeneous_poisson",
+        "label": "modes.homogeneous_poisson",
+        "seed_used": 2263178450663708450
+      },
+      {
+        "trial_idx": 75,
+        "setting_path": "modes.homogeneous_poisson",
+        "group": "bg_inh",
+        "stream": "homogeneous_poisson",
+        "label": "modes.homogeneous_poisson",
+        "seed_used": 7013960082357385633
+      },
+      {
+        "trial_idx": 75,
+        "setting_path": "modes.homogeneous_poisson",
+        "group": "bg_exc_del",
+        "stream": "homogeneous_poisson",
+        "label": "modes.homogeneous_poisson",
+        "seed_used": 9564969555670777684
+      },
+      {
+        "trial_idx": 75,
+        "setting_path": "synapses.placement",
+        "group": "pn_exc",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 7718804733458348239
+      },
+      {
+        "trial_idx": 75,
+        "setting_path": "synapses.weights",
+        "group": "pn_exc",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 17676979763677277364
+      },
+      {
+        "trial_idx": 75,
+        "setting_path": "synapses.placement",
+        "group": "bg_exc",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 6426009185924072363
+      },
+      {
+        "trial_idx": 75,
+        "setting_path": "synapses.weights",
+        "group": "bg_exc",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 11748499392324930716
+      },
+      {
+        "trial_idx": 75,
+        "setting_path": "synapses.placement",
+        "group": "bg_inh",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 1988116570024576948
+      },
+      {
+        "trial_idx": 75,
+        "setting_path": "synapses.weights",
+        "group": "bg_inh",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 5755333884706970704
+      },
+      {
+        "trial_idx": 75,
+        "setting_path": "synapses.placement",
+        "group": "bg_exc_del",
+        "stream": "placement",
+        "label": "synapses.placement",
+        "seed_used": 12255070762983555710
+      },
+      {
+        "trial_idx": 75,
+        "setting_path": "synapses.weights",
+        "group": "bg_exc_del",
+        "stream": "weights",
+        "label": "synapses.weights",
+        "seed_used": 5201895062904659084
+      }
+    ],
+    "seed_recipe": "SeedSequence([base_seed_used, trial_component, group_hash_u32, stream_hash_u32]) with base_seed_used expanded to 2x uint32 words"
+  }
+}

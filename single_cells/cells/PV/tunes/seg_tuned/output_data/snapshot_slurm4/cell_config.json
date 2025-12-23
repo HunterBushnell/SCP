@@ -1,0 +1,11 @@
+{
+  "cell_name": "PV",
+  "specimen_id": 484635029,
+  "model_type": "perisomatic",
+  "paths": {
+    "manifest": "manifest.json"
+  },
+  "tuning": {
+    "soma_diam_multiplier": 6.0
+  }
+}

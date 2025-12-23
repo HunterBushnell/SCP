@@ -1,0 +1,14 @@
+Compiling NEURON mechanisms with nrnivmodl...
+/home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned
+Mod files: "modfiles/modfiles/AMPA_NMDA_STP.mod" "modfiles/modfiles/CaDynamics.mod" "modfiles/modfiles/Ca_HVA.mod" "modfiles/modfiles/Ca_LVA.mod" "modfiles/modfiles/GABA_A.mod" "modfiles/modfiles/Ih.mod" "modfiles/modfiles/Im.mod" "modfiles/modfiles/Im_v2.mod" "modfiles/modfiles/Kd.mod" "modfiles/modfiles/K_P.mod" "modfiles/modfiles/K_T.mod" "modfiles/modfiles/Kv2like.mod" "modfiles/modfiles/Kv3_1.mod" "modfiles/modfiles/Nap.mod" "modfiles/modfiles/NaTa.mod" "modfiles/modfiles/NaTs.mod" "modfiles/modfiles/NaV.mod" "modfiles/modfiles/SK.mod" "modfiles/modfiles/vecstim.mod"
+
+ -> [32mCompiling[0m mod_func.cpp
+ => [32mLINKING[0m shared library ./libnrnmech.so
+ => [32mLINKING[0m executable ./special LDFLAGS are:    -pthread
+Successfully created x86_64/special
+Running: python /home/hrbncv/PV-SST/single_cells/run_pipeline.py --tune-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned --output-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_19893/parts --n-trials 1 --output-stem slurm_19893_7
+Mechanisms already loaded (skipping reload of /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/x86_64/.libs/libnrnmech.so)
+Loaded Allen cell for 'tunes' from /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/manifest.json, soma_diam_multiplier=6.0, Vinit=-71.0
+Geometry defined for 'tunes': 1 soma segs, 46 proximal dend segs, 41 distal dend segs, 97 total dend segs.
+Results saved to /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_19893/parts/slurm_19893_7/run_manifest.json
+Total runtime: 26.70s

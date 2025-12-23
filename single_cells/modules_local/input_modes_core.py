@@ -209,7 +209,7 @@ def _generate_inhomogeneous_from_curve(
 # =====================================================================
 
 # ---------------------------------------------------------------------
-# Mode: precomputed (STUB)
+# Mode: precomputed
 # ---------------------------------------------------------------------
 def _mode_precomputed(
     sim_cfg: Dict[str, Any],
@@ -223,8 +223,12 @@ def _mode_precomputed(
     Source options:
       - source["trains"]: inline list of spike-time arrays (ms, starting at 0)
       - source["path"]: path to file containing trains. Supported:
-          * .pkl/.p: pickled list, or pickled dict with a single key whose value is the list
+          * .pkl/.p: pickled list, or pickled dict (use source["key"] or single-key dict)
           * .json: either {"trains": [...]} or raw list
+
+    Selection:
+      - source["selection"] = "sample" (default) or "first_n"
+      - source["key"] selects a specific key in pickled dicts
 
     Timing:
       - Use time_cfg blocks; "source" blocks place sampled trains shifted to block start.
@@ -247,7 +251,139 @@ def _mode_precomputed(
 
     source = group_cfg.get("source", {}) or {}
 
+    def _normalize_pool(
+        obj,
+        *,
+        key: Optional[str] = None,
+        label: str = "precomputed",
+    ) -> List[np.ndarray]:
+        if isinstance(obj, dict):
+            if key:
+                if key not in obj:
+                    raise KeyError(f"{label}: key {key!r} not found")
+                obj = obj[key]
+            elif len(obj) == 1:
+                obj = next(iter(obj.values()))
+            else:
+                raise ValueError(
+                    f"{label}: multiple keys found; set source['key'] to select one"
+                )
+        if isinstance(obj, list):
+            return [np.asarray(x, dtype=float) for x in obj]
+        raise ValueError(f"{label}: trains must be a list or dict of lists")
+
+    def _select_input_group(inputs_map: Dict[str, Any]) -> str:
+        group_key = source.get("group") or source.get("group_name") or source.get("key")
+        if group_key and group_key in inputs_map:
+            return group_key
+        if len(inputs_map) == 1:
+            return next(iter(inputs_map.keys()))
+        if group_key:
+            raise KeyError(
+                f"precomputed: group {group_key!r} not found in inputs; "
+                f"available={list(inputs_map.keys())}"
+            )
+        raise KeyError(
+            "precomputed: multiple input groups found; set source['group'] "
+            "to choose one"
+        )
+
+    def _extract_pool_from_inputs(payload: Dict[str, Any]) -> List[np.ndarray]:
+        pool: List[np.ndarray] = []
+
+        inputs_by_trial = payload.get("inputs_by_trial")
+        if isinstance(inputs_by_trial, list):
+            for entry in inputs_by_trial:
+                inputs_map = (entry or {}).get("inputs", {}) or {}
+                if not inputs_map:
+                    continue
+                gname = _select_input_group(inputs_map)
+                gdata = inputs_map.get(gname, {}) or {}
+                for tr in gdata.get("spike_trains", []) or []:
+                    pool.append(np.asarray(tr, dtype=float))
+
+        inputs_single = payload.get("inputs")
+        if isinstance(inputs_single, dict):
+            inputs_map = inputs_single
+            if inputs_map:
+                gname = _select_input_group(inputs_map)
+                gdata = inputs_map.get(gname, {}) or {}
+                for tr in gdata.get("spike_trains", []) or []:
+                    pool.append(np.asarray(tr, dtype=float))
+
+        return pool
+
+    def _load_trains_from_run_dir(run_dir: Path) -> List[np.ndarray]:
+        manifest = run_dir / "run_manifest.json"
+        inputs_path: Optional[Path] = None
+        results_path: Optional[Path] = None
+
+        if manifest.is_file():
+            try:
+                files = json.loads(manifest.read_text()).get("files", {}) or {}
+            except Exception:
+                files = {}
+            if files.get("inputs_sample"):
+                inputs_path = run_dir / files["inputs_sample"]
+            if files.get("results_pkl"):
+                results_path = run_dir / files["results_pkl"]
+
+        if inputs_path is None:
+            fallback = run_dir / "inputs_sample.pkl"
+            if fallback.is_file():
+                inputs_path = fallback
+
+        if inputs_path is not None and inputs_path.is_file():
+            import pickle
+
+            with inputs_path.open("rb") as f:
+                payload = pickle.load(f)
+            pool = _extract_pool_from_inputs(payload if isinstance(payload, dict) else {})
+            if pool:
+                return pool
+
+        if results_path is not None and results_path.is_file():
+            import pickle
+
+            with results_path.open("rb") as f:
+                payload = pickle.load(f)
+            pool = _extract_pool_from_inputs(payload if isinstance(payload, dict) else {})
+            if pool:
+                return pool
+
+        raise ValueError(
+            "precomputed: run folder lacks inputs_sample.pkl with spike_trains. "
+            "Set n_traces_to_save > 0 (or save_full_results) and retry."
+        )
+
     def _load_trains_from_path(p: Path) -> List[np.ndarray]:
+        if p.is_file() and p.name == "run_manifest.json":
+            try:
+                return _load_trains_from_run_dir(p.parent)
+            except Exception:
+                p = p.parent
+
+        if p.is_dir():
+            if (p / "run_manifest.json").is_file() or (p / "inputs_sample.pkl").is_file():
+                try:
+                    return _load_trains_from_run_dir(p)
+                except Exception:
+                    pass
+
+            preferred = [p / f"{p.name}{ext}" for ext in (".pkl", ".p", ".json")]
+            candidates: List[Path] = [c for c in preferred if c.is_file()]
+            if not candidates:
+                candidates = sorted(p.glob("*.pkl"))
+            if not candidates:
+                candidates = sorted(p.glob("*.p"))
+            if not candidates:
+                candidates = sorted(p.glob("*.json"))
+            for candidate in candidates:
+                return _load_trains_from_path(candidate)
+            raise ValueError(
+                f"precomputed: no supported trains file found in {p}"
+            )
+
         if not p.is_file():
             raise FileNotFoundError(f"precomputed: file not found {p}")
         suffix = p.suffix.lower()
@@ -256,23 +392,17 @@ def _mode_precomputed(
 
             with p.open("rb") as f:
                 obj = pickle.load(f)
-            if isinstance(obj, dict) and len(obj) == 1:
-                obj = next(iter(obj.values()))
-            if isinstance(obj, list):
-                return [np.asarray(x, dtype=float) for x in obj]
-            raise ValueError(f"precomputed: unsupported pickle structure in {p}")
+            return _normalize_pool(obj, key=source.get("key"), label=f"precomputed:{p}")
         if suffix == ".json":
             with p.open("r") as f:
                 obj = json.load(f)
             if isinstance(obj, dict) and "trains" in obj:
                 obj = obj["trains"]
-            if isinstance(obj, list):
-                return [np.asarray(x, dtype=float) for x in obj]
-            raise ValueError(f"precomputed: unsupported JSON structure in {p}")
+            return _normalize_pool(obj, key=source.get("key"), label=f"precomputed:{p}")
         raise ValueError(f"precomputed: unsupported file type {p.suffix} for {p}")
 
     if source.get("trains") is not None:
-        pool = [np.asarray(x, dtype=float) for x in source["trains"]]
+        pool = _normalize_pool(source["trains"], key=source.get("key"))
     elif source.get("path"):
         pool = _load_trains_from_path(Path(source["path"]))
     else:
@@ -281,18 +411,31 @@ def _mode_precomputed(
     if not pool:
         return [np.array([], dtype=float) for _ in range(n_syn)]
 
-    # helper: sample trains for n_syn
+    selection = str(source.get("selection", "sample")).strip().lower()
+    if selection not in ("sample", "first_n"):
+        raise ValueError("precomputed: selection must be 'sample' or 'first_n'")
+
+    trim_ms = float(anchors.get("source_trim_ms", 0.0) or 0.0)
+    jitter_tstart = anchors.get("jitter_tstart_ms", None)
+
+    # helper: select trains for n_syn
     pool_size = len(pool)
-    def _sample_trains():
-        if n_syn == pool_size:
-            idx = np.arange(pool_size)
-        elif n_syn < pool_size:
+    def _select_trains():
+        if selection == "first_n":
+            if n_syn <= pool_size:
+                idx = list(range(n_syn))
+            else:
+                reps = n_syn // pool_size
+                rem = n_syn % pool_size
+                idx = list(range(pool_size)) * reps + list(range(rem))
+        elif n_syn <= pool_size:
             idx = rng.choice(pool_size, size=n_syn, replace=False)
         else:
             idx = rng.choice(pool_size, size=n_syn, replace=True)
         return [np.asarray(pool[i], dtype=float).copy() for i in idx]
 
     baseline_rate = anchors.get("baseline_rate_hz", None)
+    jitter_tstart = anchors.get("jitter_tstart_ms", None)
     trains_accum: List[List[float]] = [[] for _ in range(n_syn)]
 
     for block in blocks:
@@ -310,6 +453,13 @@ def _mode_precomputed(
             continue
 
         if kind == "baseline":
+            if jitter_tstart is not None:
+                try:
+                    t0 = max(t0, float(jitter_tstart))
+                except Exception:
+                    pass
+                if t1 <= t0:
+                    continue
             rate = baseline_rate
             if rate is None or rate <= 0.0:
                 continue
@@ -321,10 +471,16 @@ def _mode_precomputed(
                 rng=rng,
             )
         elif kind == "source":
-            sampled = _sample_trains()
+            sampled = _select_trains()
             seg_trains = []
             for tr in sampled:
-                shifted = tr + t0
+                # Trim any leading portion that would have occurred before the
+                # resolved source start, to keep the stimulus alignment when
+                # the raw source start was earlier than onset.
+                trimmed = tr - trim_ms
+                trimmed = trimmed[trimmed >= 0.0]
+
+                shifted = trimmed + t0
                 clipped = shifted[(shifted >= t0) & (shifted <= t1)]
                 seg_trains.append(clipped)
         else:
@@ -383,9 +539,15 @@ def _mode_homogeneous_poisson(
     time_cfg = group_cfg.get("time_cfg") or {}
     anchors  = time_cfg.get("anchors", {}) or {}
     onset    = float(anchors.get("onset", sim_tstart))
+    jitter_tstart = anchors.get("jitter_tstart_ms", None)
 
     # Effective window: from onset (clipped to sim start) to sim end
     t_start_ms = max(onset, sim_tstart)
+    if jitter_tstart is not None:
+        try:
+            t_start_ms = max(t_start_ms, float(jitter_tstart))
+        except Exception:
+            pass
     t_end_ms   = sim_tstop
 
     # Resolve synapse count
@@ -423,7 +585,7 @@ def _mode_homogeneous_poisson(
     return trains
 
 # ---------------------------------------------------------------------
-# Mode: inhomogeneous_poisson (STUB)
+# Mode: inhomogeneous_poisson
 # ---------------------------------------------------------------------
 def _mode_inhomogeneous_poisson(
     sim_cfg: Dict[str, Any],
@@ -432,10 +594,11 @@ def _mode_inhomogeneous_poisson(
     rng: np.random.Generator,
 ) -> List[np.ndarray]:
     """
-    Inhomogeneous Poisson driven by a rate curve (CSV).
+    Inhomogeneous Poisson driven by a rate curve (CSV or array).
 
     Assumptions for this implementation (current SST2 use case):
-      - source["path"] points to a CSV with columns time_col (seconds) and rate_col (Hz).
+      - source["path"] points to a CSV with columns time_col (seconds) and rate_col (Hz),
+        OR source["freq"] supplies an in-memory rate array (requires source["bin_ms"]).
       - time_col defaults to "Time", rate_col defaults to "AvgFiringRate".
       - Times < 0 are dropped; remaining times are shifted so the first sample is at 0 ms.
       - bin_ms is taken from source["bin_ms"] if provided; otherwise inferred from median Δt.
@@ -446,6 +609,7 @@ def _mode_inhomogeneous_poisson(
     time_cfg = (group_cfg or {}).get("time_cfg") or {}
     anchors = time_cfg.get("anchors", {}) or {}
     blocks = time_cfg.get("blocks", []) or []
+    jitter_tstart = anchors.get("jitter_tstart_ms", None)
 
     try:
         sim_tstart = float(sim_cfg["tstart"])
@@ -459,52 +623,101 @@ def _mode_inhomogeneous_poisson(
 
     source = group_cfg.get("source", {}) or {}
     path = source.get("path")
-    if not path:
-        raise ValueError("inhomogeneous_poisson requires source['path'] to a rate curve CSV")
+    freq = source.get("freq")
+    trim_ms = float(anchors.get("source_trim_ms", 0.0) or 0.0)
 
     time_col = source.get("time_col") or "Time"
     rate_col = source.get("rate_col") or "AvgFiringRate"
     bin_ms_cfg = source.get("bin_ms", None)
 
-    # Load curve
-    import pandas as pd  # local import to avoid forcing pandas on import
+    bin_ms = None
 
-    p = Path(path)
-    if not p.is_file():
-        raise FileNotFoundError(f"Rate curve file not found: {p}")
+    if path or (isinstance(freq, str) and freq):
+        # Load curve from CSV
+        import pandas as pd  # local import to avoid forcing pandas on import
 
-    df = pd.read_csv(p)
-    if time_col not in df or rate_col not in df:
-        raise ValueError(f"Rate curve file {p} missing required columns {time_col!r}/{rate_col!r}")
+        p = Path(path or freq)
+        if not p.is_file():
+            raise FileNotFoundError(f"Rate curve file not found: {p}")
 
-    times_ms = np.asarray(df[time_col], dtype=float) * 1000.0  # seconds → ms
-    rates_hz = np.asarray(df[rate_col], dtype=float)
+        df = pd.read_csv(p)
+        if time_col not in df or rate_col not in df:
+            raise ValueError(f"Rate curve file {p} missing required columns {time_col!r}/{rate_col!r}")
 
-    # Drop times < 0 and shift so first sample is at 0
-    keep = times_ms >= 0.0
-    times_ms = times_ms[keep]
-    rates_hz = rates_hz[keep]
-    if times_ms.size == 0:
-        raise ValueError(f"Rate curve {p} has no samples with time >= 0 ms after clipping.")
-    times_ms = times_ms - times_ms[0]
+        times_ms = np.asarray(df[time_col], dtype=float) * 1000.0  # seconds → ms
+        rates_hz = np.asarray(df[rate_col], dtype=float)
 
-    # Determine bin_ms
-    if bin_ms_cfg is not None:
-        try:
-            bin_ms = float(bin_ms_cfg)
-        except Exception as exc:
-            raise ValueError(f"source['bin_ms'] must be numeric (got {bin_ms_cfg!r})") from exc
+        # Drop times < 0 and shift so first sample is at 0
+        keep = times_ms >= 0.0
+        times_ms = times_ms[keep]
+        rates_hz = rates_hz[keep]
+        if times_ms.size == 0:
+            raise ValueError(f"Rate curve {p} has no samples with time >= 0 ms after clipping.")
+        times_ms = times_ms - times_ms[0]
+    elif freq is not None:
+        rates_hz = np.asarray(freq, dtype=float).ravel()
+        if rates_hz.size == 0:
+            raise ValueError("inhomogeneous_poisson: source['freq'] array is empty")
+        if bin_ms_cfg is None:
+            raise ValueError("inhomogeneous_poisson: source['bin_ms'] required for array inputs")
+        bin_ms = float(bin_ms_cfg)
+        if bin_ms <= 0.0:
+            raise ValueError(f"bin_ms must be > 0 (got {bin_ms!r})")
+        times_ms = np.arange(rates_hz.size, dtype=float) * bin_ms
     else:
-        if times_ms.size < 2:
-            raise ValueError("Cannot infer bin_ms from a single time sample; specify source['bin_ms'].")
-        diffs = np.diff(times_ms)
-        bin_ms = float(np.median(diffs))
-    if bin_ms <= 0.0:
-        raise ValueError(f"bin_ms must be > 0 (got {bin_ms!r})")
+        raise ValueError("inhomogeneous_poisson requires source['path'] or source['freq']")
+
+    # Determine bin_ms (CSV inputs)
+    if bin_ms is None:
+        if bin_ms_cfg is not None:
+            try:
+                bin_ms = float(bin_ms_cfg)
+            except Exception as exc:
+                raise ValueError(f"source['bin_ms'] must be numeric (got {bin_ms_cfg!r})") from exc
+        else:
+            if times_ms.size < 2:
+                raise ValueError("Cannot infer bin_ms from a single time sample; specify source['bin_ms'].")
+            diffs = np.diff(times_ms)
+            bin_ms = float(np.median(diffs))
+        if bin_ms <= 0.0:
+            raise ValueError(f"bin_ms must be > 0 (got {bin_ms!r})")
+
+    # If the raw source start was earlier than the resolved start, trim the
+    # leading portion so the stimulus alignment is preserved.
+    if trim_ms > 0.0 and bin_ms > 0.0:
+        trim_bins = int(np.floor(trim_ms / bin_ms))
+        if trim_bins > 0:
+            times_ms = times_ms[trim_bins:]
+            rates_hz = rates_hz[trim_bins:]
+            if times_ms.size:
+                times_ms = times_ms - times_ms[0]
 
     # Build per-synapse accumulators
     trains: List[List[float]] = [[] for _ in range(n_syn)]
     baseline_rate = anchors.get("baseline_rate_hz", None)
+    baseline_spec = anchors.get("baseline_spec", {}) or {}
+
+    def _baseline_from_spec():
+        if rates_hz.size == 0:
+            return None
+        if baseline_rate is not None:
+            return float(baseline_rate)
+        kind = baseline_spec.get("kind")
+        if kind == "from_curve":
+            where = baseline_spec.get("where")
+            if where == "start":
+                return float(rates_hz[0])
+            if where == "end":
+                return float(rates_hz[-1])
+            if where == "peak":
+                return float(np.max(rates_hz))
+        if kind == "from_curve_at":
+            t_ms = float(baseline_spec.get("t_ms", 0.0))
+            idx = int(np.argmin(np.abs(times_ms - t_ms)))
+            return float(rates_hz[idx])
+        return None
+
+    baseline_rate = _baseline_from_spec()
 
     # Precompute truncated/padded rate slices for any source block
     rates_len = rates_hz.size
@@ -525,6 +738,13 @@ def _mode_inhomogeneous_poisson(
             continue
 
         if kind == "baseline":
+            if jitter_tstart is not None:
+                try:
+                    t0 = max(t0, float(jitter_tstart))
+                except Exception:
+                    pass
+                if t1 <= t0:
+                    continue
             rate = baseline_rate
             if rate is None or rate <= 0.0:
                 continue

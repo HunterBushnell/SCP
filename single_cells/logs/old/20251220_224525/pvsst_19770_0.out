@@ -1,0 +1,8 @@
+Running: python /home/hrbncv/PV-SST/single_cells/run_pipeline.py --tune-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned --output-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_19771/results --n-trials 1 --output-stem slurm_19771_0
+Mechanisms already loaded (skipping reload of /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/x86_64/.libs/libnrnmech.so)
+Loaded Allen cell for 'tunes' from /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/manifest.json, soma_diam_multiplier=1.0, Vinit=-71.0
+Geometry defined for 'tunes': 1 soma segs, 46 proximal dend segs, 41 distal dend segs, 97 total dend segs.
+Results saved to /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_19771/results/slurm_19771_0/run_manifest.json
+Total runtime: 26.24s
+Submitting merge job: python /home/hrbncv/PV-SST/single_cells/scripts/merge_array_results.py --output-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_19771/results --job-id 19771 --output-stem merged
+Submitted batch job 19773

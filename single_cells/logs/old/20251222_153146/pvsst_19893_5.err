@@ -1,0 +1,12 @@
+/home/hrbncv/miniconda3/envs/BMTK/bin/nrnivmodl:10: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+  from pkg_resources import working_set
+makemod2c_inc:9: warning: overriding recipe for target 'AMPA_NMDA_STP.c'
+makemod2c_inc:2: warning: ignoring old recipe for target 'AMPA_NMDA_STP.c'
+makemod2c_inc:13: warning: overriding recipe for target 'AMPA_NMDA_STP.o'
+makemod2c_inc:6: warning: ignoring old recipe for target 'AMPA_NMDA_STP.o'
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+NEURON: The user defined name already exists: AMPA_NMDA_STP
+ near line 0
+ ^
+        nrn_load_dll("/home/hrbn...")

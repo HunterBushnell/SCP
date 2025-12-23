@@ -2,17 +2,44 @@
   "cell": "PV",
   "tune": "seg_tuned",
   "color": "b",
+  "specimen_id": 484635029,
+  "model_type": "perisomatic",
+  "soma_diam_multiplier": 6.0,
 
-  "load": null,
-  "output": null,
-  "output_format": "pkl",
-
-  "n_trials": 2,
-  "n_traces_to_save": 1,
-
-  "tstart": 200.0,
-  "tstop": 1000.0,
+  "tstart": 50.0,
+  "tstop": 1200.0,
   "dt": 0.025,
+  "jitter": 100.0,
+  "stim_start_ms": 400.0,
+  "stim_duration_ms": 550.0,
+
+  "iclamp": {
+    "enabled": false,
+    "amp_nA": 0.2,
+    "delay_ms": 200.0,
+    "dur_ms": 800.0,
+    "tstop_ms": null,
+    "dt_ms": null,
+    "record_currents": false
+  },
+  "snapshot": {
+    "enabled": true,
+    "n_trials": 1,
+    "save_all_inputs": true,
+    "save_all_traces": true,
+    "save_syn_records_by_trial": true
+  },
+
+  "n_trials": 1,
+  "n_traces_to_save": 1,
+  "n_inputs_to_save": "all",
+
+  "load": [false, null],
+  "save": [false, "snapshot_nb4", "pkl", true],
+  "append": [false, null],
+
+  "input_stats_bin_ms": 5.0,
+  "plots_profile": "off",
 
   "param_study": {
     "input_type": null,
@@ -21,34 +48,7 @@
     "n_trials": null
   },
 
-
-  "randomness": {
-    "global": {
-        "state": true,
-        "seed": null
-    },
-
-    "trials": "derived",
-
-    "inputs": "derived",
-
-    "timing": {
-        "tstart": null,
-        "tstop": null,
-        "jitter": null
-    },
-
-    "synapses": {
-        "placement": "derived",
-        "weights": "derived",
-        "dynamics": null
-    },
-
-    "modes": {
-        "homogeneous_poisson": "derived",
-        "inhomogeneous_poisson": "derived",
-        "precomputed": null
-    }
-  }
+  "randomness_mode": "fixed",
+  "random_seed": 12345
 
 }

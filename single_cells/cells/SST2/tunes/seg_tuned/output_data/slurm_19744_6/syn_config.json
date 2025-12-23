@@ -1,0 +1,348 @@
+{
+  "pn_exc": {
+    "state": true,
+    "mode": "inhomogeneous_poisson",
+    "source": {
+      "freq": null,
+      "baseline": 2.3,
+      "path": "/home/hrbncv/PV-SST/single_cells/Madhu_Data/bio_cell_output/pyrFiringRateAvg.csv",
+      "bin_ms": 5,
+      "kind": null,
+      "time_col": null,
+      "rate_col": null,
+      "ref": null,
+      "key": null
+    },
+    "timing": {
+      "onset_ms": null,
+      "stim_tstart_ms": 600.0,
+      "duration_ms": null,
+      "input_stim_tstart_ms": 100,
+      "input_duration_ms": 550
+    },
+    "syns": {
+      "type": "AMPA_NMDA_STP",
+      "N_syn": 50,
+      "segs": "all",
+      "dist_func": {
+        "kind": "uniform",
+        "params": {
+          "c": 2.0
+        }
+      },
+      "params": {
+        "wt_mean": 0.75,
+        "wt_std": 0.34,
+        "initW": 1.0,
+        "gmax_AMPA": 0.001,
+        "gmax_NMDA": 0.001,
+        "tau_r_AMPA": 4,
+        "tau_d_AMPA": 5,
+        "Use": 0.4,
+        "Dep": 0,
+        "Fac": 70,
+        "NMDA_ratio": 1.5
+      },
+      "N_syn_resolved": 50
+    },
+    "time_cfg": {
+      "anchors": {
+        "sim_tstart": 200.0,
+        "sim_tstop": 1200.0,
+        "onset": 200.0,
+        "source_tstart": 500.0,
+        "source_tstop": 1200.0,
+        "baseline_rate_hz": 2.3,
+        "baseline_spec": {
+          "kind": "fixed",
+          "hz": 2.3
+        },
+        "source_trim_ms": 0.0,
+        "jitter_tstart_ms": null,
+        "stim_tstart_ms": 600.0,
+        "input_stim_tstart_ms": 100.0,
+        "duration_ms": null,
+        "input_duration_ms": 550.0
+      },
+      "blocks": [
+        {
+          "kind": "baseline",
+          "t_start": 200.0,
+          "t_end": 500.0
+        },
+        {
+          "kind": "source",
+          "t_start": 500.0,
+          "t_end": 1200.0
+        }
+      ]
+    }
+  },
+  "vip_inh": {
+    "state": false,
+    "mode": "precomputed",
+    "color": null,
+    "source": {
+      "freq": null,
+      "baseline": 4.0,
+      "path": "/home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/tune1_1000tr1000ms",
+      "bin_ms": null,
+      "kind": null,
+      "time_col": null,
+      "rate_col": null,
+      "ref": null,
+      "key": null
+    },
+    "timing": {
+      "onset_ms": null,
+      "stim_tstart_ms": 650,
+      "duration_ms": null,
+      "input_stim_tstart_ms": 400,
+      "input_duration_ms": null
+    },
+    "syns": {
+      "type": "GABA_A",
+      "N_syn": 10,
+      "segs": "proximal",
+      "dist_func": {
+        "kind": "uniform",
+        "params": {
+          "c": 2.0
+        }
+      },
+      "params": {
+        "wt_mean": 2.0,
+        "wt_std": 0.34,
+        "initW": 1.0,
+        "gmax": 0.001,
+        "tau_r_GABAA": 0.5,
+        "tau_d_GABAA": 5.5
+      }
+    }
+  },
+  "bg_exc": {
+    "state": true,
+    "mode": "homogeneous_poisson",
+    "color": null,
+    "source": {
+      "freq": 0.05,
+      "baseline": null,
+      "path": null,
+      "bin_ms": null,
+      "kind": null,
+      "time_col": null,
+      "rate_col": null,
+      "ref": null,
+      "key": null
+    },
+    "timing": {
+      "onset_ms": null,
+      "stim_tstart_ms": null,
+      "duration_ms": null,
+      "input_stim_tstart_ms": null,
+      "input_duration_ms": null
+    },
+    "syns": {
+      "type": "AMPA_NMDA_STP",
+      "N_syn": null,
+      "segs": "all",
+      "dist_func": {
+        "kind": "uniform",
+        "params": {
+          "c": 2.0,
+          "multi": 0.8
+        }
+      },
+      "params": {
+        "wt_mean": 0.5,
+        "wt_std": 0.34,
+        "initW": 1.0,
+        "gmax_AMPA": 0.001,
+        "gmax_NMDA": 0.001,
+        "tau_r_AMPA": 4,
+        "tau_d_AMPA": 5,
+        "Use": 0.4,
+        "Dep": 0,
+        "Fac": 70,
+        "NMDA_ratio": 1.5
+      },
+      "N_syn_resolved": 3382
+    },
+    "time_cfg": {
+      "anchors": {
+        "sim_tstart": 200.0,
+        "sim_tstop": 1200.0,
+        "onset": 200.0,
+        "source_tstart": null,
+        "source_tstop": null,
+        "baseline_rate_hz": null,
+        "baseline_spec": {
+          "kind": "none"
+        },
+        "source_trim_ms": null,
+        "jitter_tstart_ms": null,
+        "stim_tstart_ms": null,
+        "input_stim_tstart_ms": null,
+        "duration_ms": null,
+        "input_duration_ms": null
+      },
+      "blocks": [
+        {
+          "kind": "quiescent",
+          "t_start": 200.0,
+          "t_end": 1200.0
+        }
+      ]
+    }
+  },
+  "bg_inh": {
+    "state": true,
+    "mode": "homogeneous_poisson",
+    "color": null,
+    "source": {
+      "freq": 0.5,
+      "baseline": null,
+      "path": null,
+      "bin_ms": null,
+      "kind": null,
+      "time_col": null,
+      "rate_col": null,
+      "ref": null,
+      "key": null
+    },
+    "timing": {
+      "onset_ms": null,
+      "stim_tstart_ms": null,
+      "duration_ms": null,
+      "input_stim_tstart_ms": null,
+      "input_duration_ms": null
+    },
+    "syns": {
+      "type": "GABA_A",
+      "N_syn": null,
+      "segs": "all",
+      "dist_func": {
+        "kind": "uniform",
+        "params": {
+          "c": 2.0,
+          "multi": 0.2
+        }
+      },
+      "params": {
+        "wt_mean": 0.5,
+        "wt_std": 0.34,
+        "initW": 1.0,
+        "gmax": 0.001,
+        "tau_r_GABAA": 0.5,
+        "tau_d_GABAA": 5.5
+      },
+      "N_syn_resolved": 796
+    },
+    "time_cfg": {
+      "anchors": {
+        "sim_tstart": 200.0,
+        "sim_tstop": 1200.0,
+        "onset": 200.0,
+        "source_tstart": null,
+        "source_tstop": null,
+        "baseline_rate_hz": null,
+        "baseline_spec": {
+          "kind": "none"
+        },
+        "source_trim_ms": null,
+        "jitter_tstart_ms": null,
+        "stim_tstart_ms": null,
+        "input_stim_tstart_ms": null,
+        "duration_ms": null,
+        "input_duration_ms": null
+      },
+      "blocks": [
+        {
+          "kind": "quiescent",
+          "t_start": 200.0,
+          "t_end": 1200.0
+        }
+      ]
+    }
+  },
+  "bg_exc_del": {
+    "state": true,
+    "mode": "homogeneous_poisson",
+    "color": null,
+    "source": {
+      "freq": 10.0,
+      "baseline": null,
+      "path": null,
+      "bin_ms": null,
+      "kind": null,
+      "time_col": null,
+      "rate_col": null,
+      "ref": null,
+      "key": null
+    },
+    "timing": {
+      "onset_ms": 800,
+      "stim_tstart_ms": null,
+      "duration_ms": null,
+      "input_stim_tstart_ms": null,
+      "input_duration_ms": null
+    },
+    "syns": {
+      "type": "AMPA_NMDA_STP",
+      "N_syn": 20,
+      "segs": "all",
+      "dist_func": {
+        "kind": "uniform",
+        "params": {
+          "c": 2.0,
+          "multi": 0.8
+        }
+      },
+      "params": {
+        "wt_mean": 0.5,
+        "wt_std": 0.34,
+        "initW": 1.0,
+        "gmax_AMPA": 0.001,
+        "gmax_NMDA": 0.001,
+        "tau_r_AMPA": 4,
+        "tau_d_AMPA": 5,
+        "Use": 0.4,
+        "Dep": 0,
+        "Fac": 70,
+        "NMDA_ratio": 1.5
+      },
+      "N_syn_resolved": 20
+    },
+    "time_cfg": {
+      "anchors": {
+        "sim_tstart": 200.0,
+        "sim_tstop": 1200.0,
+        "onset": 800.0,
+        "source_tstart": null,
+        "source_tstop": null,
+        "baseline_rate_hz": null,
+        "baseline_spec": {
+          "kind": "none"
+        },
+        "source_trim_ms": null,
+        "jitter_tstart_ms": null,
+        "stim_tstart_ms": null,
+        "input_stim_tstart_ms": null,
+        "duration_ms": null,
+        "input_duration_ms": null
+      },
+      "blocks": [
+        {
+          "kind": "quiescent",
+          "t_start": 200.0,
+          "t_end": 800.0
+        },
+        {
+          "kind": "quiescent",
+          "t_start": 800.0,
+          "t_end": 1200.0
+        }
+      ]
+    }
+  }
+}

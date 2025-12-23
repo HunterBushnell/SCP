@@ -1,0 +1,6 @@
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+NEURON: The user defined name already exists: AMPA_NMDA_STP
+ near line 0
+ ^
+        nrn_load_dll("/home/hrbn...")

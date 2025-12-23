@@ -1,0 +1,14 @@
+Running: python /home/hrbncv/PV-SST/single_cells/run_pipeline.py --tune-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned --output-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_19952/parts --n-trials 4 --output-stem slurm_19952_21
+Loaded mechanisms from /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/modfiles/x86_64/.libs/libnrnmech.so
+Loaded Allen cell for 'tunes' from /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/manifest.json, soma_diam_multiplier=6.0, Vinit=-71.0
+Geometry defined for 'tunes': 1 soma segs, 46 proximal dend segs, 41 distal dend segs, 97 total dend segs.
+[trial 1/4] input_spikes: pn_exc=225 bg_exc=53 bg_inh=1284 bg_exc_del=61 sst_inh=69 pv_inh=79
+[trial 1/4] spikes=7  rate=6.09 Hz  time=27.80s
+[trial 2/4] input_spikes: pn_exc=228 bg_exc=42 bg_inh=1262 bg_exc_del=60 sst_inh=65 pv_inh=79
+[trial 2/4] spikes=10  rate=8.70 Hz  time=27.63s
+[trial 3/4] input_spikes: pn_exc=227 bg_exc=44 bg_inh=1234 bg_exc_del=59 sst_inh=68 pv_inh=75
+[trial 3/4] spikes=9  rate=7.83 Hz  time=27.57s
+[trial 4/4] input_spikes: pn_exc=218 bg_exc=49 bg_inh=1186 bg_exc_del=60 sst_inh=82 pv_inh=80
+[trial 4/4] spikes=5  rate=4.35 Hz  time=27.63s
+Results saved to /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_19952/parts/slurm_19952_21/run_manifest.json
+Total runtime: 110.96s

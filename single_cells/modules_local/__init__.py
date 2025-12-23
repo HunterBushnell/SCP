@@ -9,3 +9,4 @@ Step 2 (Build Cell) components:
 """
 
 from .load_cell import load_cell  # re-export for convenience
+from .bio_curve import load_bio_curve  # re-export for convenience

@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Mapping, Tuple
-import json, copy, os, pickle, math, random
+import json, copy, os, pickle, math, random, time, sys, hashlib
 import numpy as np
 import matplotlib.pyplot as plt
 from neuron import h, gui  # gui not needed in headless scripts
@@ -51,12 +51,17 @@ def get_frequency(v,sim_params):
         return 0
     
 
+def _get_hoc(cell):
+    return getattr(cell, "h", cell)
+
+
 def run_current_injection(cell,sim_params,):
     
     # from neuron import h
     # h.load_file("stdrun.hoc")
 
-    stim = h.IClamp(cell.soma[0](0.5))
+    hoc = _get_hoc(cell)
+    stim = h.IClamp(hoc.soma[0](0.5))
     stim.amp = sim_params['stim_amp']
     stim.delay = sim_params['stim_delay']
     stim.dur = sim_params['stim_dur']
@@ -68,11 +73,11 @@ def run_current_injection(cell,sim_params,):
     recorded_data = {}
 
     # Attach recorders
-    vvec = h.Vector().record(cell.soma[0](0.5)._ref_v)
+    vvec = h.Vector().record(hoc.soma[0](0.5)._ref_v)
     tvec = h.Vector().record(h._ref_t)
 
     # Attach *all* the current recorders in that section
-    current_recording_vars = get_rec_vars_for_i_in_sec(cell.soma[0], 0.5)
+    current_recording_vars = get_rec_vars_for_i_in_sec(hoc.soma[0], 0.5)
 
     # Run
     h.finitialize()
@@ -85,6 +90,68 @@ def run_current_injection(cell,sim_params,):
     recorded_data['I'] = {name: vec.as_numpy().copy() for name, vec in current_recording_vars.items()} #ivecs
 
     return recorded_data
+
+
+def run_iclamp_test(cell, sim_cfg, iclamp_cfg=None):
+    """
+    Run a simple somatic current injection (IClamp) test.
+
+    Uses sim_cfg plus optional iclamp_cfg overrides to build parameters.
+    Returns a results dict compatible with save_results (traces + meta).
+    """
+    sim_cfg = dict(sim_cfg or {})
+    iclamp = dict(sim_cfg.get("iclamp", {}) or {})
+    if iclamp_cfg:
+        iclamp.update(iclamp_cfg)
+
+    def _get_float(key, fallback):
+        val = iclamp.get(key, None)
+        if val in (None, "", False):
+            val = fallback
+        return float(val)
+
+    amp_nA = _get_float("amp_nA", 0.2)
+    delay_ms = _get_float("delay_ms", sim_cfg.get("tstart", 0.0))
+    dur_ms = _get_float("dur_ms", sim_cfg.get("stim_duration_ms", 500.0))
+    dt_ms = _get_float("dt_ms", sim_cfg.get("dt", 0.025))
+
+    tstop_raw = iclamp.get("tstop_ms", None)
+    if tstop_raw in (None, "", False):
+        tstop_raw = sim_cfg.get("tstop", delay_ms + dur_ms)
+    tstop_ms = float(tstop_raw)
+
+    sim_params = {
+        "stim_amp": amp_nA,
+        "stim_delay": delay_ms,
+        "stim_dur": dur_ms,
+        "h_tstop": tstop_ms,
+        "h_dt": dt_ms,
+    }
+
+    record_currents = bool(iclamp.get("record_currents", False))
+    recorded = run_current_injection(cell, sim_params)
+    if not record_currents:
+        recorded.pop("I", None)
+
+    meta = {
+        "experiment": "iclamp",
+        "amp_nA": amp_nA,
+        "delay_ms": delay_ms,
+        "dur_ms": dur_ms,
+        "tstop_ms": tstop_ms,
+        "dt_ms": dt_ms,
+        "record_currents": record_currents,
+        "frequency_hz": recorded.get("F"),
+    }
+
+    results = {
+        "mode": "iclamp",
+        "sim_cfg": sim_cfg,
+        "meta": meta,
+        "traces": {"T": recorded.get("T"), "V": recorded.get("V")},
+        "iclamp": recorded,
+    }
+    return results
 
 def looped_current_injection(cell,sim_params,sim_amps,):
 
@@ -278,6 +345,399 @@ def _detect_spikes(T: np.ndarray, V: np.ndarray, v_thresh: float = 0.0) -> np.nd
     return T[crossings]
 
 
+def _as_bool(val: Any, default: bool = True) -> bool:
+    if val is None:
+        return default
+    if isinstance(val, str):
+        v = val.strip().lower()
+        if v in ("false", "0", "no", "off", ""):
+            return False
+        if v in ("true", "1", "yes", "on"):
+            return True
+    return bool(val)
+
+
+def _snapshot_cfg(sim_cfg: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
+    snap = sim_cfg.get("snapshot", None)
+    if isinstance(snap, dict):
+        return bool(snap.get("enabled", False)), snap
+    if snap is True:
+        return True, {"enabled": True}
+    if isinstance(snap, str) and snap.strip().lower() in ("true", "1", "yes", "on"):
+        return True, {"enabled": True}
+    return False, {}
+
+
+def _apply_snapshot_deterministic(sim_cfg: Dict[str, Any], snapshot_cfg: Dict[str, Any]) -> None:
+    """
+    Best-effort deterministic settings for snapshot comparisons.
+    Only applies if snapshot_cfg.force_deterministic is True (default).
+    """
+    if not snapshot_cfg.get("force_deterministic", True):
+        snapshot_cfg["deterministic_applied"] = False
+        return
+
+    seed = snapshot_cfg.get("deterministic_seed")
+    if seed is None:
+        seed = sim_cfg.get("random_seed", sim_cfg.get("seed", 0))
+    try:
+        seed = int(seed)
+    except Exception:
+        seed = 0
+
+    try:
+        random.seed(seed)
+    except Exception:
+        pass
+    try:
+        np.random.seed(seed % (2**32 - 1))
+    except Exception:
+        pass
+
+    try:
+        if hasattr(h, "cvode"):
+            h.cvode.active(0)
+    except Exception:
+        pass
+    try:
+        if hasattr(h, "nthread"):
+            h.nthread(1)
+    except Exception:
+        pass
+    try:
+        if hasattr(h, "Random123_globalindex"):
+            h.Random123_globalindex(seed)
+    except Exception:
+        pass
+
+    snapshot_cfg["deterministic_applied"] = True
+    snapshot_cfg["deterministic_seed"] = seed
+
+
+def _collect_versions() -> Dict[str, str]:
+    versions = {
+        "python": sys.version.split()[0],
+        "python_exe": sys.executable,
+        "numpy": np.__version__,
+    }
+    try:
+        versions["neuron"] = str(getattr(h, "nrnversion", lambda: "unknown")())
+    except Exception:
+        versions["neuron"] = "unknown"
+    return versions
+
+
+def _collect_env_snapshot() -> Dict[str, Any]:
+    keys = (
+        "OMP_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+        "NEURONHOME",
+        "NRNHOME",
+        "NRN_NMODL_PATH",
+        "NRNMECH_DLL",
+    )
+    snap: Dict[str, Any] = {}
+    for key in keys:
+        val = os.environ.get(key)
+        if val not in (None, ""):
+            snap[key] = val
+    return snap
+
+
+def _collect_neuron_state() -> Dict[str, Any]:
+    state: Dict[str, Any] = {}
+    for key in ("dt", "tstop", "t", "celsius", "secondorder", "v_init", "steps_per_ms"):
+        try:
+            state[key] = float(getattr(h, key))
+        except Exception:
+            pass
+    try:
+        if hasattr(h, "cvode"):
+            cvode = h.cvode
+            state["cvode_active"] = int(cvode.active())
+            for name in ("atol", "rtol", "minstep", "maxstep"):
+                try:
+                    state[f"cvode_{name}"] = float(getattr(cvode, name)())
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    try:
+        if hasattr(h, "secondorder"):
+            state["secondorder"] = int(h.secondorder)
+    except Exception:
+        pass
+    try:
+        if hasattr(h, "nthread"):
+            state["nthread"] = int(h.nthread())
+    except Exception:
+        pass
+    return state
+
+
+def _sha256_file(path: Path) -> str:
+    hsh = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            hsh.update(chunk)
+    return hsh.hexdigest()
+
+
+def _collect_mechanism_info(sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    info: Dict[str, Any] = {}
+    tune_dir = sim_cfg.get("tune_dir")
+    if tune_dir:
+        try:
+            tune_path = Path(str(tune_dir)).expanduser().resolve()
+        except Exception:
+            tune_path = None
+    else:
+        cell = sim_cfg.get("cell")
+        tune = sim_cfg.get("tune")
+        if cell and tune:
+            base = Path(__file__).resolve().parent.parent
+            tune_path = base / "cells" / str(cell) / "tunes" / str(tune)
+        else:
+            tune_path = None
+
+    if tune_path is None:
+        return info
+
+    info["tune_dir"] = str(tune_path)
+    mod_dir = tune_path / "modfiles"
+    mod_files = sorted(p for p in mod_dir.glob("*.mod")) if mod_dir.is_dir() else []
+    if mod_files:
+        info["modfiles_count"] = len(mod_files)
+        info["modfiles"] = [p.name for p in mod_files]
+        hsh = hashlib.sha256()
+        for p in mod_files:
+            try:
+                hsh.update(p.name.encode("ascii", errors="ignore"))
+                hsh.update(_sha256_file(p).encode("ascii"))
+            except Exception:
+                continue
+        info["modfiles_sha256"] = hsh.hexdigest()
+
+    dll_candidates = [
+        mod_dir / "x86_64" / ".libs" / "libnrnmech.so",
+        mod_dir / "x86_64" / "libnrnmech.so",
+    ]
+    for dll in dll_candidates:
+        if dll.is_file():
+            info["dll_path"] = str(dll)
+            try:
+                stat = dll.stat()
+                info["dll_size"] = int(stat.st_size)
+                info["dll_mtime"] = float(stat.st_mtime)
+            except Exception:
+                pass
+            try:
+                info["dll_sha256"] = _sha256_file(dll)
+            except Exception:
+                pass
+            break
+
+    return info
+
+
+def _snapshot_netcon_state(syn_state: Dict[str, Any]) -> Dict[str, Any]:
+    snapshot: Dict[str, Any] = {}
+    netcons = syn_state.get("netcons", {}) or {}
+    for group, ncs in netcons.items():
+        weights: List[Optional[float]] = []
+        delays: List[Optional[float]] = []
+        for nc in ncs or []:
+            try:
+                weights.append(float(nc.weight[0]))
+            except Exception:
+                weights.append(None)
+            try:
+                delays.append(float(nc.delay))
+            except Exception:
+                delays.append(None)
+        snapshot[group] = {"n": len(ncs), "weights": weights, "delays": delays}
+    return snapshot
+
+
+def _snapshot_synapse_params(
+    syn_state: Dict[str, Any],
+    groups_cfg: Dict[str, Any],
+) -> Dict[str, Any]:
+    snapshot: Dict[str, Any] = {}
+    syn_by_group = syn_state.get("synapses", {}) or {}
+    for group, syn_list in syn_by_group.items():
+        if not syn_list:
+            continue
+        syn = syn_list[0]
+        gcfg = groups_cfg.get(group, {}) or {}
+        syn_cfg = gcfg.get("syns", {}) or {}
+        params_cfg = syn_cfg.get("params", {}) or {}
+        present = {}
+        missing = []
+        for key in params_cfg:
+            if hasattr(syn, key):
+                try:
+                    present[key] = float(getattr(syn, key))
+                except Exception:
+                    present[key] = getattr(syn, key)
+            else:
+                missing.append(key)
+        snapshot[group] = {
+            "type": syn_cfg.get("type"),
+            "params_present": present,
+            "params_missing": missing,
+        }
+    return snapshot
+
+
+def _resolve_inputs_to_save(sim_cfg: Dict[str, Any], n_trials: int, fallback: int) -> int:
+    raw = sim_cfg.get("n_inputs_to_save", None)
+    if raw is None:
+        raw = sim_cfg.get("n_traces_to_save", fallback)
+    if isinstance(raw, str):
+        if raw.strip().lower() in ("all",):
+            return max(0, int(n_trials))
+        try:
+            raw = int(raw)
+        except Exception:
+            return max(0, int(fallback))
+    try:
+        raw = int(raw)
+    except Exception:
+        return max(0, int(fallback))
+    if raw < 0:
+        return max(0, int(n_trials))
+    return max(0, raw)
+
+
+def _coerce_bin_width(val: Any, default: float) -> float:
+    try:
+        bw = float(val)
+    except Exception:
+        bw = float(default)
+    if bw <= 0:
+        bw = float(default)
+    return bw
+
+
+def _prepare_input_stats_bins(
+    tstart: float,
+    tstop: float,
+    bin_width: float,
+) -> Tuple[float, np.ndarray, np.ndarray]:
+    bw = _coerce_bin_width(bin_width, 25.0)
+    t0 = float(tstart)
+    t1 = float(tstop)
+    if t1 < t0:
+        t1 = t0
+    bins = np.arange(t0, t1 + bw, bw, dtype=float)
+    if bins.size < 2:
+        bins = np.array([t0, t0 + bw], dtype=float)
+    centers = bins[:-1] + 0.5 * bw
+    return bw, bins, centers
+
+
+def _compute_input_stats_for_trial(
+    inputs_by_group: Dict[str, Any],
+    bins: np.ndarray,
+    bin_width: float,
+    tstart: float,
+    tstop: float,
+) -> Dict[str, Any]:
+    bw_s = bin_width / 1000.0
+    dur_s = max(1e-9, (float(tstop) - float(tstart)) / 1000.0)
+    groups: Dict[str, Any] = {}
+
+    for g, gi in inputs_by_group.items():
+        trains = [np.asarray(tr, dtype=float) for tr in (gi.spike_trains or [])]
+        n_syn = len(trains)
+        if n_syn:
+            all_spikes = np.concatenate(trains)
+        else:
+            all_spikes = np.array([], dtype=float)
+
+        counts, _ = np.histogram(all_spikes, bins=bins)
+        total_spikes = int(all_spikes.size)
+        rate_hz_total = total_spikes / dur_s
+        rate_hz_per_syn = rate_hz_total / n_syn if n_syn > 0 else 0.0
+
+        rate_hz_by_bin_total = counts / bw_s
+        if n_syn > 0:
+            rate_hz_by_bin_per_syn = rate_hz_by_bin_total / n_syn
+        else:
+            rate_hz_by_bin_per_syn = np.zeros_like(rate_hz_by_bin_total, dtype=float)
+
+        groups[g] = {
+            "n_syn": int(n_syn),
+            "total_spikes": total_spikes,
+            "rate_hz_total": float(rate_hz_total),
+            "rate_hz_per_syn": float(rate_hz_per_syn),
+            "counts_by_bin": counts.tolist(),
+            "rate_hz_by_bin_total": rate_hz_by_bin_total.tolist(),
+            "rate_hz_by_bin_per_syn": rate_hz_by_bin_per_syn.tolist(),
+        }
+
+    return groups
+
+
+def _aggregate_input_stats(trial_stats: List[Dict[str, Any]]) -> Dict[str, Any]:
+    if not trial_stats:
+        return {}
+
+    group_names = set(trial_stats[0].get("groups", {}).keys())
+    group_means: Dict[str, Any] = {}
+
+    for g in group_names:
+        n_syns: List[int] = []
+        totals: List[int] = []
+        rate_totals: List[float] = []
+        rate_per_syns: List[float] = []
+        counts_stack: List[List[float]] = []
+        rate_bin_total_stack: List[List[float]] = []
+        rate_bin_per_syn_stack: List[List[float]] = []
+
+        for trial in trial_stats:
+            gstats = trial.get("groups", {}).get(g)
+            if not gstats:
+                continue
+            n_syns.append(int(gstats.get("n_syn", 0)))
+            totals.append(int(gstats.get("total_spikes", 0)))
+            rate_totals.append(float(gstats.get("rate_hz_total", 0.0)))
+            rate_per_syns.append(float(gstats.get("rate_hz_per_syn", 0.0)))
+            counts_stack.append(list(gstats.get("counts_by_bin", [])))
+            rate_bin_total_stack.append(list(gstats.get("rate_hz_by_bin_total", [])))
+            rate_bin_per_syn_stack.append(list(gstats.get("rate_hz_by_bin_per_syn", [])))
+
+        if not totals:
+            continue
+
+        mean_counts = np.mean(np.asarray(counts_stack, dtype=float), axis=0).tolist() if counts_stack else []
+        mean_rate_bin_total = (
+            np.mean(np.asarray(rate_bin_total_stack, dtype=float), axis=0).tolist()
+            if rate_bin_total_stack
+            else []
+        )
+        mean_rate_bin_per_syn = (
+            np.mean(np.asarray(rate_bin_per_syn_stack, dtype=float), axis=0).tolist()
+            if rate_bin_per_syn_stack
+            else []
+        )
+
+        group_means[g] = {
+            "n_syn": int(n_syns[0]) if n_syns else 0,
+            "mean_total_spikes": float(np.mean(totals)),
+            "mean_rate_hz_total": float(np.mean(rate_totals)),
+            "mean_rate_hz_per_syn": float(np.mean(rate_per_syns)),
+            "mean_counts_by_bin": mean_counts,
+            "mean_rate_hz_by_bin_total": mean_rate_bin_total,
+            "mean_rate_hz_by_bin_per_syn": mean_rate_bin_per_syn,
+        }
+
+    return group_means
+
+
 # ---------------------------------------------------------------------
 # core run functions
 # ---------------------------------------------------------------------
@@ -307,8 +767,34 @@ def run_single(
       }
     """
     sim_cfg_local = copy.deepcopy(sim_cfg)
+    snapshot_enabled, snapshot_cfg = _snapshot_cfg(sim_cfg_local)
+    if snapshot_enabled:
+        _apply_snapshot_deterministic(sim_cfg_local, snapshot_cfg)
     trial_rng = rm.trial(0) if rm is not None else None
     n_traces_to_save = int(sim_cfg_local.get("n_traces_to_save", 1))
+    if snapshot_enabled and snapshot_cfg.get("save_all_traces", True):
+        n_traces_to_save = max(n_traces_to_save, 1)
+        sim_cfg_local["n_traces_to_save"] = n_traces_to_save
+    n_inputs_to_save = _resolve_inputs_to_save(sim_cfg_local, 1, n_traces_to_save)
+    tstart = float(sim_cfg_local.get("tstart", 0.0))
+    tstop = float(sim_cfg_local.get("tstop", tstart))
+
+    input_stats = None
+    if _as_bool(sim_cfg_local.get("save_input_stats", True), default=True):
+        bin_width = sim_cfg_local.get("input_stats_bin_ms", sim_cfg_local.get("bins", 25.0))
+        bin_width, bins, centers = _prepare_input_stats_bins(tstart, tstop, bin_width)
+        trial_groups = _compute_input_stats_for_trial(
+            inputs_by_group, bins, bin_width, tstart, tstop
+        )
+        trial_stats = [{"trial_idx": 0, "groups": trial_groups}]
+        input_stats = {
+            "bin_ms": bin_width,
+            "t_ms": centers.tolist(),
+            "tstart_ms": tstart,
+            "tstop_ms": tstop,
+            "trials": trial_stats,
+            "group_means": _aggregate_input_stats(trial_stats),
+        }
 
     # reset cell state and attach synapses
     _clear_cell_state(cell)
@@ -316,6 +802,14 @@ def run_single(
         cell, geom, sim_cfg_local, groups_cfg, inputs_by_group, trial_rng=trial_rng
     )
     syn_records = syn_state.get("records", {})
+    syn_records_by_trial: Optional[List[Dict[str, Any]]] = None
+    if _as_bool(sim_cfg_local.get("save_syn_records_by_trial", False), default=False):
+        syn_records_by_trial = [{"trial_idx": 0, "records": syn_records}]
+    syn_param_snapshot: Optional[Dict[str, Any]] = None
+    netcon_snapshot: Optional[Dict[str, Any]] = None
+    if snapshot_enabled:
+        syn_param_snapshot = _snapshot_synapse_params(syn_state, groups_cfg)
+        netcon_snapshot = _snapshot_netcon_state(syn_state)
 
     # run the actual simulation (existing 3.1 primitive)
     sim_traces = run_cell(cell, sim_cfg_local)  # assumes this is defined below / in this module
@@ -328,18 +822,45 @@ def run_single(
     if n_traces_to_save > 0 and T.size and V.size:
         traces_out = {"T": T, "V": V}
 
+    inputs_out: Optional[Dict[str, Any]] = None
+    if n_inputs_to_save > 0:
+        inputs_out = {}
+        for g, gi in inputs_by_group.items():
+            inputs_out[g] = {
+                "mode": gi.mode,
+                "spike_trains": [np.asarray(tr).copy() for tr in gi.spike_trains],
+                "meta": gi.meta,
+            }
+
     result = {
         "mode": "single",
         "sim_cfg": sim_cfg_local,
         "spikes": spikes,
         "traces": traces_out,
         "syn_records": syn_records,
+        "syn_records_by_trial": syn_records_by_trial,
+        "inputs": inputs_out,
         "meta": {
             "cell": sim_cfg_local.get("cell"),
             "tune": sim_cfg_local.get("tune"),
             "n_trials": 1,
+            "syn_config": copy.deepcopy(groups_cfg),
         },
     }
+    if rm is not None:
+        result["meta"]["randomness"] = rm.meta().as_dict()
+    if snapshot_enabled:
+        result["meta"]["snapshot"] = copy.deepcopy(snapshot_cfg)
+        result["meta"]["versions"] = _collect_versions()
+        result["meta"]["neuron_state"] = _collect_neuron_state()
+        result["meta"]["env"] = _collect_env_snapshot()
+        result["meta"]["mechanisms"] = _collect_mechanism_info(sim_cfg_local)
+        if netcon_snapshot is not None:
+            result["meta"]["netcon_snapshot"] = netcon_snapshot
+        if syn_param_snapshot is not None:
+            result["meta"]["synapse_param_snapshot"] = syn_param_snapshot
+    if input_stats is not None:
+        result["meta"]["input_stats"] = input_stats
     return result
 
 
@@ -375,19 +896,15 @@ def run_multi(
       }
     """
     sim_cfg_local = copy.deepcopy(sim_cfg)
+    snapshot_enabled, snapshot_cfg = _snapshot_cfg(sim_cfg_local)
+    if snapshot_enabled:
+        _apply_snapshot_deterministic(sim_cfg_local, snapshot_cfg)
     n_trials = int(sim_cfg_local.get("n_trials", 1))
     n_traces_to_save = int(sim_cfg_local.get("n_traces_to_save", 1))
-
-    def _as_bool(val, default=True):
-        if val is None:
-            return default
-        if isinstance(val, str):
-            v = val.strip().lower()
-            if v in ("false", "0", "no", "off", ""):
-                return False
-            if v in ("true", "1", "yes", "on"):
-                return True
-        return bool(val)
+    if snapshot_enabled and snapshot_cfg.get("save_all_traces", True):
+        n_traces_to_save = max(n_traces_to_save, n_trials)
+        sim_cfg_local["n_traces_to_save"] = n_traces_to_save
+    trial_offset = int(sim_cfg_local.get("trial_offset", 0) or 0)
 
     regen_inputs = _as_bool(sim_cfg_local.get("regen_inputs_each_trial", True), default=True)
 
@@ -406,8 +923,29 @@ def run_multi(
     spikes_by_trial: List[np.ndarray] = []
     trace_V_store: List[np.ndarray] = []
     T_ref: Optional[np.ndarray] = None
+    input_summaries: List[Dict[str, Any]] = []
+    inputs_store: List[Dict[str, Any]] = []
+    tstart = float(sim_cfg_local.get("tstart", 0.0))
+    tstop = float(sim_cfg_local.get("tstop", 0.0))
+    sim_dur_s = max(1e-9, (tstop - tstart) / 1000.0)
+    inputs_to_save = _resolve_inputs_to_save(sim_cfg_local, n_trials, n_traces_to_save)
+    input_stats_enabled = _as_bool(sim_cfg_local.get("save_input_stats", True), default=True)
+    save_syn_records_by_trial = _as_bool(
+        sim_cfg_local.get("save_syn_records_by_trial", False), default=False
+    )
+    input_stats_trials: List[Dict[str, Any]] = []
+    syn_records_by_trial: List[Dict[str, Any]] = []
+    syn_param_snapshot: Optional[Dict[str, Any]] = None
+    netcon_snapshot: Optional[Dict[str, Any]] = None
+    input_bin_width = sim_cfg_local.get("input_stats_bin_ms", sim_cfg_local.get("bins", 25.0))
+    input_bin_width, input_bins, input_centers = _prepare_input_stats_bins(
+        tstart, tstop, input_bin_width
+    )
+
     for trial_idx in range(n_trials):
-        trial_rng = rm.trial(trial_idx) if rm is not None else None
+        trial_start = time.perf_counter()
+        trial_rng_idx = trial_idx + trial_offset
+        trial_rng = rm.trial(trial_rng_idx) if rm is not None else None
 
         # Optionally regenerate inputs per trial (fresh randomness)
         if regen_inputs:
@@ -425,10 +963,50 @@ def run_multi(
             inputs_trial = inputs_by_group
             groups_cfg_for_trial = groups_cfg
 
+        if inputs_to_save > 0 and len(inputs_store) < inputs_to_save:
+            trial_inputs: Dict[str, Any] = {}
+            for g, gi in inputs_trial.items():
+                trial_inputs[g] = {
+                    "mode": gi.mode,
+                    "spike_trains": [np.asarray(tr).copy() for tr in gi.spike_trains],
+                    "meta": gi.meta,
+            }
+            inputs_store.append({"trial_idx": trial_idx, "inputs": trial_inputs})
+
+        if input_stats_enabled:
+            groups_stats = _compute_input_stats_for_trial(
+                inputs_trial, input_bins, input_bin_width, tstart, tstop
+            )
+            input_stats_trials.append({"trial_idx": trial_idx, "groups": groups_stats})
+
+        # Optional per-trial input summary (helps detect identical inputs)
+        log_input_summary = bool(sim_cfg_local.get("log_input_summary", True))
+        summary: Dict[str, Any] = {}
+        for g, gi in inputs_trial.items():
+            trains = gi.spike_trains or []
+            total_spikes = int(sum(len(tr) for tr in trains))
+            sum_spike_times = float(sum(float(np.sum(tr)) for tr in trains)) if trains else 0.0
+            summary[g] = {
+                "n_syn": int(len(trains)),
+                "total_spikes": total_spikes,
+                "sum_spike_times": sum_spike_times,
+            }
+        input_summaries.append({"trial_idx": trial_idx, "groups": summary})
+        if log_input_summary:
+            parts = [f"{g}={summary[g]['total_spikes']}" for g in summary]
+            print(f"[trial {trial_idx+1}/{n_trials}] input_spikes: " + " ".join(parts))
+
         _clear_cell_state(cell)
         syn_state = synapses.add_synapses(
             cell, geom, sim_cfg_local, groups_cfg_for_trial, inputs_trial, trial_rng=trial_rng
         )
+        if save_syn_records_by_trial:
+            syn_records_by_trial.append(
+                {"trial_idx": trial_idx, "records": syn_state.get("records", {})}
+            )
+        if snapshot_enabled and trial_idx == 0:
+            syn_param_snapshot = _snapshot_synapse_params(syn_state, groups_cfg_for_trial)
+            netcon_snapshot = _snapshot_netcon_state(syn_state)
 
         sim_traces = run_cell(cell, sim_cfg_local)
 
@@ -459,6 +1037,23 @@ def run_multi(
                 # Do not fail the simulation because a callback failed
                 pass
 
+        # Progress log to stdout (captured by SLURM)
+        spike_count = len(spikes)
+        rate_hz = spike_count / sim_dur_s if sim_dur_s > 0 else 0.0
+        elapsed = time.perf_counter() - trial_start
+        print(f"[trial {trial_idx+1}/{n_trials}] spikes={spike_count}  rate={rate_hz:.2f} Hz  time={elapsed:.2f}s")
+
+    input_stats = None
+    if input_stats_enabled:
+        input_stats = {
+            "bin_ms": input_bin_width,
+            "t_ms": input_centers.tolist(),
+            "tstart_ms": tstart,
+            "tstop_ms": tstop,
+            "trials": input_stats_trials,
+            "group_means": _aggregate_input_stats(input_stats_trials),
+        }
+
     traces_out: Dict[str, Any] = {}
     if T_ref is not None and trace_V_store:
         traces_out = {
@@ -466,18 +1061,58 @@ def run_multi(
             "V": trace_V_store,
         }
 
+    # Compute and store average firing-rate curve (raw, unsmoothed)
+    bin_width = float(sim_cfg_local.get("bins", 25.0))
+    bins = np.arange(0, tstop + bin_width, bin_width)
+    centers = bins[:-1] + 0.5 * bin_width
+    bw_s = bin_width / 1000.0
+    if spikes_by_trial:
+        per_trial_rates = []
+        for tr in spikes_by_trial:
+            tr = np.asarray(tr)
+            counts, _ = np.histogram(tr, bins=bins)
+            per_trial_rates.append(counts / bw_s)
+        mean_rate = np.mean(per_trial_rates, axis=0)
+    else:
+        mean_rate = np.array([], dtype=float)
+
+    avg_rate_curve = {
+        "bin_ms": bin_width,
+        "t_ms": centers.tolist(),
+        "rate_hz": mean_rate.tolist(),
+    }
+
     result = {
         "mode": "multi",
         "sim_cfg": sim_cfg_local,
         "spikes": spikes_by_trial,
         "traces": traces_out,
+        "inputs_by_trial": inputs_store if inputs_store else None,
+        "syn_records_by_trial": syn_records_by_trial if syn_records_by_trial else None,
         "meta": {
             "cell": sim_cfg_local.get("cell"),
             "tune": sim_cfg_local.get("tune"),
             "n_trials": n_trials,
             "trial_ids": list(range(n_trials)),
+            "avg_rate_curve": avg_rate_curve,
+            "input_summaries": input_summaries,
+            "syn_config": copy.deepcopy(groups_cfg),
         },
     }
+    if rm is not None:
+        result["meta"]["randomness"] = rm.meta().as_dict()
+    if snapshot_enabled:
+        result["meta"]["snapshot"] = copy.deepcopy(snapshot_cfg)
+        result["meta"]["versions"] = _collect_versions()
+        result["meta"]["neuron_state"] = _collect_neuron_state()
+        result["meta"]["env"] = _collect_env_snapshot()
+        result["meta"]["mechanisms"] = _collect_mechanism_info(sim_cfg_local)
+        if netcon_snapshot is not None:
+            result["meta"]["netcon_snapshot"] = netcon_snapshot
+        if syn_param_snapshot is not None:
+            result["meta"]["synapse_param_snapshot"] = syn_param_snapshot
+    if input_stats is not None:
+        result["meta"]["input_stats"] = input_stats
     return result
 
 
@@ -535,7 +1170,8 @@ def run_sim(
 
     # If sim_cfg["load"] is a filename/path, load instead of running NEURON
     load_target = sim_cfg_local.get("load")
-    if load_target:
+    load_enabled = sim_cfg_local.get("load_enabled", True)
+    if load_enabled and load_target:
         p = Path(load_target)
         if not p.is_absolute():
             p = Path("output_data") / p  # interpret as relative to output_data/
@@ -603,11 +1239,18 @@ def _build_output_path(
     '''
     Build a unique output path based on sim_cfg and base_dir.
     Returns None if sim_cfg['output'] is None/empty.
-    1) base_dir / {cell}_{tune}_{output_stem}.{suffix}
-    2) If file exists, append _1, _2, ... until unique.
-    3) suffix based on sim_cfg['output_format']: 'pickle' -> .p
+    1) base_dir / {output_stem}/
+    2) filename: {cell}_{tune}_{output_stem}.{suffix}
+    3) If run folder exists, append _1, _2, ... to output_stem.
+    4) suffix based on sim_cfg['output_format']: 'pickle' -> .pkl
     '''    
 
+    if sim_cfg.get("save_output") is False:
+        return None
+
+    output_stem = sim_cfg.get("output_stem")
+    if output_stem not in (None, ""):
+        sim_cfg["output"] = output_stem
     output_stem = sim_cfg.get("output")
     if not output_stem:
         return None  # don't save if output is None/empty
@@ -624,14 +1267,131 @@ def _build_output_path(
     else:
         suffix = ".pkl"
 
-    stem = f"{cell}_{tune}_{output_stem}"
-    path = base / (stem + suffix)
+    run_stem = str(output_stem)
+    run_dir = base / run_stem
     idx = 1
-    while path.exists():
-        path = base / f"{stem}_{idx}{suffix}"
+    while run_dir.exists():
+        run_stem = f"{output_stem}_{idx}"
+        run_dir = base / run_stem
         idx += 1
 
+    if run_stem != output_stem:
+        sim_cfg["output"] = run_stem
+
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    stem = f"{cell}_{tune}_{run_stem}"
+    path = run_dir / (stem + suffix)
     return path
+
+
+def _json_default(obj: Any):
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return str(obj)
+
+
+def _write_json(path: Path, payload: Dict[str, Any]) -> None:
+    path.write_text(json.dumps(payload, indent=2, default=_json_default))
+
+
+def _save_sidecars(results: Dict[str, Any], run_dir: Path) -> Dict[str, str]:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    mode = results.get("mode", "")
+    sim_cfg = results.get("sim_cfg", {}) or {}
+    meta = copy.deepcopy(results.get("meta", {}) or {})
+
+    files: Dict[str, str] = {}
+
+    _write_json(run_dir / "sim_cfg.json", sim_cfg)
+    files["sim_cfg"] = "sim_cfg.json"
+
+    syn_config = meta.pop("syn_config", None)
+    cell_config = meta.pop("cell_config", None)
+    geometry_config = meta.pop("geometry_config", None)
+    avg_rate_curve = meta.pop("avg_rate_curve", None)
+    input_stats = meta.pop("input_stats", None)
+    input_summaries = meta.pop("input_summaries", None)
+
+    _write_json(run_dir / "meta.json", meta)
+    files["meta"] = "meta.json"
+
+    if syn_config is not None:
+        _write_json(run_dir / "syn_config.json", syn_config)
+        files["syn_config"] = "syn_config.json"
+    if cell_config is not None:
+        _write_json(run_dir / "cell_config.json", cell_config)
+        files["cell_config"] = "cell_config.json"
+    if geometry_config is not None:
+        _write_json(run_dir / "geometry_config.json", geometry_config)
+        files["geometry_config"] = "geometry_config.json"
+    if avg_rate_curve is not None:
+        _write_json(run_dir / "avg_rate_curve.json", avg_rate_curve)
+        files["avg_rate_curve"] = "avg_rate_curve.json"
+    if input_stats is not None:
+        _write_json(run_dir / "input_stats.json", input_stats)
+        files["input_stats"] = "input_stats.json"
+    if input_summaries is not None:
+        _write_json(run_dir / "input_summaries.json", input_summaries)
+        files["input_summaries"] = "input_summaries.json"
+
+    spikes = results.get("spikes", None)
+    if spikes is not None:
+        spike_path = run_dir / "spikes.npz"
+        if mode == "multi":
+            np.savez(spike_path, spikes=np.array(spikes, dtype=object))
+        else:
+            np.savez(spike_path, spikes=np.asarray(spikes))
+        files["spikes"] = "spikes.npz"
+
+    traces = results.get("traces", {}) or {}
+    if "T" in traces:
+        trace_path = run_dir / "traces.npz"
+        if mode == "multi":
+            np.savez(
+                trace_path,
+                T=np.asarray(traces.get("T")),
+                V_trials=np.array(traces.get("V", []), dtype=object),
+            )
+        else:
+            np.savez(
+                trace_path,
+                T=np.asarray(traces.get("T")),
+                V=np.asarray(traces.get("V")),
+            )
+        files["traces"] = "traces.npz"
+
+    inputs_payload = {}
+    if results.get("inputs") is not None:
+        inputs_payload["inputs"] = results.get("inputs")
+    if results.get("inputs_by_trial") is not None:
+        inputs_payload["inputs_by_trial"] = results.get("inputs_by_trial")
+    if inputs_payload:
+        inputs_path = run_dir / "inputs_sample.pkl"
+        with inputs_path.open("wb") as f:
+            pickle.dump(inputs_payload, f)
+        files["inputs_sample"] = "inputs_sample.pkl"
+
+    if sim_cfg.get("save_syn_records_sidecar", True):
+        syn_records = results.get("syn_records")
+        if syn_records:
+            syn_path = run_dir / "syn_records.pkl"
+            with syn_path.open("wb") as f:
+                pickle.dump(syn_records, f)
+            files["syn_records"] = "syn_records.pkl"
+
+    syn_records_by_trial = results.get("syn_records_by_trial")
+    if syn_records_by_trial:
+        syn_by_trial_path = run_dir / "syn_records_by_trial.pkl"
+        with syn_by_trial_path.open("wb") as f:
+            pickle.dump(syn_records_by_trial, f)
+        files["syn_records_by_trial"] = "syn_records_by_trial.pkl"
+
+    return files
 
 
 
@@ -643,11 +1403,33 @@ def save_results(
     sim_cfg = results.get("sim_cfg", {})
     out_path = _build_output_path(sim_cfg, base_dir=base_dir)
     if out_path is None:
+        append_to = sim_cfg.get("append_to")
+        if append_to:
+            try:
+                _append_results_to_path(results, append_to, base_dir=base_dir)
+            except Exception as exc:
+                print(f"append_to failed: {exc}")
         return None
 
     fmt = sim_cfg.get("output_format", "pickle")
 
-    if fmt == "npz":
+    run_dir = out_path.parent
+    manifest = {
+        "format_version": 1,
+        "mode": results.get("mode", ""),
+        "output_stem": sim_cfg.get("output"),
+        "files": {},
+    }
+
+    save_sidecars = sim_cfg.get("save_sidecars", True)
+    save_full_results = sim_cfg.get("save_full_results", False)
+    if not save_sidecars and not save_full_results:
+        # ensure at least one artifact is written
+        save_sidecars = True
+    if save_sidecars:
+        manifest["files"].update(_save_sidecars(results, run_dir))
+
+    if save_full_results and fmt == "npz":
         # compact, interoperable: arrays + JSON metadata
         mode = results.get("mode", "")
         meta = results.get("meta", {})
@@ -656,8 +1438,8 @@ def save_results(
 
         payload = {
             "mode": np.array(mode),
-            "sim_cfg_json": np.array(json.dumps(sim_cfg)),
-            "meta_json": np.array(json.dumps(meta)),
+            "sim_cfg_json": np.array(json.dumps(sim_cfg, default=_json_default)),
+            "meta_json": np.array(json.dumps(meta, default=_json_default)),
         }
 
         if "T" in traces:
@@ -675,13 +1457,41 @@ def save_results(
                 payload["V_trials"] = np.array(traces["V"], dtype=object)
 
         np.savez(out_path, **payload)
-
-    else:
+        manifest["files"]["results_npz"] = out_path.name
+    elif save_full_results:
         # full Python dict with everything
         with out_path.open("wb") as f:
             pickle.dump(results, f)
+        manifest["files"]["results_pkl"] = out_path.name
 
-    return out_path
+    _write_json(run_dir / "run_manifest.json", manifest)
+
+    # Optional: auto-save plots into run_dir/plots
+    if sim_cfg.get("save_plots", False):
+        try:
+            from modules_local import analysis as analysis_mod
+
+            analysis_mod.save_default_plots(
+                results,
+                run_dir,
+                save_inputs=bool(sim_cfg.get("save_plots_inputs", True)),
+                save_synapses=bool(sim_cfg.get("save_plots_synapses", False)),
+                win_size=float(sim_cfg.get("plots_win_size", 50.0)),
+                input_bin_ms=sim_cfg.get("plots_input_bin_ms", None),
+                input_smooth_ms=sim_cfg.get("plots_input_smooth_ms", 50.0),
+                raster_style=str(sim_cfg.get("plots_raster_style", "dot")),
+            )
+        except Exception as exc:
+            print(f"save_plots failed: {exc}")
+
+    append_to = sim_cfg.get("append_to")
+    if sim_cfg.get("append_enabled", True) and append_to:
+        try:
+            _append_results_to_path(results, append_to, base_dir=run_dir.parent)
+        except Exception as exc:
+            print(f"append_to failed: {exc}")
+
+    return out_path if save_full_results else (run_dir / "run_manifest.json")
 
 def save_results_with_name(
     results: Dict[str, Any],
@@ -699,6 +1509,182 @@ def save_results_with_name(
     sim_cfg = results.setdefault("sim_cfg", {})
     sim_cfg["output"] = str(output_stem)
     return save_results(results, base_dir=base_dir)
+
+
+def _ensure_multi_results(results: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Coerce a single-trial results dict into multi-trial format for appending.
+    """
+    mode = results.get("mode", "single")
+    if mode == "multi":
+        return results
+    if mode != "single":
+        raise ValueError(f"append_to: unsupported results mode {mode!r}")
+
+    sim_cfg = copy.deepcopy(results.get("sim_cfg", {}))
+    traces = results.get("traces", {}) or {}
+    inputs = results.get("inputs", None)
+
+    spikes = results.get("spikes", None)
+    spikes_list = [spikes] if spikes is not None else []
+
+    multi = {
+        "mode": "multi",
+        "sim_cfg": sim_cfg,
+        "spikes": spikes_list,
+        "traces": {},
+        "inputs_by_trial": None,
+        "meta": copy.deepcopy(results.get("meta", {})),
+    }
+
+    if "T" in traces and "V" in traces:
+        multi["traces"] = {"T": traces["T"], "V": [traces["V"]]}
+
+    if inputs:
+        multi["inputs_by_trial"] = [{"trial_idx": 0, "inputs": inputs}]
+
+    meta = multi.setdefault("meta", {})
+    meta["n_trials"] = len(spikes_list)
+    meta["trial_ids"] = list(range(len(spikes_list)))
+    return multi
+
+
+def _write_results_file(results: Dict[str, Any], out_path: Path, fmt: str) -> None:
+    fmt = str(fmt).lower()
+    if fmt == "npz":
+        mode = results.get("mode", "")
+        sim_cfg = results.get("sim_cfg", {})
+        meta = results.get("meta", {})
+        traces = results.get("traces", {}) or {}
+        spikes = results.get("spikes", None)
+
+        payload = {
+            "mode": np.array(mode),
+            "sim_cfg_json": np.array(json.dumps(sim_cfg, default=_json_default)),
+            "meta_json": np.array(json.dumps(meta, default=_json_default)),
+        }
+
+        if "T" in traces:
+            payload["T"] = traces["T"]
+
+        if mode == "single":
+            if "V" in traces:
+                payload["V"] = traces["V"]
+            if spikes is not None:
+                payload["spikes"] = spikes
+        elif mode == "multi":
+            if spikes is not None:
+                payload["spikes"] = np.array(spikes, dtype=object)
+            if "V" in traces:
+                payload["V_trials"] = np.array(traces["V"], dtype=object)
+
+        np.savez(out_path, **payload)
+    else:
+        with out_path.open("wb") as f:
+            pickle.dump(results, f)
+
+
+def _write_results_to_run_dir(
+    results: Dict[str, Any],
+    run_dir: Path,
+    *,
+    fmt: Optional[str] = None,
+    results_name: Optional[str] = None,
+) -> Path:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    sim_cfg = results.get("sim_cfg", {}) or {}
+
+    if fmt is None:
+        fmt = sim_cfg.get("output_format", "pickle")
+    fmt = str(fmt).lower()
+
+    if results_name is None:
+        cell = sim_cfg.get("cell", "cell")
+        tune = sim_cfg.get("tune", "tune")
+        stem = sim_cfg.get("output") or "results"
+        suffix = ".npz" if fmt == "npz" else ".pkl"
+        results_name = f"{cell}_{tune}_{stem}{suffix}"
+
+    out_path = run_dir / results_name
+
+    manifest = {
+        "format_version": 1,
+        "mode": results.get("mode", ""),
+        "output_stem": sim_cfg.get("output"),
+        "files": {},
+    }
+
+    save_sidecars = sim_cfg.get("save_sidecars", True)
+    if save_sidecars:
+        manifest["files"].update(_save_sidecars(results, run_dir))
+
+    if fmt == "npz":
+        _write_results_file(results, out_path, "npz")
+        manifest["files"]["results_npz"] = out_path.name
+    else:
+        _write_results_file(results, out_path, "pickle")
+        manifest["files"]["results_pkl"] = out_path.name
+
+    _write_json(run_dir / "run_manifest.json", manifest)
+    return out_path
+
+
+def _append_results_to_path(
+    results: Dict[str, Any],
+    append_to: Union[str, Path],
+    *,
+    base_dir: Union[str, Path, None] = None,
+) -> Optional[Path]:
+    """
+    Append results to an existing file/folder (or create a new one).
+    """
+    append_path = Path(append_to)
+    if not append_path.is_absolute() and base_dir is not None:
+        base_dir = Path(base_dir)
+        if append_path.parts and append_path.parts[0] == base_dir.name:
+            append_path = base_dir / Path(*append_path.parts[1:])
+        else:
+            append_path = base_dir / append_path
+
+    # Normalize run_manifest.json to its parent folder
+    if append_path.name == "run_manifest.json":
+        append_path = append_path.parent
+
+    if append_path.exists():
+        base_results = load_results(append_path)
+        merged = append_multi_results(
+            _ensure_multi_results(base_results),
+            _ensure_multi_results(results),
+        )
+    else:
+        merged = _ensure_multi_results(results)
+
+    # Decide where/how to write
+    if append_path.suffix.lower() in (".pkl", ".npz"):
+        append_path.parent.mkdir(parents=True, exist_ok=True)
+        fmt = "npz" if append_path.suffix.lower() == ".npz" else "pickle"
+        _write_results_file(merged, append_path, fmt)
+        return append_path
+
+    # Directory target (existing or new)
+    fmt = None
+    results_name = None
+    manifest = append_path / "run_manifest.json"
+    if manifest.is_file():
+        try:
+            old_manifest = json.loads(manifest.read_text())
+            files = old_manifest.get("files", {}) or {}
+            if files.get("results_npz"):
+                fmt = "npz"
+                results_name = files.get("results_npz")
+            elif files.get("results_pkl"):
+                fmt = "pickle"
+                results_name = files.get("results_pkl")
+        except Exception:
+            fmt = None
+            results_name = None
+
+    return _write_results_to_run_dir(merged, append_path, fmt=fmt, results_name=results_name)
 
 
 def append_multi_results(
@@ -721,44 +1707,276 @@ def append_multi_results(
         raise ValueError("append_multi_results: new_results.mode must be 'multi'")
 
     merged = copy.deepcopy(base_results)
+    meta = merged.setdefault("meta", {})
+    warnings = meta.setdefault("append_warnings", [])
 
     base_spikes = list(merged.get("spikes", []) or [])
     new_spikes  = list(new_results.get("spikes", []) or [])
+    base_trial_count = len(base_spikes)
     merged_spikes = base_spikes + new_spikes
     merged["spikes"] = merged_spikes
 
     # update n_trials
     sim_cfg = merged.setdefault("sim_cfg", {})
-    sim_cfg["n_trials"] = len(merged_spikes)
+    n_trials = len(merged_spikes)
+    sim_cfg["n_trials"] = n_trials
+    meta["n_trials"] = n_trials
+    meta["trial_ids"] = list(range(n_trials))
 
     # try to merge stored Vm traces if time axes match
     base_traces = merged.get("traces", {}) or {}
     new_traces  = new_results.get("traces", {}) or {}
     T_base = base_traces.get("T")
     T_new  = new_traces.get("T")
+    max_traces = int(sim_cfg.get("n_traces_to_save", 1))
+    max_inputs = _resolve_inputs_to_save(sim_cfg, n_trials, max_traces)
 
-    if T_base is not None and T_new is not None:
+    if max_traces <= 0:
+        merged["traces"] = {}
+    elif T_base is not None and T_new is not None:
         try:
             if np.allclose(np.asarray(T_base), np.asarray(T_new)):
                 V_base = list(base_traces.get("V", []) or [])
                 V_new  = list(new_traces.get("V", []) or [])
-                base_traces["V"] = V_base + V_new
+                base_traces["V"] = (V_base + V_new)[:max_traces]
                 merged["traces"] = base_traces
+            else:
+                warnings.append("trace_time_mismatch: skipped merging traces")
         except Exception:
-            # if anything is weird, just leave traces as base_results'
-            pass
+            warnings.append("trace_merge_failed: skipped merging traces")
+
+    def _offset_trial_idx(entry: Dict[str, Any], offset: int, fallback: int) -> None:
+        if "trial_idx" in entry:
+            try:
+                entry["trial_idx"] = offset + int(entry["trial_idx"])
+                return
+            except Exception:
+                pass
+        entry["trial_idx"] = offset + fallback
+
+    def _merge_inputs_by_trial() -> None:
+        if max_inputs <= 0:
+            merged["inputs_by_trial"] = None
+            return
+        dst_inputs = merged.get("inputs_by_trial") or []
+        src_inputs = new_results.get("inputs_by_trial") or []
+        if not src_inputs:
+            merged["inputs_by_trial"] = dst_inputs if dst_inputs else None
+            return
+        for idx, entry in enumerate(src_inputs):
+            if len(dst_inputs) >= max_inputs:
+                break
+            new_entry = copy.deepcopy(entry)
+            if isinstance(new_entry, dict):
+                _offset_trial_idx(new_entry, base_trial_count, idx)
+            dst_inputs.append(new_entry)
+        merged["inputs_by_trial"] = dst_inputs if dst_inputs else None
+
+    def _merge_input_summaries() -> None:
+        src_meta = new_results.get("meta", {}) or {}
+        src_summaries = src_meta.get("input_summaries") or []
+        if not src_summaries:
+            return
+        dst_summaries = meta.get("input_summaries") or []
+        for idx, entry in enumerate(src_summaries):
+            new_entry = copy.deepcopy(entry)
+            if isinstance(new_entry, dict):
+                _offset_trial_idx(new_entry, base_trial_count, idx)
+            dst_summaries.append(new_entry)
+        meta["input_summaries"] = dst_summaries
+
+    def _stats_compatible(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
+        keys = ("bin_ms", "tstart_ms", "tstop_ms")
+        for key in keys:
+            if a.get(key) != b.get(key):
+                return False
+        a_t = a.get("t_ms") or []
+        b_t = b.get("t_ms") or []
+        try:
+            return np.allclose(np.asarray(a_t, dtype=float), np.asarray(b_t, dtype=float))
+        except Exception:
+            return False
+
+    def _merge_input_stats() -> None:
+        dst_stats = meta.get("input_stats")
+        src_stats = (new_results.get("meta", {}) or {}).get("input_stats")
+        if not src_stats:
+            return
+        if dst_stats is None:
+            dst_stats = copy.deepcopy(src_stats)
+            for idx, entry in enumerate(dst_stats.get("trials", []) or []):
+                if isinstance(entry, dict):
+                    _offset_trial_idx(entry, base_trial_count, idx)
+            dst_stats["group_means"] = _aggregate_input_stats(dst_stats.get("trials", []))
+            meta["input_stats"] = dst_stats
+            return
+        if not _stats_compatible(dst_stats, src_stats):
+            warnings.append("input_stats_mismatch: skipped merging input_stats")
+            return
+        for idx, entry in enumerate(src_stats.get("trials", []) or []):
+            new_entry = copy.deepcopy(entry)
+            if isinstance(new_entry, dict):
+                _offset_trial_idx(new_entry, base_trial_count, idx)
+            dst_stats["trials"].append(new_entry)
+        dst_stats["group_means"] = _aggregate_input_stats(dst_stats.get("trials", []))
+        meta["input_stats"] = dst_stats
+
+    def _recompute_avg_rate() -> None:
+        tstop = float(sim_cfg.get("tstop", 0.0))
+        bin_width = float(sim_cfg.get("bins", 25.0) or 25.0)
+        if tstop <= 0 or bin_width <= 0:
+            warnings.append("avg_rate_skipped: invalid tstop/bin width")
+            return
+        bins = np.arange(0, tstop + bin_width, bin_width)
+        centers = bins[:-1] + 0.5 * bin_width
+        bw_s = bin_width / 1000.0
+        if merged_spikes:
+            per_trial_rates = []
+            for tr in merged_spikes:
+                tr = np.asarray(tr)
+                counts, _ = np.histogram(tr, bins=bins)
+                per_trial_rates.append(counts / bw_s)
+            mean_rate = np.mean(per_trial_rates, axis=0)
+        else:
+            mean_rate = np.array([], dtype=float)
+        meta["avg_rate_curve"] = {
+            "bin_ms": bin_width,
+            "t_ms": centers.tolist(),
+            "rate_hz": mean_rate.tolist(),
+        }
+
+    # sanity checks on sim_cfg compatibility
+    for key in ("tstart", "tstop", "dt", "bins"):
+        if key in new_results.get("sim_cfg", {}) and new_results["sim_cfg"].get(key) != sim_cfg.get(key):
+            warnings.append(f"sim_cfg_mismatch:{key}")
+
+    if meta.get("syn_config") and (new_results.get("meta", {}) or {}).get("syn_config"):
+        if meta.get("syn_config") != new_results["meta"].get("syn_config"):
+            warnings.append("syn_config_mismatch")
 
     # annotate meta
-    meta = merged.setdefault("meta", {})
     appended = len(new_spikes)
     meta["appended_trials"] = meta.get("appended_trials", 0) + appended
+    _merge_inputs_by_trial()
+    _merge_input_summaries()
+    _merge_input_stats()
+    _recompute_avg_rate()
 
     return merged
 
 
 
+def _load_from_manifest(manifest_path: Path) -> Dict[str, Any]:
+    manifest = json.loads(manifest_path.read_text())
+    run_dir = manifest_path.parent
+    files = manifest.get("files", {}) or {}
+
+    pkl_name = files.get("results_pkl")
+    if pkl_name:
+        pkl_path = run_dir / pkl_name
+        if pkl_path.is_file():
+            return load_results(pkl_path)
+
+    npz_name = files.get("results_npz")
+    if npz_name:
+        npz_path = run_dir / npz_name
+        if npz_path.is_file():
+            return load_results(npz_path)
+
+    mode = manifest.get("mode", "single")
+
+    sim_cfg = {}
+    if files.get("sim_cfg"):
+        sim_cfg = json.loads((run_dir / files["sim_cfg"]).read_text())
+
+    meta = {}
+    if files.get("meta"):
+        meta = json.loads((run_dir / files["meta"]).read_text())
+
+    if files.get("syn_config"):
+        meta["syn_config"] = json.loads((run_dir / files["syn_config"]).read_text())
+    if files.get("cell_config"):
+        meta["cell_config"] = json.loads((run_dir / files["cell_config"]).read_text())
+    if files.get("geometry_config"):
+        meta["geometry_config"] = json.loads((run_dir / files["geometry_config"]).read_text())
+    if files.get("avg_rate_curve"):
+        meta["avg_rate_curve"] = json.loads((run_dir / files["avg_rate_curve"]).read_text())
+    if files.get("input_stats"):
+        meta["input_stats"] = json.loads((run_dir / files["input_stats"]).read_text())
+    if files.get("input_summaries"):
+        meta["input_summaries"] = json.loads((run_dir / files["input_summaries"]).read_text())
+
+    spikes = None
+    if files.get("spikes"):
+        sp = np.load(run_dir / files["spikes"], allow_pickle=True)
+        if "spikes" in sp.files:
+            spikes = sp["spikes"]
+            if mode == "multi":
+                spikes = list(spikes)
+
+    traces: Dict[str, Any] = {}
+    if files.get("traces"):
+        tr = np.load(run_dir / files["traces"], allow_pickle=True)
+        if "T" in tr.files:
+            traces["T"] = tr["T"]
+        if mode == "multi":
+            if "V_trials" in tr.files:
+                traces["V"] = list(tr["V_trials"])
+        else:
+            if "V" in tr.files:
+                traces["V"] = tr["V"]
+
+    inputs_payload = None
+    if files.get("inputs_sample"):
+        with (run_dir / files["inputs_sample"]).open("rb") as f:
+            inputs_payload = pickle.load(f)
+
+    syn_records = None
+    if files.get("syn_records"):
+        with (run_dir / files["syn_records"]).open("rb") as f:
+            syn_records = pickle.load(f)
+    syn_records_by_trial = None
+    if files.get("syn_records_by_trial"):
+        with (run_dir / files["syn_records_by_trial"]).open("rb") as f:
+            syn_records_by_trial = pickle.load(f)
+
+    results = {
+        "mode": mode,
+        "sim_cfg": sim_cfg,
+        "traces": traces,
+        "spikes": spikes,
+        "meta": meta,
+    }
+    if inputs_payload:
+        if "inputs" in inputs_payload:
+            results["inputs"] = inputs_payload["inputs"]
+        if "inputs_by_trial" in inputs_payload:
+            results["inputs_by_trial"] = inputs_payload["inputs_by_trial"]
+    if syn_records is not None:
+        results["syn_records"] = syn_records
+    if syn_records_by_trial is not None:
+        results["syn_records_by_trial"] = syn_records_by_trial
+
+    return results
+
+
 def load_results(path: Union[str, Path]) -> Dict[str, Any]:
     p = Path(path)
+    if p.is_dir():
+        manifest = p / "run_manifest.json"
+        if manifest.is_file():
+            return _load_from_manifest(manifest)
+        results_dir = p / "results"
+        if results_dir.is_dir():
+            return load_results(results_dir)
+        candidates = list(p.glob("*.pkl")) + list(p.glob("*.npz"))
+        if len(candidates) == 1:
+            return load_results(candidates[0])
+        raise FileNotFoundError(f"No run_manifest.json or single results file in {p}")
+
+    if p.name == "run_manifest.json":
+        return _load_from_manifest(p)
+
     suffix = p.suffix.lower()
 
     if suffix == ".npz":
@@ -793,9 +2011,8 @@ def load_results(path: Union[str, Path]) -> Dict[str, Any]:
             "meta": meta,
         }
 
-    else:
-        with p.open("rb") as f:
-            return pickle.load(f)
+    with p.open("rb") as f:
+        return pickle.load(f)
         
 
 # ---------------------------------------------------------------------

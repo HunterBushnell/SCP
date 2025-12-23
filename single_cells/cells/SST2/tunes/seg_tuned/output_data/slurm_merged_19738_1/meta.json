@@ -1,0 +1,9 @@
+{
+  "cell": "SST2",
+  "tune": "seg_tuned",
+  "merge_warnings": [],
+  "n_trials": 1,
+  "trial_ids": [
+    0
+  ]
+}

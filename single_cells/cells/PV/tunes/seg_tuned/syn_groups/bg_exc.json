@@ -1,0 +1,46 @@
+{
+  "bg_exc": {
+    "state": true,
+    "mode": "homogeneous_poisson",
+    "color": null,
+    "source": {
+      "freq": 0.01,
+      "baseline": null,
+      "path": null,
+      "bin_ms": null
+    },
+    "timing": {
+      "onset_ms": null,
+      "stim_tstart_ms": null,
+      "duration_ms": null,
+      "input_stim_tstart_ms": null,
+      "input_duration_ms": null
+    },
+    "syns": {
+      "type": "AMPA_NMDA_STP",
+      "N_syn": null,
+      "segs": "all",
+      "dist_func": {
+        "kind": "linear",
+        "params": {
+          "m": -0.015,
+          "b": 4.25,
+          "multi": 0.8
+        }
+      },
+      "params": {
+        "wt_mean": 1.5,
+        "wt_std": 0.3333333333333333,
+        "initW": 1.0,
+        "gmax_AMPA": 0.001,
+        "gmax_NMDA": 0.001,
+        "tau_r_AMPA": 3.5,
+        "tau_d_AMPA": 4,
+        "Use": 0.8,
+        "Dep": 100.0,
+        "Fac": 0.0,
+        "NMDA_ratio": 0.0
+      }
+    }
+  }
+}

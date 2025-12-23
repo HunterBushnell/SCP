@@ -73,6 +73,309 @@ def normalize(data,
     return norm_data
 
 # ────────────────────────────────────────────────────────────────────────────
+#  Input plotting (Step 4.2)
+# ────────────────────────────────────────────────────────────────────────────
+def plot_inputs_by_group(
+        inputs_by_group,
+        sim_cfg,
+        *,
+        groups=None,
+        bin_ms=None,
+        win_size=25.0,
+        raster_style='dot',
+        max_trains_per_group=200,
+        seed=0,
+        plot_window=None,
+        plot_raster=True):
+    """
+    Plot input rasters + average rate curves for inputs_by_group.
+
+    Returns a dict of per-group stats.
+    """
+    if groups is None:
+        groups = list(inputs_by_group.keys())
+    if not groups:
+        print("plot_inputs_by_group: no active input groups.")
+        return {}
+
+    tstart = float(sim_cfg.get("tstart", 0.0))
+    tstop = float(sim_cfg.get("tstop", 0.0))
+    bin_ms = float(bin_ms if bin_ms is not None else sim_cfg.get("bins", 5.0))
+
+    stim_start = sim_cfg.get("stim_start_ms")
+    stim_stop = sim_cfg.get("stim_stop_ms")
+    stim_dur = sim_cfg.get("stim_duration_ms")
+    if stim_start is not None and stim_stop is None and stim_dur is not None:
+        stim_stop = float(stim_start) + float(stim_dur)
+
+    rng = np.random.default_rng(seed) if seed is not None else None
+
+    if plot_raster:
+        fig, (ax_rate, ax_raster) = plt.subplots(
+            2, 1, figsize=(7, 6), sharex=True, gridspec_kw={"height_ratios": [1, 1]}
+        )
+    else:
+        fig, ax_rate = plt.subplots(1, 1, figsize=(7, 3))
+        ax_raster = None
+
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    stats = {}
+    y0 = 0
+
+    def _bin_trains(trains, t0, t1, bw):
+        edges = np.arange(t0, t1 + bw, bw, dtype=float)
+        if edges.size < 2:
+            return np.array([], dtype=float), np.array([], dtype=float)
+        counts = np.zeros(edges.size - 1, dtype=float)
+        for tr in trains:
+            if len(tr) == 0:
+                continue
+            c, _ = np.histogram(tr, bins=edges)
+            counts += c
+        n_syn = max(len(trains), 1)
+        rate = counts / (n_syn * (bw / 1000.0))
+        centers = edges[:-1] + bw * 0.5
+        return centers, rate
+
+    for i, gname in enumerate(groups):
+        gi = inputs_by_group.get(gname)
+        if gi is None:
+            continue
+        if hasattr(gi, "spike_trains"):
+            trains = list(gi.spike_trains)
+        elif isinstance(gi, dict):
+            trains = list(gi.get("spike_trains", []))
+        else:
+            trains = list(getattr(gi, "spike_trains", []))
+        n_trains = len(trains)
+        if n_trains == 0:
+            continue
+
+        centers, rate = _bin_trains(trains, tstart, tstop, bin_ms)
+        if win_size:
+            rate_smooth = moving_average(rate, win_size=win_size, bin_width=bin_ms, mode='center')
+            x_line = _align_centers(centers, rate_smooth, mode='center')
+            y_line = rate_smooth
+        else:
+            x_line = centers
+            y_line = rate
+
+        col = colors[i % len(colors)]
+        ax_rate.plot(x_line, y_line, color=col, lw=2, label=gname)
+
+        plot_trains = trains
+        if max_trains_per_group is not None and n_trains > max_trains_per_group:
+            if rng is None:
+                plot_trains = trains[:max_trains_per_group]
+            else:
+                idx = rng.choice(n_trains, size=max_trains_per_group, replace=False)
+                plot_trains = [trains[j] for j in idx]
+
+        if plot_raster and ax_raster is not None:
+            for j, tr in enumerate(plot_trains):
+                y = y0 + j + 1
+                if raster_style == 'line':
+                    ax_raster.vlines(tr, y - 0.4, y + 0.4, color=col, lw=0.8)
+                else:
+                    ax_raster.scatter(tr, np.full_like(tr, y), color=col, s=6, marker='.')
+
+        total_spikes = int(np.sum([len(tr) for tr in trains]))
+        duration_ms = max(tstop - tstart, 0.0)
+        mean_rate = total_spikes / (max(n_trains, 1) * (duration_ms / 1000.0)) if duration_ms > 0 else 0.0
+
+        stats[gname] = {
+            "n_trains": n_trains,
+            "total_spikes": total_spikes,
+            "mean_rate_hz": mean_rate,
+        }
+
+        y0 += len(plot_trains)
+
+    ax_rate.set_ylabel("Rate (Hz per synapse)")
+    ax_rate.set_title("Input rate by group")
+    if len(groups) > 1:
+        ax_rate.legend()
+    ax_rate.grid(True)
+
+    if plot_raster and ax_raster is not None:
+        ax_raster.set_ylabel("Input train")
+        ax_raster.set_xlabel("Time (ms)")
+        ax_raster.set_title("Input raster (subset)")
+        ax_raster.grid(axis='x')
+
+    if plot_window is not None:
+        ax_rate.set_xlim(plot_window[0], plot_window[1])
+
+    for vline in [stim_start, stim_stop]:
+        if vline is not None:
+            ax_rate.axvline(x=vline, color='k', linestyle='-', linewidth=1)
+            if plot_raster and ax_raster is not None:
+                ax_raster.axvline(x=vline, color='k', linestyle='-', linewidth=1)
+
+    plt.tight_layout()
+    return stats
+
+
+def plot_compare_input_means(
+        summary_a,
+        summary_b,
+        *,
+        labels=("Run A", "Run B"),
+        groups=None,
+        layout="side-by-side",
+        show_std=False,
+        output_curves=None,
+        figsize=None,
+):
+    """
+    Plot averaged input rate curves for two runs.
+
+    summary_* should be output from analysis.summarize_inputs_from_results.
+    output_curves: optional tuple (curve_a, curve_b), each as dict with keys
+    't_ms' and 'rate_hz'. If provided, plots on a twin y-axis.
+    """
+    if summary_a is None or summary_b is None:
+        raise ValueError("plot_compare_input_means: summaries must not be None")
+
+    groups_a = set((summary_a.get("groups") or {}).keys())
+    groups_b = set((summary_b.get("groups") or {}).keys())
+    if groups is None:
+        groups = sorted(groups_a.union(groups_b))
+    else:
+        groups = [g for g in groups if g in groups_a or g in groups_b]
+
+    if layout in ("stacked", "top-bottom", "vertical"):
+        nrows, ncols = 2, 1
+    else:
+        nrows, ncols = 1, 2
+
+    if figsize is None:
+        figsize = (10, 4) if ncols == 2 else (7, 6)
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, sharex=True)
+    if nrows * ncols == 1:
+        axes = [axes]
+    else:
+        axes = axes.flatten()
+
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    color_map = {g: colors[i % len(colors)] for i, g in enumerate(groups)}
+
+    summaries = [summary_a, summary_b]
+    for idx, ax in enumerate(axes[:2]):
+        summary = summaries[idx]
+        label = labels[idx] if idx < len(labels) else f"Run {idx+1}"
+        t_ms = summary.get("t_ms") or []
+        for g in groups:
+            gdata = (summary.get("groups") or {}).get(g)
+            if not gdata:
+                continue
+            mean_rate = np.asarray(gdata.get("mean_rate", []), dtype=float)
+            std_rate = np.asarray(gdata.get("std_rate", []), dtype=float)
+            if len(t_ms) != len(mean_rate):
+                continue
+            ax.plot(t_ms, mean_rate, color=color_map[g], lw=2, label=g)
+            if show_std and std_rate.size:
+                ax.fill_between(
+                    t_ms,
+                    mean_rate - std_rate,
+                    mean_rate + std_rate,
+                    color=color_map[g],
+                    alpha=0.2,
+                )
+
+        ax.set_title(f"{label} inputs (mean)")
+        ax.set_ylabel("Input rate (Hz per synapse)")
+        ax.grid(True)
+        if len(groups) > 1:
+            ax.legend()
+
+        # Optional output curve overlay
+        if output_curves and idx < len(output_curves):
+            curve = output_curves[idx]
+            if curve:
+                out_t = curve.get("t_ms", [])
+                out_r = curve.get("rate_hz", [])
+                if out_t and out_r:
+                    ax2 = ax.twinx()
+                    ax2.plot(out_t, out_r, color="black", lw=1.5, linestyle="--", label="output")
+                    ax2.set_ylabel("Output rate (Hz)")
+
+    # Shared x label
+    axes[-1].set_xlabel("Time (ms)")
+    plt.tight_layout()
+    return fig, axes
+
+
+def plot_input_means(
+        summary,
+        *,
+        label="Run",
+        groups=None,
+        show_std=False,
+        output_curve=None,
+        figsize=None,
+):
+    """
+    Plot averaged input rate curves for a single run.
+
+    summary should be output from analysis.summarize_inputs_from_results.
+    output_curve: optional dict with keys 't_ms' and 'rate_hz' to overlay.
+    """
+    if summary is None:
+        raise ValueError("plot_input_means: summary must not be None")
+
+    groups_avail = list((summary.get("groups") or {}).keys())
+    if groups is None:
+        groups = groups_avail
+    else:
+        groups = [g for g in groups if g in groups_avail]
+
+    if figsize is None:
+        figsize = (8, 4)
+
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    color_map = {g: colors[i % len(colors)] for i, g in enumerate(groups)}
+
+    t_ms = summary.get("t_ms") or []
+    for g in groups:
+        gdata = (summary.get("groups") or {}).get(g)
+        if not gdata:
+            continue
+        mean_rate = np.asarray(gdata.get("mean_rate", []), dtype=float)
+        std_rate = np.asarray(gdata.get("std_rate", []), dtype=float)
+        if len(t_ms) != len(mean_rate):
+            continue
+        ax.plot(t_ms, mean_rate, color=color_map[g], lw=2, label=g)
+        if show_std and std_rate.size:
+            ax.fill_between(
+                t_ms,
+                mean_rate - std_rate,
+                mean_rate + std_rate,
+                color=color_map[g],
+                alpha=0.2,
+            )
+
+    ax.set_title(f"{label} inputs (mean)")
+    ax.set_xlabel("Time (ms)")
+    ax.set_ylabel("Input rate (Hz per synapse)")
+    ax.grid(True)
+    if len(groups) > 1:
+        ax.legend()
+
+    if output_curve:
+        out_t = output_curve.get("t_ms", [])
+        out_r = output_curve.get("rate_hz", [])
+        if out_t and out_r:
+            ax2 = ax.twinx()
+            ax2.plot(out_t, out_r, color="black", lw=1.5, linestyle="--", label="output")
+            ax2.set_ylabel("Output rate (Hz)")
+
+    plt.tight_layout()
+    return fig, ax
+
+# ────────────────────────────────────────────────────────────────────────────
 #  Synapse-property plots (distance / weight / distance-density)
 # ────────────────────────────────────────────────────────────────────────────
 # def plot_syn_records(
@@ -501,15 +804,20 @@ def plot_syn_records(
 # ────────────────────────────────────────────────────────────────────────────
 #  Plotting wrapper for new run_sim results
 # ────────────────────────────────────────────────────────────────────────────
+_MISSING = object()
+
+
 def plot_results(
     results,
     syn_records=None,
     *,
     win_size=25,
     rate_style='line',
-    raster_style='dot',
+    raster_style=_MISSING,
     plot_window=None,
     in_vivo_curve=None,
+    benchmark_path=None,
+    benchmark_label="benchmark",
     plot_bio=None,
     shade_mode=None,
     alpha=0.6,
@@ -540,6 +848,9 @@ def plot_results(
     mode    = results.get("mode", "single")
     sim_cfg = results.get("sim_cfg", {})
 
+    raster_style_set = raster_style is not _MISSING
+    raster_style_val = "line" if not raster_style_set else raster_style
+
     # ── SINGLE: dispatch to plot_single ────────────────────────────────────
     if mode == "single":
         sim_traces = results.get("traces", {})
@@ -551,13 +862,13 @@ def plot_results(
             syn_records = results.get("syn_records", {}) or {}
 
         # mode-dependent default:
-        #   None  => no raster by default
+        #   None  => raster ON by default if syn_records present; otherwise OFF
         #   True  => enable raster with given raster_style
         #   False => disable raster
         if plot_raster is None:
-            rs = None          # default: no raster for single
+            rs = raster_style_val if (raster_style_set or syn_records) else None
         else:
-            rs = raster_style if plot_raster else None
+            rs = raster_style_val if plot_raster else None
 
         # Color: explicit override > sim_cfg["color"] > default None
         col = set_color if set_color is not None else sim_cfg.get("color", None)
@@ -587,6 +898,9 @@ def plot_results(
             "delay": float(sim_cfg.get("delay", 0.0)),
             "n_trials": len(spikes_by_trial),
             "color": sim_cfg.get("color", None),
+            "stim_start_ms": sim_cfg.get("stim_start_ms"),
+            "stim_stop_ms": sim_cfg.get("stim_stop_ms"),
+            "stim_duration_ms": sim_cfg.get("stim_duration_ms"),
         }
 
         # mode-dependent default:
@@ -628,8 +942,10 @@ def plot_results(
             win_size=win_size,
             plot_type=plot_type,
             plot_bio=plot_bio,
+            benchmark_path=benchmark_path,
+            benchmark_label=benchmark_label,
             plot_raster=plot_rast_flag,
-            raster_style=raster_style,
+            raster_style=raster_style_val,
             alpha=alpha,
             plot_window=pw,
             norm_fr=None,
@@ -694,14 +1010,23 @@ def plot_single(
     else:
         bin_width = float(sim_cfg.get('bins', 25.0))  # default 25 ms
 
-    # stimulus delay / window
+    # stimulus window (prefer explicit sim_cfg markers; fall back to legacy delay)
     if delay is not None:
         delay_ms = float(delay)
     else:
         delay_ms = float(sim_cfg.get('delay', 0.0))
 
-    stim_start = delay_ms + 100.0  # Start/stop of stim manual for now
-    stim_stop  = delay_ms + 550.0
+    stim_start = sim_cfg.get("stim_start_ms")
+    stim_stop = sim_cfg.get("stim_stop_ms")
+    stim_dur = sim_cfg.get("stim_duration_ms")
+
+    if stim_start is None:
+        stim_start = delay_ms + 100.0
+    if stim_stop is None:
+        if stim_dur is not None:
+            stim_stop = float(stim_start) + float(stim_dur)
+        else:
+            stim_stop = delay_ms + 550.0
 
     # ---- helper to extract spike_times from dict or SynapseRecord ----
     def _get_spike_times(rec):
@@ -711,7 +1036,13 @@ def plot_single(
         return np.asarray(getattr(rec, 'spike_times', []), dtype=float)
 
     # Dynamically determine groups and colours
+    if syn_records is None:
+        syn_records = {}
     groups = list(syn_records.keys())
+
+    if raster_style and not syn_records:
+        print("plot_single: raster_style requested but syn_records is empty; raster will be empty.")
+
     colors = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     g2col  = {g: next(colors) for g in groups}
 
@@ -933,6 +1264,8 @@ def plot_multi(
         win_size=25,
         plot_type='line',       # 'hist' | 'line' | 'both'
         plot_bio=None,
+        benchmark_path=None,
+        benchmark_label="benchmark",
         plot_raster=False,
         raster_style='line',    # 'line' | 'dot'
         alpha=0.6,
@@ -955,8 +1288,17 @@ def plot_multi(
     bin_width       = float(sim_params.get('bins', 25.0))
     delay_ms        = float(sim_params.get('delay', 0.0))
 
-    stim_start = delay_ms + 100.0  # same manual window as single
-    stim_stop  = delay_ms + 550.0
+    stim_start = sim_params.get("stim_start_ms")
+    stim_stop = sim_params.get("stim_stop_ms")
+    stim_dur = sim_params.get("stim_duration_ms")
+
+    if stim_start is None:
+        stim_start = delay_ms + 100.0
+    if stim_stop is None:
+        if stim_dur is not None:
+            stim_stop = float(stim_start) + float(stim_dur)
+        else:
+            stim_stop = delay_ms + 550.0
 
     bw_s   = bin_width / 1000.0
     bins   = np.arange(0, sim_duration_ms + bin_width, bin_width)
@@ -1028,6 +1370,49 @@ def plot_multi(
             bio_data = normalize(bio_data, norm_offset=-1 * bio_data[0])
         axRate.plot(plot_bio[1] * 1000, bio_data, 'k',
                     lw=2, label='In-Vivo Input')
+
+    # optional benchmark curve from old/new results
+    if benchmark_path:
+        try:
+            from modules_local import run_sim as run_sim_mod
+            try:
+                bench_res = run_sim_mod.load_results(benchmark_path)
+                bench_spikes = bench_res.get("spikes", []) if bench_res.get("mode") == "multi" else []
+            except Exception:
+                bench_res = run_sim_mod.load_old_multi_results(
+                    benchmark_path,
+                    label=None,
+                    tstop=sim_duration_ms,
+                    bins=bin_width,
+                    delay=delay_ms,
+                )
+                bench_spikes = bench_res.get("spikes", [])
+
+            if bench_spikes:
+                bw_s = bin_width / 1000.0
+                bins = np.arange(0, sim_duration_ms + bin_width, bin_width)
+                centers = bins[:-1] + 0.5 * bin_width
+                per_trial = []
+                for tr in bench_spikes:
+                    tr = np.asarray(tr)
+                    counts, _ = np.histogram(tr, bins=bins)
+                    per_trial.append(counts / bw_s)
+                Y = np.vstack(per_trial)
+                x = centers.copy()
+                if win_size:
+                    Y_smooth = []
+                    for y in Y:
+                        ys = moving_average(y, win_size=win_size,
+                                            bin_width=bin_width, mode='center')
+                        Y_smooth.append(ys)
+                    T_new = min(len(y) for y in Y_smooth)
+                    Y = np.vstack([y[:T_new] for y in Y_smooth])
+                    drop = (len(x) - T_new) // 2
+                    x = x[drop: drop + T_new]
+                mean = Y.mean(axis=0)
+                axRate.plot(x, mean, color='k', lw=2, ls='--', label=benchmark_label)
+        except Exception:
+            pass
 
     axRate.set_ylabel("Avg rate (Hz)")
     if len(groups) > 1 or (plot_bio and plot_bio[0]):
@@ -1208,4 +1593,97 @@ def plot_compare_multi(
         plt.xlim(plot_window['x'][0],plot_window['x'][1])
         plt.ylim(plot_window['y'][0],plot_window['y'][1])
     plt.title(f'Comparison of Average Firing Rates (Win: {win_size} ms)')
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  Side-by-side comparison for two results
+# ────────────────────────────────────────────────────────────────────────────
+def _rate_curve_from_results(results, win_size=25, bin_ms=None):
+    sim_cfg = results.get("sim_cfg", {}) or {}
+    tstart = float(sim_cfg.get("tstart", 0.0))
+    tstop = float(sim_cfg.get("tstop", 0.0))
+    if tstop <= tstart:
+        return np.array([]), np.array([]), 0
+
+    bin_width = float(bin_ms if bin_ms is not None else sim_cfg.get("bins", 25.0))
+    bins = np.arange(tstart, tstop + bin_width, bin_width)
+    centers = bins[:-1] + 0.5 * bin_width
+    bw_s = bin_width / 1000.0
+
+    spikes = results.get("spikes")
+    if spikes is None:
+        spikes = []
+    if results.get("mode") == "multi":
+        if isinstance(spikes, np.ndarray):
+            trials = [np.asarray(tr) for tr in spikes.tolist()]
+        elif isinstance(spikes, (list, tuple)):
+            trials = [np.asarray(tr) for tr in spikes]
+        else:
+            trials = [np.asarray(spikes)]
+    else:
+        trials = [np.asarray(spikes)]
+
+    if not trials:
+        return centers, np.zeros_like(centers), 0
+
+    rates = []
+    for tr in trials:
+        counts, _ = np.histogram(tr, bins=bins)
+        rates.append(counts / bw_s)
+
+    Y = np.vstack(rates)
+    mean = Y.mean(axis=0)
+
+    if win_size:
+        mean = moving_average(mean, win_size=win_size, bin_width=bin_width, mode='center')
+        centers = _align_centers(centers, mean, mode='center')
+
+    return centers, mean, len(trials)
+
+
+def plot_compare_side_by_side(
+        results_a,
+        results_b,
+        *,
+        labels=("A", "B"),
+        win_size=25,
+        bin_ms=None,
+        plot_window=None,
+        colors=None):
+    """
+    Plot two results side-by-side (average firing rate curves).
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
+
+    for ax, res, label, color in zip(
+            axes,
+            (results_a, results_b),
+            labels,
+            (colors or [None, None])):
+        sim_cfg = res.get("sim_cfg", {}) or {}
+        x, mean, n_trials = _rate_curve_from_results(res, win_size=win_size, bin_ms=bin_ms)
+
+        col = color if color is not None else sim_cfg.get("color", None)
+        ax.plot(x, mean, color=col, lw=2)
+
+        stim_start = sim_cfg.get("stim_start_ms")
+        stim_stop = sim_cfg.get("stim_stop_ms")
+        stim_dur = sim_cfg.get("stim_duration_ms")
+        if stim_start is not None and stim_stop is None and stim_dur is not None:
+            stim_stop = float(stim_start) + float(stim_dur)
+
+        for vline in [stim_start, stim_stop]:
+            if vline is not None:
+                ax.axvline(x=vline, color='k', linestyle='-', linewidth=1)
+
+        ax.set_title(f"{label} (n={n_trials})")
+        ax.set_xlabel("Time (ms)")
+        ax.grid(True)
+        if plot_window is not None:
+            ax.set_xlim(plot_window[0], plot_window[1])
+
+    axes[0].set_ylabel("Avg Rate (Hz)")
+    plt.tight_layout()
+    plt.show()
+    return fig, axes
         

@@ -662,7 +662,9 @@ all_param_data, all_syn_records = run_sim.run_param_analysis(
 
 save_data = True
 # output_fn = 'tune1_10tr1000ms'
-output_fp = os.path.join("output_data", output_fn + ".pkl")
+run_dir = os.path.join("output_data", output_fn)
+os.makedirs(run_dir, exist_ok=True)
+output_fp = os.path.join(run_dir, output_fn + ".pkl")
 
 # if param_study['param_type'] == None:
 #     output_fn = 'bg...'
@@ -687,12 +689,12 @@ new_fn      = 'tune1_500tr1000ms'
 
 
 if append_data:
-    old_fp = os.path.join("output_data", old_fn + ".pkl")
+    old_fp = os.path.join("output_data", old_fn, old_fn + ".pkl")
     with open(old_fp, "rb") as f:
         all_param_data_old = pickle.load(f)
 
     if old_fn2 is not None:
-        old_fp2 = os.path.join("output_data", old_fn2 + ".pkl")
+        old_fp2 = os.path.join("output_data", old_fn2, old_fn2 + ".pkl")
         with open(old_fp2, "rb") as f:
             added_data = pickle.load(f)
     else:
@@ -704,7 +706,9 @@ if append_data:
         else:
             all_param_data_old[param] = list(new_trials)
 
-    new_fp = os.path.join("output_data", new_fn + ".pkl")
+    new_dir = os.path.join("output_data", new_fn)
+    os.makedirs(new_dir, exist_ok=True)
+    new_fp = os.path.join(new_dir, new_fn + ".pkl")
     with open(new_fp, "wb") as f:
         pickle.dump(all_param_data_old, f)
 

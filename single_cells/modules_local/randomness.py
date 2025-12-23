@@ -88,6 +88,89 @@ def _parse_setting(val: SettingValue) -> Tuple[str, Optional[int]]:
     raise ValueError(f"Invalid randomness setting: {val!r}")
 
 
+def _normalize_mode(mode: str) -> str:
+    mode = str(mode).strip().lower()
+    aliases = {
+        "fixed": "fixed",
+        "off": "fixed",
+        "none": "fixed",
+        "identical": "fixed",
+        "same": "fixed",
+        "derived": "derived",
+        "per_trial": "derived",
+        "trial": "derived",
+        "random": "random",
+        "stochastic": "random",
+        "full": "random",
+    }
+    return aliases.get(mode, mode)
+
+
+def apply_randomness_mode(sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Apply a simplified randomness_mode to sim_cfg.
+
+    If sim_cfg["randomness_mode"] is set, this function overwrites
+    sim_cfg["randomness"] with a consistent per-component config.
+    """
+    if not isinstance(sim_cfg, dict):
+        return sim_cfg
+    mode = sim_cfg.get("randomness_mode")
+    if mode in (None, "", False):
+        return sim_cfg
+
+    mode = _normalize_mode(mode)
+    if mode not in ("fixed", "derived", "random"):
+        raise ValueError(f"Invalid randomness_mode: {mode!r}")
+
+    if mode == "fixed":
+        setting_val: SettingValue = False
+        trials_val: SettingValue = False
+    elif mode == "derived":
+        setting_val = "derived"
+        trials_val = "derived"
+    else:
+        setting_val = True
+        trials_val = True
+
+    rand_cfg = sim_cfg.get("randomness")
+    if not isinstance(rand_cfg, dict):
+        rand_cfg = {}
+
+    global_cfg = rand_cfg.get("global")
+    if not isinstance(global_cfg, dict):
+        global_cfg = {}
+
+    seed = global_cfg.get("seed", sim_cfg.get("seed"))
+    rand_cfg = {
+        "global": {
+            "state": True,
+            "seed": seed,
+        },
+        "trials": trials_val,
+        "inputs": setting_val,
+        "timing": {
+            "tstart": setting_val,
+            "tstop": setting_val,
+            "jitter": setting_val,
+        },
+        "synapses": {
+            "placement": setting_val,
+            "weights": setting_val,
+            "dynamics": setting_val,
+        },
+        "modes": {
+            "homogeneous_poisson": setting_val,
+            "inhomogeneous_poisson": setting_val,
+            "precomputed": setting_val,
+        },
+    }
+
+    sim_cfg["randomness"] = rand_cfg
+    sim_cfg["randomness_mode"] = mode
+    return sim_cfg
+
+
 @dataclass
 class RandomnessMeta:
     base_seed_used: Optional[int]
