@@ -435,7 +435,13 @@ def _mode_precomputed(
         return [np.asarray(pool[i], dtype=float).copy() for i in idx]
 
     baseline_rate = anchors.get("baseline_rate_hz", None)
+    baseline_spec = anchors.get("baseline_spec") or {}
     jitter_tstart = anchors.get("jitter_tstart_ms", None)
+    if baseline_rate is None and baseline_spec.get("kind") not in (None, "none"):
+        print(
+            "precomputed mode: baseline spec requires a rate curve; "
+            "no baseline will be generated."
+        )
     trains_accum: List[List[float]] = [[] for _ in range(n_syn)]
 
     for block in blocks:
@@ -776,6 +782,11 @@ def _mode_inhomogeneous_poisson(
                 n_syn=n_syn,
                 rng=rng,
             )
+            # Clip to the block window to avoid spillover beyond t1.
+            seg_trains = [
+                tr[(tr >= t0) & (tr <= t1)] if tr.size else tr
+                for tr in seg_trains
+            ]
         else:
             continue
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Union
 
 from collections import Counter
+import csv
 import json
 import math
 import pickle
@@ -1058,6 +1059,224 @@ def run_snapshot(results: Dict[str, Any], *, label: Optional[str] = None) -> Dic
         "avg_rate_curve_bin_ms": avg_curve_bin_ms,
         "avg_rate_curve_len": avg_curve_len,
     }
+
+
+def _truncate_text(text: Any, max_len: int) -> str:
+    if text is None:
+        return ""
+    s = str(text)
+    if len(s) <= max_len:
+        return s
+    return s[: max_len - 3] + "..."
+
+
+def _summarize_array(arr: Any) -> str:
+    try:
+        a = np.asarray(arr)
+    except Exception:
+        return "array(?)"
+    shape = a.shape
+    dtype = str(a.dtype)
+    if a.size == 0:
+        return f"array(shape={shape}, dtype={dtype}, empty)"
+    if np.issubdtype(a.dtype, np.number):
+        try:
+            af = a.astype(float)
+            return (
+                f"array(shape={shape}, dtype={dtype}, min={np.nanmin(af):.6g}, "
+                f"max={np.nanmax(af):.6g}, mean={np.nanmean(af):.6g}, std={np.nanstd(af):.6g})"
+            )
+        except Exception:
+            pass
+    return f"array(shape={shape}, dtype={dtype})"
+
+
+def _summarize_list(values: list, *, max_items: int, max_str: int) -> str:
+    n = len(values)
+    if n == 0:
+        return "list(len=0)"
+    if n <= max_items and all(not isinstance(v, (dict, list, tuple, np.ndarray)) for v in values):
+        return _truncate_text(values, max_str)
+    sample = values[:max_items]
+    return f"list(len={n}, sample={_truncate_text(sample, max_str)})"
+
+
+def _summarize_value(val: Any, *, max_list_items: int, max_str: int) -> str:
+    if isinstance(val, np.ndarray):
+        return _summarize_array(val)
+    if isinstance(val, (list, tuple)):
+        return _summarize_list(list(val), max_items=max_list_items, max_str=max_str)
+    if isinstance(val, dict):
+        return f"dict(len={len(val)})"
+    if isinstance(val, (float, int, bool)) or val is None:
+        return _truncate_text(val, max_str)
+    return _truncate_text(val, max_str)
+
+
+def _flatten_for_compare(
+    obj: Any,
+    prefix: str,
+    out: Dict[str, str],
+    *,
+    max_depth: int,
+    max_list_items: int,
+    max_dict_items: int,
+    max_str: int,
+) -> None:
+    if max_depth <= 0:
+        out[prefix] = _summarize_value(obj, max_list_items=max_list_items, max_str=max_str)
+        return
+    if isinstance(obj, dict):
+        if len(obj) > max_dict_items:
+            out[prefix] = f"dict(len={len(obj)})"
+            return
+        for key in sorted(obj.keys(), key=lambda k: str(k)):
+            _flatten_for_compare(
+                obj[key],
+                f"{prefix}.{key}",
+                out,
+                max_depth=max_depth - 1,
+                max_list_items=max_list_items,
+                max_dict_items=max_dict_items,
+                max_str=max_str,
+            )
+        return
+    if isinstance(obj, (list, tuple)):
+        if len(obj) > max_list_items:
+            out[prefix] = _summarize_list(list(obj), max_items=max_list_items, max_str=max_str)
+            return
+        for idx, item in enumerate(obj):
+            _flatten_for_compare(
+                item,
+                f"{prefix}[{idx}]",
+                out,
+                max_depth=max_depth - 1,
+                max_list_items=max_list_items,
+                max_dict_items=max_dict_items,
+                max_str=max_str,
+            )
+        return
+    out[prefix] = _summarize_value(obj, max_list_items=max_list_items, max_str=max_str)
+
+
+def build_compare_table(
+    run_a: Union[str, Path, Dict[str, Any]],
+    run_b: Union[str, Path, Dict[str, Any]],
+    *,
+    scope: str = "full",
+    max_depth: int = 6,
+    max_list_items: int = 20,
+    max_dict_items: int = 200,
+    max_str: int = 160,
+) -> list[dict[str, str]]:
+    """
+    Build a flattened side-by-side comparison table.
+
+    scope:
+      - "snapshot": compare run_snapshot(...) output
+      - "meta": compare results["meta"]
+      - "full": compare full results dict
+    """
+    res_a = _load_results_any(run_a)
+    res_b = _load_results_any(run_b)
+
+    if scope == "snapshot":
+        obj_a = run_snapshot(res_a, label="A")
+        obj_b = run_snapshot(res_b, label="B")
+        prefix = "results.snapshot"
+    elif scope == "meta":
+        obj_a = res_a.get("meta", {}) or {}
+        obj_b = res_b.get("meta", {}) or {}
+        prefix = "results.meta"
+    else:
+        obj_a = res_a
+        obj_b = res_b
+        prefix = "results"
+
+    flat_a: Dict[str, str] = {}
+    flat_b: Dict[str, str] = {}
+    _flatten_for_compare(
+        obj_a,
+        prefix,
+        flat_a,
+        max_depth=max_depth,
+        max_list_items=max_list_items,
+        max_dict_items=max_dict_items,
+        max_str=max_str,
+    )
+    _flatten_for_compare(
+        obj_b,
+        prefix,
+        flat_b,
+        max_depth=max_depth,
+        max_list_items=max_list_items,
+        max_dict_items=max_dict_items,
+        max_str=max_str,
+    )
+
+    keys = sorted(set(flat_a.keys()) | set(flat_b.keys()))
+    rows: list[dict[str, str]] = []
+    for key in keys:
+        a_val = flat_a.get(key, "")
+        b_val = flat_b.get(key, "")
+        rows.append(
+            {
+                "path": key,
+                "a": a_val,
+                "b": b_val,
+                "equal": str(a_val == b_val),
+            }
+        )
+    return rows
+
+
+def save_compare_table(
+    run_a: Union[str, Path, Dict[str, Any]],
+    run_b: Union[str, Path, Dict[str, Any]],
+    out_path: Union[str, Path],
+    *,
+    scope: str = "full",
+    fmt: str = "csv",
+    max_depth: int = 6,
+    max_list_items: int = 20,
+    max_dict_items: int = 200,
+    max_str: int = 160,
+) -> Dict[str, Path]:
+    """
+    Save a comparison table to CSV (and optionally XLSX if pandas is available).
+    """
+    rows = build_compare_table(
+        run_a,
+        run_b,
+        scope=scope,
+        max_depth=max_depth,
+        max_list_items=max_list_items,
+        max_dict_items=max_dict_items,
+        max_str=max_str,
+    )
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    outputs: Dict[str, Path] = {}
+
+    fmt = fmt.lower()
+    if fmt in ("csv", "both"):
+        csv_path = out_path if out_path.suffix.lower() == ".csv" else out_path.with_suffix(".csv")
+        with csv_path.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=["path", "a", "b", "equal"])
+            writer.writeheader()
+            writer.writerows(rows)
+        outputs["csv"] = csv_path
+
+    if fmt in ("xlsx", "excel", "both"):
+        try:
+            import pandas as pd
+        except Exception:
+            return outputs
+        xlsx_path = out_path if out_path.suffix.lower() in (".xlsx", ".xls") else out_path.with_suffix(".xlsx")
+        pd.DataFrame(rows).to_excel(xlsx_path, index=False)
+        outputs["xlsx"] = xlsx_path
+
+    return outputs
 
 
 def format_snapshot_table(

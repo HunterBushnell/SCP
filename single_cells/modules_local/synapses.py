@@ -188,6 +188,7 @@ def add_synapses(
     inputs_by_group: Dict[str, Any],
     *,
     trial_rng: randomness.TrialRandomness = None,
+    preview_only: bool = False,
 ) -> Dict[str, Any]:
     """
     Step 2.4 — Add Synapses
@@ -231,6 +232,9 @@ def add_synapses(
           - len(gi.spike_trains) must be either:
               * 1 (broadcast to all synapses), or
               * N_syn_resolved (1:1 mapping to synapses).
+    preview_only : bool
+        If True, do not create NEURON synapses/VecStims/NetCons; only return
+        synapse records for inspection.
 
     Returns
     -------
@@ -247,6 +251,7 @@ def add_synapses(
     ------------
     - Attaches lists `synapses`, `netcons`, `stims`, `vecs` to the `cell` object
       (creating them if missing) so that NEURON objects are kept alive.
+      Skipped when preview_only is True.
 
     Notes
     -----
@@ -256,16 +261,18 @@ def add_synapses(
       way; that should be implemented explicitly rather than inferred.
     """
     h = cell.h
+    preview_only = bool(preview_only)
 
     # Persistent lists on cell
-    if not hasattr(cell, "synapses"):
-        cell.synapses = []
-    if not hasattr(cell, "netcons"):
-        cell.netcons = []
-    if not hasattr(cell, "stims"):
-        cell.stims = []
-    if not hasattr(cell, "vecs"):
-        cell.vecs = []
+    if not preview_only:
+        if not hasattr(cell, "synapses"):
+            cell.synapses = []
+        if not hasattr(cell, "netcons"):
+            cell.netcons = []
+        if not hasattr(cell, "stims"):
+            cell.stims = []
+        if not hasattr(cell, "vecs"):
+            cell.vecs = []
 
     syn_state: Dict[str, Any] = {
         "synapses": {},
@@ -274,6 +281,8 @@ def add_synapses(
         "vecs": {},
         "records": {},
     }
+    if preview_only:
+        syn_state["preview_only"] = True
 
     syn_id = 0
 
@@ -391,34 +400,40 @@ def add_synapses(
         group_records: List[SynapseRecord] = []
 
         for i, syn_loc in enumerate(all_syn_locs):
-            syn = _gen_syn_mech(h, weight_rng, syn_loc, mech_params)
-            # syn = _gen_syn_mech(h, weight_rng, syn_loc, syn_cfg)
+            if preview_only:
+                syn = None
+                syn_wt = _draw_syn_weight(weight_rng, mech_params)
+            else:
+                syn = _gen_syn_mech(h, weight_rng, syn_loc, mech_params)
+                # syn = _gen_syn_mech(h, weight_rng, syn_loc, syn_cfg)
+                syn_wt = float(getattr(syn, "initW", 0.0))
 
             train_arr = np.asarray(_get_train(i), dtype=float)
             spike_times = train_arr.tolist()
 
-            vec = h.Vector(spike_times)
-            stim = h.VecStim()
-            stim.play(vec)
-            nc = h.NetCon(stim, syn)
-            nc.weight[0] = 1.0  # actual synaptic weight is syn.initW
+            if not preview_only:
+                vec = h.Vector(spike_times)
+                stim = h.VecStim()
+                stim.play(vec)
+                nc = h.NetCon(stim, syn)
+                nc.weight[0] = 1.0  # actual synaptic weight is syn.initW
 
-            cell.synapses.append(syn)
-            cell.vecs.append(vec)
-            cell.stims.append(stim)
-            cell.netcons.append(nc)
+                cell.synapses.append(syn)
+                cell.vecs.append(vec)
+                cell.stims.append(stim)
+                cell.netcons.append(nc)
 
-            group_syns.append(syn)
-            group_vecs.append(vec)
-            group_stims.append(stim)
-            group_ncs.append(nc)
+                group_syns.append(syn)
+                group_vecs.append(vec)
+                group_stims.append(stim)
+                group_ncs.append(nc)
 
             dist = float(h.distance(syn_loc))
             rec = SynapseRecord(
                 syn_id=syn_id,
                 group=syn_group,
                 type=syn_cfg["type"],
-                weight=float(getattr(syn, "initW", 0.0)),
+                weight=float(syn_wt),
                 distance=dist,
                 section=syn_loc.sec.name(),
                 x=float(syn_loc.x),
@@ -436,3 +451,29 @@ def add_synapses(
         # print(f"{syn_group}: generated {len(all_syn_locs)} synapses.")
 
     return syn_state
+
+
+def preview_synapses(
+    cell: Any,
+    geom: Dict[str, Any],
+    sim_cfg: Dict[str, Any],
+    groups_cfg: Dict[str, Dict[str, Any]],
+    inputs_by_group: Dict[str, Any],
+    *,
+    trial_rng: randomness.TrialRandomness = None,
+) -> Dict[str, Any]:
+    """
+    Preview synapse placement/weights without creating NEURON objects.
+
+    This returns a syn_state dict with records only (preview_only=True), which is
+    useful for notebook plotting/debugging without affecting simulations.
+    """
+    return add_synapses(
+        cell=cell,
+        geom=geom,
+        sim_cfg=sim_cfg,
+        groups_cfg=groups_cfg,
+        inputs_by_group=inputs_by_group,
+        trial_rng=trial_rng,
+        preview_only=True,
+    )

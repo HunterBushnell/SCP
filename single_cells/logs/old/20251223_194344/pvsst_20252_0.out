@@ -1,0 +1,16 @@
+Running: python /home/hrbncv/PV-SST/single_cells/run_pipeline.py --tune-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned --output-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_20252/parts --n-trials 4 --output-stem slurm_20252_0 --trial-offset 0 --force-save
+Loaded mechanisms from /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/modfiles/x86_64/.libs/libnrnmech.so
+Loaded Allen cell for 'PV' from manifest.json, soma_diam_multiplier=6.0, Vinit=-71.0
+Geometry defined for 'PV': 1 soma segs, 46 proximal dend segs, 41 distal dend segs, 97 total dend segs.
+[trial 1/4] input_spikes: pn_exc=212 bg_exc=43 bg_inh=1162
+[trial 1/4] spikes=7  rate=6.09 Hz  time=28.40s
+[trial 2/4] input_spikes: pn_exc=236 bg_exc=45 bg_inh=1245
+[trial 2/4] spikes=7  rate=6.09 Hz  time=28.08s
+[trial 3/4] input_spikes: pn_exc=224 bg_exc=39 bg_inh=1212
+[trial 3/4] spikes=7  rate=6.09 Hz  time=27.52s
+[trial 4/4] input_spikes: pn_exc=209 bg_exc=43 bg_inh=1206
+[trial 4/4] spikes=5  rate=4.35 Hz  time=27.84s
+Results saved to /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_20252/parts/slurm_20252_0/run_manifest.json
+Total runtime: 111.99s
+Submitting merge job: python /home/hrbncv/PV-SST/single_cells/scripts/merge_array_results.py --input-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_20252/parts --output-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_20252 --job-id 20252 --output-stem results
+Submitted batch job 20277

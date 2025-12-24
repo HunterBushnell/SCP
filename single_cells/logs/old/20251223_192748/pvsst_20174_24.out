@@ -1,0 +1,14 @@
+Running: python /home/hrbncv/PV-SST/single_cells/run_pipeline.py --tune-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned --output-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_20174/parts --n-trials 4 --output-stem slurm_20174_24 --trial-offset 96 --force-save
+Loaded mechanisms from /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/modfiles/x86_64/.libs/libnrnmech.so
+Loaded Allen cell for 'PV' from manifest.json, soma_diam_multiplier=6.0, Vinit=-71.0
+Geometry defined for 'PV': 1 soma segs, 46 proximal dend segs, 41 distal dend segs, 97 total dend segs.
+[trial 1/4] input_spikes: pn_exc=224 bg_exc=47 bg_inh=1302
+[trial 1/4] spikes=5  rate=4.35 Hz  time=27.80s
+[trial 2/4] input_spikes: pn_exc=224 bg_exc=63 bg_inh=1268
+[trial 2/4] spikes=8  rate=6.96 Hz  time=27.48s
+[trial 3/4] input_spikes: pn_exc=216 bg_exc=57 bg_inh=1267
+[trial 3/4] spikes=9  rate=7.83 Hz  time=27.48s
+[trial 4/4] input_spikes: pn_exc=246 bg_exc=59 bg_inh=1247
+[trial 4/4] spikes=7  rate=6.09 Hz  time=27.58s
+Results not saved (sim_cfg['output'] was empty).
+Total runtime: 110.44s

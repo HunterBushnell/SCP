@@ -1,0 +1,46 @@
+Running: python /home/hrbncv/PV-SST/single_cells/run_pipeline.py --tune-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned --output-dir /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_20278/parts --n-trials 20 --output-stem slurm_20278_13 --trial-offset 260 --force-save
+Loaded mechanisms from /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/modfiles/x86_64/.libs/libnrnmech.so
+Loaded Allen cell for 'PV' from manifest.json, soma_diam_multiplier=6.0, Vinit=-71.0
+Geometry defined for 'PV': 1 soma segs, 46 proximal dend segs, 41 distal dend segs, 97 total dend segs.
+[trial 1/20] input_spikes: pn_exc=212 bg_exc=54 bg_inh=1314
+[trial 1/20] spikes=8  rate=6.67 Hz  time=27.82s
+[trial 2/20] input_spikes: pn_exc=219 bg_exc=53 bg_inh=1305
+[trial 2/20] spikes=10  rate=8.33 Hz  time=27.64s
+[trial 3/20] input_spikes: pn_exc=225 bg_exc=60 bg_inh=1320
+[trial 3/20] spikes=6  rate=5.00 Hz  time=27.65s
+[trial 4/20] input_spikes: pn_exc=243 bg_exc=41 bg_inh=1356
+[trial 4/20] spikes=11  rate=9.17 Hz  time=27.65s
+[trial 5/20] input_spikes: pn_exc=262 bg_exc=58 bg_inh=1330
+[trial 5/20] spikes=9  rate=7.50 Hz  time=27.68s
+[trial 6/20] input_spikes: pn_exc=251 bg_exc=46 bg_inh=1345
+[trial 6/20] spikes=7  rate=5.83 Hz  time=27.63s
+[trial 7/20] input_spikes: pn_exc=238 bg_exc=59 bg_inh=1298
+[trial 7/20] spikes=8  rate=6.67 Hz  time=27.81s
+[trial 8/20] input_spikes: pn_exc=206 bg_exc=55 bg_inh=1333
+[trial 8/20] spikes=7  rate=5.83 Hz  time=27.40s
+[trial 9/20] input_spikes: pn_exc=207 bg_exc=49 bg_inh=1299
+[trial 9/20] spikes=3  rate=2.50 Hz  time=27.64s
+[trial 10/20] input_spikes: pn_exc=222 bg_exc=50 bg_inh=1275
+[trial 10/20] spikes=5  rate=4.17 Hz  time=27.65s
+[trial 11/20] input_spikes: pn_exc=194 bg_exc=59 bg_inh=1332
+[trial 11/20] spikes=9  rate=7.50 Hz  time=27.64s
+[trial 12/20] input_spikes: pn_exc=242 bg_exc=56 bg_inh=1321
+[trial 12/20] spikes=9  rate=7.50 Hz  time=27.61s
+[trial 13/20] input_spikes: pn_exc=230 bg_exc=56 bg_inh=1300
+[trial 13/20] spikes=8  rate=6.67 Hz  time=27.73s
+[trial 14/20] input_spikes: pn_exc=220 bg_exc=54 bg_inh=1267
+[trial 14/20] spikes=8  rate=6.67 Hz  time=27.63s
+[trial 15/20] input_spikes: pn_exc=226 bg_exc=56 bg_inh=1334
+[trial 15/20] spikes=9  rate=7.50 Hz  time=27.59s
+[trial 16/20] input_spikes: pn_exc=235 bg_exc=65 bg_inh=1289
+[trial 16/20] spikes=13  rate=10.83 Hz  time=27.73s
+[trial 17/20] input_spikes: pn_exc=234 bg_exc=54 bg_inh=1315
+[trial 17/20] spikes=7  rate=5.83 Hz  time=27.73s
+[trial 18/20] input_spikes: pn_exc=228 bg_exc=55 bg_inh=1338
+[trial 18/20] spikes=8  rate=6.67 Hz  time=27.73s
+[trial 19/20] input_spikes: pn_exc=259 bg_exc=58 bg_inh=1226
+[trial 19/20] spikes=10  rate=8.33 Hz  time=27.66s
+[trial 20/20] input_spikes: pn_exc=215 bg_exc=49 bg_inh=1331
+[trial 20/20] spikes=5  rate=4.17 Hz  time=26.93s
+Results saved to /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_20278/parts/slurm_20278_13/run_manifest.json
+Total runtime: 552.71s

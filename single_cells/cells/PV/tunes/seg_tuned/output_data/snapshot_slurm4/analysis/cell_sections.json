@@ -1,0 +1,57 @@
+{
+  "soma": {
+    "n_sections": 1,
+    "n_segments": 1,
+    "total_length_um": 14.599853515625,
+    "mean_section_length_um": 14.599853515625,
+    "mean_segment_length_um": 14.599853515625,
+    "total_area_um2": 4017.876017303496,
+    "mean_diam_um": 87.59880065917969,
+    "min_diam_um": 87.59880065917969,
+    "max_diam_um": 87.59880065917969
+  },
+  "dend": {
+    "n_sections": 41,
+    "n_segments": 97,
+    "total_length_um": 1957.0752786230628,
+    "mean_section_length_um": 47.73354338105031,
+    "mean_segment_length_um": 20.17603380023776,
+    "total_area_um2": 1975.790386307436,
+    "mean_diam_um": 0.32136500918997657,
+    "min_diam_um": 0.25689865137899004,
+    "max_diam_um": 0.6993895929345356
+  },
+  "apic": {
+    "n_sections": 0,
+    "n_segments": 0,
+    "total_length_um": 0.0,
+    "mean_section_length_um": 0.0,
+    "mean_segment_length_um": 0.0,
+    "total_area_um2": 0.0,
+    "mean_diam_um": null,
+    "min_diam_um": null,
+    "max_diam_um": null
+  },
+  "axon": {
+    "n_sections": 2,
+    "n_segments": 2,
+    "total_length_um": 60.0,
+    "mean_section_length_um": 30.0,
+    "mean_segment_length_um": 30.0,
+    "total_area_um2": 188.49555921538757,
+    "mean_diam_um": 1.0,
+    "min_diam_um": 1.0,
+    "max_diam_um": 1.0
+  },
+  "all": {
+    "n_sections": 44,
+    "n_segments": 100,
+    "total_length_um": 2031.6751321386878,
+    "mean_section_length_um": 46.17443482133381,
+    "mean_segment_length_um": 20.316751321386878,
+    "total_area_um2": 6182.16196282632,
+    "mean_diam_um": 1.207712065506074,
+    "min_diam_um": 0.25689865137899004,
+    "max_diam_um": 87.59880065917969
+  }
+}

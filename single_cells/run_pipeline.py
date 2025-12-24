@@ -110,6 +110,7 @@ def _finalize_sim_cfg(sim_cfg: Dict[str, Any], args: argparse.Namespace) -> Dict
     save_output = bool(save_output)
     if getattr(args, "force_save", False):
         save_output = True
+    sim_cfg["save_output"] = save_output
 
     output_stem = sim_cfg.get("output_stem")
     if output_stem not in (None, ""):

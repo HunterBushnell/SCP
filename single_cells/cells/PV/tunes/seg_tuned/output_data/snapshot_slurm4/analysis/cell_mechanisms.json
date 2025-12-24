@@ -1,0 +1,35 @@
+{
+  "soma": {
+    "density_mechs": {
+      "pas": 1
+    },
+    "point_mechs": {},
+    "ions": {}
+  },
+  "dend": {
+    "density_mechs": {
+      "pas": 41
+    },
+    "point_mechs": {},
+    "ions": {}
+  },
+  "apic": {
+    "density_mechs": {},
+    "point_mechs": {},
+    "ions": {}
+  },
+  "axon": {
+    "density_mechs": {
+      "pas": 2
+    },
+    "point_mechs": {},
+    "ions": {}
+  },
+  "all": {
+    "density_mechs": {
+      "pas": 44
+    },
+    "point_mechs": {},
+    "ions": {}
+  }
+}

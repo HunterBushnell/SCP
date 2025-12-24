@@ -100,11 +100,13 @@ def my_custom_mode_example(
     - Return: list[np.ndarray], where each array is a 1D array of spike
       times (ms, simulation time).
 
-    Replace this body with your own logic.
+    Placeholder implementation:
+    - Returns one empty spike train per synapse (no spikes).
+    - Satisfies the Step 2.3 mode contract.
     """
-    # Placeholder implementation: no spikes.
-    spike_trains: list[np.ndarray] = []
-    return spike_trains
+    syn_cfg = (group_cfg or {}).get("syns", {}) or {}
+    n_syn = int(syn_cfg.get("N_syn_resolved", 0) or 0)
+    return [np.array([], dtype=float) for _ in range(n_syn)]
 
 
 # ---------------------------------------------------------------------
@@ -120,7 +122,7 @@ def get_user_mode_registry() -> Mapping[str, Any]:
     Edit this function to expose your custom modes.
     """
     return {
-        # "my_custom_mode": my_custom_mode_example,
+        "my_custom_mode": my_custom_mode_example,
         # Add your own modes here, e.g.:
         # "my_burst_mode": my_burst_mode,
     }

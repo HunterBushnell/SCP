@@ -1,0 +1,84 @@
+{
+  "cell": "PV",
+  "tune": "seg_tuned",
+  "color": "b",
+  "specimen_id": 484635029,
+  "model_type": "perisomatic",
+  "soma_diam_multiplier": 6.0,
+  "tstart": 50.0,
+  "tstop": 1200.0,
+  "dt": 0.025,
+  "jitter": 100.0,
+  "stim_start_ms": 400.0,
+  "stim_duration_ms": 550.0,
+  "n_trials": 1,
+  "n_traces_to_save": 1,
+  "n_inputs_to_save": 1,
+  "load": null,
+  "save": "slurm_test",
+  "append": null,
+  "input_stats_bin_ms": 5.0,
+  "plots_profile": "off",
+  "iclamp": {
+    "enabled": false,
+    "amp_nA": 0.2,
+    "delay_ms": 200.0,
+    "dur_ms": 800.0,
+    "tstop_ms": null,
+    "dt_ms": null,
+    "record_currents": false
+  },
+  "snapshot": {
+    "enabled": false,
+    "n_trials": 1,
+    "save_all_inputs": true,
+    "save_all_traces": true,
+    "save_syn_records_by_trial": true
+  },
+  "param_study": {
+    "input_type": null,
+    "param_type": null,
+    "param_vals": [],
+    "n_trials": null
+  },
+  "randomness_mode": "random",
+  "random_seed": null,
+  "stim_stop_ms": null,
+  "seed": null,
+  "trial_randomness": "synapses",
+  "load_enabled": false,
+  "save_output": true,
+  "output": "slurm_test_8",
+  "output_format": "pkl",
+  "save_full_results": false,
+  "save_plots": false,
+  "save_plots_inputs": false,
+  "save_plots_synapses": false,
+  "append_enabled": false,
+  "append_to": null,
+  "randomness": {
+    "global": {
+      "state": true,
+      "seed": null
+    },
+    "trials": true,
+    "inputs": true,
+    "timing": {
+      "tstart": true,
+      "tstop": true,
+      "jitter": true
+    },
+    "synapses": {
+      "placement": true,
+      "weights": true,
+      "dynamics": true
+    },
+    "modes": {
+      "homogeneous_poisson": true,
+      "inhomogeneous_poisson": true,
+      "precomputed": true
+    }
+  },
+  "_jitter_tstart_ms": 50.0,
+  "trial_offset": 8
+}
