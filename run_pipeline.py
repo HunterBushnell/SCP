@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """
-CLI entrypoint to run the PV-SST single-cell pipeline without notebooks.
+CLI entrypoint to run the SCP single-cell pipeline without notebooks.
 
 Minimal usage (from repo root or tune dir):
-    python -m run_pipeline --tune-dir cells/SST/tunes/seg_tuned --mode multi --n-trials 10
+    python run_pipeline.py --tune-dir cells/SST/tunes/seg_tuned --mode multi --n-trials 10
 
 Defaults:
     - Uses sim_config.json and syn_config.json in --tune-dir (or --tune-dir/cell_configs).
@@ -143,7 +143,7 @@ def _resolve_append_target(sim_cfg_raw: Dict[str, Any], output_base: Path) -> Op
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Run PV-SST pipeline (single or multi) for a tune directory.")
+    p = argparse.ArgumentParser(description="Run SCP pipeline (single or multi) for a tune directory.")
     p.add_argument("--tune-dir", type=str, default=None,
                    help="Path to tune directory containing sim_config.json and syn_config.json "
                         "(optionally under cell_configs/).")

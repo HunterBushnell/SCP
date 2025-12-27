@@ -12,6 +12,6 @@ Modfiles
 - Build once per tune:
   `cd <tune_dir>/modfiles && nrnivmodl`
 
-Planned (Colab)
-- `5_colab.ipynb` will be expanded to bootstrap an empty environment
-  (download cell, build modfiles, and run the pipeline end-to-end).
+Colab/Linux (bootstrapped)
+- `5_colab.ipynb` can bootstrap a clean environment
+  (install deps, compile modfiles, and run the pipeline end-to-end).

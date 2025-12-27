@@ -1,6 +1,6 @@
 {
   "bg_exc_del": {
-    "state": true,
+    "state": false,
     "mode": "homogeneous_poisson",
     "color": null,
     "source": {

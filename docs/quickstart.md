@@ -10,10 +10,10 @@ Option A: Notebook
 
 Option B: CLI
 - Single run:
-  `python /home/hrbncv/SCP/run_pipeline.py --tune-dir /home/hrbncv/SCP/cells/PV/tunes/seg_tuned --n-trials 1`
+  `python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 1`
 
 - If modfiles are missing, build them once per tune:
-  `cd /home/hrbncv/SCP/cells/PV/tunes/seg_tuned/modfiles && nrnivmodl`
+  `cd cells/PV/tunes/seg_tuned/modfiles && nrnivmodl`
 
 Outputs land under:
 - `{tune_dir}/output_data/<output_stem>/`

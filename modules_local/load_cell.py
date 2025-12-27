@@ -1,5 +1,5 @@
 """
-Step 2.1 — Load Cell
+Step 5.2.1 — Load Cell
 
 Single entry point:
 
@@ -16,7 +16,7 @@ and uses AllenSDK's Config + Utils to:
 - record Vinit.
 
 It does *not* download files, compile MODs, or change directories.
-Those belong in Step 1 (Prepare Model).
+Those belong in the prep steps (e.g., 0_download or the 5_colab setup cell).
 """
 
 from __future__ import annotations

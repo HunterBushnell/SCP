@@ -102,6 +102,32 @@ def _get_active_window_from_time_cfg(time_cfg: Dict[str, Any]) -> Tuple[float, f
 
 
 # ---------------------------------------------------------------------
+# Shared helper: resolve source paths
+# ---------------------------------------------------------------------
+def _find_scp_root(start: Path) -> Optional[Path]:
+    for p in [start] + list(start.parents):
+        if (p / "cells").is_dir() and (p / "run_pipeline.py").is_file():
+            return p
+    return None
+
+
+def _resolve_source_path(raw_path: str, sim_cfg: Dict[str, Any]) -> Path:
+    p = Path(raw_path)
+    if p.is_absolute():
+        return p
+
+    tune_dir_raw = sim_cfg.get("tune_dir")
+    tune_dir = Path(tune_dir_raw) if tune_dir_raw else Path.cwd()
+    tune_dir = tune_dir.resolve()
+    repo_root = _find_scp_root(tune_dir)
+
+    if repo_root and p.parts and p.parts[0] in ("external_data", "cells"):
+        return (repo_root / p).resolve()
+
+    return (tune_dir / p).resolve()
+
+
+# ---------------------------------------------------------------------
 # Shared helper: homogeneous Poisson spike train generator
 # ---------------------------------------------------------------------
 def _generate_homogeneous_poisson_trains(
@@ -205,7 +231,7 @@ def _generate_inhomogeneous_from_curve(
 
 
 # =====================================================================
-# Default mode functions (stubs for 2.3 contract alignment)
+# Core mode functions (Step 5.2.3 input-generation contract)
 # =====================================================================
 
 # ---------------------------------------------------------------------
@@ -404,7 +430,12 @@ def _mode_precomputed(
     if source.get("trains") is not None:
         pool = _normalize_pool(source["trains"], key=source.get("key"))
     elif source.get("path"):
-        pool = _load_trains_from_path(Path(source["path"]))
+        try:
+            resolved = _resolve_source_path(str(source["path"]), sim_cfg)
+            pool = _load_trains_from_path(resolved)
+        except FileNotFoundError:
+            print(f"precomputed: missing source path {source.get('path')!r}; using empty trains")
+            return [np.array([], dtype=float) for _ in range(n_syn)]
     else:
         raise ValueError("precomputed mode requires source['trains'] or source['path']")
 
@@ -642,9 +673,10 @@ def _mode_inhomogeneous_poisson(
         # Load curve from CSV
         import pandas as pd  # local import to avoid forcing pandas on import
 
-        p = Path(path or freq)
+        p = _resolve_source_path(str(path or freq), sim_cfg)
         if not p.is_file():
-            raise FileNotFoundError(f"Rate curve file not found: {p}")
+            print(f"inhomogeneous_poisson: missing rate curve file {p}; using empty trains")
+            return [np.array([], dtype=float) for _ in range(n_syn)]
 
         df = pd.read_csv(p)
         if time_col not in df or rate_col not in df:
@@ -817,7 +849,7 @@ def _mode_inhomogeneous_poisson(
 
 def get_default_mode_registry() -> Dict[str, Any]:
     """
-    Return the default mode registry for Step 2.3.
+    Return the default mode registry for Step 5.2.3.
 
     All registered handlers obey the 4-argument mode contract:
         handler(sim_cfg, group_cfg, geometry, rng)

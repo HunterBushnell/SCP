@@ -73,7 +73,7 @@ def normalize(data,
     return norm_data
 
 # ────────────────────────────────────────────────────────────────────────────
-#  Input plotting (Step 4.2)
+#  Input plotting (Step 5.4.2)
 # ────────────────────────────────────────────────────────────────────────────
 def plot_inputs_by_group(
         inputs_by_group,
@@ -378,6 +378,56 @@ def plot_input_means(
 # ────────────────────────────────────────────────────────────────────────────
 #  Synapse-property plots (distance / weight / distance-density)
 # ────────────────────────────────────────────────────────────────────────────
+def plot_synapse_compare_hist(
+        vals_a,
+        vals_b,
+        *,
+        labels=("Run A", "Run B"),
+        bin_width=0.1,
+        xlabel="Value",
+        title="Synapse distribution",
+        density=True,
+        figsize=(6, 4),
+):
+    """
+    Overlay two synapse distributions as line histograms.
+    vals_*: array-like of numeric values.
+    """
+    vals_a = np.asarray(vals_a or [], dtype=float)
+    vals_b = np.asarray(vals_b or [], dtype=float)
+    if vals_a.size == 0 and vals_b.size == 0:
+        print(f"No synapse data for {title}.")
+        return None
+
+    all_vals = np.concatenate([v for v in (vals_a, vals_b) if v.size])
+    if all_vals.size == 0:
+        print(f"No synapse data for {title}.")
+        return None
+
+    lo, hi = float(all_vals.min()), float(all_vals.max())
+    if lo == hi:
+        lo -= 0.5 * bin_width
+        hi += 0.5 * bin_width
+    edges = np.arange(lo, hi + bin_width, bin_width, dtype=float)
+    centers = (edges[:-1] + edges[1:]) * 0.5
+
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    if vals_a.size:
+        y_a, _ = np.histogram(vals_a, bins=edges, density=density)
+        ax.plot(centers, y_a, lw=2, label=labels[0])
+    if vals_b.size:
+        y_b, _ = np.histogram(vals_b, bins=edges, density=density)
+        ax.plot(centers, y_b, lw=2, label=labels[1])
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Density" if density else "Count")
+    ax.set_title(title)
+    ax.legend()
+    ax.grid(True)
+    fig.tight_layout()
+    return fig
+
+
 # def plot_syn_records(
 #         cell,
 #         syn_records,

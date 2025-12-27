@@ -11,6 +11,7 @@ from collections import Counter
 import csv
 import json
 import math
+import os
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
@@ -1655,4 +1656,433 @@ def compare_snapshot_runs(
         "manifest_files_a": files_a,
         "manifest_files_b": files_b,
         "manifest_diff": manifest_diff,
+    }
+
+
+# ---------------------------------------------------------------------
+# Step 6 helpers (run selection + lightweight analysis glue)
+# ---------------------------------------------------------------------
+
+def find_scp_root(start: Path) -> Path:
+    """
+    Locate the SCP repo root starting from `start`.
+    Falls back to `start` if no SCP layout is detected.
+    """
+    for p in [start] + list(start.parents):
+        if (p / "cells").is_dir() and (p / "run_pipeline.py").is_file():
+            return p
+        if (p / "single_cells" / "cells").is_dir():
+            return p / "single_cells"
+
+    try:
+        for child in start.iterdir():
+            if not child.is_dir():
+                continue
+            if (child / "cells").is_dir() and (child / "run_pipeline.py").is_file():
+                return child
+            if (child / "single_cells" / "cells").is_dir():
+                return child / "single_cells"
+    except Exception:
+        pass
+
+    return start
+
+
+def list_cells(base_dir: Path) -> list[str]:
+    cells_dir = base_dir / "cells"
+    if not cells_dir.is_dir():
+        return []
+    return sorted([p.name for p in cells_dir.iterdir() if p.is_dir()])
+
+
+def list_tunes(base_dir: Path, cell: str) -> list[str]:
+    base = base_dir / "cells" / cell
+    if not base.is_dir():
+        return []
+    if (base / "tunes").is_dir():
+        return ["tunes"]
+    return sorted([p.name for p in base.iterdir() if p.is_dir()])
+
+
+def list_models(base_dir: Path, cell: str, tunes: str) -> list[str]:
+    base = base_dir / "cells" / cell / tunes
+    if not base.is_dir():
+        return []
+    return sorted([p.name for p in base.iterdir() if p.is_dir()])
+
+
+def resolve_run_dir(candidate: Path) -> Path:
+    if (candidate / "run_manifest.json").is_file():
+        return candidate
+    nested = candidate / "results"
+    if (nested / "run_manifest.json").is_file():
+        return nested
+    return candidate
+
+
+def collect_run_dirs(base_dir: Path) -> list[Path]:
+    candidates: list[Path] = []
+    seen: set[str] = set()
+    if not base_dir.is_dir():
+        return candidates
+    for p in base_dir.iterdir():
+        if not p.is_dir():
+            continue
+        resolved = resolve_run_dir(p)
+        if (resolved / "run_manifest.json").is_file():
+            key = str(resolved)
+            if key not in seen:
+                seen.add(key)
+                candidates.append(resolved)
+    return sorted(candidates, key=lambda p: (p / "run_manifest.json").stat().st_mtime)
+
+
+def resolve_run(base_dir: Path, stem_or_path: Optional[Union[str, Path]]) -> Path:
+    if stem_or_path is None:
+        stem_or_path = "latest"
+    p = stem_or_path if isinstance(stem_or_path, Path) else Path(str(stem_or_path))
+    if p.is_absolute():
+        return resolve_run_dir(p)
+    runs = collect_run_dirs(base_dir)
+    if str(stem_or_path) in (None, "latest"):
+        if not runs:
+            raise FileNotFoundError(f"No run folders found under {base_dir}")
+        return runs[-1]
+    if str(stem_or_path) in ("previous", "prev", "latest-1"):
+        if len(runs) < 2:
+            raise FileNotFoundError(f"Need at least 2 runs under {base_dir}")
+        return runs[-2]
+    try:
+        parts = list(p.parts)
+        if "output_data" in parts:
+            idx = parts.index("output_data")
+            if idx + 1 < len(parts):
+                candidate = base_dir / parts[idx + 1]
+                if candidate.exists():
+                    return resolve_run_dir(candidate)
+    except Exception:
+        pass
+    if p.exists():
+        return resolve_run_dir(p)
+    candidate = base_dir / str(stem_or_path)
+    if candidate.exists():
+        return resolve_run_dir(candidate)
+    names = [p.name for p in runs]
+    raise FileNotFoundError(
+        f"Run not found: {stem_or_path!r}. Available under {base_dir}: {names}"
+    )
+
+
+def run_label(run_dir: Path) -> str:
+    return run_dir.parent.name if run_dir.name == "results" else run_dir.name
+
+
+def plot_dir_for_run(run_dir: Path) -> Path:
+    return run_dir.parent / "plots" if run_dir.name == "results" else run_dir / "plots"
+
+
+def analysis_dir_for_run(run_dir: Path) -> Path:
+    return run_dir.parent / "analysis" if run_dir.name == "results" else run_dir / "analysis"
+
+
+def plot_dir_for_compare(base_dir: Path, run_a: Path, run_b: Path) -> Path:
+    label = f"{run_label(run_a)}_vs_{run_label(run_b)}"
+    return base_dir / "_comparisons" / label / "plots"
+
+
+def analysis_dir_for_compare(base_dir: Path, run_a: Path, run_b: Path) -> Path:
+    label = f"{run_label(run_a)}_vs_{run_label(run_b)}"
+    return base_dir / "_comparisons" / label / "analysis"
+
+
+def parse_groups(text: Optional[str]) -> Optional[list[str]]:
+    if text is None:
+        return None
+    text = str(text).strip()
+    if not text:
+        return None
+    return [p.strip() for p in text.split(",") if p.strip()]
+
+
+def parse_optional_float(text: Optional[Union[str, float, int]]) -> Optional[float]:
+    if text is None:
+        return None
+    text = str(text).strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def load_bio_curve_optional(
+    *,
+    enabled: bool,
+    path: str,
+    time_col: str = "Time",
+    rate_col: str = "AvgFiringRate",
+    t_min: float = 0.0,
+    delay_ms: float = 0.0,
+    time_unit: str = "s",
+    shift_ms: Optional[float] = None,
+    quiet: bool = False,
+) -> Optional[tuple[np.ndarray, np.ndarray]]:
+    if not enabled:
+        return None
+    if not path:
+        if not quiet:
+            print("Bio curve enabled but path is empty.")
+        return None
+    try:
+        from modules_local import bio_curve
+
+        t_s, rate = bio_curve.load_bio_curve(
+            path,
+            time_col=time_col,
+            rate_col=rate_col,
+            t_min=t_min,
+            delay_ms=delay_ms,
+            time_unit=time_unit,
+        )
+    except Exception as exc:
+        if not quiet:
+            print("Bio curve load failed:", exc)
+        return None
+    if shift_ms is not None:
+        t_s = t_s + float(shift_ms) / 1000.0
+    return (np.asarray(t_s), np.asarray(rate))
+
+
+def select_inputs_payload(results: Dict[str, Any], *, trial_idx: int = 0) -> Optional[Dict[str, Any]]:
+    payload = results.get("inputs")
+    if payload is not None:
+        return payload
+    trials = results.get("inputs_by_trial") or []
+    if not trials:
+        return None
+    idx = min(max(int(trial_idx), 0), len(trials) - 1)
+    return (trials[idx] or {}).get("inputs")
+
+
+def extract_synapse_values(
+    syn_records: Dict[str, Any],
+    field: str,
+    groups: Optional[Iterable[str]] = None,
+) -> np.ndarray:
+    if not syn_records:
+        return np.array([], dtype=float)
+    if groups is None or list(groups) == ["all"]:
+        groups = list(syn_records.keys())
+    vals: list[float] = []
+    for g in groups:
+        for rec in syn_records.get(g, []) or []:
+            if isinstance(rec, dict):
+                val = rec.get(field)
+            else:
+                val = getattr(rec, field, None)
+            if val is not None:
+                vals.append(float(val))
+    return np.asarray(vals, dtype=float)
+
+
+def build_multi_plot_inputs(
+    results: Dict[str, Any],
+    *,
+    plot_window: Optional[Union[tuple[Optional[float], Optional[float]], Dict[str, Any]]] = None,
+) -> tuple[Dict[str, Any], Dict[str, Any], Optional[Dict[str, Any]]]:
+    spikes_by_trial = results.get("spikes", []) or []
+    if isinstance(spikes_by_trial, np.ndarray):
+        spikes_by_trial = spikes_by_trial.tolist()
+    all_param_data = {"multi": spikes_by_trial}
+    sim_cfg = results.get("sim_cfg", {}) or {}
+    sim_params = {
+        "tstop": float(sim_cfg.get("tstop", 0.0)),
+        "bins": float(sim_cfg.get("bins", 25.0)),
+        "delay": float(sim_cfg.get("delay", 0.0)),
+        "n_trials": len(spikes_by_trial),
+        "color": sim_cfg.get("color", None),
+        "stim_start_ms": sim_cfg.get("stim_start_ms"),
+        "stim_stop_ms": sim_cfg.get("stim_stop_ms"),
+        "stim_duration_ms": sim_cfg.get("stim_duration_ms"),
+    }
+    pw = plot_window
+    if pw is not None and not isinstance(pw, dict):
+        pw = {"x": (pw[0], pw[1]), "y": (None, None)}
+    return all_param_data, sim_params, pw
+
+
+def load_cell_and_geometry(
+    tune_dir: Path,
+) -> tuple[Any, Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    cell_cfg_path = tune_dir / "cell_configs" / "cell_config.json"
+    geom_cfg_path = tune_dir / "cell_configs" / "geometry.json"
+    cell_cfg = json.loads(cell_cfg_path.read_text())
+    geom_cfg = json.loads(geom_cfg_path.read_text()) if geom_cfg_path.is_file() else None
+
+    manifest = cell_cfg.get("paths", {}).get("manifest", "manifest.json")
+    manifest_path = Path(manifest)
+    if not manifest_path.is_absolute():
+        manifest_path = (tune_dir / manifest).resolve()
+    if not manifest_path.is_file():
+        fallback = (tune_dir / "manifest.json").resolve()
+        if fallback.is_file():
+            manifest_path = fallback
+        else:
+            raise FileNotFoundError(
+                f"manifest.json not found. Tried {manifest_path} and {fallback} (tune_dir={tune_dir})"
+            )
+    cell_cfg.setdefault("paths", {})["manifest"] = str(manifest_path)
+
+    from modules_local import load_cell, geometry as geom_mod
+
+    cwd = Path.cwd()
+    try:
+        os.chdir(tune_dir)
+        cell = load_cell(cell_cfg)
+        geom = geom_mod.define_geometry(cell, geom_cfg)
+    finally:
+        os.chdir(cwd)
+
+    return cell, geom, geom_cfg
+
+
+def resolve_figure(obj=None):
+    if obj is None:
+        return plt.gcf()
+    if isinstance(obj, tuple):
+        return resolve_figure(obj[0])
+    if hasattr(obj, "savefig"):
+        return obj
+    if hasattr(obj, "figure"):
+        return obj.figure
+    return plt.gcf()
+
+
+def save_figure(fig, out_path: Path, *, enabled: bool = True, dpi: int = 150) -> Optional[Path]:
+    if not enabled:
+        return None
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig = resolve_figure(fig)
+    fig.savefig(out_path, dpi=dpi)
+    return out_path
+
+
+def save_json(data: Dict[str, Any], out_path: Path, *, enabled: bool = True) -> Optional[Path]:
+    if not enabled:
+        return None
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(data, indent=2))
+    return out_path
+
+
+def format_diff_list_table(diffs: Iterable[str], *, title: str, max_items: int = 20) -> str:
+    lines = [f"**{title}**", "| # | Difference |", "| --- | --- |"]
+    diffs_list = list(diffs or [])
+    if not diffs_list:
+        lines.append("| (no differences found) | — |")
+        return "\n".join(lines)
+    for i, line in enumerate(diffs_list[:max_items], 1):
+        lines.append(f"| {i} | {line} |")
+    return "\n".join(lines)
+
+
+def snapshot_compare_report(
+    run_a: Union[Path, Dict[str, Any]],
+    run_b: Union[Path, Dict[str, Any]],
+    *,
+    labels: Optional[tuple[str, str]] = None,
+    max_diffs: int = 200,
+    diff_only: bool = True,
+    save_table: bool = False,
+    table_scope: str = "full",
+    table_format: str = "csv",
+    table_max_depth: int = 60,
+    table_max_list_items: int = 200,
+    out_dir: Optional[Path] = None,
+    save_report_json: bool = False,
+) -> Dict[str, Any]:
+    label_a = labels[0] if labels else "A"
+    label_b = labels[1] if labels else "B"
+    report = compare_snapshot_runs(
+        run_a,
+        run_b,
+        labels=(label_a, label_b),
+        max_diffs=max_diffs,
+        rtol=0.0,
+        atol=0.0,
+        print_summary=False,
+    )
+
+    manifest_table = format_diff_list_table(
+        report.get("manifest_diff", []),
+        title="Manifest differences",
+        max_items=40,
+    )
+    deep_table = format_diff_list_table(
+        report.get("diffs", []),
+        title="Deep differences (first 20)",
+        max_items=20,
+    )
+
+    if save_table and out_dir is not None:
+        compare_path = out_dir / f"snapshot_compare_{table_scope}"
+        save_compare_table(
+            run_a,
+            run_b,
+            compare_path,
+            scope=table_scope,
+            fmt=table_format,
+            max_depth=table_max_depth,
+            max_list_items=table_max_list_items,
+        )
+
+    if save_report_json and out_dir is not None:
+        save_json(report, out_dir / "snapshot_compare.json", enabled=True)
+
+    return {
+        "report": report,
+        "snapshot_diff_table": report.get("snapshot_diff_table"),
+        "manifest_diff_table": manifest_table,
+        "deep_diff_table": deep_table,
+    }
+
+
+def summarize_iclamp(results: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    traces = results.get("traces", {}) or {}
+    T = traces.get("T")
+    V = traces.get("V")
+    meta = results.get("meta", {}) or {}
+    if T is None or V is None:
+        return None
+    delay = meta.get("delay_ms", None)
+    dur = meta.get("dur_ms", None)
+    if delay is not None:
+        base_mask = T < float(delay)
+        baseline = float(V[base_mask].mean()) if base_mask.any() else float(V.mean())
+    else:
+        baseline = float(V.mean())
+    peak = float(V.max())
+    vmin = float(V.min())
+    spike_count = None
+    spike_rate = None
+    if delay is not None and dur is not None:
+        start = float(delay)
+        stop = float(delay + dur)
+        seg = (T >= start) & (T <= stop)
+        if seg.any():
+            vseg = V[seg]
+            crossings = ((vseg[:-1] < -20.0) & (vseg[1:] >= -20.0)).sum()
+            spike_count = int(crossings)
+            spike_rate = crossings / (dur / 1000.0) if dur > 0 else None
+    return {
+        "T": T,
+        "V": V,
+        "delay_ms": delay,
+        "dur_ms": dur,
+        "baseline": baseline,
+        "peak": peak,
+        "vmin": vmin,
+        "spike_count": spike_count,
+        "spike_rate": spike_rate,
     }

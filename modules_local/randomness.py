@@ -1,6 +1,6 @@
 # modules_local/randomness.py
 """
-Randomness utilities for PV-SST pipeline.
+Randomness utilities for the SCP pipeline.
 
 Goal: consistent, user-configurable randomness across trials, groups, and purposes
 (inputs vs synapse placement vs synapse weights, etc.) with minimal coupling.

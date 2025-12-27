@@ -5,7 +5,7 @@
     "source": {
       "freq": null,
       "baseline": 2.3,
-      "path": "/home/hrbncv/SCP/external_data/bio_cell_output/pyrFiringRateAvg.csv",
+      "path": "external_data/pyrFiringRateAvg.csv",
       "bin_ms": 5
     },
     "timing": {

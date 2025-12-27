@@ -328,7 +328,7 @@ class AllenCell:
         # If inhomogeneous based on bio data
         elif isinstance(syn_params['freq'], str):
 
-            # file_loc = "../../../external_data/bio_cell_output"
+            # file_loc = "../../../external_data"
             PFR = pd.read_csv(os.path.join(syn_params['freq']),delimiter=",")
             bio_stim_input = np.array(PFR['AvgFiringRate'][PFR['Time'] >0])
 
@@ -513,7 +513,7 @@ syn_params = {
                 'N_syn': None, # num of syns generated; if None uses dist_func
                 'segs': 'all', # 'all', 'proximal', 'distal'
                 'dist_func': lambda d: (-0.015*d + 4.25)*0.02, # *0.02 to scale to 50
-                'freq': '/home/hrbncv/SCP/external_data/bio_cell_output/pyrFiringRateAvg.csv', # constant, or .csv fp for inhomog input
+                'freq': '/home/hrbncv/SCP/external_data/pyrFiringRateAvg.csv', # constant, or .csv fp for inhomog input
 
                 'wt_mean': 1.5, 
                 'wt_std': (0.25/0.75), # bio data shows about 0.25/0.75 of mean
@@ -574,7 +574,7 @@ syn_params = {
                 'N_syn': 50, # num of syns generated; if None uses dist_func
                 'segs': 'all', # 'all', 'proximal', 'distal'
                 'dist_func': lambda d: 2.0,
-                'freq': '/home/hrbncv/SCP/external_data/bio_cell_output/pyrFiringRateAvg.csv', # constant, or .csv fp for inhomog input
+                'freq': '/home/hrbncv/SCP/external_data/pyrFiringRateAvg.csv', # constant, or .csv fp for inhomog input
 
                 'wt_mean': 0.5, 
                 'wt_std': (0.17/0.5), # bio data shows about 0.17/0.5 of mean

@@ -6,7 +6,7 @@
     "source": {
       "freq": null,
       "baseline": 4.0,
-      "path": "/home/hrbncv/SCP/cells/PV/tunes/seg_tuned/output_data/tune1_1000tr1000ms",
+      "path": "external_data/PV_1000tr.pkl",
       "bin_ms": null
     },
     "timing": {

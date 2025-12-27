@@ -4,11 +4,12 @@ Step 5 is the stable, current pipeline for running tuned single-cell simulations
 The notebook `5_local.ipynb` is the reference implementation.
 
 Sub-steps (documentation labels)
-- 5.1 Load cell: build NEURON cell from `cell_config.json` and `manifest.json`.
-- 5.2 Geometry: load `geometry.json` and build segment groups.
+- 5.2.1 Load cell: build NEURON cell from `cell_config.json` and `manifest.json`.
+- 5.2.2 Geometry: load `geometry.json` and build segment groups.
 - 5.2.3 Inputs: generate spike trains from `syn_config.json` and `syn_groups/`.
 - 5.2.4 Synapses: place synapses on the cell using geometry + inputs.
 - 5.3 Run: run single or multi trials and save outputs.
+- 5.4 Analyze: summarize and compare outputs.
 
 Entry points
 - Notebook: `5_local.ipynb`
@@ -42,4 +43,4 @@ Notes
 - Step numbers in older docs may refer to 2.x (2.3, 2.4). In SCP these map
   to 5.2.3 and 5.2.4 to keep Step 5 as the stable pipeline.
 - `5_old_PV.ipynb` and `5_old_SST.ipynb` are legacy notebooks kept for reference.
-- `5_colab.ipynb` will be expanded to bootstrap a clean environment and downloads.
+- `5_colab.ipynb` bootstraps a clean environment when needed.

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Simple SLURM wrapper for PV-SST single-cell pipeline.
+# Simple SLURM wrapper for the SCP single-cell pipeline.
 # Adjust SBATCH fields to your cluster defaults.
 
 #SBATCH -J pvsst

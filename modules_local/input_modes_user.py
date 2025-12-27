@@ -1,7 +1,5 @@
 """
-input_modes_user.py
-
-User-defined synaptic input modes for Step 2.3.
+User-defined synaptic input modes for Step 5.2.3 (input generation).
 
 Usage
 -----
@@ -16,11 +14,7 @@ Usage
         ...
 
   Each function must return a list of 1D NumPy arrays of spike times (ms)
-  in simulation time, **one array per synapse-equivalent source**.
-
-  The core pipeline (inputs._process_all_groups) will:
-    - resolve syns["N_syn_resolved"] before calling your mode,
-    - check that len(returned_trains) == N_syn_resolved.
+  in simulation time, one array per synapse-equivalent source.
 
 - Register them in get_user_mode_registry() by name, e.g.:
 
@@ -28,47 +22,15 @@ Usage
         "my_custom_mode": my_custom_mode,
     }
 
-- In the notebook, merge with the default registry from inputs.py and pass
-  the combined registry into inputs.generate_inputs(...).
-"""
+- In the notebook, merge with the default registry from input_modes_core
+  and pass the combined registry into inputs.generate_inputs(...).
 
-"""
-User-defined input modes for step 2.3 (input generation).
-
-CONTRACT FOR ANY MODE
----------------------
-Signature:
-    def my_mode(sim_cfg, group_cfg, geometry, rng) -> list[np.ndarray]
-
-Inputs:
-    sim_cfg : dict
-        Normalized global sim config; must NOT be modified.
-    group_cfg : dict
-        Normalized group config; includes:
-            group_cfg["source"]  – mode-specific inputs (freq, path, etc.)
-            group_cfg["timing"]  – onset/duration/timing fields (ms)
-            group_cfg["syns"]    – synapse spec incl. "N_syn_resolved" (int)
-    geometry : any | None
-        Optional cell geometry; use only if your mode is geometry-dependent.
-    rng : np.random.Generator
-        Use this for all randomness (do not use global np.random).
-
-Outputs:
-    list[np.ndarray]
-        One 1D float array of spike times (ms, sorted) per synapse-source.
-        Length of list MUST equal group_cfg["syns"]["N_syn_resolved"].
-        All spike times MUST lie within [sim_cfg["tstart"], sim_cfg["tstop"]].
-
-Typical mode steps (per group):
-    1) Read N_syn = group_cfg["syns"]["N_syn_resolved"].
-    2) Compute or read the effective time window for this group
-       (often via the timing fields in group_cfg["timing"]).
-    3) Use group_cfg["source"] + rng (and optionally geometry) to
-       generate N_syn spike trains.
-    4) Ensure trains are np.ndarray[float], sorted, and time-clipped
-       into the sim window.
-    5) Return the list of trains; no NEURON calls and no in-place edits
-       to sim_cfg / group_cfg.
+Contract highlights
+-------------------
+- Use group_cfg["syns"]["N_syn_resolved"] for the final synapse count.
+- Use rng for randomness (do not use global np.random).
+- Do not mutate sim_cfg or group_cfg.
+- Return a list[np.ndarray] with times clipped to [sim_cfg["tstart"], sim_cfg["tstop"]].
 """
 
 
@@ -79,7 +41,7 @@ import numpy as np
 
 
 # ---------------------------------------------------------------------
-# Example user mode stubs
+# Example user modes
 # ---------------------------------------------------------------------
 
 
@@ -102,7 +64,7 @@ def my_custom_mode_example(
 
     Placeholder implementation:
     - Returns one empty spike train per synapse (no spikes).
-    - Satisfies the Step 2.3 mode contract.
+    - Satisfies the Step 5.2.3 mode contract.
     """
     syn_cfg = (group_cfg or {}).get("syns", {}) or {}
     n_syn = int(syn_cfg.get("N_syn_resolved", 0) or 0)

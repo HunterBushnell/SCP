@@ -1,4 +1,4 @@
-PV-SST results and outputs contract (v1)
+SCP results and outputs contract (v1)
 
 * **Scope**
   * Covers artifacts produced by running the pipeline via `run_pipeline.py`, `run_slurm.sh`, or notebooks that call `run_sim.*`.

@@ -4,9 +4,10 @@ These steps will be updated after the PV/SST paper to align with the current
 config layout in `cell_configs/`. The notes below are placeholders.
 
 0_download.ipynb
-- Purpose: download the cell model and write manifests.
-- Inputs: ADB cell ID or selection parameters.
-- Outputs (expected): morphology files, `manifest.json`, `modfiles/`.
+- Purpose: download an AllenDB biophysical bundle into `cells/<CELL>/...`.
+- Inputs: `specimen_id`, `model_type`, `tunes_dir`, optional `model_dir`.
+- Outputs (expected): Allen bundle files including `manifest.json`, morphologies,
+  and `modfiles/` (compiled in 0.2).
 
 1_segment.ipynb
 - Purpose: segment the morphology and build a geometry description.

@@ -2,7 +2,7 @@ CLI and SLURM
 
 CLI (run_pipeline.py)
 - Minimal:
-  `python /home/hrbncv/SCP/run_pipeline.py --tune-dir <tune_dir> --n-trials 1`
+  `python run_pipeline.py --tune-dir <tune_dir> --n-trials 1`
 
 - Auto mode selection:
   If `--mode` is omitted, it is inferred from `n_trials`.

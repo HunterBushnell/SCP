@@ -191,22 +191,22 @@ def add_synapses(
     preview_only: bool = False,
 ) -> Dict[str, Any]:
     """
-    Step 2.4 — Add Synapses
+    Step 5.2.4 — Add Synapses
 
-    New 2.3→2.4 contract:
+    New 5.2.3→5.2.4 contract:
 
     Parameters
     ----------
     cell : Any
         Loaded cell object (e.g. from load_cell.load_cell); must expose `cell.h`.
     geom : dict
-        Geometry dict from Step 2.2, with `geom["groups"]` containing segment refs
+        Geometry dict from Step 5.2.2, with `geom["groups"]` containing segment refs
         for keys like "soma", "proximal", "distal", "all_dend".
     sim_cfg : dict
-        Simulation configuration from Step 2.3 (normalized "sim" block).
+        Simulation configuration from Step 5.2.3 (normalized "sim" block).
         Used here primarily for RNG seeding via sim_cfg["seed"].
     groups_cfg : dict
-        Per-group configs from Step 2.3 (normalized "synapse_groups" block),
+        Per-group configs from Step 5.2.3 (normalized "synapse_groups" block),
         keyed by group name. For each synapse group `g` that appears in
         `inputs_by_group`, we expect:
 
@@ -221,7 +221,7 @@ def add_synapses(
             }
 
     inputs_by_group : dict
-        Per-group inputs from Step 2.3, keyed by group name. Values are
+        Per-group inputs from Step 5.2.3, keyed by group name. Values are
         GroupInputs-like objects with at least:
 
             gi.mode: str
@@ -332,7 +332,7 @@ def add_synapses(
         if n_syn is None:
             raise ValueError(
                 f"add_synapses: neither 'N_syn_resolved' nor 'N_syn' set for "
-                f"group {syn_group!r}; ensure Step 2.3 resolved syn counts."
+                f"group {syn_group!r}; ensure Step 5.2.3 resolved syn counts."
             )
 
         n_syn = int(n_syn)
@@ -352,11 +352,11 @@ def add_synapses(
         seg_refs = geom["groups"].get(geom_group_name, [])
         seg_list = [ref.sec(ref.x) for ref in seg_refs]
 
-        # Compile dist_func spec into a density function, as in Step 2.3
+        # Compile dist_func spec into a density function, as in Step 5.2.3
         dist_spec = syn_cfg.get("dist_func", None)
         dens_eq = _compile_density_from_spec(dist_spec)
 
-        # Density-aware placement, mirroring Step 2.2/2.3 semantics
+        # Density-aware placement, mirroring Step 5.2.2/5.2.3 semantics
         # RNGs: placement and weights get distinct streams
         if trial_rng is not None:
             placement_rng = trial_rng.rng(

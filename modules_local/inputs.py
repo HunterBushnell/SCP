@@ -23,7 +23,7 @@ from modules_local import randomness
 class GroupInputs:
     """
     Final per-group inputs structure produced by generate_inputs and
-    consumed by the synapse-building step (2.4).
+    consumed by the synapse-building step (5.2.4).
 
     For now we keep it minimal: name, mode, and spike trains (in ms,
     in simulation time). meta can hold timing and other snapshot info.
@@ -35,7 +35,7 @@ class GroupInputs:
 
 
 # ====================================================================
-# 2.3 Top-level API
+# 5.2.3 Top-level API
 # ====================================================================
 
 from pathlib import Path
@@ -134,7 +134,7 @@ def generate_inputs(
     # cache: Optional[Dict[str, "GroupInputs"]] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]], Dict[str, "GroupInputs"]]:
     """
-    Step 2.3 main entry point: load, normalize, and materialize synaptic inputs.
+    Step 5.2.3 main entry point: load, normalize, and materialize synaptic inputs.
 
     This function assumes the split-config layout:
       - sim_config.json: simulation-level settings (dt, tstart, tstop, seed, etc.)
@@ -161,7 +161,7 @@ def generate_inputs(
         Optional simulation config dict. When provided, it replaces the contents
         of sim_config.json while syn_config.json is still loaded from disk.
     geometry
-        Geometry / segment-group information from Step 2.2 (may be None if not used).
+        Geometry / segment-group information from Step 5.2.2 (may be None if not used).
     rng
         Optional NumPy random number generator. If None, a new generator is created
         based on the seed in `sim_config.json`.
@@ -206,7 +206,7 @@ def generate_inputs(
         groups_cfg_raw = json.load(f)
 
     # ------------------------------------------------------------------
-    # 2.3.2 – Normalize configs
+    # 5.2.3.2 – Normalize configs
     # ------------------------------------------------------------------
     sim_cfg = _normalize_sim_config(sim_cfg_raw)
     _inject_path_metadata(sim_cfg, config_root)
@@ -214,7 +214,7 @@ def generate_inputs(
     groups_cfg = _normalize_group_configs(groups_cfg_expanded)
 
     # ------------------------------------------------------------------
-    # 2.3.3 – Shared resources: RNG and mode registry
+    # 5.2.3.3 – Shared resources: RNG and mode registry
     # ------------------------------------------------------------------
     if seed_override is not None:
         sim_cfg["seed"] = int(seed_override)
@@ -1166,7 +1166,7 @@ def _resolve_n_syn(
 
            summed over all segments.
 
-    Geometry contract (from Step 2.2):
+    Geometry contract (from Step 5.2.2):
       - geometry["groups"][<name>] must be a list of segment references
         each with:
           * .sec     → NEURON Section

@@ -1,5 +1,5 @@
 """
-Utilities for sampling generated inputs (Step 2.3) to build summary
+Utilities for sampling generated inputs (Step 5.2.3) to build summary
 firing-rate curves for a synapse group.
 """
 
