@@ -1,1 +1,3 @@
-single_cells/Madhu_Data/
+external_data/
+logs/
+cells/**/output_data/

@@ -1,8 +1,0 @@
-/home/hrbncv/miniconda3/envs/BMTK/bin/nrnivmodl:10: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
-  from pkg_resources import working_set
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-NEURON: The user defined name already exists: AMPA_NMDA_STP
- near line 0
- ^
-        nrn_load_dll("/home/hrbn...")

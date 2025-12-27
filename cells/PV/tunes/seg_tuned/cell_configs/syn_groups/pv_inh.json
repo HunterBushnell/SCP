@@ -1,0 +1,42 @@
+{
+  "pv_inh": {
+    "state": false,
+    "mode": "precomputed",
+    "color": null,
+    "source": {
+      "freq": null,
+      "baseline": 3.0,
+      "path": "/home/hrbncv/SCP/cells/PV/tunes/seg_tuned/output_data/tune1_1000tr1000ms",
+      "bin_ms": null,
+      "key": "base tune"
+    },
+    "timing": {
+      "onset_ms": null,
+      "stim_tstart_ms": 420.0,
+      "duration_ms": null,
+      "input_stim_tstart_ms": 400.0,
+      "input_duration_ms": null
+    },
+    "syns": {
+      "type": "GABA_A",
+      "N_syn": 10,
+      "segs": "all",
+      "dist_func": {
+        "kind": "linear",
+        "params": {
+          "m": -0.015,
+          "b": 4.25,
+          "multi": 1.0
+        }
+      },
+      "params": {
+        "wt_mean": 2.0,
+        "wt_std": 0.34,
+        "initW": 1.0,
+        "gmax": 0.001,
+        "tau_r_GABAA": 0.5,
+        "tau_d_GABAA": 5.5
+      }
+    }
+  }
+}

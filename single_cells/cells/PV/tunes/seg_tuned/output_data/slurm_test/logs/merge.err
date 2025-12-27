@@ -1,8 +1,0 @@
-Warning: no DISPLAY environment variable.
---No graphics will be displayed.
-Traceback (most recent call last):
-  File "/home/hrbncv/PV-SST/single_cells/scripts/merge_array_results.py", line 348, in <module>
-    main()
-  File "/home/hrbncv/PV-SST/single_cells/scripts/merge_array_results.py", line 215, in main
-    raise FileNotFoundError(f"No results found in {output_dir}")
-FileNotFoundError: No results found in /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/output_data/slurm_test

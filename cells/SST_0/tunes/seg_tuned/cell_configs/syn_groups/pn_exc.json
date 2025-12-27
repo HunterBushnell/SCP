@@ -1,0 +1,43 @@
+{
+  "pn_exc": {
+    "state": true,
+    "mode": "inhomogeneous_poisson",
+    "source": {
+      "freq": null,
+      "baseline": 2.3,
+      "path": "/home/hrbncv/SCP/external_data/bio_cell_output/pyrFiringRateAvg.csv",
+      "bin_ms": 5
+    },
+    "timing": {
+      "onset_ms": null,
+      "stim_tstart_ms": 600.0,
+      "duration_ms": null,
+      "input_stim_tstart_ms": 100,
+      "input_duration_ms": 550
+    },
+    "syns": {
+      "type": "AMPA_NMDA_STP",
+      "N_syn": 50,
+      "segs": "all",
+      "dist_func": {
+        "kind": "uniform",
+        "params": {
+          "c": 2.0
+        }
+      },
+      "params": {
+        "wt_mean": 0.75,
+        "wt_std": 0.34,
+        "initW": 1.0,
+        "gmax_AMPA": 0.001,
+        "gmax_NMDA": 0.001,
+        "tau_r_AMPA": 4,
+        "tau_d_AMPA": 5,
+        "Use": 0.4,
+        "Dep": 0,
+        "Fac": 70,
+        "NMDA_ratio": 1.5
+      }
+    }
+  }
+}

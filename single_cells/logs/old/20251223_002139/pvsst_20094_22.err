@@ -1,4 +1,0 @@
-  File "<stdin>", line 25
-    print(f\"{int(enabled)} {stem}\")
-            ^
-SyntaxError: unexpected character after line continuation character

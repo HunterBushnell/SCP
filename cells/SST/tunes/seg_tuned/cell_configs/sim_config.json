@@ -1,0 +1,89 @@
+{
+  "tstart": 200.0,
+  "tstop": 1200.0,
+  "dt": 0.025,
+  "jitter": 100.0,
+  "stim_start_ms": 600.0,
+  "stim_duration_ms": 550.0,
+  "n_trials": 1,
+  "n_traces_to_save": 1,
+  "n_inputs_to_save": 1,
+  "load": [
+    false,
+    null
+  ],
+  "save": [
+    false,
+    null,
+    "pkl",
+    false
+  ],
+  "append": [
+    false,
+    null
+  ],
+  "input_stats_bin_ms": 25.0,
+  "plots_profile": "off",
+  "iclamp": {
+    "enabled": false,
+    "amp_nA": 0.2,
+    "delay_ms": 200.0,
+    "dur_ms": 800.0,
+    "tstop_ms": null,
+    "dt_ms": null,
+    "record_currents": false
+  },
+  "snapshot": {
+    "enabled": false,
+    "n_trials": 1,
+    "save_all_inputs": true,
+    "save_all_traces": true,
+    "save_syn_records_by_trial": true
+  },
+  "param_study": {
+    "input_type": null,
+    "param_type": null,
+    "param_vals": [],
+    "n_trials": null
+  },
+  "randomness_mode": null,
+  "random_seed": null,
+  "output": null,
+  "append_to": null,
+  "output_format": "pkl",
+  "save_full_results": false,
+  "save_sidecars": true,
+  "save_input_stats": true,
+  "save_syn_records_sidecar": false,
+  "log_input_summary": true,
+  "save_plots": false,
+  "save_plots_inputs": true,
+  "save_plots_synapses": false,
+  "plots_win_size": 50.0,
+  "plots_input_bin_ms": null,
+  "plots_input_smooth_ms": 50.0,
+  "plots_raster_style": "dot",
+  "randomness": {
+    "global": {
+      "state": true,
+      "seed": null
+    },
+    "trials": "derived",
+    "inputs": "derived",
+    "timing": {
+      "tstart": null,
+      "tstop": null,
+      "jitter": null
+    },
+    "synapses": {
+      "placement": "derived",
+      "weights": "derived",
+      "dynamics": null
+    },
+    "modes": {
+      "homogeneous_poisson": "derived",
+      "inhomogeneous_poisson": "derived",
+      "precomputed": null
+    }
+  }
+}
