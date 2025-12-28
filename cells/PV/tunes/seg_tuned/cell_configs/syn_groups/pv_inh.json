@@ -2,7 +2,7 @@
   "pv_inh": {
     "state": false,
     "mode": "precomputed",
-    "color": null,
+    "color": "#8c564b",
     "source": {
       "freq": null,
       "baseline": 3.0,

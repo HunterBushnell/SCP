@@ -72,6 +72,78 @@ def normalize(data,
 
     return norm_data
 
+
+def plot_output_curve(
+    curve,
+    *,
+    label=None,
+    color=None,
+    plot_window=None,
+    stim_start=None,
+    stim_stop=None,
+    title="Output rate curve",
+):
+    t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
+    y = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
+    units = curve.get("units", "Hz")
+    y_label = "Rate (Hz)" if units == "Hz" else "Rate (normalized)"
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(t_ms, y, lw=2, color=color, label=label)
+    if label:
+        ax.legend()
+    if plot_window is not None:
+        ax.set_xlim(plot_window[0], plot_window[1])
+    if stim_start is not None:
+        ax.axvline(float(stim_start), color="k", linestyle="-", linewidth=1)
+    if stim_stop is not None:
+        ax.axvline(float(stim_stop), color="k", linestyle="-", linewidth=1)
+    ax.set_xlabel("Time (ms)")
+    ax.set_ylabel(y_label)
+    ax.set_title(title)
+    ax.grid(True)
+    plt.tight_layout()
+    return fig, ax
+
+
+def plot_compare_output_curves(
+    curve_a,
+    curve_b,
+    *,
+    labels=("A", "B"),
+    colors=None,
+    plot_window=None,
+    stim_start=None,
+    stim_stop=None,
+    title="Output curve compare",
+):
+    if colors is None:
+        colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    fig, ax = plt.subplots(figsize=(6, 4))
+    for idx, curve in enumerate((curve_a, curve_b)):
+        if not curve:
+            continue
+        t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
+        y = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
+        lab = labels[idx] if labels and idx < len(labels) else None
+        ax.plot(t_ms, y, lw=2, color=colors[idx % len(colors)], label=lab)
+    units = (curve_a or curve_b or {}).get("units", "Hz")
+    y_label = "Rate (Hz)" if units == "Hz" else "Rate (normalized)"
+    if labels:
+        ax.legend()
+    if plot_window is not None:
+        ax.set_xlim(plot_window[0], plot_window[1])
+    if stim_start is not None:
+        ax.axvline(float(stim_start), color="k", linestyle="-", linewidth=1)
+    if stim_stop is not None:
+        ax.axvline(float(stim_stop), color="k", linestyle="-", linewidth=1)
+    ax.set_xlabel("Time (ms)")
+    ax.set_ylabel(y_label)
+    ax.set_title(title)
+    ax.grid(True)
+    plt.tight_layout()
+    return fig, ax
+
 # ────────────────────────────────────────────────────────────────────────────
 #  Input plotting (Step 5.4.2)
 # ────────────────────────────────────────────────────────────────────────────
@@ -82,6 +154,7 @@ def plot_inputs_by_group(
         groups=None,
         bin_ms=None,
         win_size=25.0,
+        group_colors=None,
         raster_style='dot',
         max_trains_per_group=200,
         seed=0,
@@ -89,6 +162,7 @@ def plot_inputs_by_group(
         plot_raster=True):
     """
     Plot input rasters + average rate curves for inputs_by_group.
+    group_colors: optional dict {group: color} for consistent coloring.
 
     Returns a dict of per-group stats.
     """
@@ -160,7 +234,10 @@ def plot_inputs_by_group(
             x_line = centers
             y_line = rate
 
-        col = colors[i % len(colors)]
+        if group_colors and gname in group_colors:
+            col = group_colors[gname]
+        else:
+            col = colors[i % len(colors)]
         ax_rate.plot(x_line, y_line, color=col, lw=2, label=gname)
 
         plot_trains = trains
@@ -225,6 +302,7 @@ def plot_compare_input_means(
         layout="side-by-side",
         show_std=False,
         output_curves=None,
+        group_colors=None,
         figsize=None,
 ):
     """
@@ -233,6 +311,7 @@ def plot_compare_input_means(
     summary_* should be output from analysis.summarize_inputs_from_results.
     output_curves: optional tuple (curve_a, curve_b), each as dict with keys
     't_ms' and 'rate_hz'. If provided, plots on a twin y-axis.
+    group_colors: optional dict {group: color} for consistent coloring.
     """
     if summary_a is None or summary_b is None:
         raise ValueError("plot_compare_input_means: summaries must not be None")
@@ -259,7 +338,12 @@ def plot_compare_input_means(
         axes = axes.flatten()
 
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-    color_map = {g: colors[i % len(colors)] for i, g in enumerate(groups)}
+    color_map = {}
+    for i, g in enumerate(groups):
+        if group_colors and g in group_colors:
+            color_map[g] = group_colors[g]
+        else:
+            color_map[g] = colors[i % len(colors)]
 
     summaries = [summary_a, summary_b]
     for idx, ax in enumerate(axes[:2]):
@@ -314,6 +398,7 @@ def plot_input_means(
         groups=None,
         show_std=False,
         output_curve=None,
+        group_colors=None,
         figsize=None,
 ):
     """
@@ -321,6 +406,7 @@ def plot_input_means(
 
     summary should be output from analysis.summarize_inputs_from_results.
     output_curve: optional dict with keys 't_ms' and 'rate_hz' to overlay.
+    group_colors: optional dict {group: color} for consistent coloring.
     """
     if summary is None:
         raise ValueError("plot_input_means: summary must not be None")
@@ -336,7 +422,12 @@ def plot_input_means(
 
     fig, ax = plt.subplots(1, 1, figsize=figsize)
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-    color_map = {g: colors[i % len(colors)] for i, g in enumerate(groups)}
+    color_map = {}
+    for i, g in enumerate(groups):
+        if group_colors and g in group_colors:
+            color_map[g] = group_colors[g]
+        else:
+            color_map[g] = colors[i % len(colors)]
 
     t_ms = summary.get("t_ms") or []
     for g in groups:
@@ -874,6 +965,7 @@ def plot_results(
     set_color=None,
     plot_type='line',
     plot_raster=None,
+    smooth_mode="center",
 ):
     """
     Convenience wrapper for new run_sim results.
@@ -933,6 +1025,7 @@ def plot_results(
             col=col,
             in_vivo_curve=in_vivo_curve,
             plot_window=plot_window or (None, None),
+            smooth_mode=smooth_mode,
         )
 
     # --- MULTI: plot trials from run_sim.run_multi ---------------------------
@@ -1002,6 +1095,7 @@ def plot_results(
             shade_mode=shade_mode,
             set_color=col,
             save_curve=False,
+            smooth_mode=smooth_mode,
         )
 
  
@@ -1027,6 +1121,7 @@ def plot_single(
         plot_window   = (None, None),
         bins          = None,    # optional override for bin width (ms)
         delay         = None,    # optional override for stimulus delay (ms)
+        smooth_mode   = "center",
     ):
     """
     New interface (pipeline-friendly):
@@ -1192,11 +1287,11 @@ def plot_single(
             if win_size:
                 rate  = moving_average(rate, win_size=win_size,
                                        bin_width=bin_width,
-                                       mode='center')
+                                       mode=smooth_mode)
             rates[g] = rate
 
         if win_size:
-            centers = centers[:len(next(iter(rates.values())))]
+            centers = _align_centers(centers, next(iter(rates.values())), mode=smooth_mode)
 
         if rate_style in ('hist', 'both'):
             for g in groups:
@@ -1221,7 +1316,7 @@ def plot_single(
             total_rate = moving_average(total_rate,
                                         win_size=win_size,
                                         bin_width=bin_width,
-                                        mode='center')
+                                        mode=smooth_mode)
 
         # in-vivo data
         if in_vivo_curve is not None:
@@ -1324,6 +1419,7 @@ def plot_multi(
         shade_mode=None,
         set_color=None,
         save_curve=False,       # or filename
+        smooth_mode="center",
     ):
 
     ok_rate = ('hist', 'line', 'both')
@@ -1390,7 +1486,7 @@ def plot_multi(
             Y_smooth = []
             for y in Y:
                 ys = moving_average(y, win_size=win_size,
-                                    bin_width=bin_width, mode='center')
+                                    bin_width=bin_width, mode=smooth_mode)
                 Y_smooth.append(ys)
             T_new = min(len(y) for y in Y_smooth)
             Y = np.vstack([y[:T_new] for y in Y_smooth])
@@ -1453,7 +1549,7 @@ def plot_multi(
                     Y_smooth = []
                     for y in Y:
                         ys = moving_average(y, win_size=win_size,
-                                            bin_width=bin_width, mode='center')
+                                            bin_width=bin_width, mode=smooth_mode)
                         Y_smooth.append(ys)
                     T_new = min(len(y) for y in Y_smooth)
                     Y = np.vstack([y[:T_new] for y in Y_smooth])
@@ -1553,6 +1649,7 @@ def plot_compare_multi(
         plot_bio = (False),
         plot_window = None,
         shade_mode = None,
+        smooth_mode="center",
         ):
     
 
@@ -1595,7 +1692,7 @@ def plot_compare_multi(
         if win_size:
             Y_smooth = []
             for y in Y:
-                ys = moving_average(y, win_size=win_size, bin_width=bin_width, mode='center')
+                ys = moving_average(y, win_size=win_size, bin_width=bin_width, mode=smooth_mode)
                 Y_smooth.append(ys)
             T_new = min(len(y) for y in Y_smooth) # After smoothing, length shrinks: align x
             Y = np.vstack([y[:T_new] for y in Y_smooth])
@@ -1648,7 +1745,7 @@ def plot_compare_multi(
 # ────────────────────────────────────────────────────────────────────────────
 #  Side-by-side comparison for two results
 # ────────────────────────────────────────────────────────────────────────────
-def _rate_curve_from_results(results, win_size=25, bin_ms=None):
+def _rate_curve_from_results(results, win_size=25, bin_ms=None, smooth_mode="center"):
     sim_cfg = results.get("sim_cfg", {}) or {}
     tstart = float(sim_cfg.get("tstart", 0.0))
     tstop = float(sim_cfg.get("tstop", 0.0))
@@ -1685,8 +1782,8 @@ def _rate_curve_from_results(results, win_size=25, bin_ms=None):
     mean = Y.mean(axis=0)
 
     if win_size:
-        mean = moving_average(mean, win_size=win_size, bin_width=bin_width, mode='center')
-        centers = _align_centers(centers, mean, mode='center')
+        mean = moving_average(mean, win_size=win_size, bin_width=bin_width, mode=smooth_mode)
+        centers = _align_centers(centers, mean, mode=smooth_mode)
 
     return centers, mean, len(trials)
 
@@ -1699,7 +1796,8 @@ def plot_compare_side_by_side(
         win_size=25,
         bin_ms=None,
         plot_window=None,
-        colors=None):
+        colors=None,
+        smooth_mode="center"):
     """
     Plot two results side-by-side (average firing rate curves).
     """
@@ -1711,7 +1809,12 @@ def plot_compare_side_by_side(
             labels,
             (colors or [None, None])):
         sim_cfg = res.get("sim_cfg", {}) or {}
-        x, mean, n_trials = _rate_curve_from_results(res, win_size=win_size, bin_ms=bin_ms)
+        x, mean, n_trials = _rate_curve_from_results(
+            res,
+            win_size=win_size,
+            bin_ms=bin_ms,
+            smooth_mode=smooth_mode,
+        )
 
         col = color if color is not None else sim_cfg.get("color", None)
         ax.plot(x, mean, color=col, lw=2)

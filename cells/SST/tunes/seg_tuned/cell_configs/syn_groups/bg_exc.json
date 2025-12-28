@@ -2,7 +2,7 @@
   "bg_exc": {
     "state": true,
     "mode": "homogeneous_poisson",
-    "color": null,
+    "color": "#2ca02c",
     "source": {
       "freq": 0.05,
       "baseline": null,

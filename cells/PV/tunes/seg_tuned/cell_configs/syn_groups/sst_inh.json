@@ -2,7 +2,7 @@
   "sst_inh": {
     "state": true,
     "mode": "precomputed",
-    "color": null,
+    "color": "#ff7f0e",
     "source": {
       "freq": null,
       "baseline": 4.0,

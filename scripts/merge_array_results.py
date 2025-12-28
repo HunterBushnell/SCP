@@ -16,7 +16,7 @@ import copy
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -176,6 +176,35 @@ def _stats_compatible(template: Dict[str, Any], candidate: Dict[str, Any]) -> bo
         return False
 
 
+def _smooth_rate_curve(
+    centers: np.ndarray,
+    rates: np.ndarray,
+    bin_ms: float,
+    smooth_ms: Optional[float],
+) -> Tuple[np.ndarray, np.ndarray]:
+    if smooth_ms is None:
+        return centers, rates
+    try:
+        smooth_ms = float(smooth_ms)
+    except Exception:
+        return centers, rates
+    if smooth_ms <= 0 or bin_ms <= 0:
+        return centers, rates
+
+    k = int(round(smooth_ms / bin_ms))
+    if k <= 1 or rates.size < k:
+        return centers, rates
+    if k % 2 == 0:
+        k += 1
+
+    kernel = np.ones(k, dtype=float) / float(k)
+    y = np.convolve(rates, kernel, mode="valid")
+    drop = (len(centers) - len(y)) // 2
+    if drop < 0:
+        return centers, rates
+    return centers[drop : drop + len(y)], y
+
+
 def _recompute_avg_rate(sim_cfg: Dict[str, Any], spikes_by_trial: List[np.ndarray]) -> Dict[str, Any]:
     tstop = float(sim_cfg.get("tstop", 0.0))
     bin_width = float(sim_cfg.get("bins", 25.0))
@@ -193,7 +222,18 @@ def _recompute_avg_rate(sim_cfg: Dict[str, Any], spikes_by_trial: List[np.ndarra
         mean_rate = np.mean(per_trial_rates, axis=0)
     else:
         mean_rate = np.array([], dtype=float)
-    return {"bin_ms": bin_width, "t_ms": centers.tolist(), "rate_hz": mean_rate.tolist()}
+    smooth_ms = sim_cfg.get("avg_rate_curve_smooth_ms", 25.0)
+    centers, mean_rate = _smooth_rate_curve(centers, mean_rate, bin_width, smooth_ms)
+    try:
+        smooth_ms_val = float(smooth_ms) if smooth_ms is not None else 0.0
+    except Exception:
+        smooth_ms_val = 0.0
+    return {
+        "bin_ms": bin_width,
+        "smooth_ms": smooth_ms_val,
+        "t_ms": centers.tolist(),
+        "rate_hz": mean_rate.tolist(),
+    }
 
 
 def main() -> None:

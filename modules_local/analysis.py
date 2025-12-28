@@ -145,6 +145,314 @@ def _moving_average(values: np.ndarray, win_bins: int) -> np.ndarray:
     return np.convolve(values, kernel, mode="same")
 
 
+def _resolve_stim_window(sim_cfg: Dict[str, Any]) -> tuple[Optional[float], Optional[float]]:
+    stim_start = sim_cfg.get("stim_start_ms")
+    stim_stop = sim_cfg.get("stim_stop_ms")
+    stim_dur = sim_cfg.get("stim_duration_ms")
+    if stim_start is None:
+        delay = sim_cfg.get("delay")
+        if delay is not None:
+            stim_start = float(delay) + 100.0
+    if stim_stop is None and stim_start is not None and stim_dur is not None:
+        stim_stop = float(stim_start) + float(stim_dur)
+    return (
+        float(stim_start) if stim_start is not None else None,
+        float(stim_stop) if stim_stop is not None else None,
+    )
+
+
+def _select_window_mask(
+    t_ms: np.ndarray,
+    start_ms: Optional[float],
+    stop_ms: Optional[float],
+) -> np.ndarray:
+    mask = np.ones_like(t_ms, dtype=bool)
+    if start_ms is not None:
+        mask &= t_ms >= float(start_ms)
+    if stop_ms is not None:
+        mask &= t_ms < float(stop_ms)
+    return mask
+
+
+def group_colors_from_syn_config(syn_config: Dict[str, Any]) -> Dict[str, str]:
+    colors: Dict[str, str] = {}
+    for group, cfg in (syn_config or {}).items():
+        color = (cfg or {}).get("color")
+        if color:
+            colors[str(group)] = str(color)
+    return colors
+
+
+def group_colors_from_results(results: Dict[str, Any]) -> Dict[str, str]:
+    meta = results.get("meta") or {}
+    return group_colors_from_syn_config(meta.get("syn_config") or {})
+
+
+def merge_group_colors(*results: Dict[str, Any]) -> Dict[str, str]:
+    merged: Dict[str, str] = {}
+    for res in results:
+        if not res:
+            continue
+        merged.update(group_colors_from_results(res))
+    return merged
+
+
+def normalize_output_curve(
+    curve: Dict[str, Any],
+    sim_cfg: Dict[str, Any],
+    *,
+    mode: str = "raw",
+    norm_mode: str = "avg",
+    baseline_ms: float = 100.0,
+    norm_window: str = "stim",
+) -> Dict[str, Any]:
+    """
+    Normalize an avg_rate_curve with baseline subtraction + avg/peak scaling.
+    """
+    mode = (mode or "raw").lower()
+    norm_mode = (norm_mode or "avg").lower()
+    norm_window = (norm_window or "stim").lower()
+
+    t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
+    rate = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
+
+    out = dict(curve)
+    out["t_ms"] = t_ms.tolist()
+    out["rate_hz"] = rate.tolist()
+    out["normalized"] = False
+    out["norm_mode"] = None
+    out["norm_window"] = None
+    out["baseline_ms"] = None
+    out["baseline_mean"] = None
+    out["norm_scale"] = None
+    out["units"] = "Hz"
+
+    if mode == "raw":
+        return out
+
+    tstart = sim_cfg.get("tstart")
+    tstop = sim_cfg.get("tstop")
+    stim_start, stim_stop = _resolve_stim_window(sim_cfg)
+
+    baseline_start = None
+    if stim_start is not None:
+        baseline_start = float(stim_start) - float(baseline_ms)
+    baseline_mask = _select_window_mask(t_ms, baseline_start, stim_start)
+    baseline_mean = float(np.mean(rate[baseline_mask])) if baseline_mask.any() else 0.0
+
+    rate_bs = rate - baseline_mean
+
+    if norm_window == "full":
+        window_mask = _select_window_mask(t_ms, tstart, tstop)
+    else:
+        window_mask = _select_window_mask(t_ms, stim_start, stim_stop)
+    if not window_mask.any():
+        window_mask = np.ones_like(t_ms, dtype=bool)
+
+    if norm_mode == "peak":
+        norm_scale = float(np.max(rate_bs[window_mask])) if rate_bs.size else 0.0
+    else:
+        norm_scale = float(np.mean(rate_bs[window_mask])) if rate_bs.size else 0.0
+
+    if norm_scale == 0.0:
+        norm_scale = 1.0
+
+    rate_norm = rate_bs / norm_scale
+
+    out["rate_hz"] = rate_norm.tolist()
+    out["normalized"] = True
+    out["norm_mode"] = norm_mode
+    out["norm_window"] = norm_window
+    out["baseline_ms"] = float(baseline_ms)
+    out["baseline_mean"] = baseline_mean
+    out["norm_scale"] = norm_scale
+    out["units"] = "normalized"
+    return out
+
+
+def _smooth_rate_curve(
+    centers: np.ndarray,
+    rates: np.ndarray,
+    bin_ms: float,
+    smooth_ms: Optional[float],
+    *,
+    mode: str = "center",
+) -> tuple[np.ndarray, np.ndarray]:
+    if smooth_ms is None:
+        return centers, rates
+    try:
+        smooth_ms = float(smooth_ms)
+    except Exception:
+        return centers, rates
+    if smooth_ms <= 0 or bin_ms <= 0:
+        return centers, rates
+
+    k = int(round(smooth_ms / bin_ms))
+    if k <= 1 or rates.size < k:
+        return centers, rates
+    if mode == "center" and k % 2 == 0:
+        k += 1
+
+    kernel = np.ones(k, dtype=float) / float(k)
+    if mode == "center":
+        y = np.convolve(rates, kernel, mode="valid")
+        drop = (len(centers) - len(y)) // 2
+        if drop < 0:
+            return centers, rates
+        return centers[drop : drop + len(y)], y
+    if mode == "causal":
+        pad = (k - 1, 0)
+        y = np.convolve(np.pad(rates, pad), kernel, mode="valid")
+        return centers[: len(y)], y
+    return centers, rates
+
+
+def compute_output_curve_from_results(
+    results: Dict[str, Any],
+    *,
+    bin_ms: Optional[float] = None,
+    smooth_ms: Optional[float] = None,
+    smooth_mode: str = "causal",
+) -> Optional[Dict[str, Any]]:
+    sim_cfg = results.get("sim_cfg", {}) or {}
+    tstart = float(sim_cfg.get("tstart", 0.0))
+    tstop = sim_cfg.get("tstop")
+    if tstop is None:
+        traces = results.get("traces", {}) or {}
+        T = traces.get("T")
+        if T is not None and len(T) > 0:
+            tstop = float(T[-1])
+    if tstop is None or tstop <= tstart:
+        return None
+
+    bin_width = float(bin_ms if bin_ms is not None else sim_cfg.get("bins", 25.0))
+    if bin_width <= 0:
+        return None
+
+    bins = np.arange(tstart, tstop + bin_width, bin_width, dtype=float)
+    if bins.size < 2:
+        return None
+    centers = bins[:-1] + 0.5 * bin_width
+    bw_s = bin_width / 1000.0
+
+    spikes = results.get("spikes")
+    if spikes is None:
+        return None
+
+    if results.get("mode") == "multi":
+        if isinstance(spikes, np.ndarray):
+            spikes_by_trial = list(spikes.tolist())
+        elif isinstance(spikes, (list, tuple)):
+            spikes_by_trial = list(spikes)
+        else:
+            spikes_by_trial = [spikes]
+    else:
+        spikes_by_trial = [spikes]
+
+    if not spikes_by_trial:
+        mean_rate = np.array([], dtype=float)
+    else:
+        rates = []
+        for tr in spikes_by_trial:
+            tr = np.asarray(tr, dtype=float)
+            counts, _ = np.histogram(tr, bins=bins)
+            rates.append(counts / bw_s)
+        mean_rate = np.mean(np.vstack(rates), axis=0) if rates else np.array([], dtype=float)
+
+    smooth_mode = str(smooth_mode or "center").lower()
+    centers, mean_rate = _smooth_rate_curve(
+        centers,
+        mean_rate,
+        bin_width,
+        smooth_ms,
+        mode=smooth_mode,
+    )
+
+    try:
+        smooth_ms_val = float(smooth_ms) if smooth_ms is not None else 0.0
+    except Exception:
+        smooth_ms_val = 0.0
+
+    return {
+        "bin_ms": bin_width,
+        "smooth_ms": smooth_ms_val,
+        "smooth_mode": smooth_mode,
+        "t_ms": centers.tolist(),
+        "rate_hz": mean_rate.tolist(),
+    }
+
+
+def compute_output_metrics(
+    curve: Dict[str, Any],
+    sim_cfg: Dict[str, Any],
+    *,
+    peak_window_ms: float = 100.0,
+    drop_window_ms: float = 100.0,
+    auc_window: str = "stim",
+) -> Dict[str, Any]:
+    auc_window = (auc_window or "stim").lower()
+    t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
+    rate = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
+    stim_start, stim_stop = _resolve_stim_window(sim_cfg)
+
+    metrics = {
+        "peak_window_ms": float(peak_window_ms),
+        "drop_window_ms": float(drop_window_ms),
+        "auc_window": auc_window,
+        "stim_start_ms": stim_start,
+        "stim_stop_ms": stim_stop,
+        "peak_time_ms": None,
+        "peak_value": None,
+        "peak_latency_ms": None,
+        "drop_time_ms": None,
+        "drop_value": None,
+        "drop_pct": None,
+        "auc": None,
+        "auc_units": f"{curve.get('units', 'Hz')}*ms",
+    }
+
+    if t_ms.size == 0 or rate.size == 0:
+        return metrics
+
+    if stim_start is None:
+        return metrics
+
+    peak_start = stim_start
+    peak_stop = stim_start + float(peak_window_ms)
+    peak_mask = _select_window_mask(t_ms, peak_start, peak_stop)
+    if not peak_mask.any():
+        return metrics
+    peak_idx = np.argmax(rate[peak_mask])
+    peak_indices = np.flatnonzero(peak_mask)
+    peak_pos = peak_indices[peak_idx]
+    peak_time = float(t_ms[peak_pos])
+    peak_val = float(rate[peak_pos])
+
+    metrics["peak_time_ms"] = peak_time
+    metrics["peak_value"] = peak_val
+    metrics["peak_latency_ms"] = peak_time - float(stim_start)
+
+    drop_target = float(stim_start) + float(drop_window_ms)
+    drop_pos = int(np.argmin(np.abs(t_ms - drop_target)))
+    drop_time = float(t_ms[drop_pos])
+    drop_val = float(rate[drop_pos])
+    metrics["drop_time_ms"] = drop_time
+    metrics["drop_value"] = drop_val
+    if peak_val != 0:
+        metrics["drop_pct"] = 100.0 * (peak_val - drop_val) / peak_val
+
+    tstart = sim_cfg.get("tstart")
+    tstop = sim_cfg.get("tstop")
+    if auc_window == "full":
+        auc_mask = _select_window_mask(t_ms, tstart, tstop)
+    else:
+        auc_mask = _select_window_mask(t_ms, stim_start, stim_stop)
+    if auc_mask.any():
+        metrics["auc"] = float(np.trapz(rate[auc_mask], t_ms[auc_mask]))
+
+    return metrics
+
+
 def _bin_trains(
     trains: Iterable[np.ndarray],
     tstart: float,
@@ -620,12 +928,14 @@ def save_default_plots(
                 bin_ms=input_bin_ms,
                 smooth_ms=input_smooth_ms,
             )
+            group_colors = group_colors_from_results(results)
             fig_in, _ = plotting.plot_input_means(
                 summary,
                 label="inputs",
                 groups=None,
                 show_std=False,
                 output_curve=(results.get("meta") or {}).get("avg_rate_curve"),
+                group_colors=group_colors,
             )
             in_path = plot_dir / "inputs_mean.png"
             fig_in.savefig(in_path, dpi=150)

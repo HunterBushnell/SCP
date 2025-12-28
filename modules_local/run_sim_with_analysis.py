@@ -639,6 +639,43 @@ def _coerce_bin_width(val: Any, default: float) -> float:
     return bw
 
 
+def _smooth_rate_curve(
+    centers: np.ndarray,
+    rates: np.ndarray,
+    bin_ms: float,
+    smooth_ms: Optional[float],
+    *,
+    mode: str = "center",
+) -> Tuple[np.ndarray, np.ndarray]:
+    if smooth_ms is None:
+        return centers, rates
+    try:
+        smooth_ms = float(smooth_ms)
+    except Exception:
+        return centers, rates
+    if smooth_ms <= 0 or bin_ms <= 0:
+        return centers, rates
+
+    k = int(round(smooth_ms / bin_ms))
+    if k <= 1 or rates.size < k:
+        return centers, rates
+    if mode == "center" and k % 2 == 0:
+        k += 1
+
+    kernel = np.ones(k, dtype=float) / float(k)
+    if mode == "center":
+        y = np.convolve(rates, kernel, mode="valid")
+        drop = (len(centers) - len(y)) // 2
+        if drop < 0:
+            return centers, rates
+        return centers[drop : drop + len(y)], y
+    if mode == "causal":
+        pad = (k - 1, 0)
+        y = np.convolve(np.pad(rates, pad), kernel, mode="valid")
+        return centers[: len(y)], y
+    return centers, rates
+
+
 def _prepare_input_stats_bins(
     tstart: float,
     tstop: float,
@@ -1095,8 +1132,24 @@ def run_multi(
     else:
         mean_rate = np.array([], dtype=float)
 
+    smooth_ms = sim_cfg_local.get("avg_rate_curve_smooth_ms", 25.0)
+    smooth_mode = sim_cfg_local.get("avg_rate_curve_smooth_mode", "center") or "center"
+    centers, mean_rate = _smooth_rate_curve(
+        centers,
+        mean_rate,
+        bin_width,
+        smooth_ms,
+        mode=str(smooth_mode),
+    )
+    try:
+        smooth_ms_val = float(smooth_ms) if smooth_ms is not None else 0.0
+    except Exception:
+        smooth_ms_val = 0.0
+
     avg_rate_curve = {
         "bin_ms": bin_width,
+        "smooth_ms": smooth_ms_val,
+        "smooth_mode": str(smooth_mode),
         "t_ms": centers.tolist(),
         "rate_hz": mean_rate.tolist(),
     }
@@ -1862,8 +1915,23 @@ def append_multi_results(
             mean_rate = np.mean(per_trial_rates, axis=0)
         else:
             mean_rate = np.array([], dtype=float)
+        smooth_ms = sim_cfg.get("avg_rate_curve_smooth_ms", 25.0)
+        smooth_mode = sim_cfg.get("avg_rate_curve_smooth_mode", "center") or "center"
+        centers, mean_rate = _smooth_rate_curve(
+            centers,
+            mean_rate,
+            bin_width,
+            smooth_ms,
+            mode=str(smooth_mode),
+        )
+        try:
+            smooth_ms_val = float(smooth_ms) if smooth_ms is not None else 0.0
+        except Exception:
+            smooth_ms_val = 0.0
         meta["avg_rate_curve"] = {
             "bin_ms": bin_width,
+            "smooth_ms": smooth_ms_val,
+            "smooth_mode": str(smooth_mode),
             "t_ms": centers.tolist(),
             "rate_hz": mean_rate.tolist(),
         }

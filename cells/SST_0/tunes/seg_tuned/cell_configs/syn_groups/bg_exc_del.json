@@ -2,7 +2,7 @@
   "bg_exc_del": {
     "state": true,
     "mode": "homogeneous_poisson",
-    "color": null,
+    "color": "#17becf",
     "source": {
       "freq": 10.0,
       "baseline": null,

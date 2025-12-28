@@ -1,8 +1,8 @@
 {
   "vip_inh": {
-    "state": false,
+    "state": true,
     "mode": "precomputed",
-    "color": null,
+    "color": "#9467bd",
     "source": {
       "freq": null,
       "baseline": 4.0,
@@ -27,7 +27,7 @@
         }
       },
       "params": {
-        "wt_mean": 2.0,
+        "wt_mean": 3.0,
         "wt_std": 0.34,
         "initW": 1.0,
         "gmax": 0.001,

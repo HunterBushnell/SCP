@@ -971,11 +971,15 @@ def _process_all_groups(
                 else:
                     jitter_rng = np.random.default_rng(int(seed) ^ 0xA5A5A5A5)
 
-            mean = float(sim_cfg.get("tstart", 0.0))
-            mu, sig = _lognormal_mu_sigma(mean, jitter_std)
-            jitter_tstart = float(jitter_rng.lognormal(mu, sig)) if sig > 0 else mean
-            # Clamp to simulation window start
-            jitter_tstart = max(mean, jitter_tstart)
+            tstart = float(sim_cfg.get("tstart", 0.0))
+            tstop = float(sim_cfg.get("tstop", tstart))
+            mu, sig = _lognormal_mu_sigma(jitter_std, jitter_std)
+            jitter_offset = float(jitter_rng.lognormal(mu, sig)) if sig > 0 else jitter_std
+            jitter_offset = max(0.0, jitter_offset)
+            jitter_tstart = tstart + jitter_offset
+            if tstop > tstart:
+                jitter_tstart = min(jitter_tstart, tstop)
+            sim_cfg["_jitter_delay_ms"] = jitter_offset
 
     # Stash for timing calculation (used by modes)
     sim_cfg["_jitter_tstart_ms"] = jitter_tstart

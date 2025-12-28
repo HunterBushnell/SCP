@@ -58,7 +58,8 @@ SCP results and outputs contract (v1)
     * `syn_config`: normalized per-group config (expanded includes, resolved `N_syn_resolved`, timing).
       * Includes derived fields such as `time_cfg` (anchors + blocks).
   * **meta (multi-only)**
-    * `avg_rate_curve`: `{"bin_ms": float, "t_ms": [...], "rate_hz": [...]}`.
+    * `avg_rate_curve`: `{"bin_ms": float, "smooth_ms": float, "smooth_mode": str, "t_ms": [...], "rate_hz": [...]}`.
+      * `smooth_ms` is a centered moving-average window applied to the binned curve (0 disables smoothing).
     * `input_summaries`: list of per-trial summaries (see below).
 * **meta (optional)**
   * `input_stats`: present if `save_input_stats` is true (see below).

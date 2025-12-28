@@ -2,7 +2,7 @@
   "bg_inh": {
     "state": true,
     "mode": "homogeneous_poisson",
-    "color": null,
+    "color": "#d62728",
     "source": {
       "freq": 1.0,
       "baseline": null,

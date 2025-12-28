@@ -2,7 +2,7 @@
   "vip_inh": {
     "state": false,
     "mode": "precomputed",
-    "color": null,
+    "color": "#9467bd",
     "source": {
       "freq": null,
       "baseline": 4.0,
