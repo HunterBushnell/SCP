@@ -13,7 +13,7 @@
       "onset_ms": null,
       "stim_tstart_ms": 650,
       "duration_ms": null,
-      "input_stim_tstart_ms": 400,
+      "input_stim_tstart_m I I s": 400,
       "input_duration_ms": null
     },
     "syns": {
@@ -27,7 +27,7 @@
         }
       },
       "params": {
-        "wt_mean": 3.0,
+        "wt_mean": 2.0,
         "wt_std": 0.34,
         "initW": 1.0,
         "gmax": 0.001,

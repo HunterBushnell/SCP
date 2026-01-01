@@ -204,6 +204,7 @@ def normalize_output_curve(
     mode: str = "raw",
     norm_mode: str = "avg",
     baseline_ms: float = 100.0,
+    baseline_mode: str = "window",
     norm_window: str = "stim",
 ) -> Dict[str, Any]:
     """
@@ -212,6 +213,7 @@ def normalize_output_curve(
     mode = (mode or "raw").lower()
     norm_mode = (norm_mode or "avg").lower()
     norm_window = (norm_window or "stim").lower()
+    baseline_mode = (baseline_mode or "window").lower()
 
     t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
     rate = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
@@ -223,6 +225,8 @@ def normalize_output_curve(
     out["norm_mode"] = None
     out["norm_window"] = None
     out["baseline_ms"] = None
+    out["baseline_mode"] = None
+    out["baseline_time_ms"] = None
     out["baseline_mean"] = None
     out["norm_scale"] = None
     out["units"] = "Hz"
@@ -234,11 +238,19 @@ def normalize_output_curve(
     tstop = sim_cfg.get("tstop")
     stim_start, stim_stop = _resolve_stim_window(sim_cfg)
 
-    baseline_start = None
+    baseline_mean = 0.0
+    baseline_time = None
     if stim_start is not None:
-        baseline_start = float(stim_start) - float(baseline_ms)
-    baseline_mask = _select_window_mask(t_ms, baseline_start, stim_start)
-    baseline_mean = float(np.mean(rate[baseline_mask])) if baseline_mask.any() else 0.0
+        baseline_time = float(stim_start) - float(baseline_ms)
+        if baseline_mode == "point":
+            if t_ms.size:
+                baseline_mean = float(
+                    np.interp(baseline_time, t_ms, rate, left=rate[0], right=rate[-1])
+                )
+        else:
+            baseline_start = baseline_time
+            baseline_mask = _select_window_mask(t_ms, baseline_start, stim_start)
+            baseline_mean = float(np.mean(rate[baseline_mask])) if baseline_mask.any() else 0.0
 
     rate_bs = rate - baseline_mean
 
@@ -264,6 +276,8 @@ def normalize_output_curve(
     out["norm_mode"] = norm_mode
     out["norm_window"] = norm_window
     out["baseline_ms"] = float(baseline_ms)
+    out["baseline_mode"] = baseline_mode
+    out["baseline_time_ms"] = baseline_time
     out["baseline_mean"] = baseline_mean
     out["norm_scale"] = norm_scale
     out["units"] = "normalized"
@@ -382,12 +396,137 @@ def compute_output_curve_from_results(
     }
 
 
+def load_scatter_curve_optional(
+    *,
+    enabled: bool,
+    path: str,
+    time_unit: str = "s",
+    bin_ms: Optional[float] = None,
+    smooth_ms: Optional[float] = None,
+    smooth_mode: str = "center",
+    x_col: int = 0,
+    y_col: int = 1,
+    shift_ms: Optional[float] = None,
+    quiet: bool = False,
+) -> Optional[Dict[str, Any]]:
+    if not enabled:
+        return None
+    if not path:
+        if not quiet:
+            print("Scatter curve enabled but path is empty.")
+        return None
+    try:
+        import pandas as pd
+
+        df = pd.read_csv(path, header=None)
+        x_raw = pd.to_numeric(df.iloc[:, x_col], errors="coerce")
+        y_raw = pd.to_numeric(df.iloc[:, y_col], errors="coerce")
+        mask = x_raw.notna() & y_raw.notna()
+        x_vals = x_raw[mask].to_numpy(dtype=float)
+        y_vals = y_raw[mask].to_numpy(dtype=float)
+    except Exception:
+        try:
+            data = np.genfromtxt(path, delimiter=",")
+            if data.ndim != 2 or data.shape[1] < 2:
+                raise ValueError("scatter CSV must have at least two columns")
+            x_vals = data[:, x_col].astype(float)
+            y_vals = data[:, y_col].astype(float)
+            mask = np.isfinite(x_vals) & np.isfinite(y_vals)
+            x_vals = x_vals[mask]
+            y_vals = y_vals[mask]
+        except Exception as exc:
+            if not quiet:
+                print("Scatter curve load failed:", exc)
+            return None
+
+    if x_vals.size == 0:
+        if not quiet:
+            print("Scatter curve is empty after parsing.")
+        return None
+
+    time_unit = (time_unit or "s").strip().lower()
+    if time_unit == "s":
+        t_ms = x_vals * 1000.0
+    elif time_unit == "ms":
+        t_ms = x_vals
+    else:
+        if not quiet:
+            print(f"Scatter time_unit must be 's' or 'ms' (got {time_unit!r}).")
+        return None
+
+    if shift_ms is not None:
+        t_ms = t_ms + float(shift_ms)
+
+    order = np.argsort(t_ms)
+    t_ms = t_ms[order]
+    y_vals = y_vals[order]
+
+    if bin_ms is None or float(bin_ms) <= 0:
+        return {
+            "bin_ms": None,
+            "smooth_ms": float(smooth_ms) if smooth_ms else 0.0,
+            "smooth_mode": str(smooth_mode),
+            "t_ms": t_ms.tolist(),
+            "rate_hz": y_vals.tolist(),
+        }
+
+    bin_ms = float(bin_ms)
+    t_min = float(np.min(t_ms))
+    t_max = float(np.max(t_ms))
+    edges = np.arange(t_min, t_max + bin_ms, bin_ms, dtype=float)
+    if edges.size < 2:
+        return None
+    centers = edges[:-1] + 0.5 * bin_ms
+
+    bin_idx = np.digitize(t_ms, edges) - 1
+    bin_idx = bin_idx[(bin_idx >= 0) & (bin_idx < len(centers))]
+    if bin_idx.size == 0:
+        return None
+    sums = np.bincount(bin_idx, weights=y_vals, minlength=len(centers))
+    counts = np.bincount(bin_idx, minlength=len(centers))
+    mean = np.full_like(centers, np.nan, dtype=float)
+    nonzero = counts > 0
+    mean[nonzero] = sums[nonzero] / counts[nonzero]
+
+    if np.isnan(mean).any():
+        valid = ~np.isnan(mean)
+        if valid.sum() >= 2:
+            mean = np.interp(centers, centers[valid], mean[valid])
+        elif valid.sum() == 1:
+            mean = np.full_like(mean, mean[valid][0], dtype=float)
+        else:
+            return None
+
+    smooth_mode = str(smooth_mode or "center").lower()
+    centers, mean = _smooth_rate_curve(
+        centers,
+        mean,
+        bin_ms,
+        smooth_ms,
+        mode=smooth_mode,
+    )
+
+    try:
+        smooth_ms_val = float(smooth_ms) if smooth_ms is not None else 0.0
+    except Exception:
+        smooth_ms_val = 0.0
+
+    return {
+        "bin_ms": bin_ms,
+        "smooth_ms": smooth_ms_val,
+        "smooth_mode": smooth_mode,
+        "t_ms": centers.tolist(),
+        "rate_hz": mean.tolist(),
+    }
+
+
 def compute_output_metrics(
     curve: Dict[str, Any],
     sim_cfg: Dict[str, Any],
     *,
     peak_window_ms: float = 100.0,
     drop_window_ms: float = 100.0,
+    rebound_window_ms: Optional[float] = 300.0,
     auc_window: str = "stim",
 ) -> Dict[str, Any]:
     auc_window = (auc_window or "stim").lower()
@@ -403,10 +542,15 @@ def compute_output_metrics(
         "stim_stop_ms": stim_stop,
         "peak_time_ms": None,
         "peak_value": None,
+        "peak_rate_hz": None,
         "peak_latency_ms": None,
         "drop_time_ms": None,
         "drop_value": None,
         "drop_pct": None,
+        "rebound_window_ms": float(rebound_window_ms) if rebound_window_ms is not None else None,
+        "rebound_time_ms": None,
+        "rebound_value": None,
+        "rebound_pct": None,
         "auc": None,
         "auc_units": f"{curve.get('units', 'Hz')}*ms",
     }
@@ -430,9 +574,10 @@ def compute_output_metrics(
 
     metrics["peak_time_ms"] = peak_time
     metrics["peak_value"] = peak_val
+    metrics["peak_rate_hz"] = peak_val
     metrics["peak_latency_ms"] = peak_time - float(stim_start)
 
-    drop_target = float(stim_start) + float(drop_window_ms)
+    drop_target = peak_time + float(drop_window_ms)
     drop_pos = int(np.argmin(np.abs(t_ms - drop_target)))
     drop_time = float(t_ms[drop_pos])
     drop_val = float(rate[drop_pos])
@@ -440,6 +585,16 @@ def compute_output_metrics(
     metrics["drop_value"] = drop_val
     if peak_val != 0:
         metrics["drop_pct"] = 100.0 * (peak_val - drop_val) / peak_val
+
+    if rebound_window_ms is not None:
+        rebound_target = peak_time + float(rebound_window_ms)
+        rebound_pos = int(np.argmin(np.abs(t_ms - rebound_target)))
+        rebound_time = float(t_ms[rebound_pos])
+        rebound_val = float(rate[rebound_pos])
+        metrics["rebound_time_ms"] = rebound_time
+        metrics["rebound_value"] = rebound_val
+        if peak_val != 0:
+            metrics["rebound_pct"] = 100.0 * (peak_val - rebound_val) / peak_val
 
     tstart = sim_cfg.get("tstart")
     tstop = sim_cfg.get("tstop")
@@ -889,9 +1044,9 @@ def save_default_plots(
     *,
     save_inputs: bool = True,
     save_synapses: bool = False,
-    win_size: float = 50.0,
+    win_size: float = 25.0,
     input_bin_ms: Optional[float] = None,
-    input_smooth_ms: Optional[float] = 50.0,
+    input_smooth_ms: Optional[float] = 25.0,
     raster_style: str = "dot",
 ) -> Dict[str, Path]:
     """
@@ -2045,6 +2200,56 @@ def collect_run_dirs(base_dir: Path) -> list[Path]:
                 seen.add(key)
                 candidates.append(resolved)
     return sorted(candidates, key=lambda p: (p / "run_manifest.json").stat().st_mtime)
+
+
+def _candidate_mtime(candidate: Path) -> float:
+    if candidate.is_file():
+        return candidate.stat().st_mtime
+    manifest = candidate / "run_manifest.json"
+    if manifest.is_file():
+        return manifest.stat().st_mtime
+    results_manifest = candidate / "results" / "run_manifest.json"
+    if results_manifest.is_file():
+        return results_manifest.stat().st_mtime
+    files = list(candidate.glob("*.pkl")) + list(candidate.glob("*.npz"))
+    if len(files) == 1:
+        return files[0].stat().st_mtime
+    return candidate.stat().st_mtime
+
+
+def collect_run_candidates(base_dir: Path) -> list[Path]:
+    """
+    Collect run folders plus legacy outputs (single .pkl/.npz files or folders
+    containing a single .pkl/.npz) for selection UIs.
+    """
+    candidates: list[Path] = []
+    seen: set[str] = set()
+    if not base_dir.is_dir():
+        return candidates
+
+    for p in base_dir.iterdir():
+        if p.is_dir():
+            resolved = resolve_run_dir(p)
+            if (resolved / "run_manifest.json").is_file():
+                key = str(resolved)
+                if key not in seen:
+                    seen.add(key)
+                    candidates.append(resolved)
+                continue
+            files = list(p.glob("*.pkl")) + list(p.glob("*.npz"))
+            if len(files) == 1:
+                key = str(p)
+                if key not in seen:
+                    seen.add(key)
+                    candidates.append(p)
+            continue
+        if p.is_file() and p.suffix.lower() in (".pkl", ".npz"):
+            key = str(p)
+            if key not in seen:
+                seen.add(key)
+                candidates.append(p)
+
+    return sorted(candidates, key=_candidate_mtime)
 
 
 def resolve_run(base_dir: Path, stem_or_path: Optional[Union[str, Path]]) -> Path:

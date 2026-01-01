@@ -64,7 +64,7 @@
   "save_plots_synapses": false,
   "plots_win_size": 25.0,
   "plots_input_bin_ms": null,
-  "plots_input_smooth_ms": 50.0,
+  "plots_input_smooth_ms": 25.0,
   "plots_raster_style": "dot",
   "randomness": {
     "global": {

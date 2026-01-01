@@ -119,6 +119,9 @@ def plot_compare_output_curves(
 ):
     if colors is None:
         colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    color_a = colors[0 % len(colors)] if colors else None
+    color_b = colors[1 % len(colors)] if colors else None
+    same_color = (color_a is not None and color_b is not None and color_a == color_b)
     fig, ax = plt.subplots(figsize=(6, 4))
     for idx, curve in enumerate((curve_a, curve_b)):
         if not curve:
@@ -126,7 +129,8 @@ def plot_compare_output_curves(
         t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
         y = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
         lab = labels[idx] if labels and idx < len(labels) else None
-        ax.plot(t_ms, y, lw=2, color=colors[idx % len(colors)], label=lab)
+        ls = "--" if same_color and idx == 1 else "-"
+        ax.plot(t_ms, y, lw=2, color=colors[idx % len(colors)], linestyle=ls, label=lab)
     units = (curve_a or curve_b or {}).get("units", "Hz")
     y_label = "Rate (Hz)" if units == "Hz" else "Rate (normalized)"
     if labels:
@@ -323,8 +327,11 @@ def plot_compare_input_means(
     else:
         groups = [g for g in groups if g in groups_a or g in groups_b]
 
+    layout = (layout or "side-by-side").lower()
     if layout in ("stacked", "top-bottom", "vertical"):
         nrows, ncols = 2, 1
+    elif layout in ("overlay", "same", "same-plot", "overlap"):
+        nrows, ncols = 1, 1
     else:
         nrows, ncols = 1, 2
 
@@ -346,44 +353,101 @@ def plot_compare_input_means(
             color_map[g] = colors[i % len(colors)]
 
     summaries = [summary_a, summary_b]
-    for idx, ax in enumerate(axes[:2]):
-        summary = summaries[idx]
-        label = labels[idx] if idx < len(labels) else f"Run {idx+1}"
-        t_ms = summary.get("t_ms") or []
-        for g in groups:
-            gdata = (summary.get("groups") or {}).get(g)
-            if not gdata:
-                continue
-            mean_rate = np.asarray(gdata.get("mean_rate", []), dtype=float)
-            std_rate = np.asarray(gdata.get("std_rate", []), dtype=float)
-            if len(t_ms) != len(mean_rate):
-                continue
-            ax.plot(t_ms, mean_rate, color=color_map[g], lw=2, label=g)
-            if show_std and std_rate.size:
-                ax.fill_between(
+    if layout in ("overlay", "same", "same-plot", "overlap"):
+        ax = axes[0]
+        ax2 = None
+        for idx, summary in enumerate(summaries):
+            label = labels[idx] if idx < len(labels) else f"Run {idx+1}"
+            linestyle = "-" if idx == 0 else "--"
+            alpha = 0.25 if idx == 0 else 0.18
+            t_ms = summary.get("t_ms") or []
+            for g in groups:
+                gdata = (summary.get("groups") or {}).get(g)
+                if not gdata:
+                    continue
+                mean_rate = np.asarray(gdata.get("mean_rate", []), dtype=float)
+                std_rate = np.asarray(gdata.get("std_rate", []), dtype=float)
+                if len(t_ms) != len(mean_rate):
+                    continue
+                ax.plot(
                     t_ms,
-                    mean_rate - std_rate,
-                    mean_rate + std_rate,
+                    mean_rate,
                     color=color_map[g],
-                    alpha=0.2,
+                    lw=2,
+                    linestyle=linestyle,
+                    label=f"{g} ({label})",
                 )
+                if show_std and std_rate.size:
+                    ax.fill_between(
+                        t_ms,
+                        mean_rate - std_rate,
+                        mean_rate + std_rate,
+                        color=color_map[g],
+                        alpha=alpha,
+                    )
 
-        ax.set_title(f"{label} inputs (mean)")
+            if output_curves and idx < len(output_curves):
+                curve = output_curves[idx]
+                if curve:
+                    out_t = curve.get("t_ms", [])
+                    out_r = curve.get("rate_hz", [])
+                    if out_t and out_r:
+                        if ax2 is None:
+                            ax2 = ax.twinx()
+                            ax2.set_ylabel("Output rate (Hz)")
+                        ax2.plot(
+                            out_t,
+                            out_r,
+                            color="black",
+                            lw=1.5,
+                            linestyle=linestyle,
+                            label=f"output ({label})",
+                        )
+
+        ax.set_title("Inputs (mean) overlay")
         ax.set_ylabel("Input rate (Hz per synapse)")
         ax.grid(True)
-        if len(groups) > 1:
+        if groups:
             ax.legend()
+    else:
+        for idx, ax in enumerate(axes[:2]):
+            summary = summaries[idx]
+            label = labels[idx] if idx < len(labels) else f"Run {idx+1}"
+            t_ms = summary.get("t_ms") or []
+            for g in groups:
+                gdata = (summary.get("groups") or {}).get(g)
+                if not gdata:
+                    continue
+                mean_rate = np.asarray(gdata.get("mean_rate", []), dtype=float)
+                std_rate = np.asarray(gdata.get("std_rate", []), dtype=float)
+                if len(t_ms) != len(mean_rate):
+                    continue
+                ax.plot(t_ms, mean_rate, color=color_map[g], lw=2, label=g)
+                if show_std and std_rate.size:
+                    ax.fill_between(
+                        t_ms,
+                        mean_rate - std_rate,
+                        mean_rate + std_rate,
+                        color=color_map[g],
+                        alpha=0.2,
+                    )
 
-        # Optional output curve overlay
-        if output_curves and idx < len(output_curves):
-            curve = output_curves[idx]
-            if curve:
-                out_t = curve.get("t_ms", [])
-                out_r = curve.get("rate_hz", [])
-                if out_t and out_r:
-                    ax2 = ax.twinx()
-                    ax2.plot(out_t, out_r, color="black", lw=1.5, linestyle="--", label="output")
-                    ax2.set_ylabel("Output rate (Hz)")
+            ax.set_title(f"{label} inputs (mean)")
+            ax.set_ylabel("Input rate (Hz per synapse)")
+            ax.grid(True)
+            if len(groups) > 1:
+                ax.legend()
+
+            # Optional output curve overlay
+            if output_curves and idx < len(output_curves):
+                curve = output_curves[idx]
+                if curve:
+                    out_t = curve.get("t_ms", [])
+                    out_r = curve.get("rate_hz", [])
+                    if out_t and out_r:
+                        ax2 = ax.twinx()
+                        ax2.plot(out_t, out_r, color="black", lw=1.5, linestyle="--", label="output")
+                        ax2.set_ylabel("Output rate (Hz)")
 
     # Shared x label
     axes[-1].set_xlabel("Time (ms)")
@@ -966,6 +1030,7 @@ def plot_results(
     plot_type='line',
     plot_raster=None,
     smooth_mode="center",
+    bin_ms=None,
 ):
     """
     Convenience wrapper for new run_sim results.
@@ -1025,6 +1090,7 @@ def plot_results(
             col=col,
             in_vivo_curve=in_vivo_curve,
             plot_window=plot_window or (None, None),
+            bins=bin_ms,
             smooth_mode=smooth_mode,
         )
 
@@ -1045,6 +1111,8 @@ def plot_results(
             "stim_stop_ms": sim_cfg.get("stim_stop_ms"),
             "stim_duration_ms": sim_cfg.get("stim_duration_ms"),
         }
+        if bin_ms is not None:
+            sim_params["bins"] = float(bin_ms)
 
         # mode-dependent default:
         #   None  => raster ON by default for multi
@@ -1420,6 +1488,7 @@ def plot_multi(
         set_color=None,
         save_curve=False,       # or filename
         smooth_mode="center",
+        output_norm=None,
     ):
 
     ok_rate = ('hist', 'line', 'both')
@@ -1495,8 +1564,17 @@ def plot_multi(
 
         col = set_color if set_color is not None else g2col[key]
 
+        if output_norm:
+            baseline_mean = output_norm.get("baseline_mean")
+            norm_scale = output_norm.get("norm_scale")
+            if baseline_mean is not None:
+                Y = Y - float(baseline_mean)
+            if norm_scale not in (None, 0):
+                Y = Y / float(norm_scale)
+
+        norm_fr_local = None if output_norm else norm_fr
         mean, lo, hi = _mean_band_stats(
-            Y, shade=shade_mode, norm_fr=norm_fr, norm_scope='post_mean'
+            Y, shade=shade_mode, norm_fr=norm_fr_local, norm_scope='post_mean'
         )
 
         if plot_type in ('hist', 'both'):
@@ -1560,7 +1638,10 @@ def plot_multi(
         except Exception:
             pass
 
-    axRate.set_ylabel("Avg rate (Hz)")
+    if output_norm or norm_fr is not None:
+        axRate.set_ylabel("Rate (normalized)")
+    else:
+        axRate.set_ylabel("Avg rate (Hz)")
     if len(groups) > 1 or (plot_bio and plot_bio[0]):
         axRate.legend()
     axRate.grid()
@@ -1745,7 +1826,13 @@ def plot_compare_multi(
 # ────────────────────────────────────────────────────────────────────────────
 #  Side-by-side comparison for two results
 # ────────────────────────────────────────────────────────────────────────────
-def _rate_curve_from_results(results, win_size=25, bin_ms=None, smooth_mode="center"):
+def _rate_curve_from_results(
+    results,
+    win_size=25,
+    bin_ms=None,
+    smooth_mode="center",
+    output_norm=None,
+):
     sim_cfg = results.get("sim_cfg", {}) or {}
     tstart = float(sim_cfg.get("tstart", 0.0))
     tstop = float(sim_cfg.get("tstop", 0.0))
@@ -1785,6 +1872,14 @@ def _rate_curve_from_results(results, win_size=25, bin_ms=None, smooth_mode="cen
         mean = moving_average(mean, win_size=win_size, bin_width=bin_width, mode=smooth_mode)
         centers = _align_centers(centers, mean, mode=smooth_mode)
 
+    if output_norm:
+        baseline_mean = output_norm.get("baseline_mean")
+        norm_scale = output_norm.get("norm_scale")
+        if baseline_mean is not None:
+            mean = mean - float(baseline_mean)
+        if norm_scale not in (None, 0):
+            mean = mean / float(norm_scale)
+
     return centers, mean, len(trials)
 
 
@@ -1797,27 +1892,42 @@ def plot_compare_side_by_side(
         bin_ms=None,
         plot_window=None,
         colors=None,
-        smooth_mode="center"):
+        smooth_mode="center",
+        output_norms=None,
+        layout="side-by-side"):
     """
-    Plot two results side-by-side (average firing rate curves).
+    Plot two results using the requested comparison layout.
     """
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
+    layout = (layout or "side-by-side").lower()
+    if layout in ("stacked", "top-bottom", "vertical"):
+        fig, axes = plt.subplots(2, 1, figsize=(6, 6), sharex=True, sharey=True)
+    elif layout in ("overlay", "same", "same-plot", "overlap"):
+        fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+        axes = np.array([ax])
+    else:
+        fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
 
-    for ax, res, label, color in zip(
-            axes,
-            (results_a, results_b),
-            labels,
-            (colors or [None, None])):
+    axes = np.atleast_1d(axes)
+    norms = output_norms or (None, None)
+    colors_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+
+    curves = []
+    for idx, (res, label, color, norm) in enumerate(
+            zip((results_a, results_b), labels, (colors or [None, None]), norms)):
         sim_cfg = res.get("sim_cfg", {}) or {}
         x, mean, n_trials = _rate_curve_from_results(
             res,
             win_size=win_size,
             bin_ms=bin_ms,
             smooth_mode=smooth_mode,
+            output_norm=norm,
         )
 
-        col = color if color is not None else sim_cfg.get("color", None)
-        ax.plot(x, mean, color=col, lw=2)
+        col = color
+        if col is None:
+            col = sim_cfg.get("color", None)
+        if col is None:
+            col = colors_cycle[idx % len(colors_cycle)]
 
         stim_start = sim_cfg.get("stim_start_ms")
         stim_stop = sim_cfg.get("stim_stop_ms")
@@ -1825,17 +1935,70 @@ def plot_compare_side_by_side(
         if stim_start is not None and stim_stop is None and stim_dur is not None:
             stim_stop = float(stim_start) + float(stim_dur)
 
-        for vline in [stim_start, stim_stop]:
+        curves.append({
+            "x": x,
+            "mean": mean,
+            "n_trials": n_trials,
+            "label": label,
+            "color": col,
+            "stim_start": stim_start,
+            "stim_stop": stim_stop,
+        })
+
+    if layout in ("overlay", "same", "same-plot", "overlap"):
+        ax = axes[0]
+        same_color = False
+        if len(curves) > 1:
+            same_color = curves[0]["color"] == curves[1]["color"]
+        for curve in curves:
+            if curve["x"].size == 0:
+                continue
+            label = curve["label"]
+            if label:
+                label = f"{label} (n={curve['n_trials']})"
+            ls = "--" if same_color and curve is curves[1] else "-"
+            ax.plot(curve["x"], curve["mean"], color=curve["color"], lw=2, linestyle=ls, label=label)
+
+        base_start = curves[0]["stim_start"] if curves else None
+        base_stop = curves[0]["stim_stop"] if curves else None
+        for vline in [base_start, base_stop]:
             if vline is not None:
                 ax.axvline(x=vline, color='k', linestyle='-', linewidth=1)
 
-        ax.set_title(f"{label} (n={n_trials})")
+        if len(curves) > 1:
+            for vline in [curves[1]["stim_start"], curves[1]["stim_stop"]]:
+                if vline is not None and vline not in (base_start, base_stop):
+                    ax.axvline(
+                        x=vline,
+                        color=curves[1]["color"],
+                        linestyle='--',
+                        linewidth=1,
+                        alpha=0.7,
+                    )
+
+        if any(curve["label"] for curve in curves):
+            ax.legend()
+        ax.set_title("Compare (overlay)")
         ax.set_xlabel("Time (ms)")
         ax.grid(True)
         if plot_window is not None:
             ax.set_xlim(plot_window[0], plot_window[1])
+    else:
+        for ax, curve in zip(axes, curves):
+            ax.plot(curve["x"], curve["mean"], color=curve["color"], lw=2)
+            for vline in [curve["stim_start"], curve["stim_stop"]]:
+                if vline is not None:
+                    ax.axvline(x=vline, color='k', linestyle='-', linewidth=1)
+            ax.set_title(f"{curve['label']} (n={curve['n_trials']})")
+            ax.set_xlabel("Time (ms)")
+            ax.grid(True)
+            if plot_window is not None:
+                ax.set_xlim(plot_window[0], plot_window[1])
 
-    axes[0].set_ylabel("Avg Rate (Hz)")
+    if any(norms):
+        axes[0].set_ylabel("Rate (normalized)")
+    else:
+        axes[0].set_ylabel("Avg Rate (Hz)")
     plt.tight_layout()
     plt.show()
     return fig, axes

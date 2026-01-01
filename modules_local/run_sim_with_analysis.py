@@ -1552,9 +1552,9 @@ def save_results(
                 run_dir,
                 save_inputs=bool(sim_cfg.get("save_plots_inputs", True)),
                 save_synapses=bool(sim_cfg.get("save_plots_synapses", False)),
-                win_size=float(sim_cfg.get("plots_win_size", 50.0)),
+                win_size=float(sim_cfg.get("plots_win_size", 25.0)),
                 input_bin_ms=sim_cfg.get("plots_input_bin_ms", None),
-                input_smooth_ms=sim_cfg.get("plots_input_smooth_ms", 50.0),
+                input_smooth_ms=sim_cfg.get("plots_input_smooth_ms", 25.0),
                 raster_style=str(sim_cfg.get("plots_raster_style", "dot")),
             )
         except Exception as exc:
@@ -2103,7 +2103,13 @@ def load_results(path: Union[str, Path]) -> Dict[str, Any]:
         }
 
     with p.open("rb") as f:
-        return pickle.load(f)
+        payload = pickle.load(f)
+    if isinstance(payload, dict) and "mode" in payload and "sim_cfg" in payload:
+        return payload
+    try:
+        return load_old_multi_results(p)
+    except Exception:
+        return payload
         
 
 # ---------------------------------------------------------------------
@@ -2119,7 +2125,7 @@ def load_old_multi_results(
     label: str = None,
     color: str = None,
     tstop: float = 1200.0,
-    bins: float = 25.0,
+    bins: float = 5.0,
     delay: float = 0.0,
 ) -> Dict[str, Any]:
     """
@@ -2151,6 +2157,23 @@ def load_old_multi_results(
     p = Path(path)
     with p.open("rb") as f:
         payload = pickle.load(f)
+
+    if color is None:
+        for cfg_path in (
+            p.parent / "cell_config.json",
+            p.parent / "sim_cfg.json",
+            p.parent / "sim_config.json",
+        ):
+            if not cfg_path.is_file():
+                continue
+            try:
+                cfg = json.loads(cfg_path.read_text())
+            except Exception:
+                continue
+            cfg_color = (cfg or {}).get("color")
+            if cfg_color:
+                color = cfg_color
+                break
 
     # Try to detect shape:
     #  Case 1: {'all_param_data': {...}, 'param_study': ..., 'sim_params': ...}

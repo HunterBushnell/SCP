@@ -8,7 +8,7 @@
 #SBATCH -t 0-03:00:00
 #SBATCH -N 1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=16G
+#SBATCH --mem=2G
 # To overwrite output files, uncomment the following lines:
 # #SBATCH -o logs/pvsst.out
 # #SBATCH -e logs/pvsst.err
