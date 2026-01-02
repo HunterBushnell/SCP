@@ -12,14 +12,14 @@
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 350.0,
+      "stim_tstart_ms": 375.0,
       "duration_ms": null,
       "input_stim_tstart_ms": 600.0,
       "input_duration_ms": null
     },
     "syns": {
       "type": "GABA_A",
-      "N_syn": 25,
+      "N_syn": 50,
       "segs": "proximal",
       "dist_func": {
         "kind": "linear",
@@ -30,7 +30,7 @@
         }
       },
       "params": {
-        "wt_mean": 1.5,
+        "wt_mean": 4.5,
         "wt_std": 0.34,
         "initW": 1.0,
         "gmax": 0.001,

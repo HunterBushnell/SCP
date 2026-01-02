@@ -228,6 +228,8 @@ def normalize_output_curve(
     out["baseline_mode"] = None
     out["baseline_time_ms"] = None
     out["baseline_mean"] = None
+    out["baseline_subtracted"] = False
+    out["rate_hz_baseline_sub"] = None
     out["norm_scale"] = None
     out["units"] = "Hz"
 
@@ -279,6 +281,8 @@ def normalize_output_curve(
     out["baseline_mode"] = baseline_mode
     out["baseline_time_ms"] = baseline_time
     out["baseline_mean"] = baseline_mean
+    out["baseline_subtracted"] = True
+    out["rate_hz_baseline_sub"] = rate_bs.tolist()
     out["norm_scale"] = norm_scale
     out["units"] = "normalized"
     return out
@@ -604,6 +608,16 @@ def compute_output_metrics(
         auc_mask = _select_window_mask(t_ms, stim_start, stim_stop)
     if auc_mask.any():
         metrics["auc"] = float(np.trapz(rate[auc_mask], t_ms[auc_mask]))
+
+    if curve.get("normalized"):
+        metrics["baseline_mean"] = curve.get("baseline_mean")
+        metrics["baseline_time_ms"] = curve.get("baseline_time_ms")
+        metrics["baseline_ms"] = curve.get("baseline_ms")
+        metrics["baseline_mode"] = curve.get("baseline_mode")
+        metrics["norm_mode"] = curve.get("norm_mode")
+        metrics["norm_window"] = curve.get("norm_window")
+        metrics["norm_scale"] = curve.get("norm_scale")
+        metrics["avg_norm_scale"] = curve.get("norm_scale") if curve.get("norm_mode") == "avg" else None
 
     return metrics
 

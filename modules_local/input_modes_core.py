@@ -248,9 +248,11 @@ def _mode_precomputed(
 
     Source options:
       - source["trains"]: inline list of spike-time arrays (ms, starting at 0)
-      - source["path"]: path to file containing trains. Supported:
-          * .pkl/.p: pickled list, or pickled dict (use source["key"] or single-key dict)
+      - source["path"]: path to file (or run folder) containing trains. Supported:
+          * .pkl/.p: pickled list, or dict (auto-selects spikes/trains or source["key"])
           * .json: either {"trains": [...]} or raw list
+          * .npz/.npy: arrays of trains (auto-selects "spikes" or single array)
+          * run folder with spikes.npz / inputs_sample.pkl / results.pkl
 
     Selection:
       - source["selection"] = "sample" (default) or "first_n"
@@ -284,19 +286,34 @@ def _mode_precomputed(
         label: str = "precomputed",
     ) -> List[np.ndarray]:
         if isinstance(obj, dict):
-            if key:
-                if key not in obj:
-                    raise KeyError(f"{label}: key {key!r} not found")
+            if "inputs_by_trial" in obj or "inputs" in obj:
+                pool = _extract_pool_from_inputs(obj)
+                if pool:
+                    return pool
+            if key and key in obj:
                 obj = obj[key]
-            elif len(obj) == 1:
-                obj = next(iter(obj.values()))
             else:
-                raise ValueError(
-                    f"{label}: multiple keys found; set source['key'] to select one"
-                )
-        if isinstance(obj, list):
+                for k in ("spikes", "spike_trains", "trains"):
+                    if k in obj:
+                        obj = obj[k]
+                        break
+                else:
+                    if len(obj) == 1:
+                        obj = next(iter(obj.values()))
+                    else:
+                        raise ValueError(
+                            f"{label}: multiple keys found; set source['key'] to select one"
+                        )
+        if isinstance(obj, np.ndarray):
+            if obj.dtype == object:
+                return [np.asarray(x, dtype=float) for x in obj.tolist()]
+            if obj.ndim == 1:
+                return [np.asarray(obj, dtype=float)]
+            if obj.ndim == 2:
+                return [np.asarray(row, dtype=float) for row in obj]
+        if isinstance(obj, (list, tuple)):
             return [np.asarray(x, dtype=float) for x in obj]
-        raise ValueError(f"{label}: trains must be a list or dict of lists")
+        raise ValueError(f"{label}: trains must be a list, array, or dict of lists")
 
     def _select_input_group(inputs_map: Dict[str, Any]) -> str:
         group_key = source.get("group") or source.get("group_name") or source.get("key")
@@ -343,6 +360,7 @@ def _mode_precomputed(
         manifest = run_dir / "run_manifest.json"
         inputs_path: Optional[Path] = None
         results_path: Optional[Path] = None
+        spikes_path: Optional[Path] = None
 
         if manifest.is_file():
             try:
@@ -353,6 +371,32 @@ def _mode_precomputed(
                 inputs_path = run_dir / files["inputs_sample"]
             if files.get("results_pkl"):
                 results_path = run_dir / files["results_pkl"]
+            if files.get("spikes"):
+                spikes_path = run_dir / files["spikes"]
+
+        if spikes_path is None:
+            candidates = [
+                run_dir / "spikes.npz",
+                run_dir / "spikes.pkl",
+                run_dir / "spikes.p",
+                run_dir / "spikes.npy",
+                run_dir / "results" / "spikes.npz",
+                run_dir / "results" / "spikes.pkl",
+                run_dir / "results" / "spikes.p",
+                run_dir / "results" / "spikes.npy",
+            ]
+            for cand in candidates:
+                if cand.is_file():
+                    spikes_path = cand
+                    break
+
+        if spikes_path is not None and spikes_path.is_file():
+            try:
+                pool = _load_trains_from_path(spikes_path)
+            except Exception:
+                pool = []
+            if pool:
+                return pool
 
         if inputs_path is None:
             fallback = run_dir / "inputs_sample.pkl"
@@ -364,7 +408,14 @@ def _mode_precomputed(
 
             with inputs_path.open("rb") as f:
                 payload = pickle.load(f)
-            pool = _extract_pool_from_inputs(payload if isinstance(payload, dict) else {})
+            try:
+                pool = _normalize_pool(
+                    payload,
+                    key=source.get("key"),
+                    label=f"precomputed:{inputs_path}",
+                )
+            except Exception:
+                pool = []
             if pool:
                 return pool
 
@@ -373,13 +424,20 @@ def _mode_precomputed(
 
             with results_path.open("rb") as f:
                 payload = pickle.load(f)
-            pool = _extract_pool_from_inputs(payload if isinstance(payload, dict) else {})
+            try:
+                pool = _normalize_pool(
+                    payload,
+                    key=source.get("key"),
+                    label=f"precomputed:{results_path}",
+                )
+            except Exception:
+                pool = []
             if pool:
                 return pool
 
         raise ValueError(
-            "precomputed: run folder lacks inputs_sample.pkl with spike_trains. "
-            "Set n_traces_to_save > 0 (or save_full_results) and retry."
+            "precomputed: run folder lacks spikes.npz (or inputs_sample.pkl). "
+            "Provide a file path to spike trains or enable saving spikes/inputs."
         )
 
     def _load_trains_from_path(p: Path) -> List[np.ndarray]:
@@ -390,18 +448,39 @@ def _mode_precomputed(
                 p = p.parent
 
         if p.is_dir():
-            if (p / "run_manifest.json").is_file() or (p / "inputs_sample.pkl").is_file():
+            if (
+                (p / "run_manifest.json").is_file()
+                or (p / "inputs_sample.pkl").is_file()
+                or (p / "spikes.npz").is_file()
+            ):
                 try:
                     return _load_trains_from_run_dir(p)
                 except Exception:
                     pass
 
-            preferred = [p / f"{p.name}{ext}" for ext in (".pkl", ".p", ".json")]
+            results_dir = p / "results"
+            if results_dir.is_dir():
+                for cand in (
+                    results_dir / "spikes.npz",
+                    results_dir / "spikes.pkl",
+                    results_dir / "spikes.p",
+                    results_dir / "spikes.npy",
+                ):
+                    if cand.is_file():
+                        return _load_trains_from_path(cand)
+
+            preferred = [p / f"{p.name}{ext}" for ext in (".npz", ".npy", ".pkl", ".p", ".json")]
             candidates: List[Path] = [c for c in preferred if c.is_file()]
+            if not candidates:
+                candidates = sorted(p.glob("spikes.*"))
             if not candidates:
                 candidates = sorted(p.glob("*.pkl"))
             if not candidates:
                 candidates = sorted(p.glob("*.p"))
+            if not candidates:
+                candidates = sorted(p.glob("*.npz"))
+            if not candidates:
+                candidates = sorted(p.glob("*.npy"))
             if not candidates:
                 candidates = sorted(p.glob("*.json"))
             for candidate in candidates:
@@ -418,6 +497,13 @@ def _mode_precomputed(
 
             with p.open("rb") as f:
                 obj = pickle.load(f)
+            return _normalize_pool(obj, key=source.get("key"), label=f"precomputed:{p}")
+        if suffix in (".npz", ".npy"):
+            if suffix == ".npz":
+                with np.load(p, allow_pickle=True) as data:
+                    obj = {k: data[k] for k in data.files}
+            else:
+                obj = np.load(p, allow_pickle=True)
             return _normalize_pool(obj, key=source.get("key"), label=f"precomputed:{p}")
         if suffix == ".json":
             with p.open("r") as f:
