@@ -1489,6 +1489,7 @@ def plot_multi(
         save_curve=False,       # or filename
         smooth_mode="center",
         output_norm=None,
+        output_scale=None,
     ):
 
     ok_rate = ('hist', 'line', 'both')
@@ -1520,6 +1521,12 @@ def plot_multi(
     centers = bins[:-1] + 0.5 * bin_width
 
     groups = list(all_param_data.keys())
+    scale_val = None
+    if output_scale is not None:
+        try:
+            scale_val = float(output_scale)
+        except Exception:
+            scale_val = None
     colors = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     g2col  = {g: next(colors) for g in groups}
 
@@ -1571,6 +1578,8 @@ def plot_multi(
                 Y = Y - float(baseline_mean)
             if norm_scale not in (None, 0):
                 Y = Y / float(norm_scale)
+        if scale_val not in (None, 1.0):
+            Y = Y * scale_val
 
         norm_fr_local = None if output_norm else norm_fr
         mean, lo, hi = _mean_band_stats(
@@ -1592,6 +1601,8 @@ def plot_multi(
         bio_data = plot_bio[2]
         if norm_fr is not None:
             bio_data = normalize(bio_data, norm_offset=-1 * bio_data[0])
+        if scale_val not in (None, 1.0):
+            bio_data = np.asarray(bio_data, dtype=float) * scale_val
         axRate.plot(plot_bio[1] * 1000, bio_data, 'k',
                     lw=2, label='In-Vivo Input')
 
@@ -1894,7 +1905,8 @@ def plot_compare_side_by_side(
         colors=None,
         smooth_mode="center",
         output_norms=None,
-        layout="side-by-side"):
+        layout="side-by-side",
+        output_scale=None):
     """
     Plot two results using the requested comparison layout.
     """
@@ -1912,6 +1924,12 @@ def plot_compare_side_by_side(
     colors_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
     curves = []
+    scale_val = None
+    if output_scale is not None:
+        try:
+            scale_val = float(output_scale)
+        except Exception:
+            scale_val = None
     for idx, (res, label, color, norm) in enumerate(
             zip((results_a, results_b), labels, (colors or [None, None]), norms)):
         sim_cfg = res.get("sim_cfg", {}) or {}
@@ -1935,6 +1953,8 @@ def plot_compare_side_by_side(
         if stim_start is not None and stim_stop is None and stim_dur is not None:
             stim_stop = float(stim_start) + float(stim_dur)
 
+        if scale_val not in (None, 1.0):
+            mean = mean * scale_val
         curves.append({
             "x": x,
             "mean": mean,

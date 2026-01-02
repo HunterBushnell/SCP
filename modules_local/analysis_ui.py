@@ -148,6 +148,54 @@ def _apply_output_norm(curve: Optional[Dict[str, Any]], output_norm: Optional[Di
     return updated
 
 
+def _parse_plot_scale(scale: Any) -> float:
+    if scale is None:
+        return 1.0
+    try:
+        return float(scale)
+    except Exception:
+        return 1.0
+
+
+def _scale_curve_for_plot(curve: Optional[Dict[str, Any]], scale: Any) -> Optional[Dict[str, Any]]:
+    if not curve:
+        return curve
+    scale_val = _parse_plot_scale(scale)
+    if scale_val == 1.0:
+        return curve
+    updated = dict(curve)
+    rate = np.asarray(curve.get("rate_hz", []) or [], dtype=float) * scale_val
+    updated["rate_hz"] = rate.tolist()
+    if curve.get("rate_hz_baseline_sub") is not None:
+        rate_bs = np.asarray(curve.get("rate_hz_baseline_sub") or [], dtype=float) * scale_val
+        updated["rate_hz_baseline_sub"] = rate_bs.tolist()
+    return updated
+
+
+def _scale_metrics_for_plot(metrics: Optional[Dict[str, Any]], scale: Any) -> Optional[Dict[str, Any]]:
+    if not metrics:
+        return metrics
+    scale_val = _parse_plot_scale(scale)
+    if scale_val == 1.0:
+        return metrics
+    scaled = dict(metrics)
+    for key in (
+        "peak_value",
+        "peak_rate_hz",
+        "drop_value",
+        "rebound_value",
+        "peak_value_raw",
+        "peak_rate_hz_raw",
+    ):
+        val = scaled.get(key)
+        if val is not None:
+            try:
+                scaled[key] = float(val) * scale_val
+            except Exception:
+                pass
+    return scaled
+
+
 def _smooth_curve_if_requested(
     curve: Optional[Dict[str, Any]],
     *,
@@ -287,6 +335,7 @@ def run_output_plots(
     save_analysis: bool = False,
     plots_dpi: int = 150,
 ) -> None:
+    plot_scale = _parse_plot_scale(opts.get("output_plot_scale"))
     list_entries = _compare_list_entries(selection)
     if list_entries:
         base_dir = selection.get("base")
@@ -356,8 +405,9 @@ def run_output_plots(
             fig_curve, ax = plt.subplots(figsize=(6, 4))
             color_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
             for idx, (curve, label) in enumerate(zip(curves, labels)):
-                t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
-                y = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
+                curve_plot = _scale_curve_for_plot(curve, plot_scale)
+                t_ms = np.asarray(curve_plot.get("t_ms", []) or [], dtype=float)
+                y = np.asarray(curve_plot.get("rate_hz", []) or [], dtype=float)
                 col = colors[idx] if colors[idx] is not None else color_cycle[idx % len(color_cycle)]
                 ax.plot(t_ms, y, lw=2, color=col, label=label)
                 if opts.get("output_show_metric_points", True):
@@ -369,9 +419,10 @@ def run_output_plots(
                         rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
                         auc_window=opts.get("output_auc_window", "stim"),
                     )
+                    metrics_plot = _scale_metrics_for_plot(metrics, plot_scale)
                     _plot_metric_points(
                         ax,
-                        metrics,
+                        metrics_plot,
                         color=col,
                         label_prefix=label,
                         show_labels=bool(opts.get("output_metric_label_points", False)),
@@ -488,6 +539,7 @@ def run_output_plots(
                     smooth_mode=smooth_mode,
                     output_norms=output_norms,
                     layout=opts.get("compare_output_layout", "side-by-side"),
+                    output_scale=plot_scale,
                 )
             if fig_cmp is not None and opts.get("output_show_metric_points", True):
                 curve_a_out = analysis.compute_output_curve_from_results(
@@ -522,6 +574,8 @@ def run_output_plots(
                     rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
                     auc_window=opts.get("output_auc_window", "stim"),
                 ) if curve_b_out else None
+                metrics_a_plot = _scale_metrics_for_plot(metrics_a, plot_scale)
+                metrics_b_plot = _scale_metrics_for_plot(metrics_b, plot_scale)
 
                 fig_cmp_res = analysis.resolve_figure(fig_cmp)
                 axes = np.atleast_1d(fig_cmp_res.axes)
@@ -533,7 +587,7 @@ def run_output_plots(
                     if metrics_a:
                         _plot_metric_points(
                             ax,
-                            metrics_a,
+                            metrics_a_plot,
                             color=color_a,
                             label_prefix=label_a,
                             show_labels=bool(opts.get("output_metric_label_points", False)),
@@ -542,7 +596,7 @@ def run_output_plots(
                     if metrics_b:
                         _plot_metric_points(
                             ax,
-                            metrics_b,
+                            metrics_b_plot,
                             color=color_b,
                             label_prefix=label_b,
                             show_labels=bool(opts.get("output_metric_label_points", False)),
@@ -554,7 +608,7 @@ def run_output_plots(
                         color_a = line_colors[0] if line_colors else None
                         _plot_metric_points(
                             axes[0],
-                            metrics_a,
+                            metrics_a_plot,
                             color=color_a,
                             label_prefix=label_a,
                             show_labels=bool(opts.get("output_metric_label_points", False)),
@@ -565,7 +619,7 @@ def run_output_plots(
                         color_b = line_colors[0] if line_colors else None
                         _plot_metric_points(
                             axes[1],
-                            metrics_b,
+                            metrics_b_plot,
                             color=color_b,
                             label_prefix=label_b,
                             show_labels=bool(opts.get("output_metric_label_points", False)),
@@ -633,9 +687,11 @@ def run_output_plots(
                     )
                 sim_cfg_a = (res_a.get("sim_cfg") if res_a else _default_sim_cfg_for_curve(curve_a, fallback=(res_b.get("sim_cfg") if res_b else None))) or {}
                 stim_start, stim_stop = _stim_window(sim_cfg_a)
+                curve_a_plot = _scale_curve_for_plot(curve_a, plot_scale)
+                curve_b_plot = _scale_curve_for_plot(curve_b, plot_scale)
                 fig_curve, _ = plotting.plot_compare_output_curves(
-                    curve_a,
-                    curve_b,
+                    curve_a_plot,
+                    curve_b_plot,
                     labels=(label_a, label_b),
                     plot_window=opts.get("plot_window", (None, None)),
                     stim_start=stim_start,
@@ -659,6 +715,8 @@ def run_output_plots(
                         rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
                         auc_window=opts.get("output_auc_window", "stim"),
                     )
+                    metrics_a_plot = _scale_metrics_for_plot(metrics_a, plot_scale)
+                    metrics_b_plot = _scale_metrics_for_plot(metrics_b, plot_scale)
                     ax = fig_curve.axes[0] if fig_curve.axes else None
                     if ax is not None:
                         line_colors = [line.get_color() for line in ax.lines]
@@ -666,7 +724,7 @@ def run_output_plots(
                         color_b = line_colors[1] if len(line_colors) > 1 else None
                         _plot_metric_points(
                             ax,
-                            metrics_a,
+                            metrics_a_plot,
                             color=color_a,
                             label_prefix=label_a,
                             show_labels=bool(opts.get("output_metric_label_points", False)),
@@ -674,7 +732,7 @@ def run_output_plots(
                         )
                         _plot_metric_points(
                             ax,
-                            metrics_b,
+                            metrics_b_plot,
                             color=color_b,
                             label_prefix=label_b,
                             show_labels=bool(opts.get("output_metric_label_points", False)),
@@ -683,9 +741,10 @@ def run_output_plots(
                 if scatter_curve:
                     ax = fig_curve.axes[0] if fig_curve.axes else None
                     if ax is not None:
+                        scatter_plot = _scale_curve_for_plot(scatter_curve, plot_scale)
                         ax.plot(
-                            np.asarray(scatter_curve.get("t_ms", []), dtype=float),
-                            np.asarray(scatter_curve.get("rate_hz", []), dtype=float),
+                            np.asarray(scatter_plot.get("t_ms", []), dtype=float),
+                            np.asarray(scatter_plot.get("rate_hz", []), dtype=float),
                             color=opts.get("output_scatter_color", "0.4"),
                             lw=2,
                             ls="--",
@@ -700,9 +759,10 @@ def run_output_plots(
                                 rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
                                 auc_window=opts.get("output_auc_window", "stim"),
                             )
+                            scatter_metrics_plot = _scale_metrics_for_plot(scatter_metrics, plot_scale)
                             _plot_metric_points(
                                 ax,
-                                scatter_metrics,
+                                scatter_metrics_plot,
                                 color=opts.get("output_scatter_color", "0.4"),
                                 label_prefix=opts.get("output_scatter_label", "Bio scatter"),
                                 show_labels=bool(opts.get("output_metric_label_points", False)),
@@ -790,6 +850,7 @@ def run_output_plots(
                 set_color=(res.get("sim_cfg", {}) or {}).get("color", None),
                 smooth_mode=smooth_mode,
                 output_norm=output_norm,
+                output_scale=plot_scale,
             )
             if opts.get("output_show_metric_points", True):
                 curve_out = analysis.compute_output_curve_from_results(
@@ -812,9 +873,10 @@ def run_output_plots(
                 if ax_rate is not None and metrics_out:
                     line_colors = [line.get_color() for line in ax_rate.lines if len(line.get_xdata()) > 2]
                     color_out = line_colors[0] if line_colors else None
+                    metrics_plot = _scale_metrics_for_plot(metrics_out, plot_scale)
                     _plot_metric_points(
                         ax_rate,
-                        metrics_out,
+                        metrics_plot,
                         color=color_out,
                         label_prefix=analysis.run_label(run_dir),
                         show_labels=bool(opts.get("output_metric_label_points", False)),
@@ -830,9 +892,10 @@ def run_output_plots(
                         rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
                         auc_window=opts.get("output_auc_window", "stim"),
                     )
+                    bio_metrics_plot = _scale_metrics_for_plot(bio_metrics, plot_scale)
                     _plot_metric_points(
                         ax_rate,
-                        bio_metrics,
+                        bio_metrics_plot,
                         color="k",
                         label_prefix="Bio",
                         show_labels=bool(opts.get("output_metric_label_points", False)),
@@ -891,8 +954,9 @@ def run_output_plots(
                 norm_window=opts.get("output_norm_window", "stim"),
             )
             stim_start, stim_stop = _stim_window(res.get("sim_cfg", {}) or {})
+            curve_single_plot = _scale_curve_for_plot(curve_single, plot_scale)
             fig_curve, _ = plotting.plot_output_curve(
-                curve_single,
+                curve_single_plot,
                 label=analysis.run_label(run_dir),
                 color=(res.get("sim_cfg", {}) or {}).get("color", None),
                 plot_window=opts.get("plot_window", (None, None)),
@@ -909,12 +973,13 @@ def run_output_plots(
                     rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
                     auc_window=opts.get("output_auc_window", "stim"),
                 )
+                metrics_single_plot = _scale_metrics_for_plot(metrics_single, plot_scale)
                 ax = fig_curve.axes[0] if fig_curve.axes else None
                 if ax is not None:
                     line_color = ax.lines[0].get_color() if ax.lines else None
                     _plot_metric_points(
                         ax,
-                        metrics_single,
+                        metrics_single_plot,
                         color=line_color,
                         label_prefix=analysis.run_label(run_dir),
                         show_labels=bool(opts.get("output_metric_label_points", False)),
@@ -923,9 +988,10 @@ def run_output_plots(
             if scatter_curve:
                 ax = fig_curve.axes[0] if fig_curve.axes else None
                 if ax is not None:
+                    scatter_plot = _scale_curve_for_plot(scatter_curve, plot_scale)
                     ax.plot(
-                        np.asarray(scatter_curve.get("t_ms", []), dtype=float),
-                        np.asarray(scatter_curve.get("rate_hz", []), dtype=float),
+                        np.asarray(scatter_plot.get("t_ms", []), dtype=float),
+                        np.asarray(scatter_plot.get("rate_hz", []), dtype=float),
                         color=opts.get("output_scatter_color", "0.4"),
                         lw=2,
                         ls="--",
@@ -940,9 +1006,10 @@ def run_output_plots(
                             rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
                             auc_window=opts.get("output_auc_window", "stim"),
                         )
+                        scatter_metrics_plot = _scale_metrics_for_plot(scatter_metrics, plot_scale)
                         _plot_metric_points(
                             ax,
-                            scatter_metrics,
+                            scatter_metrics_plot,
                             color=opts.get("output_scatter_color", "0.4"),
                             label_prefix=opts.get("output_scatter_label", "Bio scatter"),
                             show_labels=bool(opts.get("output_metric_label_points", False)),
@@ -1402,6 +1469,7 @@ def output_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "output_baseline_ms": g.get("output_baseline_ms"),
         "output_baseline_mode": g.get("output_baseline_mode"),
         "output_norm_window": g.get("output_norm_window"),
+        "output_plot_scale": g.get("output_plot_scale"),
         "output_bin_ms": g.get("output_bin_ms"),
         "output_smooth_ms": g.get("output_smooth_ms"),
         "output_smooth_mode": g.get("output_smooth_mode"),
@@ -1584,6 +1652,7 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
     output_baseline_txt = widgets.FloatText(value=g.get("output_baseline_ms"), description="Baseline ms")
     output_baseline_mode_dd = widgets.Dropdown(options=["point", "window"], value=g.get("output_baseline_mode"), description="Baseline mode")
     output_norm_window_dd = widgets.Dropdown(options=["stim", "full"], value=g.get("output_norm_window"), description="Norm window")
+    output_plot_scale_txt = widgets.FloatText(value=g.get("output_plot_scale"), description="Plot scale")
     output_bin_txt = widgets.Text(value="" if g.get("output_bin_ms") is None else str(g.get("output_bin_ms")), description="Curve bin ms")
     output_smooth_txt = widgets.Text(value="" if g.get("output_smooth_ms") is None else str(g.get("output_smooth_ms")), description="Curve smooth ms")
     output_smooth_mode_dd = widgets.Dropdown(options=["causal", "center"], value=g.get("output_smooth_mode"), description="Curve smooth mode")
@@ -1624,6 +1693,7 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
         g["output_baseline_ms"] = float(output_baseline_txt.value)
         g["output_baseline_mode"] = output_baseline_mode_dd.value
         g["output_norm_window"] = output_norm_window_dd.value
+        g["output_plot_scale"] = float(output_plot_scale_txt.value)
         g["output_bin_ms"] = analysis.parse_optional_float(output_bin_txt.value)
         g["output_smooth_ms"] = analysis.parse_optional_float(output_smooth_txt.value)
         g["output_smooth_mode"] = output_smooth_mode_dd.value
@@ -1657,7 +1727,7 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
             widgets.HBox([outputs_raster_cb, outputs_style_dd, outputs_win_txt]),
             widgets.HBox([window_start_txt, window_end_txt]),
             widgets.HBox([output_curve_mode_dd, output_norm_mode_dd, output_baseline_txt, output_baseline_mode_dd, output_norm_window_dd]),
-            widgets.HBox([output_bin_txt, output_smooth_txt, output_smooth_mode_dd]),
+            widgets.HBox([output_plot_scale_txt, output_bin_txt, output_smooth_txt, output_smooth_mode_dd]),
             widgets.HBox([output_scatter_cb, output_scatter_path_txt, output_scatter_unit_dd]),
             widgets.HBox([output_scatter_label_txt, output_scatter_color_txt, output_scatter_shift_txt]),
             widgets.HBox([outputs_plot_type_dd, outputs_shade_dd, outputs_norm_txt]),

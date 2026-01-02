@@ -581,6 +581,14 @@ def compute_output_metrics(
     metrics["peak_rate_hz"] = peak_val
     metrics["peak_latency_ms"] = peak_time - float(stim_start)
 
+    rate_raw = np.asarray(curve.get("rate_hz_baseline_sub") or [], dtype=float)
+    if rate_raw.size == rate.size and peak_mask.any():
+        peak_raw_idx = np.argmax(rate_raw[peak_mask])
+        peak_raw_pos = peak_indices[peak_raw_idx]
+        peak_raw_val = float(rate_raw[peak_raw_pos])
+        metrics["peak_value_raw"] = peak_raw_val
+        metrics["peak_rate_hz_raw"] = peak_raw_val
+
     drop_target = peak_time + float(drop_window_ms)
     drop_pos = int(np.argmin(np.abs(t_ms - drop_target)))
     drop_time = float(t_ms[drop_pos])
