@@ -660,18 +660,36 @@ def _mode_homogeneous_poisson(
 
     # Resolve anchors from group_cfg["time_cfg"], if present
     time_cfg = group_cfg.get("time_cfg") or {}
-    anchors  = time_cfg.get("anchors", {}) or {}
-    onset    = float(anchors.get("onset", sim_tstart))
+    anchors = time_cfg.get("anchors", {}) or {}
+    onset = float(anchors.get("onset", sim_tstart))
+    source_tstart = anchors.get("source_tstart")
+    source_tstop = anchors.get("source_tstop")
+    duration = anchors.get("duration_ms")
     jitter_tstart = anchors.get("jitter_tstart_ms", None)
 
-    # Effective window: from onset (clipped to sim start) to sim end
+    # Effective window: honor explicit source window or onset+duration when provided.
     t_start_ms = max(onset, sim_tstart)
+    if source_tstart is not None:
+        try:
+            t_start_ms = max(float(source_tstart), sim_tstart)
+        except Exception:
+            pass
     if jitter_tstart is not None:
         try:
             t_start_ms = max(t_start_ms, float(jitter_tstart))
         except Exception:
             pass
-    t_end_ms   = sim_tstop
+    t_end_ms = sim_tstop
+    if source_tstop is not None:
+        try:
+            t_end_ms = min(float(source_tstop), sim_tstop)
+        except Exception:
+            pass
+    elif duration is not None:
+        try:
+            t_end_ms = min(t_start_ms + float(duration), sim_tstop)
+        except Exception:
+            pass
 
     # Resolve synapse count
     n_syn = _get_n_syn(group_cfg)

@@ -5,7 +5,7 @@
   "bins": 5.0,
   "jitter": 100.0,
   "stim_start_ms": 400.0,
-  "stim_duration_ms": 400.0,
+  "stim_duration_ms": 450.0,
 
   "n_trials": 1,
   "n_traces_to_save": 1,

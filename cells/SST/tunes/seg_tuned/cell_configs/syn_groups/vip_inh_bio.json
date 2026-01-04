@@ -1,19 +1,21 @@
 {
-  "vip_inh": {
-    "state": true,
-    "mode": "precomputed",
+  "vip_inh_bio": {
+    "state": false,
+    "mode": "inhomogeneous_poisson",
     "color": "#9467bd",
     "source": {
       "freq": null,
-      "baseline": 4.0,
-      "path": "external_data/PV_1000tr.pkl",
-      "bin_ms": null
+      "baseline": 3.0,
+      "path": "external_data/PVFiringRateAvg.csv",
+      "bin_ms": null,
+      "time_col": "Time",
+      "rate_col": "AvgFiringRate"
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 650,
-      "duration_ms": null,
-      "input_stim_tstart_ms": 400,
+      "stim_tstart_ms": 650.0,
+      "duration_ms": 700.0,
+      "input_stim_tstart_ms": 200.0,
       "input_duration_ms": null
     },
     "syns": {

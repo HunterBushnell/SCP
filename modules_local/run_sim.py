@@ -2158,11 +2158,37 @@ def load_old_multi_results(
     with p.open("rb") as f:
         payload = pickle.load(f)
 
+    def _load_json_cfg(cfg_path: Path) -> Optional[Dict[str, Any]]:
+        if not cfg_path.is_file():
+            return None
+        try:
+            return json.loads(cfg_path.read_text())
+        except Exception:
+            return None
+
+    def _find_tune_cfg(pkl_path: Path) -> Optional[Dict[str, Any]]:
+        for parent in pkl_path.parents:
+            if parent.name == "output_data":
+                tune_dir = parent.parent
+                for cfg_path in (
+                    tune_dir / "cell_configs" / "sim_config.json",
+                    tune_dir / "sim_config.json",
+                    tune_dir / "cell_config.json",
+                ):
+                    cfg = _load_json_cfg(cfg_path)
+                    if cfg:
+                        return cfg
+                break
+        return None
+
     if color is None:
         for cfg_path in (
             p.parent / "cell_config.json",
             p.parent / "sim_cfg.json",
             p.parent / "sim_config.json",
+            p.parent.parent / "sim_cfg.json",
+            p.parent.parent / "sim_config.json",
+            p.parent.parent / "cell_config.json",
         ):
             if not cfg_path.is_file():
                 continue
@@ -2229,6 +2255,12 @@ def load_old_multi_results(
         "seed": None,
         "trial_randomness": "synapses",
     }
+
+    tune_cfg = _find_tune_cfg(p)
+    if tune_cfg:
+        for key in ("stim_start_ms", "stim_duration_ms", "stim_stop_ms", "delay"):
+            if sim_cfg.get(key) is None and tune_cfg.get(key) is not None:
+                sim_cfg[key] = tune_cfg.get(key)
 
     results = {
         "mode": "multi",

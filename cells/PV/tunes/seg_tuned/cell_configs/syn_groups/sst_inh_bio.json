@@ -1,36 +1,40 @@
 {
-  "bg_inh": {
+  "sst_inh_bio": {
     "state": true,
-    "mode": "homogeneous_poisson",
-    "color": "#d62728",
+    "mode": "inhomogeneous_poisson",
+    "color": "#ff7f0e",
     "source": {
-      "freq": 1.0,
-      "baseline": null,
-      "path": null,
-      "bin_ms": null
+      "freq": null,
+      "baseline": 4.0,
+      "path": "external_data/SSTFiringRateAvg.csv",
+      "bin_ms": null,
+      "key": "base tune",
+      "time_col": "Time",
+      "rate_col": "AvgFiringRate",
+      "ref": null
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": null,
+      "stim_tstart_ms": 375.0,
       "duration_ms": null,
-      "input_stim_tstart_ms": null,
+      "input_stim_tstart_ms": 200.0,
       "input_duration_ms": null
     },
     "syns": {
       "type": "GABA_A",
-      "N_syn": null,
-      "segs": "all",
+      "N_syn": 15,
+      "segs": "proximal",
       "dist_func": {
         "kind": "linear",
         "params": {
           "m": -0.015,
           "b": 4.25,
-          "multi": 0.2
+          "multi": 1.0
         }
       },
       "params": {
         "wt_mean": 0.5,
-        "wt_std": 0.3333333333333333,
+        "wt_std": 0.34,
         "initW": 1.0,
         "gmax": 0.001,
         "tau_r_GABAA": 0.5,

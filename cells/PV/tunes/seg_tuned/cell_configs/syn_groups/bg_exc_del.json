@@ -1,30 +1,31 @@
 {
   "bg_exc_del": {
-    "state": false,
+    "state": true,
     "mode": "homogeneous_poisson",
     "color": "#17becf",
     "source": {
-      "freq": 10.0,
+      "freq": 1.0,
       "baseline": null,
       "path": null,
       "bin_ms": null
     },
     "timing": {
-      "onset_ms": 600,
+      "onset_ms": 450,
       "stim_tstart_ms": null,
-      "duration_ms": null,
+      "duration_ms": 450.0,
       "input_stim_tstart_ms": null,
       "input_duration_ms": null
     },
     "syns": {
       "type": "AMPA_NMDA_STP",
-      "N_syn": 10,
+      "N_syn": 100,
       "segs": "all",
       "dist_func": {
-        "kind": "uniform",
+        "kind": "linear",
         "params": {
-          "c": 2.0,
-          "multi": 0.8
+          "m": -0.015,
+          "b": 4.25,
+          "multi": 1.0
         }
       },
       "params": {

@@ -205,6 +205,7 @@ def normalize_output_curve(
     norm_mode: str = "avg",
     baseline_ms: float = 100.0,
     baseline_mode: str = "window",
+    baseline_center_ms: Optional[float] = None,
     norm_window: str = "stim",
 ) -> Dict[str, Any]:
     """
@@ -227,6 +228,7 @@ def normalize_output_curve(
     out["baseline_ms"] = None
     out["baseline_mode"] = None
     out["baseline_time_ms"] = None
+    out["baseline_center_ms"] = None
     out["baseline_mean"] = None
     out["baseline_subtracted"] = False
     out["rate_hz_baseline_sub"] = None
@@ -242,16 +244,20 @@ def normalize_output_curve(
 
     baseline_mean = 0.0
     baseline_time = None
+    baseline_center_offset = None
     if stim_start is not None:
-        baseline_time = float(stim_start) - float(baseline_ms)
+        baseline_center_offset = float(baseline_center_ms) if baseline_center_ms is not None else float(baseline_ms) * 0.5
+        baseline_time = float(stim_start) - baseline_center_offset
         if baseline_mode == "point":
             if t_ms.size:
                 baseline_mean = float(
                     np.interp(baseline_time, t_ms, rate, left=rate[0], right=rate[-1])
                 )
         else:
-            baseline_start = baseline_time
-            baseline_mask = _select_window_mask(t_ms, baseline_start, stim_start)
+            half = float(baseline_ms) * 0.5
+            baseline_start = baseline_time - half
+            baseline_stop = baseline_time + half
+            baseline_mask = _select_window_mask(t_ms, baseline_start, baseline_stop)
             baseline_mean = float(np.mean(rate[baseline_mask])) if baseline_mask.any() else 0.0
 
     rate_bs = rate - baseline_mean
@@ -280,6 +286,7 @@ def normalize_output_curve(
     out["baseline_ms"] = float(baseline_ms)
     out["baseline_mode"] = baseline_mode
     out["baseline_time_ms"] = baseline_time
+    out["baseline_center_ms"] = baseline_center_offset
     out["baseline_mean"] = baseline_mean
     out["baseline_subtracted"] = True
     out["rate_hz_baseline_sub"] = rate_bs.tolist()
@@ -532,16 +539,29 @@ def compute_output_metrics(
     drop_window_ms: float = 100.0,
     rebound_window_ms: Optional[float] = 300.0,
     auc_window: str = "stim",
+    pdp_mode: Optional[str] = None,
+    pdp_window_ms: Optional[float] = None,
+    baseline_ms: Optional[float] = None,
+    baseline_mode: Optional[str] = None,
+    baseline_center_ms: Optional[float] = None,
+    stim_start_ms: Optional[float] = None,
+    stim_stop_ms: Optional[float] = None,
 ) -> Dict[str, Any]:
     auc_window = (auc_window or "stim").lower()
     t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
     rate = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
     stim_start, stim_stop = _resolve_stim_window(sim_cfg)
+    if stim_start_ms is not None:
+        stim_start = float(stim_start_ms)
+    if stim_stop_ms is not None:
+        stim_stop = float(stim_stop_ms)
 
     metrics = {
         "peak_window_ms": float(peak_window_ms),
         "drop_window_ms": float(drop_window_ms),
         "auc_window": auc_window,
+        "pdp_mode": None,
+        "pdp_window_ms": None,
         "stim_start_ms": stim_start,
         "stim_stop_ms": stim_stop,
         "peak_time_ms": None,
@@ -556,7 +576,18 @@ def compute_output_metrics(
         "rebound_value": None,
         "rebound_pct": None,
         "auc": None,
-        "auc_units": f"{curve.get('units', 'Hz')}*ms",
+        "auc_units": f"{curve.get('units', 'Hz')}*s",
+        "baseline_ms": None,
+        "baseline_mode": None,
+        "baseline_time_ms": None,
+        "baseline_center_ms": None,
+        "baseline_window_start_ms": None,
+        "baseline_window_stop_ms": None,
+        "baseline_mean": None,
+        "norm_mode": curve.get("norm_mode"),
+        "norm_window": curve.get("norm_window"),
+        "norm_scale": curve.get("norm_scale"),
+        "avg_norm_scale": curve.get("norm_scale") if curve.get("norm_mode") == "avg" else None,
     }
 
     if t_ms.size == 0 or rate.size == 0:
@@ -564,6 +595,56 @@ def compute_output_metrics(
 
     if stim_start is None:
         return metrics
+
+    baseline_ms_val = baseline_ms
+    if baseline_ms_val is None:
+        baseline_ms_val = curve.get("baseline_ms", 100.0)
+    try:
+        baseline_ms_val = float(baseline_ms_val)
+    except Exception:
+        baseline_ms_val = 100.0
+    baseline_mode_val = (baseline_mode or curve.get("baseline_mode") or "window").lower()
+    pdp_mode_val = (pdp_mode or curve.get("pdp_mode") or "point").lower()
+    pdp_window_val = pdp_window_ms if pdp_window_ms is not None else curve.get("pdp_window_ms")
+    try:
+        pdp_window_val = float(pdp_window_val) if pdp_window_val is not None else 0.0
+    except Exception:
+        pdp_window_val = 0.0
+    baseline_center_val = baseline_center_ms
+    if baseline_center_val is None:
+        baseline_center_val = curve.get("baseline_center_ms")
+    try:
+        baseline_center_val = float(baseline_center_val) if baseline_center_val is not None else float(baseline_ms_val) * 0.5
+    except Exception:
+        baseline_center_val = float(baseline_ms_val) * 0.5
+    baseline_time = curve.get("baseline_time_ms")
+    baseline_mean_curve = curve.get("baseline_mean")
+    baseline_mean = baseline_mean_curve
+    if baseline_time is None:
+        baseline_time = float(stim_start) - float(baseline_center_val)
+    if baseline_mean is None and t_ms.size:
+        if baseline_mode_val == "point":
+            baseline_mean = float(
+                np.interp(baseline_time, t_ms, rate, left=rate[0], right=rate[-1])
+            )
+        else:
+            half = float(baseline_ms_val) * 0.5
+            baseline_start = baseline_time - half
+            baseline_stop = baseline_time + half
+            baseline_mask = _select_window_mask(t_ms, baseline_start, baseline_stop)
+            baseline_mean = float(np.mean(rate[baseline_mask])) if baseline_mask.any() else 0.0
+
+    metrics["baseline_ms"] = baseline_ms_val
+    metrics["baseline_mode"] = baseline_mode_val
+    metrics["baseline_time_ms"] = baseline_time
+    metrics["baseline_center_ms"] = baseline_center_val
+    if baseline_mode_val == "window":
+        half = float(baseline_ms_val) * 0.5
+        metrics["baseline_window_start_ms"] = float(baseline_time) - half
+        metrics["baseline_window_stop_ms"] = float(baseline_time) + half
+    metrics["baseline_mean"] = baseline_mean
+    metrics["pdp_mode"] = pdp_mode_val
+    metrics["pdp_window_ms"] = pdp_window_val
 
     peak_start = stim_start
     peak_stop = stim_start + float(peak_window_ms)
@@ -581,30 +662,67 @@ def compute_output_metrics(
     metrics["peak_rate_hz"] = peak_val
     metrics["peak_latency_ms"] = peak_time - float(stim_start)
 
-    rate_raw = np.asarray(curve.get("rate_hz_baseline_sub") or [], dtype=float)
-    if rate_raw.size == rate.size and peak_mask.any():
-        peak_raw_idx = np.argmax(rate_raw[peak_mask])
+    rate_bs = np.asarray(curve.get("rate_hz_baseline_sub") or [], dtype=float)
+    raw_rate = None
+    baseline_for_raw = baseline_mean_curve if baseline_mean_curve is not None else baseline_mean
+    if rate_bs.size == rate.size and baseline_for_raw is not None:
+        raw_rate = rate_bs + float(baseline_for_raw)
+    elif not bool(curve.get("normalized")):
+        raw_rate = rate.copy()
+
+    if raw_rate is not None and raw_rate.size == rate.size and peak_mask.any():
+        peak_raw_idx = np.argmax(raw_rate[peak_mask])
         peak_raw_pos = peak_indices[peak_raw_idx]
-        peak_raw_val = float(rate_raw[peak_raw_pos])
+        peak_raw_val = float(raw_rate[peak_raw_pos])
         metrics["peak_value_raw"] = peak_raw_val
         metrics["peak_rate_hz_raw"] = peak_raw_val
 
     drop_target = peak_time + float(drop_window_ms)
-    drop_pos = int(np.argmin(np.abs(t_ms - drop_target)))
-    drop_time = float(t_ms[drop_pos])
-    drop_val = float(rate[drop_pos])
+    if pdp_mode_val == "window" and pdp_window_val > 0:
+        half = 0.5 * pdp_window_val
+        drop_mask = _select_window_mask(t_ms, drop_target - half, drop_target + half)
+        if drop_mask.any():
+            drop_time = float(drop_target)
+            drop_val = float(np.mean(rate[drop_mask]))
+        else:
+            drop_pos = int(np.argmin(np.abs(t_ms - drop_target)))
+            drop_time = float(t_ms[drop_pos])
+            drop_val = float(rate[drop_pos])
+    else:
+        drop_pos = int(np.argmin(np.abs(t_ms - drop_target)))
+        drop_time = float(t_ms[drop_pos])
+        drop_val = float(rate[drop_pos])
     metrics["drop_time_ms"] = drop_time
     metrics["drop_value"] = drop_val
+    metrics["drop_center_ms"] = float(drop_target)
+    if pdp_mode_val == "window" and pdp_window_val > 0:
+        metrics["drop_window_start_ms"] = float(drop_target) - (0.5 * float(pdp_window_val))
+        metrics["drop_window_stop_ms"] = float(drop_target) + (0.5 * float(pdp_window_val))
     if peak_val != 0:
         metrics["drop_pct"] = 100.0 * (peak_val - drop_val) / peak_val
 
     if rebound_window_ms is not None:
         rebound_target = peak_time + float(rebound_window_ms)
-        rebound_pos = int(np.argmin(np.abs(t_ms - rebound_target)))
-        rebound_time = float(t_ms[rebound_pos])
-        rebound_val = float(rate[rebound_pos])
+        if pdp_mode_val == "window" and pdp_window_val > 0:
+            half = 0.5 * pdp_window_val
+            rebound_mask = _select_window_mask(t_ms, rebound_target - half, rebound_target + half)
+            if rebound_mask.any():
+                rebound_time = float(rebound_target)
+                rebound_val = float(np.mean(rate[rebound_mask]))
+            else:
+                rebound_pos = int(np.argmin(np.abs(t_ms - rebound_target)))
+                rebound_time = float(t_ms[rebound_pos])
+                rebound_val = float(rate[rebound_pos])
+        else:
+            rebound_pos = int(np.argmin(np.abs(t_ms - rebound_target)))
+            rebound_time = float(t_ms[rebound_pos])
+            rebound_val = float(rate[rebound_pos])
         metrics["rebound_time_ms"] = rebound_time
         metrics["rebound_value"] = rebound_val
+        metrics["rebound_center_ms"] = float(rebound_target)
+        if pdp_mode_val == "window" and pdp_window_val > 0:
+            metrics["rebound_window_start_ms"] = float(rebound_target) - (0.5 * float(pdp_window_val))
+            metrics["rebound_window_stop_ms"] = float(rebound_target) + (0.5 * float(pdp_window_val))
         if peak_val != 0:
             metrics["rebound_pct"] = 100.0 * (peak_val - rebound_val) / peak_val
 
@@ -615,17 +733,7 @@ def compute_output_metrics(
     else:
         auc_mask = _select_window_mask(t_ms, stim_start, stim_stop)
     if auc_mask.any():
-        metrics["auc"] = float(np.trapz(rate[auc_mask], t_ms[auc_mask]))
-
-    if curve.get("normalized"):
-        metrics["baseline_mean"] = curve.get("baseline_mean")
-        metrics["baseline_time_ms"] = curve.get("baseline_time_ms")
-        metrics["baseline_ms"] = curve.get("baseline_ms")
-        metrics["baseline_mode"] = curve.get("baseline_mode")
-        metrics["norm_mode"] = curve.get("norm_mode")
-        metrics["norm_window"] = curve.get("norm_window")
-        metrics["norm_scale"] = curve.get("norm_scale")
-        metrics["avg_norm_scale"] = curve.get("norm_scale") if curve.get("norm_mode") == "avg" else None
+        metrics["auc"] = float(np.trapz(rate[auc_mask], t_ms[auc_mask] / 1000.0))
 
     return metrics
 

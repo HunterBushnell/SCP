@@ -1490,6 +1490,7 @@ def plot_multi(
         smooth_mode="center",
         output_norm=None,
         output_scale=None,
+        bio_scale=None,
     ):
 
     ok_rate = ('hist', 'line', 'both')
@@ -1527,6 +1528,12 @@ def plot_multi(
             scale_val = float(output_scale)
         except Exception:
             scale_val = None
+    bio_scale_val = None
+    if bio_scale is not None:
+        try:
+            bio_scale_val = float(bio_scale)
+        except Exception:
+            bio_scale_val = None
     colors = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     g2col  = {g: next(colors) for g in groups}
 
@@ -1601,8 +1608,8 @@ def plot_multi(
         bio_data = plot_bio[2]
         if norm_fr is not None:
             bio_data = normalize(bio_data, norm_offset=-1 * bio_data[0])
-        if scale_val not in (None, 1.0):
-            bio_data = np.asarray(bio_data, dtype=float) * scale_val
+        if bio_scale_val not in (None, 1.0):
+            bio_data = np.asarray(bio_data, dtype=float) * bio_scale_val
         axRate.plot(plot_bio[1] * 1000, bio_data, 'k',
                     lw=2, label='In-Vivo Input')
 
@@ -1906,7 +1913,9 @@ def plot_compare_side_by_side(
         smooth_mode="center",
         output_norms=None,
         layout="side-by-side",
-        output_scale=None):
+        output_scale=None,
+        stim_start_ms=None,
+        stim_stop_ms=None):
     """
     Plot two results using the requested comparison layout.
     """
@@ -1952,6 +1961,16 @@ def plot_compare_side_by_side(
         stim_dur = sim_cfg.get("stim_duration_ms")
         if stim_start is not None and stim_stop is None and stim_dur is not None:
             stim_stop = float(stim_start) + float(stim_dur)
+        if stim_start_ms is not None:
+            try:
+                stim_start = float(stim_start_ms)
+            except Exception:
+                pass
+        if stim_stop_ms is not None:
+            try:
+                stim_stop = float(stim_stop_ms)
+            except Exception:
+                pass
 
         if scale_val not in (None, 1.0):
             mean = mean * scale_val

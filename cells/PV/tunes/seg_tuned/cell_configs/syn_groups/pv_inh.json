@@ -19,7 +19,7 @@
     },
     "syns": {
       "type": "GABA_A",
-      "N_syn": 10,
+      "N_syn": 45,
       "segs": "all",
       "dist_func": {
         "kind": "linear",
@@ -30,7 +30,7 @@
         }
       },
       "params": {
-        "wt_mean": 2.0,
+        "wt_mean": 1.5,
         "wt_std": 0.34,
         "initW": 1.0,
         "gmax": 0.001,
