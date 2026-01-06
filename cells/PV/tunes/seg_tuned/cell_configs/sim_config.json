@@ -15,7 +15,7 @@
   "save": [false, "slurm_test", "pkl", false],
   "append": [false, null],
 
-  "input_stats_bi I n_ms": 5.0,
+  "input_stats_bin_ms": 5.0,
   "avg_rate_curve_smooth_ms": 25.0,
   "avg_rate_curve_smooth_mode": "causal",
   "plots_win_size": 25.0,

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple
 
+import json
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 
-from modules_local import analysis, plotting, run_sim
+from modules_local import analysis, input_sampling, inputs, plotting, run_sim
 
 
 def compare_enabled(selection: Dict[str, Any]) -> bool:
@@ -428,15 +429,51 @@ def _split_path_and_shift(item: str) -> Tuple[str, Optional[float], Optional[flo
     return path_part.strip(), shift_val, scale_val
 
 
+def _load_compare_preset(path_val: Any, base_dir: Optional[Path]) -> list[Dict[str, Any]]:
+    if path_val in (None, "", "none", "None"):
+        return []
+    preset_path = Path(str(path_val)).expanduser()
+    if not preset_path.is_absolute():
+        repo_root = analysis.find_scp_root(base_dir or Path.cwd())
+        preset_path = (repo_root / preset_path).resolve()
+    if not preset_path.exists():
+        print(f"Compare preset not found: {preset_path}")
+        return []
+    try:
+        payload = json.loads(preset_path.read_text())
+    except Exception:
+        print(f"Compare preset unreadable: {preset_path}")
+        return []
+    entries = payload.get("entries") if isinstance(payload, dict) else payload if isinstance(payload, list) else []
+    if not isinstance(entries, list):
+        return []
+    out: list[Dict[str, Any]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        path_raw = entry.get("path") or entry.get("run") or entry.get("file")
+        if not path_raw:
+            continue
+        path = _coerce_run_path(path_raw, base_dir or preset_path.parent)
+        if path is None:
+            continue
+        if not path.exists():
+            print(f"Skipping missing preset path: {path}")
+            continue
+        out.append({
+            "path": path,
+            "shift_ms": entry.get("shift_ms") if entry.get("shift_ms") is not None else entry.get("shift"),
+            "scale": entry.get("scale"),
+            "color": entry.get("color"),
+            "linestyle": entry.get("linestyle") or entry.get("ls"),
+            "label": entry.get("label"),
+        })
+    return out
+
+
 def _parse_compare_list_paths(text: str) -> list[str]:
     if not text:
         return []
-    def _looks_float(val: str) -> bool:
-        try:
-            float(val)
-            return True
-        except Exception:
-            return False
 
     entries: list[str] = []
     for line in text.splitlines():
@@ -446,16 +483,8 @@ def _parse_compare_list_paths(text: str) -> list[str]:
         parts = [p.strip() for p in raw.split(",") if p.strip()]
         if not parts:
             continue
-        i = 0
-        while i < len(parts):
-            part = parts[i]
-            if "@" in part and i + 1 < len(parts):
-                _, spec = part.split("@", 1)
-                if _looks_float(spec.strip()) and _looks_float(parts[i + 1]):
-                    part = part + "," + parts[i + 1]
-                    i += 1
+        for part in parts:
             entries.append(part)
-            i += 1
     return entries
 
 
@@ -487,26 +516,47 @@ def run_output_plots(
 ) -> None:
     output_scale = 1.0
     external_scale = 1.0
-    list_entries = _compare_list_entries(selection)
-    if list_entries:
-        base_dir = selection.get("base")
+    base_dir = selection.get("base")
+    preset_entries = _load_compare_preset(selection.get("compare_preset_path"), base_dir)
+    list_entries = _compare_list_entries(selection) if not preset_entries else []
+    if preset_entries or list_entries:
         paths: list[Path] = []
         shifts: list[Optional[float]] = []
         scales: list[Optional[float]] = []
+        labels_override: list[Optional[str]] = []
+        colors_override: list[Optional[str]] = []
+        linestyles_override: list[Optional[str]] = []
         has_curve = False
-        for item in list_entries:
-            path_raw, shift_ms, scale_val = _split_path_and_shift(str(item))
-            path = _coerce_run_path(path_raw, base_dir)
-            if path is None:
-                continue
-            if not path.exists():
-                print(f"Skipping missing path: {path}")
-                continue
-            paths.append(path)
-            shifts.append(shift_ms)
-            scales.append(scale_val)
-            if _is_curve_path(path):
-                has_curve = True
+        if preset_entries:
+            for entry in preset_entries:
+                path = entry["path"]
+                shift_ms = entry.get("shift_ms")
+                scale_val = entry.get("scale")
+                if _is_curve_path(path):
+                    has_curve = True
+                paths.append(path)
+                shifts.append(shift_ms)
+                scales.append(scale_val)
+                labels_override.append(entry.get("label"))
+                colors_override.append(entry.get("color"))
+                linestyles_override.append(entry.get("linestyle"))
+        else:
+            for item in list_entries:
+                path_raw, shift_ms, scale_val = _split_path_and_shift(str(item))
+                path = _coerce_run_path(path_raw, base_dir)
+                if path is None:
+                    continue
+                if not path.exists():
+                    print(f"Skipping missing path: {path}")
+                    continue
+                paths.append(path)
+                shifts.append(shift_ms)
+                scales.append(scale_val)
+                labels_override.append(None)
+                colors_override.append(None)
+                linestyles_override.append(None)
+                if _is_curve_path(path):
+                    has_curve = True
 
         fallback_sim_cfg = None
         for path in paths:
@@ -515,7 +565,7 @@ def run_output_plots(
                 fallback_sim_cfg = (res.get("sim_cfg") or {}) if res else None
                 break
 
-        if len(paths) == 1 and not has_curve:
+        if len(paths) == 1 and not has_curve and not preset_entries:
             selection["run_single"] = paths[0]
             selection["compare_list"] = []
             selection["compare_list_paths"] = []
@@ -523,17 +573,22 @@ def run_output_plots(
             curves = []
             labels = []
             colors = []
+            linestyles = []
             sim_cfgs = []
             curve_paths = []
             curve_scales = []
-            for path, shift_ms, scale_val in zip(paths, shifts, scales):
+            for idx, (path, shift_ms, scale_val) in enumerate(zip(paths, shifts, scales)):
                 if _is_curve_path(path):
                     curve = _load_curve_from_path(path, opts, shift_ms=shift_ms, fallback_sim_cfg=fallback_sim_cfg)
                     if not curve:
                         continue
+                    label_override = labels_override[idx] if idx < len(labels_override) else None
+                    color_override = colors_override[idx] if idx < len(colors_override) else None
+                    linestyle_override = linestyles_override[idx] if idx < len(linestyles_override) else None
                     curves.append(curve)
-                    labels.append(Path(path).stem)
-                    colors.append(None)
+                    labels.append(label_override or Path(path).stem)
+                    colors.append(color_override)
+                    linestyles.append(linestyle_override)
                     sim_cfgs.append(_default_sim_cfg_for_curve(curve, fallback=fallback_sim_cfg))
                     curve_paths.append(path)
                     curve_scales.append(scale_val)
@@ -564,9 +619,13 @@ def run_output_plots(
                         t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float) + float(shift_ms)
                         curve = dict(curve)
                         curve["t_ms"] = t_ms.tolist()
+                    label_override = labels_override[idx] if idx < len(labels_override) else None
+                    color_override = colors_override[idx] if idx < len(colors_override) else None
+                    linestyle_override = linestyles_override[idx] if idx < len(linestyles_override) else None
                     curves.append(curve)
-                    labels.append(analysis.run_label(path))
-                    colors.append((res.get("sim_cfg", {}) or {}).get("color", None))
+                    labels.append(label_override or analysis.run_label(path))
+                    colors.append(color_override or (res.get("sim_cfg", {}) or {}).get("color", None))
+                    linestyles.append(linestyle_override)
                     sim_cfgs.append(res.get("sim_cfg", {}) or {})
                     curve_paths.append(path)
                     curve_scales.append(scale_val)
@@ -577,9 +636,11 @@ def run_output_plots(
 
             run_indices = [i for i, p in enumerate(curve_paths) if not _is_curve_path(p)]
             if len(run_indices) >= 2:
-                rand_colors = _unique_compare_colors(len(run_indices))
-                for idx, col in zip(run_indices, rand_colors):
-                    colors[idx] = col
+                open_indices = [idx for idx in run_indices if colors[idx] is None]
+                if open_indices:
+                    rand_colors = _unique_compare_colors(len(open_indices))
+                    for idx, col in zip(open_indices, rand_colors):
+                        colors[idx] = col
 
             layout = (opts.get("compare_output_layout") or "overlay").lower()
             overlay_layouts = {"overlay", "same", "same-plot", "overlap"}
@@ -605,7 +666,8 @@ def run_output_plots(
                     t_ms = np.asarray(curve_plot.get("t_ms", []) or [], dtype=float)
                     y = np.asarray(curve_plot.get("rate_hz", []) or [], dtype=float)
                     col = colors[idx] if colors[idx] is not None else color_cycle[idx % len(color_cycle)]
-                    ax_i.plot(t_ms, y, lw=2, color=col)
+                    ls = linestyles[idx] if idx < len(linestyles) and linestyles[idx] else "-"
+                    ax_i.plot(t_ms, y, lw=2, color=col, linestyle=ls)
                     stim_start_i, stim_stop_i = _stim_window_for_opts(sim_cfgs[idx] or {}, opts)
                     if opts.get("output_show_metric_points", True):
                         metrics = _compute_output_metrics(
@@ -657,7 +719,8 @@ def run_output_plots(
                     t_ms = np.asarray(curve_plot.get("t_ms", []) or [], dtype=float)
                     y = np.asarray(curve_plot.get("rate_hz", []) or [], dtype=float)
                     col = colors[idx] if colors[idx] is not None else color_cycle[idx % len(color_cycle)]
-                    ax.plot(t_ms, y, lw=2, color=col, label=label)
+                    ls = linestyles[idx] if idx < len(linestyles) and linestyles[idx] else "-"
+                    ax.plot(t_ms, y, lw=2, color=col, linestyle=ls, label=label)
                     if opts.get("output_show_metric_points", True):
                         metrics = _compute_output_metrics(
                             curve,
@@ -1490,26 +1553,41 @@ def run_output_metrics(
     *,
     save_analysis: bool = False,
 ) -> Optional[Dict[str, Any]]:
-    list_entries = _compare_list_entries(selection)
-    if list_entries:
-        base_dir = selection.get("base")
+    base_dir = selection.get("base")
+    preset_entries = _load_compare_preset(selection.get("compare_preset_path"), base_dir)
+    list_entries = _compare_list_entries(selection) if not preset_entries else []
+    if preset_entries or list_entries:
         paths: list[Path] = []
         shifts: list[Optional[float]] = []
         scales: list[Optional[float]] = []
+        labels_override: list[Optional[str]] = []
         has_curve = False
-        for item in list_entries:
-            path_raw, shift_ms, scale_val = _split_path_and_shift(str(item))
-            path = _coerce_run_path(path_raw, base_dir)
-            if path is None:
-                continue
-            if not path.exists():
-                print(f"Skipping missing path: {path}")
-                continue
-            paths.append(path)
-            shifts.append(shift_ms)
-            scales.append(scale_val)
-            if _is_curve_path(path):
-                has_curve = True
+        if preset_entries:
+            for entry in preset_entries:
+                path = entry["path"]
+                shift_ms = entry.get("shift_ms")
+                scale_val = entry.get("scale")
+                if _is_curve_path(path):
+                    has_curve = True
+                paths.append(path)
+                shifts.append(shift_ms)
+                scales.append(scale_val)
+                labels_override.append(entry.get("label"))
+        else:
+            for item in list_entries:
+                path_raw, shift_ms, scale_val = _split_path_and_shift(str(item))
+                path = _coerce_run_path(path_raw, base_dir)
+                if path is None:
+                    continue
+                if not path.exists():
+                    print(f"Skipping missing path: {path}")
+                    continue
+                paths.append(path)
+                shifts.append(shift_ms)
+                scales.append(scale_val)
+                labels_override.append(None)
+                if _is_curve_path(path):
+                    has_curve = True
 
         if len(paths) == 1 and not has_curve:
             selection["run_single"] = paths[0]
@@ -1522,12 +1600,13 @@ def run_output_metrics(
                     break
 
             metrics_map: Dict[str, Any] = {}
-            for path, shift_ms, _scale_val in zip(paths, shifts, scales):
+            for idx, (path, shift_ms, _scale_val) in enumerate(zip(paths, shifts, scales)):
                 if _is_curve_path(path):
                     curve = _load_curve_from_path(path, opts, shift_ms=shift_ms, fallback_sim_cfg=fallback_sim_cfg)
                     if not curve:
                         continue
-                    label = Path(path).stem
+                    label_override = labels_override[idx] if idx < len(labels_override) else None
+                    label = label_override or Path(path).stem
                     sim_cfg = _default_sim_cfg_for_curve(curve, fallback=fallback_sim_cfg)
                 else:
                     res = _safe_load_results(path)
@@ -1556,7 +1635,8 @@ def run_output_metrics(
                         t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float) + float(shift_ms)
                         curve = dict(curve)
                         curve["t_ms"] = t_ms.tolist()
-                    label = analysis.run_label(path)
+                    label_override = labels_override[idx] if idx < len(labels_override) else None
+                    label = label_override or analysis.run_label(path)
                     sim_cfg = res.get("sim_cfg", {}) or {}
 
                 metrics_map[label] = _compute_output_metrics(
@@ -2053,6 +2133,7 @@ def get_selection_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "run_b_path": comp_b,
         "compare_list": compare_list,
         "compare_list_paths": compare_list_paths,
+        "compare_preset_path": g.get("compare_preset_path"),
     }
 
 
@@ -2422,6 +2503,7 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
             ("Compare configs (cell/geom/syn)", "compare_configs"),
             ("Compare outputs (plots)", "compare_outputs"),
             ("Compare inputs (plots)", "compare_inputs"),
+            ("Input sampling (preview)", "input_sampling"),
             ("Snapshot compare", "snapshot_compare"),
             ("Single-run tables", "single_tables"),
             ("Spike stats", "spike_stats"),
@@ -2536,6 +2618,61 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         widgets.HBox([metrics_show_delta_cb, metrics_highlight_cb]),
     ])
 
+    sample_source_dd = widgets.Dropdown(
+        options=[
+            ("Selection (cell/tune/model)", "selection"),
+            ("Output run", "run"),
+            ("Path", "path"),
+        ],
+        value=g.get("input_sample_source", "selection"),
+        description="Source",
+        layout=widgets.Layout(width="40%"),
+    )
+    sample_run_dd = widgets.Dropdown(
+        options=["latest"],
+        value=g.get("input_sample_run", "latest"),
+        description="Run",
+        layout=widgets.Layout(width="40%"),
+    )
+    sample_path_txt = widgets.Text(
+        value=str(g.get("input_sample_path") or ""),
+        description="Path",
+        layout=widgets.Layout(width="70%"),
+    )
+    sample_groups_sel = widgets.SelectMultiple(
+        options=[],
+        value=tuple(g.get("input_sample_groups") or []),
+        description="Groups",
+        rows=6,
+    )
+    sample_runs_txt = widgets.IntText(
+        value=int(g.get("input_sample_runs", 200)),
+        description="Runs",
+    )
+    sample_bin_txt = widgets.Text(
+        value="" if g.get("input_sample_bin_ms") is None else str(g.get("input_sample_bin_ms")),
+        description="Bin ms",
+        layout=widgets.Layout(width="160px"),
+    )
+    sample_seed_txt = widgets.Text(
+        value="" if g.get("input_sample_seed") is None else str(g.get("input_sample_seed")),
+        description="Seed",
+        layout=widgets.Layout(width="160px"),
+    )
+    sample_std_cb = widgets.Checkbox(
+        value=bool(g.get("input_sample_show_std", True)),
+        description="Show std",
+    )
+    sample_ref_cb = widgets.Checkbox(
+        value=bool(g.get("input_sample_show_ref", True)),
+        description="Show ref",
+    )
+    sample_box = widgets.VBox([
+        widgets.HBox([sample_source_dd, sample_run_dd]),
+        widgets.HBox([sample_path_txt]),
+        widgets.HBox([sample_groups_sel, widgets.VBox([sample_runs_txt, sample_bin_txt, sample_seed_txt, sample_std_cb, sample_ref_cb])]),
+    ])
+
     snap_box = widgets.VBox([
         widgets.HBox([snap_diff_cb, snap_save_cb]),
         widgets.HBox([snap_scope_dd, snap_fmt_dd]),
@@ -2546,7 +2683,46 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         mode = mode_dd.value
         cfg_box.layout.display = "flex" if mode == "compare_configs" else "none"
         metrics_box.layout.display = "flex" if mode == "output_metrics" else "none"
+        sample_box.layout.display = "flex" if mode == "input_sampling" else "none"
         snap_box.layout.display = "flex" if mode == "snapshot_compare" else "none"
+
+    def _resolve_sampling_path() -> Optional[Path]:
+        sel = get_selection_from_globals(g)
+        source = sample_source_dd.value
+        if source == "run":
+            run_label = sample_run_dd.value or "latest"
+            try:
+                return Path(analysis.resolve_run(sel["base"], run_label))
+            except Exception:
+                return None
+        if source == "path":
+            raw = sample_path_txt.value.strip()
+            return Path(raw).expanduser() if raw else None
+        return (g.get("CELLS_DIR") / sel["cell"] / sel["tunes"] / sel["model"]).resolve()
+
+    def _refresh_sample_runs():
+        sel = get_selection_from_globals(g)
+        base = sel.get("base")
+        try:
+            names = [analysis.run_label(p) for p in analysis.collect_run_candidates(base)]
+        except Exception:
+            names = []
+        if not names:
+            names = ["latest"]
+        sample_run_dd.options = names
+        if sample_run_dd.value not in names:
+            sample_run_dd.value = names[0]
+
+    def _refresh_sample_groups():
+        path = _resolve_sampling_path()
+        groups = _list_groups_for_sampling(path) if path is not None else []
+        sample_groups_sel.options = groups
+        prev = list(sample_groups_sel.value)
+        if prev:
+            selected = [gname for gname in prev if gname in groups]
+        else:
+            selected = groups
+        sample_groups_sel.value = tuple(selected)
 
     def _refresh_metrics_refs():
         sel = get_selection_from_globals(g)
@@ -2569,6 +2745,19 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
 
     _toggle_sections()
     mode_dd.observe(_toggle_sections, names="value")
+    sample_source_dd.observe(_toggle_sections, names="value")
+    sample_source_dd.observe(lambda *_: _refresh_sample_groups(), names="value")
+    sample_run_dd.observe(lambda *_: _refresh_sample_groups(), names="value")
+    sample_path_txt.observe(lambda *_: _refresh_sample_groups(), names="value")
+    if g.get("cell_dd") is not None:
+        g["cell_dd"].observe(lambda *_: _refresh_sample_runs(), names="value")
+        g["cell_dd"].observe(lambda *_: _refresh_sample_groups(), names="value")
+    if g.get("tunes_dd") is not None:
+        g["tunes_dd"].observe(lambda *_: _refresh_sample_runs(), names="value")
+        g["tunes_dd"].observe(lambda *_: _refresh_sample_groups(), names="value")
+    if g.get("model_dd") is not None:
+        g["model_dd"].observe(lambda *_: _refresh_sample_runs(), names="value")
+        g["model_dd"].observe(lambda *_: _refresh_sample_groups(), names="value")
 
     def _apply_extra_opts():
         g["extra_mode"] = mode_dd.value
@@ -2604,9 +2793,28 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         g["output_metrics_highlight_best"] = metrics_highlight_cb.value
         ref_val = metrics_ref_dd.value
         g["output_metrics_ref_label"] = None if ref_val in (None, "", "(none)") else ref_val
+        g["input_sample_path"] = sample_path_txt.value.strip() or None
+        g["input_sample_source"] = sample_source_dd.value
+        g["input_sample_run"] = sample_run_dd.value
+        g["input_sample_groups"] = list(sample_groups_sel.value)
+        g["input_sample_runs"] = int(sample_runs_txt.value)
+        g["input_sample_show_std"] = sample_std_cb.value
+        g["input_sample_show_ref"] = sample_ref_cb.value
+        sample_bin = analysis.parse_optional_float(sample_bin_txt.value)
+        if sample_bin is not None:
+            g["input_sample_bin_ms"] = sample_bin
+        else:
+            g["input_sample_bin_ms"] = None
+        sample_seed = analysis.parse_optional_float(sample_seed_txt.value)
+        if sample_seed is not None:
+            g["input_sample_seed"] = int(sample_seed)
+        else:
+            g["input_sample_seed"] = None
 
     def _on_run(_):
         _refresh_metrics_refs()
+        _refresh_sample_runs()
+        _refresh_sample_groups()
         _apply_extra_opts()
         with out_extra:
             out_extra.clear_output()
@@ -2617,6 +2825,8 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
                 run_output_plots_from_globals(g)
             elif mode == "compare_inputs":
                 run_input_plots_from_globals(g)
+            elif mode == "input_sampling":
+                run_input_sampling_from_globals(g)
             elif mode == "snapshot_compare":
                 g["extra_snapshot_tables"] = True
                 run_snapshot_compare_from_globals(g)
@@ -2659,10 +2869,115 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
             widgets.HBox([mode_dd, run_btn]),
             cfg_box,
             metrics_box,
+            sample_box,
             snap_box,
             out_extra,
         ])
     )
+
+
+def run_input_sampling_from_globals(g: Dict[str, Any]) -> None:
+    sel = get_selection_from_globals(g)
+    source = g.get("input_sample_source", "selection")
+    path_raw = g.get("input_sample_path")
+    if source == "run":
+        run_label = g.get("input_sample_run") or "latest"
+        try:
+            path_raw = analysis.resolve_run(sel["base"], run_label)
+        except Exception:
+            print(f"Input sampling: could not resolve run {run_label!r}")
+            return
+    elif source == "selection" or not path_raw:
+        path_raw = (g.get("CELLS_DIR") / sel["cell"] / sel["tunes"] / sel["model"]).resolve()
+    groups = g.get("input_sample_groups") or []
+    group = g.get("input_sample_group")
+    runs = int(g.get("input_sample_runs", 200))
+    bin_ms = g.get("input_sample_bin_ms")
+    seed = g.get("input_sample_seed")
+    show_std = bool(g.get("input_sample_show_std", True))
+    show_ref = bool(g.get("input_sample_show_ref", True))
+
+    try:
+        path = Path(path_raw)
+        if not groups:
+            groups = [group] if group else []
+        if not groups:
+            groups = _list_groups_for_sampling(path)
+        if not groups:
+            raise ValueError("No groups selected/found for input sampling.")
+    except Exception as exc:
+        print("Input sampling failed:", exc)
+        return
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    plotted = False
+    color_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    for idx, group_name in enumerate(groups):
+        try:
+            centers, mean_rate, std_rate, _, meta, ref_curve = input_sampling.sample_group_rates_from_path(
+                path,
+                group=group_name,
+                runs=runs,
+                bin_ms=bin_ms,
+                seed=seed,
+            )
+        except Exception as exc:
+            print(f"Input sampling failed for {group_name}: {exc}")
+            continue
+        plotted = True
+        col = color_cycle[idx % len(color_cycle)]
+        ax.plot(centers, mean_rate, label=f"{group_name} mean", color=col)
+        if show_std:
+            ax.fill_between(
+                centers,
+                mean_rate - std_rate,
+                mean_rate + std_rate,
+                alpha=0.15,
+                color=col,
+                label=f"{group_name} ±std",
+            )
+        if show_ref and ref_curve:
+            ref_t, ref_r = ref_curve
+            ax.plot(ref_t, ref_r, "--", color=col, linewidth=1.5, label=f"{group_name} source")
+    ax.set_xlabel("Time (ms)")
+    ax.set_ylabel("Rate (Hz per synapse)")
+    ax.set_title(f"Input sampling: {runs} runs")
+    if plotted:
+        ax.legend()
+    ax.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+
+def _list_groups_for_sampling(path: Optional[Path]) -> list[str]:
+    if path is None:
+        return []
+    p = Path(path).expanduser().resolve()
+    groups = {}
+    if p.is_file() and p.suffix == ".json":
+        try:
+            with p.open("r") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                if {"tstart", "tstop", "dt"}.issubset(data.keys()):
+                    data = {}
+                groups = data
+        except Exception:
+            groups = {}
+    if not groups:
+        config_root = inputs._resolve_config_root(p)
+        results_root = p / "results" if p.is_dir() else None
+        if results_root and (results_root / "syn_config.json").is_file():
+            config_root = results_root
+        syn_path = config_root / "syn_config.json"
+        if syn_path.is_file():
+            try:
+                with syn_path.open("r") as f:
+                    groups = json.load(f)
+                groups = inputs._expand_group_includes(groups, config_root)
+            except Exception:
+                groups = {}
+    return sorted(list(groups.keys())) if isinstance(groups, dict) else []
 
 
 def run_extra_tables_from_globals(g: Dict[str, Any]) -> None:

@@ -1,0 +1,44 @@
+{
+  "title": "paper_compare",
+  "entries": [
+    {
+      "path": "cells/PV/tunes/seg_tuned/output_data/tune3_1000tr",
+      "label": "PV output",
+      "shift_ms": 200,
+      "scale": 1,
+      "color": "b",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/tune2_1000tr",
+      "label": "SST output",
+      "scale": 1,
+      "color": "m",
+      "linestyle": "-"
+    },
+    {
+      "path": "external_data/PVFiringRateAvg.csv",
+      "label": "PV bio",
+      "shift_ms": 400,
+      "scale": 1,
+      "color": "b",
+      "linestyle": "--"
+    },
+    {
+      "path": "external_data/SSTFiringRateAvg.csv",
+      "label": "SST bio",
+      "shift_ms": 400,
+      "scale": 1,
+      "color": "m",
+      "linestyle": "--"
+    },
+    {
+      "path": "external_data/pyrFiringRateAvg.csv",
+      "label": "PN bio",
+      "shift_ms": 500,
+      "scale": 1,
+      "color": "k",
+      "linestyle": "--"
+    }
+  ]
+}
