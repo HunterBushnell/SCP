@@ -4,13 +4,13 @@
     "mode": "homogeneous_poisson",
     "color": "#17becf",
     "source": {
-      "freq": 10.0,
+      "freq": 1.0,
       "baseline": null,
       "path": null,
       "bin_ms": null
     },
     "timing": {
-      "onset_ms": 800,
+      "onset_ms": 650,
       "stim_tstart_ms": null,
       "duration_ms": null,
       "input_stim_tstart_ms": null,
@@ -18,7 +18,7 @@
     },
     "syns": {
       "type": "AMPA_NMDA_STP",
-      "N_syn": 10,
+      "N_syn": 100,
       "segs": "all",
       "dist_func": {
         "kind": "uniform",

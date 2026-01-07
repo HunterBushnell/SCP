@@ -46,7 +46,7 @@ PARAMETER {
     Fac          = 10    (ms) :  relaxation time constant from facilitation
     e_GABAA      = -75   (mV) : GABAA reversal potential was -80mv change to -75 never heard of e_gaba not -75 - Greg
     gmax         = .001  (uS) : weight conversion factor (from nS to uS)
-    u0           = 0          :initial value of u, which is the running value of release probability
+    u0           = 0          : initial value of u, which is the running value of release probability
     synapseID    = 0
     verboseLevel = 0
     conductance  = 0.0

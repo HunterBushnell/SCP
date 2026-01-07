@@ -1,5 +1,21 @@
 {
   "title": "paper_compare",
+  "defaults": {
+    "plot_window": [200, 900],
+    "compare_output_layout": "overlay",
+    "multi_plot_type": "line",
+    "multi_shade_mode": null,
+    "output_curve_mode": "normalized",
+    "output_norm_mode": "peak",
+    "output_norm_window": "stim",
+    "output_baseline_center_ms": 100.0,
+    "output_metric_mode": "window",
+    "output_metric_window_ms": 50.0,
+    "output_bin_ms": 5.0,
+    "output_smooth_mode": "center",
+    "output_stim_start_ms": 500.0,
+    "output_stim_stop_ms": 1000.0
+  },
   "entries": [
     {
       "path": "cells/PV/tunes/seg_tuned/output_data/tune3_1000tr",
@@ -19,7 +35,7 @@
     {
       "path": "external_data/PVFiringRateAvg.csv",
       "label": "PV bio",
-      "shift_ms": 400,
+      "shift_ms": 500,
       "scale": 1,
       "color": "b",
       "linestyle": "--"
@@ -27,7 +43,7 @@
     {
       "path": "external_data/SSTFiringRateAvg.csv",
       "label": "SST bio",
-      "shift_ms": 400,
+      "shift_ms": 500,
       "scale": 1,
       "color": "m",
       "linestyle": "--"

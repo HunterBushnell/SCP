@@ -397,11 +397,22 @@ def _curve_from_xy(t_ms: np.ndarray, rate: np.ndarray, *, units: str = "Hz") -> 
     }
 
 
+def _parse_figsize(value: Any) -> Optional[tuple[float, float]]:
+    if isinstance(value, (list, tuple)) and len(value) == 2:
+        try:
+            return (float(value[0]), float(value[1]))
+        except Exception:
+            return None
+    return None
+
+
 def _split_path_and_shift(item: str) -> Tuple[str, Optional[float], Optional[float]]:
     if "@" not in item:
         return item.strip(), None, None
     path_part, spec = item.split("@", 1)
     spec = spec.strip()
+    if ";" in spec:
+        spec = spec.split(";", 1)[0].strip()
     if not spec:
         return path_part.strip(), None, None
     shift_part = spec
@@ -429,20 +440,82 @@ def _split_path_and_shift(item: str) -> Tuple[str, Optional[float], Optional[flo
     return path_part.strip(), shift_val, scale_val
 
 
-def _load_compare_preset(path_val: Any, base_dir: Optional[Path]) -> list[Dict[str, Any]]:
+def _parse_shift_value(text: str) -> Optional[float]:
+    val = text.strip()
+    if val.lower().endswith("ms"):
+        val = val[:-2].strip()
+    try:
+        return float(val) if val else None
+    except Exception:
+        return None
+
+
+def _parse_scale_value(text: str) -> Optional[float]:
+    val = text.strip()
+    if val.lower().endswith("x"):
+        val = val[:-1].strip()
+    try:
+        return float(val) if val else None
+    except Exception:
+        return None
+
+
+def _parse_compare_list_item(raw: str) -> Dict[str, Any]:
+    parts = [p.strip() for p in str(raw).split(";") if p.strip()]
+    base = parts[0] if parts else str(raw).strip()
+    path_part, shift_val, scale_val = _split_path_and_shift(base)
+    color = None
+    label = None
+    linestyle = None
+    for part in parts[1:]:
+        if "=" not in part:
+            continue
+        key, val = part.split("=", 1)
+        key = key.strip().lower()
+        val = val.strip()
+        if not val:
+            continue
+        if key in ("color", "colour", "c"):
+            color = val
+        elif key in ("scale", "scale_x", "gain", "s"):
+            scale_val = _parse_scale_value(val)
+        elif key in ("shift", "shift_ms", "offset", "tshift"):
+            shift_val = _parse_shift_value(val)
+        elif key in ("label", "name"):
+            label = val
+        elif key in ("linestyle", "ls", "style"):
+            linestyle = val
+    return {
+        "path": path_part.strip(),
+        "shift_ms": shift_val,
+        "scale": scale_val,
+        "color": color,
+        "label": label,
+        "linestyle": linestyle,
+    }
+
+
+def _read_compare_preset(path_val: Any, base_dir: Optional[Path]) -> tuple[Optional[Path], Optional[Any]]:
     if path_val in (None, "", "none", "None"):
-        return []
+        return None, None
     preset_path = Path(str(path_val)).expanduser()
     if not preset_path.is_absolute():
         repo_root = analysis.find_scp_root(base_dir or Path.cwd())
         preset_path = (repo_root / preset_path).resolve()
     if not preset_path.exists():
         print(f"Compare preset not found: {preset_path}")
-        return []
+        return None, None
     try:
         payload = json.loads(preset_path.read_text())
     except Exception:
         print(f"Compare preset unreadable: {preset_path}")
+        return preset_path, None
+    return preset_path, payload
+
+
+def _load_compare_preset(path_val: Any, base_dir: Optional[Path]) -> list[Dict[str, Any]]:
+    preset_path, payload = _read_compare_preset(path_val, base_dir)
+    if payload is None:
         return []
     entries = payload.get("entries") if isinstance(payload, dict) else payload if isinstance(payload, list) else []
     if not isinstance(entries, list):
@@ -454,7 +527,7 @@ def _load_compare_preset(path_val: Any, base_dir: Optional[Path]) -> list[Dict[s
         path_raw = entry.get("path") or entry.get("run") or entry.get("file")
         if not path_raw:
             continue
-        path = _coerce_run_path(path_raw, base_dir or preset_path.parent)
+        path = _coerce_run_path(path_raw, base_dir or (preset_path.parent if preset_path else Path.cwd()))
         if path is None:
             continue
         if not path.exists():
@@ -469,6 +542,38 @@ def _load_compare_preset(path_val: Any, base_dir: Optional[Path]) -> list[Dict[s
             "label": entry.get("label"),
         })
     return out
+
+
+def _load_compare_preset_defaults(path_val: Any, base_dir: Optional[Path]) -> Dict[str, Any]:
+    _, payload = _read_compare_preset(path_val, base_dir)
+    if not isinstance(payload, dict):
+        return {}
+    defaults = payload.get("defaults")
+    return defaults if isinstance(defaults, dict) else {}
+
+
+def _is_missing_default(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str) and not value.strip():
+        return True
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return True
+        return all(v is None or (isinstance(v, str) and not v.strip()) for v in value)
+    return False
+
+
+def _merge_preset_defaults(opts: Dict[str, Any], defaults: Dict[str, Any]) -> Dict[str, Any]:
+    if not defaults:
+        return opts
+    merged = dict(opts)
+    for key, val in defaults.items():
+        if val is None:
+            continue
+        if _is_missing_default(merged.get(key)):
+            merged[key] = val
+    return merged
 
 
 def _parse_compare_list_paths(text: str) -> list[str]:
@@ -492,17 +597,46 @@ def _compare_list_entries(selection: Dict[str, Any]) -> list[str]:
     entries: list[str] = []
     entries.extend(selection.get("compare_list") or [])
     entries.extend(selection.get("compare_list_paths") or [])
-    # de-dupe while preserving order (by path + shift + scale)
+    # de-dupe while preserving order (by path + shift + scale + extras)
     seen = set()
     out = []
     for item in entries:
-        raw = str(item)
-        path_part, shift_val, scale_val = _split_path_and_shift(raw)
-        key = (path_part, shift_val, scale_val)
+        raw = str(item).strip()
+        spec = _parse_compare_list_item(raw)
+        key = (
+            spec.get("path"),
+            spec.get("shift_ms"),
+            spec.get("scale"),
+            spec.get("color"),
+            spec.get("label"),
+            spec.get("linestyle"),
+        )
         if key in seen:
             continue
         seen.add(key)
         out.append(raw)
+    return out
+
+
+def _compare_list_run_paths(selection: Dict[str, Any]) -> list[Path]:
+    base_dir = selection.get("base")
+    entries = selection.get("compare_list") or []
+    if base_dir is None:
+        return []
+    seen: set[Path] = set()
+    out: list[Path] = []
+    for item in entries:
+        spec = _parse_compare_list_item(str(item))
+        path_raw = spec.get("path")
+        path = _coerce_run_path(path_raw, base_dir)
+        if path is None or not path.exists():
+            continue
+        if _is_curve_path(path):
+            continue
+        if path in seen:
+            continue
+        seen.add(path)
+        out.append(path)
     return out
 
 
@@ -517,6 +651,9 @@ def run_output_plots(
     output_scale = 1.0
     external_scale = 1.0
     base_dir = selection.get("base")
+    preset_defaults = _load_compare_preset_defaults(selection.get("compare_preset_path"), base_dir)
+    if preset_defaults:
+        opts = _merge_preset_defaults(opts, preset_defaults)
     preset_entries = _load_compare_preset(selection.get("compare_preset_path"), base_dir)
     list_entries = _compare_list_entries(selection) if not preset_entries else []
     if preset_entries or list_entries:
@@ -542,7 +679,10 @@ def run_output_plots(
                 linestyles_override.append(entry.get("linestyle"))
         else:
             for item in list_entries:
-                path_raw, shift_ms, scale_val = _split_path_and_shift(str(item))
+                spec = _parse_compare_list_item(str(item))
+                path_raw = spec.get("path")
+                shift_ms = spec.get("shift_ms")
+                scale_val = spec.get("scale")
                 path = _coerce_run_path(path_raw, base_dir)
                 if path is None:
                     continue
@@ -552,9 +692,9 @@ def run_output_plots(
                 paths.append(path)
                 shifts.append(shift_ms)
                 scales.append(scale_val)
-                labels_override.append(None)
-                colors_override.append(None)
-                linestyles_override.append(None)
+                labels_override.append(spec.get("label"))
+                colors_override.append(spec.get("color"))
+                linestyles_override.append(spec.get("linestyle"))
                 if _is_curve_path(path):
                     has_curve = True
 
@@ -646,6 +786,9 @@ def run_output_plots(
             overlay_layouts = {"overlay", "same", "same-plot", "overlap"}
             stacked_layouts = {"stacked", "top-bottom", "vertical"}
             side_layouts = {"side-by-side", "side_by_side", "horizontal"}
+            compare_title = "Output curves"
+            compare_figsize = _parse_figsize(opts.get("output_compare_figsize"))
+            compare_panel = _parse_figsize(opts.get("output_compare_panel_size"))
 
             stim_start, stim_stop = _stim_window_for_opts(sim_cfgs[0] or {}, opts)
             fig_curve = None
@@ -655,9 +798,21 @@ def run_output_plots(
             if layout in stacked_layouts or layout in side_layouts:
                 n = len(curves)
                 if layout in stacked_layouts:
-                    fig_curve, axes = plt.subplots(n, 1, figsize=(6, max(3.2, 3.2 * n)), sharex=True)
+                    if compare_panel:
+                        panel_w, panel_h = compare_panel
+                        fig_curve, axes = plt.subplots(
+                            n, 1, figsize=(panel_w, max(panel_h, panel_h * n)), sharex=True
+                        )
+                    else:
+                        fig_curve, axes = plt.subplots(n, 1, figsize=(6, max(3.2, 3.2 * n)), sharex=True)
                 else:
-                    fig_curve, axes = plt.subplots(1, n, figsize=(max(4.0, 4.2 * n), 4), sharey=True)
+                    if compare_panel:
+                        panel_w, panel_h = compare_panel
+                        fig_curve, axes = plt.subplots(
+                            1, n, figsize=(max(panel_w, panel_w * n), panel_h), sharey=True
+                        )
+                    else:
+                        fig_curve, axes = plt.subplots(1, n, figsize=(max(4.0, 4.2 * n), 4), sharey=True)
                 axes = np.atleast_1d(axes)
                 for idx, (curve, label) in enumerate(zip(curves, labels)):
                     ax_i = axes[idx] if idx < axes.size else axes[-1]
@@ -709,10 +864,10 @@ def run_output_plots(
                         if idx == axes.size - 1:
                             ax_i.set_xlabel("Time (ms)")
                 if fig_curve is not None:
-                    fig_curve.suptitle("Output curve compare (list)")
+                    fig_curve.suptitle(compare_title)
                     plt.tight_layout(rect=[0, 0, 1, 0.96])
             else:
-                fig_curve, ax = plt.subplots(figsize=(6, 4))
+                fig_curve, ax = plt.subplots(figsize=compare_figsize or (6, 4))
                 for idx, (curve, label) in enumerate(zip(curves, labels)):
                     scale_val = curve_scales[idx] if curve_scales[idx] is not None else (external_scale if _is_curve_path(curve_paths[idx]) else output_scale)
                     curve_plot = _scale_curve_for_plot(curve, scale_val)
@@ -753,7 +908,7 @@ def run_output_plots(
                     ax.set_xlim(opts.get("plot_window")[0], opts.get("plot_window")[1])
                 ax.set_xlabel("Time (ms)")
                 ax.set_ylabel(y_label)
-                ax.set_title("Output curve compare (list)")
+                ax.set_title(compare_title)
                 ax.grid(True)
                 ax.legend()
                 plt.tight_layout()
@@ -1030,7 +1185,7 @@ def run_output_plots(
                     plot_window=opts.get("plot_window", (None, None)),
                     stim_start=stim_start,
                     stim_stop=stim_stop,
-                    title="Output curve compare",
+                    title="Output curves",
                 )
                 if opts.get("output_show_metric_points", True):
                     metrics_a = _compute_output_metrics(
@@ -1446,11 +1601,15 @@ def run_input_plots(
     save_analysis: bool = False,
     plots_dpi: int = 150,
 ) -> None:
-    if compare_enabled(selection):
-        run_a, run_b, res_a, res_b = resolve_compare(selection)
-        if run_b is None or res_a is None or res_b is None:
-            print("Comparison disabled (set Compare B to a run name).")
+    compare_runs = _compare_list_run_paths(selection)
+    if len(compare_runs) >= 2:
+        run_a, run_b = compare_runs[0], compare_runs[1]
+        res_a = _safe_load_results(run_a)
+        res_b = _safe_load_results(run_b)
+        if res_a is None or res_b is None:
+            print("Comparison disabled (missing input data in one or more runs).")
             return
+
         label_a = analysis.run_label(run_a)
         label_b = analysis.run_label(run_b)
         group_colors = analysis.merge_group_colors(res_a, res_b)
@@ -1554,6 +1713,9 @@ def run_output_metrics(
     save_analysis: bool = False,
 ) -> Optional[Dict[str, Any]]:
     base_dir = selection.get("base")
+    preset_defaults = _load_compare_preset_defaults(selection.get("compare_preset_path"), base_dir)
+    if preset_defaults:
+        opts = _merge_preset_defaults(opts, preset_defaults)
     preset_entries = _load_compare_preset(selection.get("compare_preset_path"), base_dir)
     list_entries = _compare_list_entries(selection) if not preset_entries else []
     if preset_entries or list_entries:
@@ -1575,7 +1737,10 @@ def run_output_metrics(
                 labels_override.append(entry.get("label"))
         else:
             for item in list_entries:
-                path_raw, shift_ms, scale_val = _split_path_and_shift(str(item))
+                spec = _parse_compare_list_item(str(item))
+                path_raw = spec.get("path")
+                shift_ms = spec.get("shift_ms")
+                scale_val = spec.get("scale")
                 path = _coerce_run_path(path_raw, base_dir)
                 if path is None:
                     continue
@@ -1585,7 +1750,7 @@ def run_output_metrics(
                 paths.append(path)
                 shifts.append(shift_ms)
                 scales.append(scale_val)
-                labels_override.append(None)
+                labels_override.append(spec.get("label"))
                 if _is_curve_path(path):
                     has_curve = True
 
@@ -2146,6 +2311,8 @@ def output_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "raster_style": g.get("raster_style"),
         "plot_window": g.get("plot_window"),
         "compare_output_layout": g.get("compare_output_layout"),
+        "output_compare_figsize": g.get("output_compare_figsize"),
+        "output_compare_panel_size": g.get("output_compare_panel_size"),
         "win_size": g.get("win_size"),
         "multi_plot_type": g.get("multi_plot_type"),
         "multi_shade_mode": g.get("multi_shade_mode"),
@@ -2363,10 +2530,18 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
     outputs_shade_dd = widgets.Dropdown(options=["none", "sem", "std"], value="none" if shade_val is None else shade_val, description="Shade")
     outputs_compare_layout_dd = widgets.Dropdown(options=["side-by-side", "stacked", "overlay"], value=g.get("compare_output_layout"), description="Compare layout")
 
+    preset_path_default = g.get("compare_preset_path") or "modules_local/analysis_presets/paper_compare.json"
+    compare_preset_cb = widgets.Checkbox(
+        value=bool(g.get("compare_preset_path")),
+        description="Paper compare",
+    )
+
     outputs_btn = widgets.Button(description="Run output plots")
+    outputs_btn.layout = widgets.Layout(width="160px", flex="0 0 auto")
 
     def _on_outputs(_):
         sync_common_from_globals(g)
+        g["compare_preset_path"] = preset_path_default if compare_preset_cb.value else None
         g["plot_outputs"] = True
         g["plot_output_curve"] = True
         g["plot_raster"] = outputs_raster_cb.value
@@ -2398,7 +2573,7 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
 
     display(
         widgets.VBox([
-            widgets.HBox([outputs_btn, outputs_raster_cb, outputs_style_dd, outputs_win_txt]),
+            widgets.HBox([outputs_btn, compare_preset_cb, outputs_raster_cb, outputs_style_dd, outputs_win_txt]),
             widgets.HBox([output_bin_txt, output_smooth_mode_dd, outputs_shade_dd, outputs_compare_layout_dd]),
             widgets.HBox([window_start_txt, window_end_txt, output_stim_start_txt, output_stim_stop_txt]),
             widgets.HBox([output_curve_mode_dd, output_norm_mode_dd, outputs_norm_txt]),
@@ -2444,6 +2619,7 @@ def build_inputs_ui(g: Dict[str, Any]) -> None:
     compare_std_cb = widgets.Checkbox(value=g.get("compare_show_input_std"), description="Compare std")
 
     inputs_btn = widgets.Button(description="Run input plots")
+    inputs_btn.layout = widgets.Layout(width="160px", flex="0 0 auto")
 
     def _on_inputs(_):
         sync_common_from_globals(g)
@@ -2588,6 +2764,7 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
     )
 
     run_btn = widgets.Button(description="Run extra analysis")
+    run_btn.layout = widgets.Layout(width="160px", flex="0 0 auto")
     out_extra = widgets.Output()
 
     cfg_box = widgets.VBox([
@@ -2729,7 +2906,8 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         entries = _compare_list_entries(sel)
         labels: list[str] = []
         for item in entries:
-            path_raw, _, _ = _split_path_and_shift(str(item))
+            spec = _parse_compare_list_item(str(item))
+            path_raw = spec.get("path")
             path = _coerce_run_path(path_raw, sel.get("base"))
             if path is None:
                 continue

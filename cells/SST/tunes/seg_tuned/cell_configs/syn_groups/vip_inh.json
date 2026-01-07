@@ -1,6 +1,6 @@
 {
   "vip_inh": {
-    "state": true,
+    "state": false,
     "mode": "precomputed",
     "color": "#9467bd",
     "source": {
@@ -11,13 +11,13 @@
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 650,
+      "stim_tstart_ms": 550,
       "duration_ms": null,
-      "input_stim_tstart_ms": 400,
+      "input_stim_tstart_ms": 300,
       "input_duration_ms": null
     },
     "syns": {
-      "type": "GABA_A",
+      "type": "GABA_A_STP",
       "N_syn": 12,
       "segs": "proximal",
       "dist_func": {
@@ -32,7 +32,10 @@
         "initW": 1.0,
         "gmax": 0.001,
         "tau_r_GABAA": 0.5,
-        "tau_d_GABAA": 5.5
+        "tau_d_GABAA": 5.5,
+        "Use": 1.0,
+        "Dep": 100,
+        "Fac": 0
       }
     }
   }

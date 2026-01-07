@@ -26,6 +26,57 @@ LOG_SRC_DIR="${SUBMIT_DIR}/logs"
 # For arrays, SLURM_JOB_ID is per-task; SLURM_ARRAY_JOB_ID is the shared batch id.
 ARRAY_JOB_ID="${SLURM_ARRAY_JOB_ID:-${SLURM_JOB_ID:-}}"
 
+# Status tracking (per-job/task file written in logs/status/)
+STATUS_DIR="${STATUS_DIR:-${LOG_SRC_DIR}/status}"
+MANUAL_TAG=""
+if [[ -z "${SLURM_JOB_ID:-}" ]]; then
+    MANUAL_TAG="manual_$(date +%Y%m%d_%H%M%S)_$$"
+fi
+if [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then
+    STATUS_TAG="${ARRAY_JOB_ID:-${MANUAL_TAG}}_${SLURM_ARRAY_TASK_ID}"
+else
+    STATUS_TAG="${ARRAY_JOB_ID:-${MANUAL_TAG}}_0"
+fi
+STATUS_FILE="${STATUS_FILE:-${STATUS_DIR}/pvsst_${STATUS_TAG}.status}"
+STATUS_LATEST_FILE="${STATUS_LATEST_FILE:-${STATUS_DIR}/pvsst_latest.status}"
+
+write_status() {
+    local state="$1"
+    local msg="${2:-}"
+    local now
+    now=$(date -Iseconds 2>/dev/null || date)
+    mkdir -p "${STATUS_DIR}" 2>/dev/null || true
+    {
+        echo "state=${state}"
+        echo "time=${now}"
+        echo "job_name=pvsst"
+        echo "job_id=${SLURM_JOB_ID:-}"
+        echo "array_job_id=${SLURM_ARRAY_JOB_ID:-}"
+        echo "array_task_id=${SLURM_ARRAY_TASK_ID:-}"
+        echo "tune_dir=${TUNE_DIR:-}"
+        echo "output_dir=${RESULTS_DIR:-}"
+        echo "run_root=${RUN_ROOT:-}"
+        echo "output_stem=${RUN_OUTPUT_STEM:-}"
+        echo "message=${msg}"
+    } > "${STATUS_FILE}" 2>/dev/null || true
+    if [[ -n "${STATUS_LATEST_FILE}" && "${STATUS_LATEST_FILE}" != "${STATUS_FILE}" ]]; then
+        cp -f "${STATUS_FILE}" "${STATUS_LATEST_FILE}" 2>/dev/null || true
+    fi
+}
+
+on_exit() {
+    local rc=$?
+    trap - EXIT
+    if [[ "${rc}" -eq 0 ]]; then
+        write_status "SUCCESS" "completed"
+    else
+        write_status "ERROR" "exit_code=${rc}"
+    fi
+    exit "${rc}"
+}
+trap on_exit EXIT
+write_status "RUNNING" "starting"
+
 # Rotate old logs so the latest run is easy to find (keep current job logs in logs/)
 # For job arrays, rotate only on task 0 to avoid races.
 ROTATE_LOGS=1
@@ -224,6 +275,8 @@ fi
 CMD=(python /home/hrbncv/SCP/run_pipeline.py
     --tune-dir "$TUNE_DIR"
     --output-dir "$RESULTS_DIR")
+
+write_status "RUNNING" "run_pipeline"
 
 if [[ -n "${MODE}" ]]; then
     CMD+=(--mode "$MODE")

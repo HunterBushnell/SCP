@@ -10,11 +10,11 @@
       "bin_ms": 5
     },
     "timing": {
-      "onset_ms": 500.0,
+      "onset_ms": null,
       "stim_tstart_ms": 500.0,
       "duration_ms": null,
       "input_stim_tstart_ms": 0.0,
-      "input_duration_ms": 550
+      "input_duration_ms": null
     },
     "syns": {
       "type": "AMPA_NMDA_STP",

@@ -12,9 +12,9 @@
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 375.0,
+      "stim_tstart_ms": 275.0,
       "duration_ms": null,
-      "input_stim_tstart_ms": 600.0,
+      "input_stim_tstart_ms": 500.0,
       "input_duration_ms": null
     },
     "syns": {
