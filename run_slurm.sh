@@ -37,18 +37,61 @@ if [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then
 else
     STATUS_TAG="${ARRAY_JOB_ID:-${MANUAL_TAG}}_0"
 fi
+RUN_TAG="${ARRAY_JOB_ID:-${MANUAL_TAG}}"
 STATUS_FILE="${STATUS_FILE:-${STATUS_DIR}/pvsst_${STATUS_TAG}.status}"
 STATUS_LATEST_FILE="${STATUS_LATEST_FILE:-${STATUS_DIR}/pvsst_latest.status}"
+STATUS_PRIMARY_FILE="${STATUS_PRIMARY_FILE:-${STATUS_DIR}/pvsst_primary.status}"
+STATUS_IS_PRIMARY=1
+if [[ -n "${SLURM_ARRAY_TASK_ID:-}" && "${SLURM_ARRAY_TASK_ID}" != "0" ]]; then
+    STATUS_IS_PRIMARY=0
+fi
+
+# Clean old per-run status files (keep stable latest/primary files)
+CLEAN_STATUS="${CLEAN_STATUS:-1}"
+if [[ "${CLEAN_STATUS}" == "1" ]]; then
+    if [[ -z "${SLURM_ARRAY_TASK_ID:-}" || "${SLURM_ARRAY_TASK_ID}" == "0" ]]; then
+        if [[ -d "${STATUS_DIR}" ]]; then
+            shopt -s nullglob
+            for f in "${STATUS_DIR}"/pvsst_*.status; do
+                base="$(basename "${f}")"
+                case "${base}" in
+                    "$(basename "${STATUS_LATEST_FILE}")") ;;
+                    "$(basename "${STATUS_PRIMARY_FILE}")") ;;
+                    *) rm -f "${f}" ;;
+                esac
+            done
+            shopt -u nullglob
+        fi
+    fi
+fi
+
+allow_update_file() {
+    local file="$1"
+    local state="$2"
+    local latest_tag
+    if [[ -f "${file}" ]]; then
+        latest_tag=$(grep -m1 "^run_tag=" "${file}" 2>/dev/null | cut -d= -f2- || true)
+        if [[ -n "${latest_tag:-}" && "${latest_tag}" == "${RUN_TAG:-}" ]]; then
+            if grep -q "^state=ERROR" "${file}" && [[ "${state}" != "ERROR" ]]; then
+                return 1
+            fi
+        fi
+    fi
+    return 0
+}
 
 write_status() {
     local state="$1"
     local msg="${2:-}"
     local now
+    local update_latest=0
+    local update_primary=0
     now=$(date -Iseconds 2>/dev/null || date)
     mkdir -p "${STATUS_DIR}" 2>/dev/null || true
     {
         echo "state=${state}"
         echo "time=${now}"
+        echo "run_tag=${RUN_TAG:-}"
         echo "job_name=pvsst"
         echo "job_id=${SLURM_JOB_ID:-}"
         echo "array_job_id=${SLURM_ARRAY_JOB_ID:-}"
@@ -59,8 +102,24 @@ write_status() {
         echo "output_stem=${RUN_OUTPUT_STEM:-}"
         echo "message=${msg}"
     } > "${STATUS_FILE}" 2>/dev/null || true
-    if [[ -n "${STATUS_LATEST_FILE}" && "${STATUS_LATEST_FILE}" != "${STATUS_FILE}" ]]; then
-        cp -f "${STATUS_FILE}" "${STATUS_LATEST_FILE}" 2>/dev/null || true
+    if [[ "${state}" != "MERGE_PENDING" ]]; then
+        if [[ "${STATUS_IS_PRIMARY}" == "1" ]]; then
+            update_latest=1
+            update_primary=1
+        elif [[ "${state}" == "ERROR" ]]; then
+            update_latest=1
+            update_primary=1
+        fi
+    fi
+    if [[ "${update_latest}" == "1" && -n "${STATUS_LATEST_FILE}" && "${STATUS_LATEST_FILE}" != "${STATUS_FILE}" ]]; then
+        if allow_update_file "${STATUS_LATEST_FILE}" "${state}"; then
+            cp -f "${STATUS_FILE}" "${STATUS_LATEST_FILE}" 2>/dev/null || true
+        fi
+    fi
+    if [[ "${update_primary}" == "1" && -n "${STATUS_PRIMARY_FILE}" && "${STATUS_PRIMARY_FILE}" != "${STATUS_FILE}" ]]; then
+        if allow_update_file "${STATUS_PRIMARY_FILE}" "${state}"; then
+            cp -f "${STATUS_FILE}" "${STATUS_PRIMARY_FILE}" 2>/dev/null || true
+        fi
     fi
 }
 
@@ -68,7 +127,12 @@ on_exit() {
     local rc=$?
     trap - EXIT
     if [[ "${rc}" -eq 0 ]]; then
-        write_status "SUCCESS" "completed"
+        local merge_array="${MERGE_ARRAY:-1}"
+        if [[ -n "${SLURM_ARRAY_TASK_ID:-}" && "${merge_array}" == "1" ]]; then
+            write_status "MERGE_PENDING" "waiting_for_merge"
+        else
+            write_status "SUCCESS" "completed"
+        fi
     else
         write_status "ERROR" "exit_code=${rc}"
     fi
@@ -79,7 +143,8 @@ write_status "RUNNING" "starting"
 
 # Rotate old logs so the latest run is easy to find (keep current job logs in logs/)
 # For job arrays, rotate only on task 0 to avoid races.
-ROTATE_LOGS=1
+# Set ROTATE_LOGS=1 in the environment to re-enable moving logs to logs/old.
+ROTATE_LOGS="${ROTATE_LOGS:-0}"
 if [[ -n "${SLURM_ARRAY_TASK_ID:-}" && "${SLURM_ARRAY_TASK_ID}" != "0" ]]; then
     ROTATE_LOGS=0
 fi
@@ -195,6 +260,10 @@ if [[ ! -f "${TUNE_DIR}/modfiles/x86_64/.libs/libnrnmech.so" && ! -f "${TUNE_DIR
         exit 1
     fi
     (cd "${TUNE_DIR}/modfiles" && nrnivmodl)
+    if [[ ! -f "${TUNE_DIR}/modfiles/x86_64/.libs/libnrnmech.so" && ! -f "${TUNE_DIR}/modfiles/x86_64/libnrnmech.so" ]]; then
+        echo "Mechanism build failed: libnrnmech.so not found after nrnivmodl." >&2
+        exit 1
+    fi
 fi
 
 # If running as a job array, default to single-trial tasks and unique outputs
@@ -272,6 +341,8 @@ if [[ -z "${SLURM_ARRAY_TASK_ID:-}" && -z "${RUN_OUTPUT_STEM}" ]]; then
     fi
 fi
 
+export STATUS_FILE STATUS_LATEST_FILE STATUS_PRIMARY_FILE STATUS_IS_PRIMARY RUN_TAG
+
 CMD=(python /home/hrbncv/SCP/run_pipeline.py
     --tune-dir "$TUNE_DIR"
     --output-dir "$RESULTS_DIR")
@@ -330,7 +401,7 @@ fi
 if [[ -n "${SLURM_ARRAY_TASK_ID:-}" && "${SLURM_ARRAY_TASK_ID}" == "0" && "${MERGE_ARRAY}" == "1" ]]; then
     MERGED_STEM=${MERGED_STEM:-"results"}
     mkdir -p "${RUN_ROOT}/logs"
-    MERGE_CMD=(python /home/hrbncv/SCP/scripts/merge_array_results.py
+    MERGE_CMD=(/home/hrbncv/SCP/scripts/merge_array_results_with_status.sh
         --input-dir "$PARTS_DIR"
         --output-dir "$RUN_ROOT"
         --job-id "$ARRAY_JOB_ID"
@@ -339,8 +410,11 @@ if [[ -n "${SLURM_ARRAY_TASK_ID:-}" && "${SLURM_ARRAY_TASK_ID}" == "0" && "${MER
         MERGE_CMD+=(--pattern "$MERGE_PATTERN")
     fi
     echo "Submitting merge job: ${MERGE_CMD[*]}"
+    ORIG_ARRAY_JOB_ID="${ARRAY_JOB_ID}"
+    STATUS_IS_PRIMARY=1
+    export ORIG_ARRAY_JOB_ID STATUS_FILE STATUS_LATEST_FILE STATUS_PRIMARY_FILE STATUS_IS_PRIMARY PARTS_DIR RUN_ROOT RESULTS_DIR RUN_OUTPUT_STEM TUNE_DIR RUN_TAG
     sbatch --dependency=afterok:${ARRAY_JOB_ID} \
         --output "${RUN_ROOT}/logs/merge.out" \
         --error "${RUN_ROOT}/logs/merge.err" \
-        --wrap "${MERGE_CMD[*]} && rm -rf \"${PARTS_DIR}\""
+        --wrap "${MERGE_CMD[*]}"
 fi

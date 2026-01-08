@@ -1062,6 +1062,7 @@ def summarize_inputs_from_payload(
     bin_ms: Optional[float] = None,
     smooth_ms: Optional[float] = None,
     max_trials: Optional[int] = None,
+    std_mode: str = "std",
 ) -> Dict[str, Any]:
     """
     Summarize saved inputs into mean/std rate curves per group.
@@ -1127,8 +1128,97 @@ def summarize_inputs_from_payload(
             win_bins = int(round(float(smooth_ms) / bin_ms))
             mean_rate = _moving_average(mean_rate, win_bins)
             std_rate = _moving_average(std_rate, win_bins)
+        if str(std_mode).lower() == "sem":
+            denom = max(1, rates_arr.shape[0]) ** 0.5
+            std_rate = std_rate / denom
 
         summary["t_ms"] = centers_ref.tolist() if centers_ref is not None else None
+        summary["groups"][g] = {
+            "mean_rate": mean_rate.tolist(),
+            "std_rate": std_rate.tolist(),
+            "n_trials": int(rates_arr.shape[0]),
+            "n_syn": int(n_syn or 0),
+        }
+
+    return summary
+
+
+def summarize_inputs_from_input_stats(
+    input_stats: Dict[str, Any],
+    *,
+    groups: Optional[Iterable[str]] = None,
+    smooth_ms: Optional[float] = None,
+    max_trials: Optional[int] = None,
+    std_mode: str = "std",
+) -> Dict[str, Any]:
+    """
+    Summarize input_stats (binned inputs saved during simulation) into mean/std curves.
+    """
+    if not input_stats:
+        raise KeyError("input_stats missing or empty")
+
+    tstart = float(input_stats.get("tstart_ms", 0.0))
+    tstop = float(input_stats.get("tstop_ms", 0.0))
+    bin_ms = float(input_stats.get("bin_ms", 0.0) or 0.0)
+    if bin_ms <= 0:
+        raise ValueError("input_stats bin_ms must be > 0")
+
+    t_ms = input_stats.get("t_ms") or []
+    if not t_ms:
+        edges = np.arange(tstart, tstop + bin_ms, bin_ms, dtype=float)
+        if edges.size >= 2:
+            t_ms = (edges[:-1] + 0.5 * bin_ms).tolist()
+
+    trials = list(input_stats.get("trials") or [])
+    if max_trials is not None:
+        trials = trials[: max(0, int(max_trials))]
+
+    group_names = set((input_stats.get("group_means") or {}).keys())
+    if not group_names:
+        for trial in trials:
+            group_names.update((trial.get("groups") or {}).keys())
+    if groups is not None:
+        group_names = set(groups).intersection(group_names)
+    group_names = sorted(group_names)
+
+    summary: Dict[str, Any] = {
+        "bin_ms": bin_ms,
+        "tstart_ms": tstart,
+        "tstop_ms": tstop,
+        "t_ms": t_ms,
+        "n_trials": len(trials),
+        "groups": {},
+    }
+
+    for g in group_names:
+        stack = []
+        n_syn = None
+        for trial in trials:
+            gstats = (trial.get("groups") or {}).get(g)
+            if not gstats:
+                continue
+            rate = gstats.get("rate_hz_by_bin_per_syn")
+            if rate is None:
+                rate = gstats.get("rate_hz_by_bin_total")
+            if rate is None:
+                continue
+            stack.append(rate)
+            if n_syn is None:
+                n_syn = gstats.get("n_syn")
+
+        if not stack:
+            continue
+        rates_arr = np.asarray(stack, dtype=float)
+        mean_rate = rates_arr.mean(axis=0)
+        std_rate = rates_arr.std(axis=0)
+        if smooth_ms is not None:
+            win_bins = int(round(float(smooth_ms) / bin_ms))
+            mean_rate = _moving_average(mean_rate, win_bins)
+            std_rate = _moving_average(std_rate, win_bins)
+        if str(std_mode).lower() == "sem":
+            denom = max(1, rates_arr.shape[0]) ** 0.5
+            std_rate = std_rate / denom
+
         summary["groups"][g] = {
             "mean_rate": mean_rate.tolist(),
             "std_rate": std_rate.tolist(),
@@ -1146,15 +1236,32 @@ def summarize_inputs_from_results(
     bin_ms: Optional[float] = None,
     smooth_ms: Optional[float] = None,
     max_trials: Optional[int] = None,
+    input_source: str = "saved",
+    std_mode: str = "std",
 ) -> Dict[str, Any]:
     """
     Convenience wrapper around summarize_inputs_from_payload for loaded results.
     """
+    input_source = (input_source or "saved").lower()
+    if input_source not in ("saved", "stats", "auto"):
+        input_source = "saved"
+
     payload: Dict[str, Any] = {}
     if results.get("inputs_by_trial") is not None:
         payload["inputs_by_trial"] = results.get("inputs_by_trial")
     if results.get("inputs") is not None:
         payload["inputs"] = results.get("inputs")
+
+    input_stats = (results.get("meta") or {}).get("input_stats")
+    if input_source == "stats" or (input_source == "auto" and not payload and input_stats):
+        return summarize_inputs_from_input_stats(
+            input_stats,
+            groups=groups,
+            smooth_ms=smooth_ms,
+            max_trials=max_trials,
+            std_mode=std_mode,
+        )
+
     if not payload:
         raise KeyError("Results missing inputs/inputs_by_trial.")
     sim_cfg = results.get("sim_cfg", {}) or {}
@@ -1165,6 +1272,7 @@ def summarize_inputs_from_results(
         bin_ms=bin_ms,
         smooth_ms=smooth_ms,
         max_trials=max_trials,
+        std_mode=std_mode,
     )
 
 
@@ -1184,7 +1292,7 @@ def save_default_plots(
 
     Returns a dict of plot name -> file path.
     """
-    from modules_local import plotting  # local import to avoid circular deps
+    from . import plotting  # local import to avoid circular deps
 
     run_dir = Path(run_dir)
     plot_dir = run_dir / "plots"
@@ -2480,7 +2588,7 @@ def load_bio_curve_optional(
             print("Bio curve enabled but path is empty.")
         return None
     try:
-        from modules_local import bio_curve
+        from . import bio_curve
 
         t_s, rate = bio_curve.load_bio_curve(
             path,

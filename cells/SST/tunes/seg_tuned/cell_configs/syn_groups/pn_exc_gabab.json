@@ -1,12 +1,12 @@
 {
-  "pn_exc": {
-    "state": false,
+  "pn_exc_gabab": {
+    "state": true,
     "mode": "inhomogeneous_poisson",
     "color": "#1f77b4",
     "source": {
       "freq": null,
       "baseline": "start",
-      "path": "external_data/bio_cell_output/pyrFiringRateAvg.csv",
+      "path": "external_data/bio_cell_output/pyrFiringRateAvg_gabab_tau50ms_delay0ms.csv",
       "bin_ms": 5
     },
     "timing": {

@@ -82,6 +82,8 @@ def plot_output_curve(
     stim_start=None,
     stim_stop=None,
     title="Output rate curve",
+    line_width=2.0,
+    stim_linewidth=1.0,
 ):
     t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
     y = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
@@ -89,15 +91,15 @@ def plot_output_curve(
     y_label = "Rate (Hz)" if units == "Hz" else "Rate (normalized)"
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.plot(t_ms, y, lw=2, color=color, label=label)
+    ax.plot(t_ms, y, lw=float(line_width), color=color, label=label)
     if label:
         ax.legend()
     if plot_window is not None:
         ax.set_xlim(plot_window[0], plot_window[1])
     if stim_start is not None:
-        ax.axvline(float(stim_start), color="k", linestyle="-", linewidth=1)
+        ax.axvline(float(stim_start), color="k", linestyle="-", linewidth=float(stim_linewidth))
     if stim_stop is not None:
-        ax.axvline(float(stim_stop), color="k", linestyle="-", linewidth=1)
+        ax.axvline(float(stim_stop), color="k", linestyle="-", linewidth=float(stim_linewidth))
     ax.set_xlabel("Time (ms)")
     ax.set_ylabel(y_label)
     ax.set_title(title)
@@ -116,6 +118,8 @@ def plot_compare_output_curves(
     stim_start=None,
     stim_stop=None,
     title="Output curve compare",
+    line_width=2.0,
+    stim_linewidth=1.0,
 ):
     if colors is None:
         colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
@@ -130,7 +134,7 @@ def plot_compare_output_curves(
         y = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
         lab = labels[idx] if labels and idx < len(labels) else None
         ls = "--" if same_color and idx == 1 else "-"
-        ax.plot(t_ms, y, lw=2, color=colors[idx % len(colors)], linestyle=ls, label=lab)
+        ax.plot(t_ms, y, lw=float(line_width), color=colors[idx % len(colors)], linestyle=ls, label=lab)
     units = (curve_a or curve_b or {}).get("units", "Hz")
     y_label = "Rate (Hz)" if units == "Hz" else "Rate (normalized)"
     if labels:
@@ -138,9 +142,9 @@ def plot_compare_output_curves(
     if plot_window is not None:
         ax.set_xlim(plot_window[0], plot_window[1])
     if stim_start is not None:
-        ax.axvline(float(stim_start), color="k", linestyle="-", linewidth=1)
+        ax.axvline(float(stim_start), color="k", linestyle="-", linewidth=float(stim_linewidth))
     if stim_stop is not None:
-        ax.axvline(float(stim_stop), color="k", linestyle="-", linewidth=1)
+        ax.axvline(float(stim_stop), color="k", linestyle="-", linewidth=float(stim_linewidth))
     ax.set_xlabel("Time (ms)")
     ax.set_ylabel(y_label)
     ax.set_title(title)
@@ -163,7 +167,10 @@ def plot_inputs_by_group(
         max_trains_per_group=200,
         seed=0,
         plot_window=None,
-        plot_raster=True):
+        plot_raster=True,
+        line_width=2.0,
+        raster_linewidth=0.8,
+        stim_linewidth=1.0):
     """
     Plot input rasters + average rate curves for inputs_by_group.
     group_colors: optional dict {group: color} for consistent coloring.
@@ -242,7 +249,7 @@ def plot_inputs_by_group(
             col = group_colors[gname]
         else:
             col = colors[i % len(colors)]
-        ax_rate.plot(x_line, y_line, color=col, lw=2, label=gname)
+        ax_rate.plot(x_line, y_line, color=col, lw=float(line_width), label=gname)
 
         plot_trains = trains
         if max_trains_per_group is not None and n_trains > max_trains_per_group:
@@ -256,7 +263,7 @@ def plot_inputs_by_group(
             for j, tr in enumerate(plot_trains):
                 y = y0 + j + 1
                 if raster_style == 'line':
-                    ax_raster.vlines(tr, y - 0.4, y + 0.4, color=col, lw=0.8)
+                    ax_raster.vlines(tr, y - 0.4, y + 0.4, color=col, lw=float(raster_linewidth))
                 else:
                     ax_raster.scatter(tr, np.full_like(tr, y), color=col, s=6, marker='.')
 
@@ -289,9 +296,9 @@ def plot_inputs_by_group(
 
     for vline in [stim_start, stim_stop]:
         if vline is not None:
-            ax_rate.axvline(x=vline, color='k', linestyle='-', linewidth=1)
+            ax_rate.axvline(x=vline, color='k', linestyle='-', linewidth=float(stim_linewidth))
             if plot_raster and ax_raster is not None:
-                ax_raster.axvline(x=vline, color='k', linestyle='-', linewidth=1)
+                ax_raster.axvline(x=vline, color='k', linestyle='-', linewidth=float(stim_linewidth))
 
     plt.tight_layout()
     return stats
@@ -308,6 +315,9 @@ def plot_compare_input_means(
         output_curves=None,
         group_colors=None,
         figsize=None,
+        line_width=2.0,
+        shade_alpha=0.2,
+        output_linewidth=1.5,
 ):
     """
     Plot averaged input rate curves for two runs.
@@ -359,7 +369,8 @@ def plot_compare_input_means(
         for idx, summary in enumerate(summaries):
             label = labels[idx] if idx < len(labels) else f"Run {idx+1}"
             linestyle = "-" if idx == 0 else "--"
-            alpha = 0.25 if idx == 0 else 0.18
+            base_alpha = float(shade_alpha)
+            alpha = base_alpha if idx == 0 else max(base_alpha * 0.72, 0.05)
             t_ms = summary.get("t_ms") or []
             for g in groups:
                 gdata = (summary.get("groups") or {}).get(g)
@@ -373,7 +384,7 @@ def plot_compare_input_means(
                     t_ms,
                     mean_rate,
                     color=color_map[g],
-                    lw=2,
+                    lw=float(line_width),
                     linestyle=linestyle,
                     label=f"{g} ({label})",
                 )
@@ -399,7 +410,7 @@ def plot_compare_input_means(
                             out_t,
                             out_r,
                             color="black",
-                            lw=1.5,
+                            lw=float(output_linewidth),
                             linestyle=linestyle,
                             label=f"output ({label})",
                         )
@@ -422,14 +433,14 @@ def plot_compare_input_means(
                 std_rate = np.asarray(gdata.get("std_rate", []), dtype=float)
                 if len(t_ms) != len(mean_rate):
                     continue
-                ax.plot(t_ms, mean_rate, color=color_map[g], lw=2, label=g)
+                ax.plot(t_ms, mean_rate, color=color_map[g], lw=float(line_width), label=g)
                 if show_std and std_rate.size:
                     ax.fill_between(
                         t_ms,
                         mean_rate - std_rate,
                         mean_rate + std_rate,
                         color=color_map[g],
-                        alpha=0.2,
+                        alpha=float(shade_alpha),
                     )
 
             ax.set_title(f"{label} inputs (mean)")
@@ -446,7 +457,14 @@ def plot_compare_input_means(
                     out_r = curve.get("rate_hz", [])
                     if out_t and out_r:
                         ax2 = ax.twinx()
-                        ax2.plot(out_t, out_r, color="black", lw=1.5, linestyle="--", label="output")
+                        ax2.plot(
+                            out_t,
+                            out_r,
+                            color="black",
+                            lw=float(output_linewidth),
+                            linestyle="--",
+                            label="output",
+                        )
                         ax2.set_ylabel("Output rate (Hz)")
 
     # Shared x label
@@ -464,6 +482,9 @@ def plot_input_means(
         output_curve=None,
         group_colors=None,
         figsize=None,
+        line_width=2.0,
+        shade_alpha=0.2,
+        output_linewidth=1.5,
 ):
     """
     Plot averaged input rate curves for a single run.
@@ -502,14 +523,14 @@ def plot_input_means(
         std_rate = np.asarray(gdata.get("std_rate", []), dtype=float)
         if len(t_ms) != len(mean_rate):
             continue
-        ax.plot(t_ms, mean_rate, color=color_map[g], lw=2, label=g)
+        ax.plot(t_ms, mean_rate, color=color_map[g], lw=float(line_width), label=g)
         if show_std and std_rate.size:
             ax.fill_between(
                 t_ms,
                 mean_rate - std_rate,
                 mean_rate + std_rate,
                 color=color_map[g],
-                alpha=0.2,
+                alpha=float(shade_alpha),
             )
 
     ax.set_title(f"{label} inputs (mean)")
@@ -524,7 +545,7 @@ def plot_input_means(
         out_r = output_curve.get("rate_hz", [])
         if out_t and out_r:
             ax2 = ax.twinx()
-            ax2.plot(out_t, out_r, color="black", lw=1.5, linestyle="--", label="output")
+            ax2.plot(out_t, out_r, color="black", lw=float(output_linewidth), linestyle="--", label="output")
             ax2.set_ylabel("Output rate (Hz)")
 
     plt.tight_layout()
@@ -1026,6 +1047,8 @@ def plot_results(
     plot_bio=None,
     shade_mode=None,
     alpha=0.6,
+    line_width=2.0,
+    shade_alpha=0.25,
     set_color=None,
     plot_type='line',
     plot_raster=None,
@@ -1158,9 +1181,11 @@ def plot_results(
             plot_raster=plot_rast_flag,
             raster_style=raster_style_val,
             alpha=alpha,
+            line_width=line_width,
             plot_window=pw,
             norm_fr=None,
             shade_mode=shade_mode,
+            shade_alpha=shade_alpha,
             set_color=col,
             save_curve=False,
             smooth_mode=smooth_mode,
@@ -1482,9 +1507,11 @@ def plot_multi(
         plot_raster=False,
         raster_style='line',    # 'line' | 'dot'
         alpha=0.6,
+        line_width=2.0,
         plot_window=None,       # {'x': (xmin,xmax), 'y': (ymin,ymax)} or None
         norm_fr=None,
         shade_mode=None,
+        shade_alpha=0.25,
         set_color=None,
         save_curve=False,       # or filename
         smooth_mode="center",
@@ -1598,10 +1625,10 @@ def plot_multi(
                        alpha=alpha, label=key)
 
         if plot_type in ('line', 'both'):
-            axRate.plot(x, mean, color=col, lw=2, label=key)
+            axRate.plot(x, mean, color=col, lw=float(line_width), label=key)
             if (shade_mode is not None) and (lo is not None) and (hi is not None):
                 axRate.fill_between(x, lo, hi, color=col,
-                                    alpha=0.25, linewidth=0)
+                                    alpha=float(shade_alpha), linewidth=0)
 
     # optional in-vivo curve
     if plot_bio and plot_bio[0]:

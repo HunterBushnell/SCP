@@ -4,7 +4,7 @@
     "mode": "homogeneous_poisson",
     "color": "#2ca02c",
     "source": {
-      "freq": 0.05,
+      "freq": 0.1,
       "baseline": null,
       "path": null,
       "bin_ms": null

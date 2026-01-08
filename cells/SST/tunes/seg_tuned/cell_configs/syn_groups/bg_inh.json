@@ -28,7 +28,7 @@
         }
       },
       "params": {
-        "wt_mean": 0.5,
+        "wt_mean": 2.0,
         "wt_std": 0.34,
         "initW": 1.0,
         "gmax": 0.001,

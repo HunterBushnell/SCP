@@ -1,11 +1,11 @@
 {
   "vip_inh_bio": {
-    "state": true,
+    "state": false,
     "mode": "inhomogeneous_poisson",
     "color": "#9467bd",
     "source": {
       "freq": null,
-      "baseline": 2.6,
+      "baseline": 3.0,
       "path": "external_data/PVFiringRateAvg.csv",
       "bin_ms": null,
       "time_col": "Time",

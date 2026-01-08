@@ -147,7 +147,8 @@ SCP results and outputs contract (v1)
 * **Quick load + plot snippet**
   * Minimal Python example for saved results (single or multi):
 ```python
-from modules_local import run_sim, plotting
+from modules_local import run_sim
+from modules_local.analysis import plotting
 
 results = run_sim.load_results("cells/SST/tunes/seg_tuned/output_data/slurm_20251218_231500")
 plotting.plot_results(results)

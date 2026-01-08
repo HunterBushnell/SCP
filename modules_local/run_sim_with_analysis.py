@@ -1545,7 +1545,7 @@ def save_results(
     # Optional: auto-save plots into run_dir/plots
     if sim_cfg.get("save_plots", False):
         try:
-            from modules_local import analysis as analysis_mod
+            from modules_local.analysis import analysis as analysis_mod
 
             analysis_mod.save_default_plots(
                 results,

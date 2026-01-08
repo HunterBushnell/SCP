@@ -31,6 +31,8 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Merge SLURM array results into a single multi-trial file.")
     p.add_argument("--tune-dir", type=str, default=None,
                    help="Tune directory (used to infer output_data).")
+    p.add_argument("--run-root", type=str, default=None,
+                   help="Run root dir (e.g., output_data/slurm_<jobid>).")
     p.add_argument("--input-dir", type=str, default=None,
                    help="Directory containing per-task results (overrides --tune-dir for input).")
     p.add_argument("--output-dir", type=str, default=None,
@@ -239,18 +241,32 @@ def _recompute_avg_rate(sim_cfg: Dict[str, Any], spikes_by_trial: List[np.ndarra
 def main() -> None:
     args = parse_args()
 
+    run_root = Path(args.run_root).resolve() if args.run_root else None
+    job_id = args.job_id
+    if run_root and not job_id:
+        m = re.search(r"slurm_(\d+)", run_root.name)
+        if m:
+            job_id = m.group(1)
+            args.job_id = job_id
+
     if args.output_dir:
         output_dir = Path(args.output_dir).resolve()
+    elif run_root:
+        output_dir = run_root
     elif args.tune_dir:
         output_dir = Path(args.tune_dir).resolve() / "output_data"
     else:
-        raise ValueError("Provide either --tune-dir or --output-dir.")
+        raise ValueError("Provide --run-root, --tune-dir, or --output-dir.")
 
-    input_dir = output_dir
     if args.input_dir:
         input_dir = Path(args.input_dir).resolve()
+    elif run_root:
+        parts_dir = run_root / "parts"
+        input_dir = parts_dir if parts_dir.is_dir() else run_root
+    else:
+        input_dir = output_dir
 
-    paths = _find_results(input_dir, args.pattern, args.job_id)
+    paths = _find_results(input_dir, args.pattern, job_id)
     if not paths:
         raise FileNotFoundError(f"No results found in {output_dir}")
 

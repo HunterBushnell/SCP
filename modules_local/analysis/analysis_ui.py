@@ -6,8 +6,69 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
+import textwrap
 
-from modules_local import analysis, input_sampling, inputs, plotting, run_sim
+from modules_local import input_sampling, inputs, run_sim
+from . import analysis, plotting
+
+HELP_SELECTION = textwrap.dedent(
+    """
+    Selection UI
+    - Cell/Tune/Model: choose which output_data tree to browse.
+    - Compare list: multi-select run folders to plot/compare.
+    - Compare paths: comma-separated curve files. Syntax: path@shift:scale;key=val
+      Keys: color, label, linestyle, shift, scale (shift in ms, scale is multiplicative).
+    - compare_list_dir_paths (defaults JSON): add folders of CSV curves to the Compare list.
+    - Use compare paths toggle: enables/disables Compare paths without deleting them.
+    - compare_list_paths entries can be objects with {path, enabled, shift_ms, scale, color, label, linestyle}.
+    - Tokens: latest/previous/prev/latest-1 resolve to runs in output_data.
+    - Save plots/analysis toggles affect saved figures/JSON.
+    Defaults live in modules_local/analysis/analysis_defaults.json.
+    """
+).strip()
+
+HELP_OUTPUTS = textwrap.dedent(
+    """
+    Outputs UI
+    - Uses the current Selection and Compare list/paths.
+    - Plot window, stim start/stop are in ms.
+    - Curve mode: raw vs normalized; Norm mode: avg/peak; Norm FR optional override.
+    - Curve bin/smooth controls binned rate and moving-average window.
+    - Compare layout: overlay/stacked/side-by-side; Shade adds std/sem band.
+    - Paper compare toggles presets from analysis_presets/paper_compare.json.
+    """
+).strip()
+
+HELP_INPUTS = textwrap.dedent(
+    """
+    Inputs UI
+    - Input source: auto (saved spikes if present, else stats), saved, or stats.
+    - Std mode: std or sem for shaded bands.
+    - Groups: comma-separated synapse groups; leave blank for all.
+    - Bin/smooth apply to input rate curves; raster settings affect raster plots.
+    - Compare layout controls multi-run plotting.
+    """
+).strip()
+
+HELP_EXTRA = textwrap.dedent(
+    """
+    Extra UI
+    - Output metrics: summary table for selected runs/curves.
+    - Compare configs: diff cell/geom/syn configs across runs.
+    - Compare outputs/inputs: reuse plot logic with the current selection.
+    - Input sampling: synthesize input curves from synapse configs.
+    - Snapshot compare: compare notebook vs slurm outputs.
+    """
+).strip()
+
+
+def _print_help(out, text: str) -> None:
+    if out is None:
+        print(text)
+        return
+    with out:
+        out.clear_output()
+        print(text)
 
 
 def compare_enabled(selection: Dict[str, Any]) -> bool:
@@ -249,13 +310,20 @@ def _scale_metrics_for_plot(metrics: Optional[Dict[str, Any]], scale: Any) -> Op
     return scaled
 
 
-def _plot_metric_window_markers(ax, metrics: Optional[Dict[str, Any]], *, color: Optional[str], alpha: float = 0.15) -> None:
+def _plot_metric_window_markers(
+    ax,
+    metrics: Optional[Dict[str, Any]],
+    *,
+    color: Optional[str],
+    alpha: float = 0.15,
+    linewidth: float = 1.0,
+) -> None:
     if not metrics or ax is None:
         return
     def _vline(x, ls="--"):
         if x is None:
             return
-        ax.axvline(float(x), color=color or "0.4", linestyle=ls, linewidth=1)
+        ax.axvline(float(x), color=color or "0.4", linestyle=ls, linewidth=linewidth)
 
     _vline(metrics.get("baseline_time_ms"))
     _vline(metrics.get("drop_center_ms"))
@@ -271,6 +339,13 @@ def _plot_metric_window_markers(ax, metrics: Optional[Dict[str, Any]], *, color:
         if start is None or stop is None:
             continue
         ax.axvspan(float(start), float(stop), color=color or "0.4", alpha=alpha, linewidth=0)
+
+
+def _metric_window_kwargs(opts: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "alpha": float(opts.get("output_metric_window_alpha", 0.15)),
+        "linewidth": float(opts.get("output_metric_linewidth", 1.0)),
+    }
 
 
 def _compute_output_metrics(
@@ -460,7 +535,7 @@ def _parse_scale_value(text: str) -> Optional[float]:
         return None
 
 
-def _parse_compare_list_item(raw: str) -> Dict[str, Any]:
+def _parse_compare_list_item_str(raw: str) -> Dict[str, Any]:
     parts = [p.strip() for p in str(raw).split(";") if p.strip()]
     base = parts[0] if parts else str(raw).strip()
     path_part, shift_val, scale_val = _split_path_and_shift(base)
@@ -493,6 +568,90 @@ def _parse_compare_list_item(raw: str) -> Dict[str, Any]:
         "label": label,
         "linestyle": linestyle,
     }
+
+
+def _parse_compare_list_item(raw: Any) -> Dict[str, Any]:
+    if isinstance(raw, dict):
+        base = raw.get("path") or raw.get("spec") or raw.get("entry") or ""
+        spec = _parse_compare_list_item_str(str(base)) if base else _parse_compare_list_item_str("")
+        if raw.get("shift_ms") is not None or raw.get("shift") is not None:
+            spec["shift_ms"] = raw.get("shift_ms", raw.get("shift"))
+        if raw.get("scale") is not None or raw.get("gain") is not None:
+            spec["scale"] = raw.get("scale", raw.get("gain"))
+        if raw.get("color") is not None:
+            spec["color"] = raw.get("color")
+        label_val = raw.get("label") if raw.get("label") is not None else raw.get("name")
+        if label_val is not None:
+            spec["label"] = label_val
+        if raw.get("linestyle") is not None:
+            spec["linestyle"] = raw.get("linestyle")
+        spec["path"] = str(spec.get("path") or base).strip()
+        return spec
+    return _parse_compare_list_item_str(str(raw))
+
+
+def _compare_entry_enabled(entry: Any) -> bool:
+    if isinstance(entry, dict):
+        return bool(entry.get("enabled", True))
+    return True
+
+
+def _compare_list_paths_text(entries: list[Any]) -> str:
+    parts: list[str] = []
+    for entry in entries:
+        if isinstance(entry, dict):
+            if not _compare_entry_enabled(entry):
+                continue
+            spec = _parse_compare_list_item(entry)
+            path = spec.get("path")
+            if not path:
+                continue
+            token = str(path)
+            shift_val = spec.get("shift_ms")
+            scale_val = spec.get("scale")
+            if shift_val is not None or scale_val is not None:
+                shift_str = "" if shift_val is None else str(shift_val)
+                scale_str = "" if scale_val is None else str(scale_val)
+                if scale_str:
+                    token = f"{token}@{shift_str}:{scale_str}"
+                else:
+                    token = f"{token}@{shift_str}"
+            if spec.get("color"):
+                token += f";color={spec['color']}"
+            if spec.get("label"):
+                token += f";label={spec['label']}"
+            if spec.get("linestyle"):
+                token += f";linestyle={spec['linestyle']}"
+            parts.append(token)
+        else:
+            parts.append(str(entry))
+    return ",".join(parts)
+
+
+def _compare_list_dir_options(g: Dict[str, Any], base_dir: Optional[Path]) -> list[tuple[str, str]]:
+    raw_dirs = g.get("compare_list_dir_paths") or []
+    if isinstance(raw_dirs, (str, Path)):
+        raw_dirs = [raw_dirs]
+    root = analysis.find_scp_root(base_dir or Path.cwd())
+    options: list[tuple[str, str]] = []
+    for raw in raw_dirs:
+        if raw in (None, "", "none", "None"):
+            continue
+        dir_path = Path(str(raw)).expanduser()
+        if not dir_path.is_absolute():
+            dir_path = (root / dir_path).resolve()
+        if not dir_path.is_dir():
+            continue
+        try:
+            files = sorted([p for p in dir_path.iterdir() if p.is_file()])
+        except Exception:
+            continue
+        for file_path in files:
+            if file_path.suffix.lower() not in (".csv", ".tsv", ".txt"):
+                continue
+            label = f"{dir_path.name}/{file_path.name}"
+            options.append((label, str(file_path)))
+    return options
 
 
 def _read_compare_preset(path_val: Any, base_dir: Optional[Path]) -> tuple[Optional[Path], Optional[Any]]:
@@ -593,16 +752,16 @@ def _parse_compare_list_paths(text: str) -> list[str]:
     return entries
 
 
-def _compare_list_entries(selection: Dict[str, Any]) -> list[str]:
-    entries: list[str] = []
+def _compare_list_entries(selection: Dict[str, Any]) -> list[Any]:
+    entries: list[Any] = []
     entries.extend(selection.get("compare_list") or [])
     entries.extend(selection.get("compare_list_paths") or [])
+    entries = [entry for entry in entries if _compare_entry_enabled(entry)]
     # de-dupe while preserving order (by path + shift + scale + extras)
     seen = set()
-    out = []
+    out: list[Any] = []
     for item in entries:
-        raw = str(item).strip()
-        spec = _parse_compare_list_item(raw)
+        spec = _parse_compare_list_item(item)
         key = (
             spec.get("path"),
             spec.get("shift_ms"),
@@ -614,7 +773,7 @@ def _compare_list_entries(selection: Dict[str, Any]) -> list[str]:
         if key in seen:
             continue
         seen.add(key)
-        out.append(raw)
+        out.append(item)
     return out
 
 
@@ -626,7 +785,7 @@ def _compare_list_run_paths(selection: Dict[str, Any]) -> list[Path]:
     seen: set[Path] = set()
     out: list[Path] = []
     for item in entries:
-        spec = _parse_compare_list_item(str(item))
+        spec = _parse_compare_list_item(item)
         path_raw = spec.get("path")
         path = _coerce_run_path(path_raw, base_dir)
         if path is None or not path.exists():
@@ -663,6 +822,7 @@ def run_output_plots(
         labels_override: list[Optional[str]] = []
         colors_override: list[Optional[str]] = []
         linestyles_override: list[Optional[str]] = []
+        paths_from_compare_list: list[bool] = []
         has_curve = False
         if preset_entries:
             for entry in preset_entries:
@@ -677,9 +837,11 @@ def run_output_plots(
                 labels_override.append(entry.get("label"))
                 colors_override.append(entry.get("color"))
                 linestyles_override.append(entry.get("linestyle"))
+                paths_from_compare_list.append(False)
         else:
+            compare_list_set = {str(v) for v in (selection.get("compare_list") or [])}
             for item in list_entries:
-                spec = _parse_compare_list_item(str(item))
+                spec = _parse_compare_list_item(item)
                 path_raw = spec.get("path")
                 shift_ms = spec.get("shift_ms")
                 scale_val = spec.get("scale")
@@ -695,6 +857,8 @@ def run_output_plots(
                 labels_override.append(spec.get("label"))
                 colors_override.append(spec.get("color"))
                 linestyles_override.append(spec.get("linestyle"))
+                from_compare_list = False if isinstance(item, dict) else str(item) in compare_list_set
+                paths_from_compare_list.append(from_compare_list)
                 if _is_curve_path(path):
                     has_curve = True
 
@@ -717,6 +881,7 @@ def run_output_plots(
             sim_cfgs = []
             curve_paths = []
             curve_scales = []
+            curve_from_compare_list: list[bool] = []
             for idx, (path, shift_ms, scale_val) in enumerate(zip(paths, shifts, scales)):
                 if _is_curve_path(path):
                     curve = _load_curve_from_path(path, opts, shift_ms=shift_ms, fallback_sim_cfg=fallback_sim_cfg)
@@ -732,6 +897,7 @@ def run_output_plots(
                     sim_cfgs.append(_default_sim_cfg_for_curve(curve, fallback=fallback_sim_cfg))
                     curve_paths.append(path)
                     curve_scales.append(scale_val)
+                    curve_from_compare_list.append(paths_from_compare_list[idx])
                 else:
                     res = _safe_load_results(path)
                     if res is None:
@@ -769,17 +935,34 @@ def run_output_plots(
                     sim_cfgs.append(res.get("sim_cfg", {}) or {})
                     curve_paths.append(path)
                     curve_scales.append(scale_val)
+                    curve_from_compare_list.append(paths_from_compare_list[idx])
 
             if not curves:
                 print("No valid curves found in compare list.")
                 return
 
             run_indices = [i for i, p in enumerate(curve_paths) if not _is_curve_path(p)]
-            if len(run_indices) >= 2:
-                open_indices = [idx for idx in run_indices if colors[idx] is None]
-                if open_indices:
-                    rand_colors = _unique_compare_colors(len(open_indices))
-                    for idx, col in zip(open_indices, rand_colors):
+            selected_run_indices = [
+                i for i in run_indices
+                if i < len(curve_from_compare_list) and curve_from_compare_list[i]
+            ]
+            if len(selected_run_indices) >= 2:
+                seen_colors: Dict[Any, int] = {}
+                override_indices: list[int] = []
+                for idx in selected_run_indices:
+                    col = colors[idx]
+                    if col is None:
+                        override_indices.append(idx)
+                        continue
+                    if col in seen_colors:
+                        override_indices.append(idx)
+                        override_indices.append(seen_colors[col])
+                    else:
+                        seen_colors[col] = idx
+                if override_indices:
+                    uniq_indices = sorted(set(override_indices))
+                    rand_colors = _unique_compare_colors(len(uniq_indices))
+                    for idx, col in zip(uniq_indices, rand_colors):
                         colors[idx] = col
 
             layout = (opts.get("compare_output_layout") or "overlay").lower()
@@ -822,7 +1005,7 @@ def run_output_plots(
                     y = np.asarray(curve_plot.get("rate_hz", []) or [], dtype=float)
                     col = colors[idx] if colors[idx] is not None else color_cycle[idx % len(color_cycle)]
                     ls = linestyles[idx] if idx < len(linestyles) and linestyles[idx] else "-"
-                    ax_i.plot(t_ms, y, lw=2, color=col, linestyle=ls)
+                    ax_i.plot(t_ms, y, lw=float(opts.get("output_linewidth", 2.0)), color=col, linestyle=ls)
                     stim_start_i, stim_stop_i = _stim_window_for_opts(sim_cfgs[idx] or {}, opts)
                     if opts.get("output_show_metric_points", True):
                         metrics = _compute_output_metrics(
@@ -846,11 +1029,11 @@ def run_output_plots(
                             size=float(opts.get("output_metric_marker_size", 36.0)),
                         )
                         if opts.get("output_metric_window_markers", False):
-                            _plot_metric_window_markers(ax_i, metrics_plot, color=col)
+                            _plot_metric_window_markers(ax_i, metrics_plot, color=col, **_metric_window_kwargs(opts))
                     if stim_start_i is not None:
-                        ax_i.axvline(float(stim_start_i), color="k", linestyle="-", linewidth=1)
+                        ax_i.axvline(float(stim_start_i), color="k", linestyle="-", linewidth=float(opts.get("output_stim_linewidth", 1.0)))
                     if stim_stop_i is not None:
-                        ax_i.axvline(float(stim_stop_i), color="k", linestyle="-", linewidth=1)
+                        ax_i.axvline(float(stim_stop_i), color="k", linestyle="-", linewidth=float(opts.get("output_stim_linewidth", 1.0)))
                     if opts.get("plot_window") is not None:
                         ax_i.set_xlim(opts.get("plot_window")[0], opts.get("plot_window")[1])
                     ax_i.set_title(label)
@@ -875,7 +1058,7 @@ def run_output_plots(
                     y = np.asarray(curve_plot.get("rate_hz", []) or [], dtype=float)
                     col = colors[idx] if colors[idx] is not None else color_cycle[idx % len(color_cycle)]
                     ls = linestyles[idx] if idx < len(linestyles) and linestyles[idx] else "-"
-                    ax.plot(t_ms, y, lw=2, color=col, linestyle=ls, label=label)
+                    ax.plot(t_ms, y, lw=float(opts.get("output_linewidth", 2.0)), color=col, linestyle=ls, label=label)
                     if opts.get("output_show_metric_points", True):
                         metrics = _compute_output_metrics(
                             curve,
@@ -898,12 +1081,12 @@ def run_output_plots(
                             size=float(opts.get("output_metric_marker_size", 36.0)),
                         )
                         if opts.get("output_metric_window_markers", False):
-                            _plot_metric_window_markers(ax, metrics_plot, color=col)
+                            _plot_metric_window_markers(ax, metrics_plot, color=col, **_metric_window_kwargs(opts))
 
                 if stim_start is not None:
-                    ax.axvline(float(stim_start), color="k", linestyle="-", linewidth=1)
+                    ax.axvline(float(stim_start), color="k", linestyle="-", linewidth=float(opts.get("output_stim_linewidth", 1.0)))
                 if stim_stop is not None:
-                    ax.axvline(float(stim_stop), color="k", linestyle="-", linewidth=1)
+                    ax.axvline(float(stim_stop), color="k", linestyle="-", linewidth=float(opts.get("output_stim_linewidth", 1.0)))
                 if opts.get("plot_window") is not None:
                     ax.set_xlim(opts.get("plot_window")[0], opts.get("plot_window")[1])
                 ax.set_xlabel("Time (ms)")
@@ -1071,7 +1254,7 @@ def run_output_plots(
                             size=float(opts.get("output_metric_marker_size", 36.0)),
                         )
                         if opts.get("output_metric_window_markers", False):
-                            _plot_metric_window_markers(ax, metrics_a_plot, color=color_a)
+                            _plot_metric_window_markers(ax, metrics_a_plot, color=color_a, **_metric_window_kwargs(opts))
                     if metrics_b:
                         _plot_metric_points(
                             ax,
@@ -1082,7 +1265,7 @@ def run_output_plots(
                             size=float(opts.get("output_metric_marker_size", 36.0)),
                         )
                         if opts.get("output_metric_window_markers", False):
-                            _plot_metric_window_markers(ax, metrics_b_plot, color=color_b)
+                            _plot_metric_window_markers(ax, metrics_b_plot, color=color_b, **_metric_window_kwargs(opts))
                 else:
                     if axes.size > 0 and metrics_a:
                         line_colors = [line.get_color() for line in axes[0].lines if len(line.get_xdata()) > 2]
@@ -1096,7 +1279,7 @@ def run_output_plots(
                             size=float(opts.get("output_metric_marker_size", 36.0)),
                         )
                         if opts.get("output_metric_window_markers", False):
-                            _plot_metric_window_markers(axes[0], metrics_a_plot, color=color_a)
+                            _plot_metric_window_markers(axes[0], metrics_a_plot, color=color_a, **_metric_window_kwargs(opts))
                     if axes.size > 1 and metrics_b:
                         line_colors = [line.get_color() for line in axes[1].lines if len(line.get_xdata()) > 2]
                         color_b = line_colors[0] if line_colors else None
@@ -1109,7 +1292,7 @@ def run_output_plots(
                             size=float(opts.get("output_metric_marker_size", 36.0)),
                         )
                         if opts.get("output_metric_window_markers", False):
-                            _plot_metric_window_markers(axes[1], metrics_b_plot, color=color_b)
+                            _plot_metric_window_markers(axes[1], metrics_b_plot, color=color_b, **_metric_window_kwargs(opts))
             if fig_cmp is not None:
                 _save_fig(
                     fig_cmp,
@@ -1186,6 +1369,8 @@ def run_output_plots(
                     stim_start=stim_start,
                     stim_stop=stim_stop,
                     title="Output curves",
+                    line_width=float(opts.get("output_linewidth", 2.0)),
+                    stim_linewidth=float(opts.get("output_stim_linewidth", 1.0)),
                 )
                 if opts.get("output_show_metric_points", True):
                     metrics_a = _compute_output_metrics(
@@ -1226,7 +1411,7 @@ def run_output_plots(
                             size=float(opts.get("output_metric_marker_size", 36.0)),
                         )
                         if opts.get("output_metric_window_markers", False):
-                            _plot_metric_window_markers(ax, metrics_a_plot, color=color_a)
+                            _plot_metric_window_markers(ax, metrics_a_plot, color=color_a, **_metric_window_kwargs(opts))
                         _plot_metric_points(
                             ax,
                             metrics_b_plot,
@@ -1236,7 +1421,7 @@ def run_output_plots(
                             size=float(opts.get("output_metric_marker_size", 36.0)),
                         )
                         if opts.get("output_metric_window_markers", False):
-                            _plot_metric_window_markers(ax, metrics_b_plot, color=color_b)
+                            _plot_metric_window_markers(ax, metrics_b_plot, color=color_b, **_metric_window_kwargs(opts))
                 if scatter_curve:
                     ax = fig_curve.axes[0] if fig_curve.axes else None
                     if ax is not None:
@@ -1245,7 +1430,7 @@ def run_output_plots(
                             np.asarray(scatter_plot.get("t_ms", []), dtype=float),
                             np.asarray(scatter_plot.get("rate_hz", []), dtype=float),
                             color=opts.get("output_scatter_color", "0.4"),
-                            lw=2,
+                            lw=float(opts.get("output_linewidth", 2.0)),
                             ls="--",
                             label=opts.get("output_scatter_label", "External curve"),
                         )
@@ -1275,6 +1460,7 @@ def run_output_plots(
                                     ax,
                                     scatter_metrics_plot,
                                     color=opts.get("output_scatter_color", "0.4"),
+                                    **_metric_window_kwargs(opts),
                                 )
                         ax.legend()
                 _save_fig(
@@ -1402,7 +1588,7 @@ def run_output_plots(
                         size=float(opts.get("output_metric_marker_size", 36.0)),
                     )
                     if opts.get("output_metric_window_markers", False):
-                        _plot_metric_window_markers(ax_rate, metrics_plot, color=color_out)
+                        _plot_metric_window_markers(ax_rate, metrics_plot, color=color_out, **_metric_window_kwargs(opts))
                 if ax_rate is not None and in_vivo_curve is not None:
                     bio_curve = _curve_from_xy(in_vivo_curve[0] * 1000.0, in_vivo_curve[1])
                     bio_metrics = _compute_output_metrics(
@@ -1426,7 +1612,7 @@ def run_output_plots(
                         size=float(opts.get("output_metric_marker_size", 36.0)),
                     )
                     if opts.get("output_metric_window_markers", False):
-                        _plot_metric_window_markers(ax_rate, bio_metrics_plot, color="k")
+                        _plot_metric_window_markers(ax_rate, bio_metrics_plot, color="k", **_metric_window_kwargs(opts))
             _save_fig(
                 plt.gcf(),
                 analysis.plot_dir_for_run(run_dir) / "output_plot.png",
@@ -1451,6 +1637,8 @@ def run_output_plots(
                 plot_window=opts.get("plot_window", (None, None)),
                 smooth_mode=smooth_mode,
                 bin_ms=opts.get("output_bin_ms"),
+                line_width=opts.get("output_linewidth", 2.0),
+                shade_alpha=opts.get("output_shade_alpha", 0.25),
             )
             _save_fig(
                 fig_out,
@@ -1497,6 +1685,8 @@ def run_output_plots(
                 stim_start=stim_start,
                 stim_stop=stim_stop,
                 title="Output curve (avg)",
+                line_width=float(opts.get("output_linewidth", 2.0)),
+                stim_linewidth=float(opts.get("output_stim_linewidth", 1.0)),
             )
             if opts.get("output_show_metric_points", True):
                 metrics_single = _compute_output_metrics(
@@ -1523,7 +1713,7 @@ def run_output_plots(
                         size=float(opts.get("output_metric_marker_size", 36.0)),
                     )
                     if opts.get("output_metric_window_markers", False):
-                        _plot_metric_window_markers(ax, metrics_single_plot, color=line_color)
+                        _plot_metric_window_markers(ax, metrics_single_plot, color=line_color, **_metric_window_kwargs(opts))
             if scatter_curve:
                 ax = fig_curve.axes[0] if fig_curve.axes else None
                 if ax is not None:
@@ -1532,7 +1722,7 @@ def run_output_plots(
                         np.asarray(scatter_plot.get("t_ms", []), dtype=float),
                         np.asarray(scatter_plot.get("rate_hz", []), dtype=float),
                         color=opts.get("output_scatter_color", "0.4"),
-                        lw=2,
+                        lw=float(opts.get("output_linewidth", 2.0)),
                         ls="--",
                         label=opts.get("output_scatter_label", "External curve"),
                     )
@@ -1562,6 +1752,7 @@ def run_output_plots(
                                 ax,
                                 scatter_metrics_plot,
                                 color=opts.get("output_scatter_color", "0.4"),
+                                **_metric_window_kwargs(opts),
                             )
                     ax.legend()
             _save_fig(
@@ -1620,12 +1811,16 @@ def run_input_plots(
                 groups=opts.get("input_groups"),
                 bin_ms=opts.get("input_bin_ms"),
                 smooth_ms=opts.get("input_smooth_ms"),
+                input_source=opts.get("input_source", "saved"),
+                std_mode=opts.get("input_std_mode", "std"),
             )
             summary_b = analysis.summarize_inputs_from_results(
                 res_b,
                 groups=opts.get("input_groups"),
                 bin_ms=opts.get("input_bin_ms"),
                 smooth_ms=opts.get("input_smooth_ms"),
+                input_source=opts.get("input_source", "saved"),
+                std_mode=opts.get("input_std_mode", "std"),
             )
             fig_cmp_in, _ = plotting.plot_compare_input_means(
                 summary_a,
@@ -1639,6 +1834,9 @@ def run_input_plots(
                     (res_b.get("meta") or {}).get("avg_rate_curve"),
                 ),
                 group_colors=group_colors,
+                line_width=opts.get("input_linewidth", 2.0),
+                shade_alpha=opts.get("input_shade_alpha", 0.2),
+                output_linewidth=opts.get("input_output_linewidth", 1.5),
             )
             _save_fig(
                 fig_cmp_in,
@@ -1659,6 +1857,8 @@ def run_input_plots(
             groups=opts.get("input_groups"),
             bin_ms=opts.get("input_bin_ms"),
             smooth_ms=opts.get("input_smooth_ms"),
+            input_source=opts.get("input_source", "saved"),
+            std_mode=opts.get("input_std_mode", "std"),
         )
         curve_single = (res.get("meta") or {}).get("avg_rate_curve")
         fig_in, _ = plotting.plot_input_means(
@@ -1668,6 +1868,9 @@ def run_input_plots(
             show_std=opts.get("show_input_std", False),
             output_curve=curve_single,
             group_colors=group_colors,
+            line_width=opts.get("input_linewidth", 2.0),
+            shade_alpha=opts.get("input_shade_alpha", 0.2),
+            output_linewidth=opts.get("input_output_linewidth", 1.5),
         )
         _save_fig(
             fig_in,
@@ -1695,6 +1898,9 @@ def run_input_plots(
                 max_trains_per_group=opts.get("input_raster_max_trains", 200),
                 plot_window=opts.get("input_plot_window", (None, None)),
                 plot_raster=True,
+                line_width=opts.get("input_linewidth", 2.0),
+                raster_linewidth=opts.get("input_raster_linewidth", 0.8),
+                stim_linewidth=opts.get("input_stim_linewidth", 1.0),
             )
             _save_fig(
                 plt.gcf(),
@@ -1737,7 +1943,7 @@ def run_output_metrics(
                 labels_override.append(entry.get("label"))
         else:
             for item in list_entries:
-                spec = _parse_compare_list_item(str(item))
+                spec = _parse_compare_list_item(item)
                 path_raw = spec.get("path")
                 shift_ms = spec.get("shift_ms")
                 scale_val = spec.get("scale")
@@ -2267,8 +2473,15 @@ def get_selection_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         comp_a = g.get("compare_a_path", "")
         comp_b = g.get("compare_b_path", "")
         compare_list = list(g["compare_list_sel"].value) if g.get("compare_list_sel") is not None else []
-        compare_list_paths = _parse_compare_list_paths(
-            g.get("compare_list_paths_txt").value if g.get("compare_list_paths_txt") is not None else ""
+        compare_paths_enabled = bool(
+            g.get("compare_paths_cb").value if g.get("compare_paths_cb") is not None else g.get("compare_list_paths_enabled", True)
+        )
+        compare_list_paths = (
+            _parse_compare_list_paths(
+                g.get("compare_list_paths_txt").value if g.get("compare_list_paths_txt") is not None else ""
+            )
+            if compare_paths_enabled
+            else []
         )
     else:
         cell = g.get("cell_name")
@@ -2280,7 +2493,10 @@ def get_selection_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         comp_a = g.get("compare_a_path", "")
         comp_b = g.get("compare_b_path", "")
         compare_list = g.get("compare_list", []) or []
+        compare_paths_enabled = bool(g.get("compare_list_paths_enabled", True))
         compare_list_paths = g.get("compare_list_paths", []) or []
+        if not compare_paths_enabled:
+            compare_list_paths = []
 
     if compare_list_paths and not compare_list:
         compare_list = ["latest"]
@@ -2335,6 +2551,11 @@ def output_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "output_show_metric_points": g.get("output_show_metric_points"),
         "output_metric_label_points": g.get("output_metric_label_points"),
         "output_metric_marker_size": g.get("output_metric_marker_size"),
+        "output_linewidth": g.get("output_linewidth"),
+        "output_stim_linewidth": g.get("output_stim_linewidth"),
+        "output_metric_linewidth": g.get("output_metric_linewidth"),
+        "output_metric_window_alpha": g.get("output_metric_window_alpha"),
+        "output_shade_alpha": g.get("output_shade_alpha"),
     }
 
 
@@ -2343,6 +2564,8 @@ def input_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "plot_inputs_mean": g.get("plot_inputs_mean"),
         "plot_input_raster": g.get("plot_input_raster"),
         "show_input_std": g.get("show_input_std"),
+        "input_source": g.get("input_source"),
+        "input_std_mode": g.get("input_std_mode"),
         "input_groups": g.get("input_groups"),
         "input_bin_ms": g.get("input_bin_ms"),
         "input_smooth_ms": g.get("input_smooth_ms"),
@@ -2353,6 +2576,11 @@ def input_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "input_plot_window": g.get("input_plot_window"),
         "compare_input_layout": g.get("compare_input_layout"),
         "compare_show_input_std": g.get("compare_show_input_std"),
+        "input_linewidth": g.get("input_linewidth"),
+        "input_shade_alpha": g.get("input_shade_alpha"),
+        "input_output_linewidth": g.get("input_output_linewidth"),
+        "input_raster_linewidth": g.get("input_raster_linewidth"),
+        "input_stim_linewidth": g.get("input_stim_linewidth"),
     }
 
 
@@ -2438,6 +2666,8 @@ def build_selection_ui(g: Dict[str, Any]) -> None:
         print("Widgets not enabled or ipywidgets unavailable.")
         return
 
+    out_selection = widgets.Output()
+
     base_dir = g.get("BASE_DIR")
     cells = analysis.list_cells(base_dir) or [g.get("cell_name")]
     cell_dd = widgets.Dropdown(options=cells, value=g.get("cell_name"), description="Cell")
@@ -2450,20 +2680,30 @@ def build_selection_ui(g: Dict[str, Any]) -> None:
         options=[],
         value=(),
         description="Compare list",
-        rows=4,
+        rows=10,
     )
+    compare_list_sel.layout = widgets.Layout(width="80%", height="200px")
     compare_list_paths_txt = widgets.Textarea(
-        value=",".join(g.get("compare_list_paths", []) or []),
+        value=_compare_list_paths_text(g.get("compare_list_paths", []) or []),
         description="Compare paths",
-        layout=widgets.Layout(width="60%"),
+        layout=widgets.Layout(width="80%", height="90px"),
     )
     compare_list_clear_btn = widgets.Button(description="Clear selection")
+    compare_paths_cb = widgets.Checkbox(
+        value=bool(g.get("compare_list_paths_enabled", True)),
+        description="Use compare paths",
+    )
+    selection_help_btn = widgets.Button(description="Help")
+    selection_help_btn.layout = widgets.Layout(width="80px", flex="0 0 auto")
 
     def _refresh_runs(*_):
         base = g.get("CELLS_DIR") / cell_dd.value / tunes_dd.value / model_dd.value / "output_data"
         names = [analysis.run_label(p) for p in analysis.collect_run_candidates(base)]
-        compare_list_sel.options = names
-        compare_list_sel.value = tuple([n for n in compare_list_sel.value if n in names])
+        options: list[tuple[str, str]] = [(n, n) for n in names]
+        options.extend(_compare_list_dir_options(g, base_dir))
+        compare_list_sel.options = options
+        valid_vals = {val for _, val in options}
+        compare_list_sel.value = tuple([n for n in compare_list_sel.value if n in valid_vals])
 
     def _refresh_models(*_):
         models = analysis.list_models(base_dir, cell_dd.value, tunes_dd.value) or [g.get("model_dir")]
@@ -2488,10 +2728,17 @@ def build_selection_ui(g: Dict[str, Any]) -> None:
     g["save_analysis_cb"] = save_analysis_cb
     g["compare_list_sel"] = compare_list_sel
     g["compare_list_paths_txt"] = compare_list_paths_txt
+    g["compare_paths_cb"] = compare_paths_cb
+
+    selection_help_btn.on_click(lambda *_: _print_help(out_selection, HELP_SELECTION))
+    compare_list_paths_txt.disabled = not compare_paths_cb.value
+    compare_paths_cb.observe(lambda *_: setattr(compare_list_paths_txt, "disabled", not compare_paths_cb.value), names="value")
 
     display(widgets.HBox([cell_dd, tunes_dd, model_dd]))
-    display(widgets.HBox([compare_list_sel, compare_list_paths_txt, compare_list_clear_btn]))
-    display(widgets.HBox([save_plots_cb, save_analysis_cb]))
+    display(widgets.HBox([compare_list_sel, compare_list_clear_btn]))
+    display(compare_list_paths_txt)
+    display(widgets.HBox([save_plots_cb, save_analysis_cb, compare_paths_cb, selection_help_btn]))
+    display(out_selection)
 
 
 def build_outputs_ui(g: Dict[str, Any]) -> None:
@@ -2530,7 +2777,7 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
     outputs_shade_dd = widgets.Dropdown(options=["none", "sem", "std"], value="none" if shade_val is None else shade_val, description="Shade")
     outputs_compare_layout_dd = widgets.Dropdown(options=["side-by-side", "stacked", "overlay"], value=g.get("compare_output_layout"), description="Compare layout")
 
-    preset_path_default = g.get("compare_preset_path") or "modules_local/analysis_presets/paper_compare.json"
+    preset_path_default = g.get("compare_preset_path") or "modules_local/analysis/analysis_presets/paper_compare.json"
     compare_preset_cb = widgets.Checkbox(
         value=bool(g.get("compare_preset_path")),
         description="Paper compare",
@@ -2538,6 +2785,8 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
 
     outputs_btn = widgets.Button(description="Run output plots")
     outputs_btn.layout = widgets.Layout(width="160px", flex="0 0 auto")
+    outputs_help_btn = widgets.Button(description="Help")
+    outputs_help_btn.layout = widgets.Layout(width="80px", flex="0 0 auto")
 
     def _on_outputs(_):
         sync_common_from_globals(g)
@@ -2567,13 +2816,14 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
             run_output_plots_from_globals(g)
 
     outputs_btn.on_click(_on_outputs)
+    outputs_help_btn.on_click(lambda *_: _print_help(out_outputs, HELP_OUTPUTS))
 
     g["out_outputs"] = out_outputs
     g["_on_outputs"] = _on_outputs
 
     display(
         widgets.VBox([
-            widgets.HBox([outputs_btn, compare_preset_cb, outputs_raster_cb, outputs_style_dd, outputs_win_txt]),
+            widgets.HBox([outputs_btn, outputs_help_btn, compare_preset_cb, outputs_raster_cb, outputs_style_dd, outputs_win_txt]),
             widgets.HBox([output_bin_txt, output_smooth_mode_dd, outputs_shade_dd, outputs_compare_layout_dd]),
             widgets.HBox([window_start_txt, window_end_txt, output_stim_start_txt, output_stim_stop_txt]),
             widgets.HBox([output_curve_mode_dd, output_norm_mode_dd, outputs_norm_txt]),
@@ -2605,6 +2855,16 @@ def build_inputs_ui(g: Dict[str, Any]) -> None:
     inputs_groups_txt = widgets.Text(value="" if input_groups is None else ",".join(input_groups), description="Groups")
     inputs_bin_txt = widgets.Text(value="" if g.get("input_bin_ms") is None else str(g.get("input_bin_ms")), description="Bin ms")
     inputs_smooth_txt = widgets.Text(value="" if g.get("input_smooth_ms") is None else str(g.get("input_smooth_ms")), description="Smooth ms")
+    inputs_source_dd = widgets.Dropdown(
+        options=["auto", "saved", "stats"],
+        value=g.get("input_source", "auto"),
+        description="Input source",
+    )
+    inputs_std_mode_dd = widgets.Dropdown(
+        options=["std", "sem"],
+        value=g.get("input_std_mode", "std"),
+        description="Std mode",
+    )
 
     raster_trial_txt = widgets.IntText(value=g.get("input_raster_trial_idx"), description="Raster trial")
     raster_max_txt = widgets.IntText(value=g.get("input_raster_max_trains"), description="Max trains")
@@ -2620,12 +2880,16 @@ def build_inputs_ui(g: Dict[str, Any]) -> None:
 
     inputs_btn = widgets.Button(description="Run input plots")
     inputs_btn.layout = widgets.Layout(width="160px", flex="0 0 auto")
+    inputs_help_btn = widgets.Button(description="Help")
+    inputs_help_btn.layout = widgets.Layout(width="80px", flex="0 0 auto")
 
     def _on_inputs(_):
         sync_common_from_globals(g)
         g["plot_inputs_mean"] = inputs_mean_cb.value
         g["plot_input_raster"] = inputs_raster_cb.value
         g["show_input_std"] = inputs_std_cb.value
+        g["input_source"] = inputs_source_dd.value
+        g["input_std_mode"] = inputs_std_mode_dd.value
         g["input_groups"] = analysis.parse_groups(inputs_groups_txt.value)
         g["input_bin_ms"] = analysis.parse_optional_float(inputs_bin_txt.value)
         g["input_smooth_ms"] = analysis.parse_optional_float(inputs_smooth_txt.value)
@@ -2645,14 +2909,15 @@ def build_inputs_ui(g: Dict[str, Any]) -> None:
             run_input_plots_from_globals(g)
 
     inputs_btn.on_click(_on_inputs)
+    inputs_help_btn.on_click(lambda *_: _print_help(out_inputs, HELP_INPUTS))
 
     g["out_inputs"] = out_inputs
     g["_on_inputs"] = _on_inputs
 
     display(
         widgets.VBox([
-            widgets.HBox([inputs_btn, inputs_mean_cb, inputs_raster_cb, inputs_std_cb]),
-            widgets.HBox([inputs_groups_txt, inputs_bin_txt, inputs_smooth_txt]),
+            widgets.HBox([inputs_btn, inputs_help_btn, inputs_mean_cb, inputs_raster_cb, inputs_std_cb, inputs_source_dd]),
+            widgets.HBox([inputs_groups_txt, inputs_bin_txt, inputs_smooth_txt, inputs_std_mode_dd]),
             widgets.HBox([raster_trial_txt, raster_max_txt, raster_win_txt, raster_style_dd]),
             widgets.HBox([input_window_start_txt, input_window_end_txt]),
             widgets.HBox([compare_layout_dd, compare_std_cb]),
@@ -2765,6 +3030,8 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
 
     run_btn = widgets.Button(description="Run extra analysis")
     run_btn.layout = widgets.Layout(width="160px", flex="0 0 auto")
+    extra_help_btn = widgets.Button(description="Help")
+    extra_help_btn.layout = widgets.Layout(width="80px", flex="0 0 auto")
     out_extra = widgets.Output()
 
     cfg_box = widgets.VBox([
@@ -2906,7 +3173,7 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         entries = _compare_list_entries(sel)
         labels: list[str] = []
         for item in entries:
-            spec = _parse_compare_list_item(str(item))
+            spec = _parse_compare_list_item(item)
             path_raw = spec.get("path")
             path = _coerce_run_path(path_raw, sel.get("base"))
             if path is None:
@@ -3038,13 +3305,14 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
                         show_md(format_output_metrics_tables(metrics, title=f"Output metrics ({label})", show_params=show_params))
 
     run_btn.on_click(_on_run)
+    extra_help_btn.on_click(lambda *_: _print_help(out_extra, HELP_EXTRA))
 
     g["extra_mode_dd"] = mode_dd
     g["out_extra"] = out_extra
 
     display(
         widgets.VBox([
-            widgets.HBox([mode_dd, run_btn]),
+            widgets.HBox([mode_dd, run_btn, extra_help_btn]),
             cfg_box,
             metrics_box,
             sample_box,

@@ -19,8 +19,13 @@
   "multi_shade_mode": null,
   "multi_norm_fr": null,
   "compare_output_layout": "overlay",
-  "output_compare_figsize": [10.0, 4.0],
+  "output_compare_figsize": [8.0, 4.0],
   "output_compare_panel_size": [4.2, 3.2],
+  "output_linewidth": 1.5,
+  "output_stim_linewidth": 1.0,
+  "output_metric_linewidth": 1.0,
+  "output_metric_window_alpha": 0.15,
+  "output_shade_alpha": 0.25,
 
   "output_curve_mode": "normalized",
   "output_norm_mode": "peak",
@@ -42,16 +47,27 @@
   "output_smooth_mode": "center",
 
   "compare_preset_path": null,
+  "compare_list_paths_enabled": true,
   "compare_list_paths": [
-    "/home/hrbncv/SCP/external_data/pyrFiringRateAvg.csv@500:1",
-    "/home/hrbncv/SCP/external_data/PVFiringRateAvg.csv@500:1",
-    "/home/hrbncv/SCP/external_data/SSTFiringRateAvg.csv@525:1"
+    {"path": "/home/hrbncv/SCP/external_data/pyrFiringRateAvg.csv@500;color=k;linestyle=--", "enabled": false},
+    {"path": "/home/hrbncv/SCP/external_data/bio_cell_output/pyrFiringRateAvg_gabab_tau200ms_delay50ms.csv@500;color=k;linestyle=-.", "enabled": false},
+    {"path": "/home/hrbncv/SCP/external_data/SSTFiringRateAvg.csv@525;color=k;linestyle=--", "enabled": true},
+    {"path": "/home/hrbncv/SCP/cells/SST/tunes/seg_tuned/output_data/tune3_SST_VIPinh_1000tr@color=m;linestyle=--", "enabled": false}
   ],
-
+  "compare_list_dir_paths": [
+  "external_data"
+  ],
   "plot_inputs_mean": true,
   "plot_input_raster": false,
   "show_input_std": false,
+  "input_source": "stats",
+  "input_std_mode": "std",
   "input_groups": null,
+  "input_linewidth": 2.0,
+  "input_shade_alpha": 0.2,
+  "input_output_linewidth": 1.5,
+  "input_raster_linewidth": 0.8,
+  "input_stim_linewidth": 1.0,
   "input_bin_ms": null,
   "input_smooth_ms": 25.0,
   "input_raster_trial_idx": 0,
