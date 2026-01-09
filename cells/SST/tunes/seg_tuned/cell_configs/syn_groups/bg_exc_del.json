@@ -1,10 +1,10 @@
 {
   "bg_exc_del": {
-    "state": true,
+    "state": false,
     "mode": "homogeneous_poisson",
     "color": "#17becf",
     "source": {
-      "freq": 2.0,
+      "freq": 2.5,
       "baseline": null,
       "path": null,
       "bin_ms": null

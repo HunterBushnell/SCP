@@ -55,6 +55,15 @@ def _align_centers(centers, y_smooth, mode='center'):
     else:
         return centers[:len(y_smooth)]
 
+def _apply_legend(ax, legend_loc=None):
+    if legend_loc is None or str(legend_loc).strip() == "":
+        ax.legend()
+        return
+    loc_val = str(legend_loc).strip()
+    if loc_val.lower() in ("none", "off", "false"):
+        return
+    ax.legend(loc=loc_val)
+
 # ────────────────────────────────────────────────────────────────────────────
 #  Normalization helper
 # ────────────────────────────────────────────────────────────────────────────
@@ -167,6 +176,7 @@ def plot_inputs_by_group(
         max_trains_per_group=200,
         seed=0,
         plot_window=None,
+        legend_loc=None,
         plot_raster=True,
         line_width=2.0,
         raster_linewidth=0.8,
@@ -282,7 +292,7 @@ def plot_inputs_by_group(
     ax_rate.set_ylabel("Rate (Hz per synapse)")
     ax_rate.set_title("Input rate by group")
     if len(groups) > 1:
-        ax_rate.legend()
+        _apply_legend(ax_rate, legend_loc)
     ax_rate.grid(True)
 
     if plot_raster and ax_raster is not None:
@@ -313,6 +323,8 @@ def plot_compare_input_means(
         layout="side-by-side",
         show_std=False,
         output_curves=None,
+        plot_window=None,
+        legend_loc=None,
         group_colors=None,
         figsize=None,
         line_width=2.0,
@@ -325,6 +337,8 @@ def plot_compare_input_means(
     summary_* should be output from analysis.summarize_inputs_from_results.
     output_curves: optional tuple (curve_a, curve_b), each as dict with keys
     't_ms' and 'rate_hz'. If provided, plots on a twin y-axis.
+    plot_window: optional tuple (tstart, tstop) to limit the x-axis.
+    legend_loc: optional matplotlib legend location (use "none" to hide).
     group_colors: optional dict {group: color} for consistent coloring.
     """
     if summary_a is None or summary_b is None:
@@ -419,7 +433,9 @@ def plot_compare_input_means(
         ax.set_ylabel("Input rate (Hz per synapse)")
         ax.grid(True)
         if groups:
-            ax.legend()
+            _apply_legend(ax, legend_loc)
+        if plot_window is not None:
+            ax.set_xlim(plot_window[0], plot_window[1])
     else:
         for idx, ax in enumerate(axes[:2]):
             summary = summaries[idx]
@@ -447,7 +463,9 @@ def plot_compare_input_means(
             ax.set_ylabel("Input rate (Hz per synapse)")
             ax.grid(True)
             if len(groups) > 1:
-                ax.legend()
+                _apply_legend(ax, legend_loc)
+            if plot_window is not None:
+                ax.set_xlim(plot_window[0], plot_window[1])
 
             # Optional output curve overlay
             if output_curves and idx < len(output_curves):
@@ -480,6 +498,8 @@ def plot_input_means(
         groups=None,
         show_std=False,
         output_curve=None,
+        plot_window=None,
+        legend_loc=None,
         group_colors=None,
         figsize=None,
         line_width=2.0,
@@ -491,6 +511,8 @@ def plot_input_means(
 
     summary should be output from analysis.summarize_inputs_from_results.
     output_curve: optional dict with keys 't_ms' and 'rate_hz' to overlay.
+    plot_window: optional tuple (tstart, tstop) to limit the x-axis.
+    legend_loc: optional matplotlib legend location (use "none" to hide).
     group_colors: optional dict {group: color} for consistent coloring.
     """
     if summary is None:
@@ -538,7 +560,9 @@ def plot_input_means(
     ax.set_ylabel("Input rate (Hz per synapse)")
     ax.grid(True)
     if len(groups) > 1:
-        ax.legend()
+        _apply_legend(ax, legend_loc)
+    if plot_window is not None:
+        ax.set_xlim(plot_window[0], plot_window[1])
 
     if output_curve:
         out_t = output_curve.get("t_ms", [])
@@ -2051,7 +2075,8 @@ def plot_compare_side_by_side(
             ax.set_xlim(plot_window[0], plot_window[1])
     else:
         for ax, curve in zip(axes, curves):
-            ax.plot(curve["x"], curve["mean"], color=curve["color"], lw=2)
+            label = curve["label"]
+            ax.plot(curve["x"], curve["mean"], color=curve["color"], lw=2, label=label if label else None)
             for vline in [curve["stim_start"], curve["stim_stop"]]:
                 if vline is not None:
                     ax.axvline(x=vline, color='k', linestyle='-', linewidth=1)
@@ -2060,6 +2085,8 @@ def plot_compare_side_by_side(
             ax.grid(True)
             if plot_window is not None:
                 ax.set_xlim(plot_window[0], plot_window[1])
+            if label:
+                ax.legend()
 
     if any(norms):
         axes[0].set_ylabel("Rate (normalized)")

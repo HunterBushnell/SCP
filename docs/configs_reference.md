@@ -43,6 +43,12 @@ syn_config.json
 syn_groups/
 - One JSON file per group (e.g., pn_exc, bg_inh, sst_inh).
 - Each group defines `state`, `mode`, `source`, `timing`, and `syns`.
+- Optional rate transforms for inhomogeneous inputs:
+  - `source.gabab`: auto GABAB-style filter on the rate curve (bool or dict).
+    - Common fields: `enabled`, `mode` (delayed|simple), `tau_s` or `tau_ms`,
+      `delay_ms`, `history` (full|trimmed).
+  - `source.freq_scale`: multiply rate curve (Hz) after GABAB.
+  - `source.freq_shift`: additive rate shift (Hz) after GABAB.
 
 Notes
 - Keep cell identity in `cell_config.json` and sim-only settings in

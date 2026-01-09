@@ -19,3 +19,7 @@ Common tweaks in `cell_configs/sim_config.json`.
 
 5) Force saving in SLURM
 - `FORCE_SAVE=1 sbatch run_slurm.sh`
+
+6) Rate curve transforms (inhomogeneous inputs)
+- In a synapse group `source`, you can add `gabab` (auto filter) plus
+  `freq_scale`/`freq_shift` for post-filter scaling (see `configs_reference.md`).

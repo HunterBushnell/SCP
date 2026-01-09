@@ -47,6 +47,7 @@ HELP_INPUTS = textwrap.dedent(
     - Groups: comma-separated synapse groups; leave blank for all.
     - Bin/smooth apply to input rate curves; raster settings affect raster plots.
     - Compare layout controls multi-run plotting.
+    - Legend: matplotlib location for input legends (e.g., best, upper left, none).
     """
 ).strip()
 
@@ -683,6 +684,8 @@ def _load_compare_preset(path_val: Any, base_dir: Optional[Path]) -> list[Dict[s
     for entry in entries:
         if not isinstance(entry, dict):
             continue
+        if entry.get("enabled", True) is False:
+            continue
         path_raw = entry.get("path") or entry.get("run") or entry.get("file")
         if not path_raw:
             continue
@@ -779,8 +782,10 @@ def _compare_list_entries(selection: Dict[str, Any]) -> list[Any]:
 
 def _compare_list_run_paths(selection: Dict[str, Any]) -> list[Path]:
     base_dir = selection.get("base")
-    entries = selection.get("compare_list") or []
     if base_dir is None:
+        return []
+    entries = _compare_list_entries(selection)
+    if not entries:
         return []
     seen: set[Path] = set()
     out: list[Path] = []
@@ -1005,7 +1010,7 @@ def run_output_plots(
                     y = np.asarray(curve_plot.get("rate_hz", []) or [], dtype=float)
                     col = colors[idx] if colors[idx] is not None else color_cycle[idx % len(color_cycle)]
                     ls = linestyles[idx] if idx < len(linestyles) and linestyles[idx] else "-"
-                    ax_i.plot(t_ms, y, lw=float(opts.get("output_linewidth", 2.0)), color=col, linestyle=ls)
+                    ax_i.plot(t_ms, y, lw=float(opts.get("output_linewidth", 2.0)), color=col, linestyle=ls, label=label)
                     stim_start_i, stim_stop_i = _stim_window_for_opts(sim_cfgs[idx] or {}, opts)
                     if opts.get("output_show_metric_points", True):
                         metrics = _compute_output_metrics(
@@ -1037,6 +1042,8 @@ def run_output_plots(
                     if opts.get("plot_window") is not None:
                         ax_i.set_xlim(opts.get("plot_window")[0], opts.get("plot_window")[1])
                     ax_i.set_title(label)
+                    if label:
+                        ax_i.legend()
                     ax_i.grid(True)
                     if layout in side_layouts:
                         ax_i.set_xlabel("Time (ms)")
@@ -1833,10 +1840,12 @@ def run_input_plots(
                     (res_a.get("meta") or {}).get("avg_rate_curve"),
                     (res_b.get("meta") or {}).get("avg_rate_curve"),
                 ),
+                legend_loc=opts.get("input_legend_loc"),
                 group_colors=group_colors,
                 line_width=opts.get("input_linewidth", 2.0),
                 shade_alpha=opts.get("input_shade_alpha", 0.2),
                 output_linewidth=opts.get("input_output_linewidth", 1.5),
+                plot_window=opts.get("input_plot_window"),
             )
             _save_fig(
                 fig_cmp_in,
@@ -1847,6 +1856,11 @@ def run_input_plots(
         if opts.get("plot_input_raster", False):
             print("Input raster is only available for single runs.")
         return
+    if len(compare_runs) == 1:
+        selection = dict(selection)
+        selection["run_single"] = compare_runs[0]
+        selection["compare_list"] = []
+        selection["compare_list_paths"] = []
 
     run_dir, res = resolve_single(selection)
     group_colors = analysis.group_colors_from_results(res)
@@ -1867,6 +1881,8 @@ def run_input_plots(
             groups=opts.get("input_groups"),
             show_std=opts.get("show_input_std", False),
             output_curve=curve_single,
+            plot_window=opts.get("input_plot_window"),
+            legend_loc=opts.get("input_legend_loc"),
             group_colors=group_colors,
             line_width=opts.get("input_linewidth", 2.0),
             shade_alpha=opts.get("input_shade_alpha", 0.2),
@@ -1897,6 +1913,7 @@ def run_input_plots(
                 raster_style=opts.get("input_raster_style", "dot"),
                 max_trains_per_group=opts.get("input_raster_max_trains", 200),
                 plot_window=opts.get("input_plot_window", (None, None)),
+                legend_loc=opts.get("input_legend_loc"),
                 plot_raster=True,
                 line_width=opts.get("input_linewidth", 2.0),
                 raster_linewidth=opts.get("input_raster_linewidth", 0.8),
@@ -2574,6 +2591,7 @@ def input_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "input_raster_win_size": g.get("input_raster_win_size"),
         "input_raster_style": g.get("input_raster_style"),
         "input_plot_window": g.get("input_plot_window"),
+        "input_legend_loc": g.get("input_legend_loc"),
         "compare_input_layout": g.get("compare_input_layout"),
         "compare_show_input_std": g.get("compare_show_input_std"),
         "input_linewidth": g.get("input_linewidth"),
@@ -2865,6 +2883,28 @@ def build_inputs_ui(g: Dict[str, Any]) -> None:
         value=g.get("input_std_mode", "std"),
         description="Std mode",
     )
+    legend_options = [
+        "best",
+        "upper right",
+        "upper left",
+        "lower right",
+        "lower left",
+        "right",
+        "center left",
+        "center right",
+        "lower center",
+        "upper center",
+        "center",
+        "none",
+    ]
+    legend_default = g.get("input_legend_loc") or "best"
+    if legend_default not in legend_options:
+        legend_options = [legend_default] + legend_options
+    inputs_legend_dd = widgets.Dropdown(
+        options=legend_options,
+        value=legend_default,
+        description="Legend",
+    )
 
     raster_trial_txt = widgets.IntText(value=g.get("input_raster_trial_idx"), description="Raster trial")
     raster_max_txt = widgets.IntText(value=g.get("input_raster_max_trains"), description="Max trains")
@@ -2901,6 +2941,7 @@ def build_inputs_ui(g: Dict[str, Any]) -> None:
             analysis.parse_optional_float(input_window_start_txt.value),
             analysis.parse_optional_float(input_window_end_txt.value),
         )
+        g["input_legend_loc"] = inputs_legend_dd.value
         g["compare_input_layout"] = compare_layout_dd.value
         g["compare_show_input_std"] = compare_std_cb.value
 
@@ -2917,7 +2958,7 @@ def build_inputs_ui(g: Dict[str, Any]) -> None:
     display(
         widgets.VBox([
             widgets.HBox([inputs_btn, inputs_help_btn, inputs_mean_cb, inputs_raster_cb, inputs_std_cb, inputs_source_dd]),
-            widgets.HBox([inputs_groups_txt, inputs_bin_txt, inputs_smooth_txt, inputs_std_mode_dd]),
+            widgets.HBox([inputs_groups_txt, inputs_bin_txt, inputs_smooth_txt, inputs_std_mode_dd, inputs_legend_dd]),
             widgets.HBox([raster_trial_txt, raster_max_txt, raster_win_txt, raster_style_dd]),
             widgets.HBox([input_window_start_txt, input_window_end_txt]),
             widgets.HBox([compare_layout_dd, compare_std_cb]),
@@ -3039,9 +3080,28 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         widgets.HBox([syn_weight_cb, syn_dist_cb, syn_density_cb]),
         widgets.HBox([syn_groups_txt, syn_weight_bin_txt, syn_dist_bin_txt]),
     ])
+    def _initial_metrics_ref_options() -> list[str]:
+        sel = get_selection_from_globals(g)
+        entries = _compare_list_entries(sel)
+        labels: list[str] = []
+        for item in entries:
+            spec = _parse_compare_list_item(item)
+            path_raw = spec.get("path")
+            path = _coerce_run_path(path_raw, sel.get("base"))
+            if path is None or not path.exists():
+                continue
+            label = Path(path).stem if _is_curve_path(Path(path)) else analysis.run_label(path)
+            if label not in labels:
+                labels.append(label)
+        return ["(none)"] + labels
+
+    metrics_ref_options = _initial_metrics_ref_options()
+    metrics_ref_value = g.get("output_metrics_ref_label") or "(none)"
+    if metrics_ref_value not in metrics_ref_options:
+        metrics_ref_value = "(none)"
     metrics_ref_dd = widgets.Dropdown(
-        options=["(none)"],
-        value=g.get("output_metrics_ref_label") or "(none)",
+        options=metrics_ref_options,
+        value=metrics_ref_value,
         description="Reference",
         layout=widgets.Layout(width="40%"),
     )
@@ -3062,30 +3122,64 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         widgets.HBox([metrics_show_delta_cb, metrics_highlight_cb]),
     ])
 
+    def _initial_sample_runs() -> list[str]:
+        sel = get_selection_from_globals(g)
+        base = sel.get("base")
+        try:
+            names = [analysis.run_label(p) for p in analysis.collect_run_candidates(base)]
+        except Exception:
+            names = []
+        return names or ["latest"]
+
+    sample_source_value = g.get("input_sample_source", "selection")
+    sample_run_options = _initial_sample_runs()
+    sample_run_value = g.get("input_sample_run", "latest")
+    if sample_run_value not in sample_run_options:
+        sample_run_value = sample_run_options[0]
+    sample_path_value = str(g.get("input_sample_path") or "")
+
     sample_source_dd = widgets.Dropdown(
         options=[
             ("Selection (cell/tune/model)", "selection"),
             ("Output run", "run"),
             ("Path", "path"),
         ],
-        value=g.get("input_sample_source", "selection"),
+        value=sample_source_value,
         description="Source",
         layout=widgets.Layout(width="40%"),
     )
     sample_run_dd = widgets.Dropdown(
-        options=["latest"],
-        value=g.get("input_sample_run", "latest"),
+        options=sample_run_options,
+        value=sample_run_value,
         description="Run",
         layout=widgets.Layout(width="40%"),
     )
     sample_path_txt = widgets.Text(
-        value=str(g.get("input_sample_path") or ""),
+        value=sample_path_value,
         description="Path",
         layout=widgets.Layout(width="70%"),
     )
+    def _initial_sampling_path() -> Optional[Path]:
+        sel = get_selection_from_globals(g)
+        if sample_source_value == "run":
+            try:
+                return Path(analysis.resolve_run(sel["base"], sample_run_value))
+            except Exception:
+                return None
+        if sample_source_value == "path":
+            raw = sample_path_value.strip()
+            return Path(raw).expanduser() if raw else None
+        return (g.get("CELLS_DIR") / sel["cell"] / sel["tunes"] / sel["model"]).resolve()
+
+    sample_groups_options = _list_groups_for_sampling(_initial_sampling_path())
+    prev_groups = list(g.get("input_sample_groups") or [])
+    if prev_groups:
+        selected_groups = [gname for gname in prev_groups if gname in sample_groups_options]
+    else:
+        selected_groups = sample_groups_options
     sample_groups_sel = widgets.SelectMultiple(
-        options=[],
-        value=tuple(g.get("input_sample_groups") or []),
+        options=sample_groups_options,
+        value=tuple(selected_groups),
         description="Groups",
         rows=6,
     )

@@ -1,5 +1,5 @@
 {
-  "pn_exc_gabab": {
+  "pn_exc_gabab_auto": {
     "state": false,
     "mode": "inhomogeneous_poisson",
     "color": "#1f77b4",
@@ -8,8 +8,16 @@
       "baseline": "start",
       "path": "external_data/bio_cell_output/pyrFiringRateAvg_gabab_tau100ms_delay50ms.csv",
       "bin_ms": 5,
+      "gabab": {
+        "enabled": true,
+        "tau_s": 0.01,
+        "delay_ms": 50.0,
+        "alpha": 1.0,
+        "history": "full"
+      },
       "freq_shift": 0,
       "freq_scale": 1.25
+      
     },
     "timing": {
       "onset_ms": null,

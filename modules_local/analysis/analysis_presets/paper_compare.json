@@ -10,7 +10,7 @@
     "output_norm_window": "stim",
     "output_baseline_center_ms": 100.0,
     "output_metric_mode": "window",
-    "output_metric_window_ms": 50.0,
+    "output_metric_window_ms": 0.0,
     "output_bin_ms": 5.0,
     "output_smooth_mode": "center",
     "output_stim_start_ms": 500.0,
@@ -18,24 +18,53 @@
   },
   "entries": [
     {
-      "path": "cells/PV/tunes/seg_tuned/output_data/tune3_1000tr",
-      "label": "PV output",
+      "path": "cells/PV/tunes/seg_tuned/output_data/_final_PV_base_1000tr",
+      "label": "PV base",
+      "enabled": false,
       "shift_ms": 200,
       "scale": 1,
       "color": "b",
       "linestyle": "-"
     },
     {
-      "path": "cells/SST/tunes/seg_tuned/output_data/tune3_SST_VIPinh_1000tr",
-      "label": "SST output",
+      "path": "cells/PV/tunes/seg_tuned/output_data/_final_PV_SSTinh_1000tr",
+      "label": "PV SSTinh",
+      "enabled": true,
+      "shift_ms": 200,
+      "scale": 1,
+      "color": "b",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_final_SST_base_1000tr",
+      "label": "SST base",
+      "enabled": false,
       "scale": 1,
       "color": "m",
       "linestyle": "-"
     },
     {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_final_SST_VIPinh2_1000tr",
+      "label": "SST VIPinh",
+      "enabled": true,
+      "scale": 1,
+      "color": "m",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_final_SST_GABAB_1000tr",
+      "label": "SST GABABinh",
+      "enabled": true,
+      "scale": 1,
+      "color": "purple",
+      "linestyle": "-"
+    },
+
+    {
       "path": "external_data/PVFiringRateAvg.csv",
       "label": "PV bio",
-      "shift_ms": 525,
+      "enabled": true,
+      "shift_ms": 500,
       "scale": 1,
       "color": "b",
       "linestyle": "--"
@@ -43,7 +72,17 @@
     {
       "path": "external_data/SSTFiringRateAvg.csv",
       "label": "SST bio",
+      "enabled": true,
       "shift_ms": 500,
+      "scale": 1,
+      "color": "k",
+      "linestyle": "--"
+    },
+    {
+      "path": "external_data/SSTFiringRateAvg.csv",
+      "label": "SST bio shifted",
+      "enabled": true,
+      "shift_ms": 525,
       "scale": 1,
       "color": "m",
       "linestyle": "--"
@@ -51,9 +90,10 @@
     {
       "path": "external_data/pyrFiringRateAvg.csv",
       "label": "PN bio",
+      "enabled": true,
       "shift_ms": 500,
       "scale": 1,
-      "color": "k",
+      "color": "r",
       "linestyle": "--"
     }
   ]

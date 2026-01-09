@@ -5,14 +5,14 @@
     "color": "#ff7f0e",
     "source": {
       "freq": null,
-      "baseline": 4.0,
-      "path": "cells/SST/tunes/seg_tuned/output_data/tune2_1000tr/results/spikes.pkl",
+      "baseline": 3.5,
+      "path": "cells/SST/tunes/seg_tuned/output_data/_final_SST_VIPinh2_1000tr/results/spikes.npz",
       "bin_ms": null,
       "key": "base tune"
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 275.0,
+      "stim_tstart_ms": 280.0,
       "duration_ms": null,
       "input_stim_tstart_ms": 500.0,
       "input_duration_ms": null

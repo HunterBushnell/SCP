@@ -1,11 +1,11 @@
 {
   "sst_inh_bio": {
-    "state": true,
+    "state": false,
     "mode": "inhomogeneous_poisson",
     "color": "#ff7f0e",
     "source": {
       "freq": null,
-      "baseline": 4.0,
+      "baseline": 3.5,
       "path": "external_data/SSTFiringRateAvg.csv",
       "bin_ms": null,
       "key": "base tune",

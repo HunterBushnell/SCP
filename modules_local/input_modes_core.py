@@ -127,6 +127,104 @@ def _resolve_source_path(raw_path: str, sim_cfg: Dict[str, Any]) -> Path:
     return (tune_dir / p).resolve()
 
 
+def _parse_gabab_cfg(source: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    raw = (source or {}).get("gabab", None)
+    if raw in (None, False):
+        return None
+    if raw is True:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"source['gabab'] must be dict/bool (got {type(raw)!r})")
+    if raw.get("enabled") is False:
+        return None
+
+    cfg = dict(raw)
+    mode = str(cfg.get("mode", "delayed")).strip().lower()
+    if mode not in ("delayed", "simple"):
+        raise ValueError(f"source['gabab'].mode must be 'delayed' or 'simple' (got {mode!r})")
+
+    history = str(cfg.get("history", "full")).strip().lower()
+    if history not in ("full", "trimmed"):
+        raise ValueError(f"source['gabab'].history must be 'full' or 'trimmed' (got {history!r})")
+
+    tau_s_raw = cfg.get("tau_s", None)
+    tau_ms_raw = cfg.get("tau_ms", None)
+    if tau_s_raw is None and tau_ms_raw is None:
+        tau_s = 0.01
+    elif tau_s_raw is not None:
+        tau_s = float(tau_s_raw)
+    else:
+        tau_s = float(tau_ms_raw) / 1000.0
+    if tau_s <= 0.0:
+        raise ValueError(f"source['gabab'].tau_s must be > 0 (got {tau_s!r})")
+
+    delay_ms_raw = cfg.get("delay_ms", cfg.get("delay", 50.0))
+    delay_ms = 0.0 if delay_ms_raw is None else float(delay_ms_raw)
+    alpha = float(cfg.get("alpha", 1.0))
+    init = str(cfg.get("init", "match"))
+    robust_norm = bool(cfg.get("robust_norm", False))
+    pctl = float(cfg.get("pctl", 99.0))
+
+    return {
+        "mode": mode,
+        "history": history,
+        "tau_s": tau_s,
+        "delay_ms": delay_ms,
+        "alpha": alpha,
+        "init": init,
+        "robust_norm": robust_norm,
+        "pctl": pctl,
+    }
+
+
+def _apply_gabab_to_curve(
+    times_ms: np.ndarray,
+    rates_hz: np.ndarray,
+    cfg: Dict[str, Any],
+) -> np.ndarray:
+    if rates_hz.size == 0 or times_ms.size < 2:
+        return rates_hz
+
+    dt_ms = float(np.median(np.diff(times_ms[: min(times_ms.size, 500)])))
+    if dt_ms <= 0.0:
+        raise ValueError(f"GABAB: invalid dt_ms {dt_ms!r}")
+    dt_s = dt_ms / 1000.0
+
+    r = np.asarray(rates_hz, dtype=float)
+    if cfg["robust_norm"]:
+        r_ref = np.percentile(r, cfg["pctl"])
+    else:
+        r_ref = r.max()
+    r_ref = max(float(r_ref), 1e-12)
+    r_norm = r / r_ref
+
+    if cfg["mode"] == "simple":
+        r_drive = r_norm
+    else:
+        k = int(round(cfg["delay_ms"] / max(dt_ms, 1e-12)))
+        if k <= 0:
+            r_drive = r_norm
+        elif k >= r.size:
+            base = r_norm[0] if cfg["init"] == "match" else 0.0
+            r_drive = np.full_like(r_norm, base)
+        else:
+            base = r_norm[0] if cfg["init"] == "match" else 0.0
+            r_drive = np.empty_like(r_norm)
+            r_drive[:k] = base
+            r_drive[k:] = r_norm[:-k]
+
+    S = np.zeros_like(r_norm)
+    S[0] = r_norm[0] if cfg["init"] == "match" else 0.0
+    coef = dt_s / cfg["tau_s"]
+    for i in range(1, r.size):
+        S[i] = S[i - 1] + coef * (r_drive[i - 1] - S[i - 1])
+    S = np.clip(S, 0.0, 1.0)
+
+    I = r * (1.0 - cfg["alpha"] * S)
+    I[I < 0.0] = 0.0
+    return I
+
+
 # ---------------------------------------------------------------------
 # Shared helper: homogeneous Poisson spike train generator
 # ---------------------------------------------------------------------
@@ -743,6 +841,11 @@ def _mode_inhomogeneous_poisson(
       - time_col defaults to "Time", rate_col defaults to "AvgFiringRate".
       - Times < 0 are dropped; remaining times are shifted so the first sample is at 0 ms.
       - bin_ms is taken from source["bin_ms"] if provided; otherwise inferred from median Δt.
+      - Optional source["gabab"] applies a GABAB-like filter to the rate curve
+        before freq_scale/freq_shift. Set gabab.history="full" (default) to
+        use pre-0 history, or "trimmed" to apply after trimming.
+      - Optional source["freq_scale"] and source["freq_shift"] apply as:
+        rates_hz = max(0, rates_hz * freq_scale + freq_shift).
       - Baseline blocks use anchors["baseline_rate_hz"] (numeric) if present; otherwise quiescent.
       - Source blocks use the rate curve, truncated/padded to the block duration
         (padding uses baseline_rate_hz or 0.0 if absent).
@@ -770,6 +873,7 @@ def _mode_inhomogeneous_poisson(
     time_col = source.get("time_col") or "Time"
     rate_col = source.get("rate_col") or "AvgFiringRate"
     bin_ms_cfg = source.get("bin_ms", None)
+    gabab_cfg = _parse_gabab_cfg(source)
 
     bin_ms = None
 
@@ -789,6 +893,9 @@ def _mode_inhomogeneous_poisson(
         times_ms = np.asarray(df[time_col], dtype=float) * 1000.0  # seconds → ms
         rates_hz = np.asarray(df[rate_col], dtype=float)
 
+        if gabab_cfg and gabab_cfg["history"] == "full":
+            rates_hz = _apply_gabab_to_curve(times_ms, rates_hz, gabab_cfg)
+
         # Drop times < 0 and shift so first sample is at 0
         keep = times_ms >= 0.0
         times_ms = times_ms[keep]
@@ -806,6 +913,8 @@ def _mode_inhomogeneous_poisson(
         if bin_ms <= 0.0:
             raise ValueError(f"bin_ms must be > 0 (got {bin_ms!r})")
         times_ms = np.arange(rates_hz.size, dtype=float) * bin_ms
+        if gabab_cfg and gabab_cfg["history"] == "full":
+            rates_hz = _apply_gabab_to_curve(times_ms, rates_hz, gabab_cfg)
     else:
         raise ValueError("inhomogeneous_poisson requires source['path'] or source['freq']")
 
@@ -834,6 +943,30 @@ def _mode_inhomogeneous_poisson(
             if times_ms.size:
                 times_ms = times_ms - times_ms[0]
 
+    if gabab_cfg and gabab_cfg["history"] == "trimmed":
+        rates_hz = _apply_gabab_to_curve(times_ms, rates_hz, gabab_cfg)
+
+    freq_scale_raw = source.get("freq_scale", None)
+    freq_shift_raw = source.get("freq_shift", None)
+    try:
+        freq_scale = 1.0 if freq_scale_raw is None else float(freq_scale_raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"source['freq_scale'] must be numeric or null (got {freq_scale_raw!r})"
+        ) from exc
+    try:
+        freq_shift = 0.0 if freq_shift_raw is None else float(freq_shift_raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"source['freq_shift'] must be numeric or null (got {freq_shift_raw!r})"
+        ) from exc
+
+    apply_xform = (freq_scale != 1.0) or (freq_shift != 0.0)
+    if apply_xform:
+        rates_hz = rates_hz * freq_scale + freq_shift
+        if rates_hz.size:
+            rates_hz = np.maximum(rates_hz, 0.0)
+
     # Build per-synapse accumulators
     trains: List[List[float]] = [[] for _ in range(n_syn)]
     baseline_rate = anchors.get("baseline_rate_hz", None)
@@ -843,7 +976,12 @@ def _mode_inhomogeneous_poisson(
         if rates_hz.size == 0:
             return None
         if baseline_rate is not None:
-            return float(baseline_rate)
+            rate = float(baseline_rate)
+            if apply_xform:
+                rate = rate * freq_scale + freq_shift
+                if rate < 0.0:
+                    rate = 0.0
+            return float(rate)
         kind = baseline_spec.get("kind")
         if kind == "from_curve":
             where = baseline_spec.get("where")

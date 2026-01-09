@@ -708,6 +708,9 @@ def _normalize_group_configs(
     source_keys = (
         "freq",
         "baseline",
+        "gabab",
+        "freq_scale",
+        "freq_shift",
         "kind",
         "path",
         "time_col",

@@ -6,7 +6,6 @@
 
   "auto_run_outputs": true,
   "auto_run_inputs": true,
-  "auto_run_extras": false,
 
   "plot_outputs": true,
   "plot_output_curve": true,
@@ -51,7 +50,9 @@
   "compare_list_paths": [
     {"path": "/home/hrbncv/SCP/external_data/pyrFiringRateAvg.csv@500;color=k;linestyle=--", "enabled": false},
     {"path": "/home/hrbncv/SCP/external_data/bio_cell_output/pyrFiringRateAvg_gabab_tau200ms_delay50ms.csv@500;color=k;linestyle=-.", "enabled": false},
-    {"path": "/home/hrbncv/SCP/external_data/SSTFiringRateAvg.csv@525;color=k;linestyle=--", "enabled": true},
+    {"path": "/home/hrbncv/SCP/external_data/SSTFiringRateAvg.csv@525;color=m;linestyle=--;label=SST_bio_shifted", "enabled": true},
+    {"path": "/home/hrbncv/SCP/external_data/SSTFiringRateAvg.csv@500;color=k;linestyle=--;label=SST_bio", "enabled": true},
+    {"path": "/home/hrbncv/SCP/external_data/PVFiringRateAvg.csv@300;color=b;linestyle=--;label=PV_bio", "enabled": false},
     {"path": "/home/hrbncv/SCP/cells/SST/tunes/seg_tuned/output_data/tune3_SST_VIPinh_1000tr@color=m;linestyle=--", "enabled": false}
   ],
   "compare_list_dir_paths": [
@@ -75,13 +76,13 @@
   "input_raster_win_size": 25.0,
   "input_raster_style": "dot",
   "input_plot_window": [
-    null,
-    null
+    400,
+    1100
   ],
+  "input_legend_loc": "upper left",
   "compare_input_layout": "side-by-side",
   "compare_show_input_std": false,
 
-  "extra_output_metrics": true,
   "output_metrics_show_params": true,
   "output_metrics_ref_label": null,
   "output_metrics_show_delta": true,

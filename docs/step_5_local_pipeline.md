@@ -42,5 +42,7 @@ Append mode
 Notes
 - Step numbers in older docs may refer to 2.x (2.3, 2.4). In SCP these map
   to 5.2.3 and 5.2.4 to keep Step 5 as the stable pipeline.
+- Inhomogeneous input sources can use `source.gabab` and
+  `source.freq_scale`/`source.freq_shift` (see `configs_reference.md`).
 - `5_old_PV.ipynb` and `5_old_SST.ipynb` are legacy notebooks kept for reference.
 - `5_colab.ipynb` bootstraps a clean environment when needed.
