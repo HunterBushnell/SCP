@@ -1,7 +1,7 @@
 {
   "title": "paper_compare",
   "defaults": {
-    "plot_window": [400, 1100],
+    "plot_window": [500, 1100],
     "compare_output_layout": "overlay",
     "multi_plot_type": "line",
     "multi_shade_mode": null,
@@ -20,10 +20,10 @@
     {
       "path": "cells/PV/tunes/seg_tuned/output_data/_final_PV_base_1000tr",
       "label": "PV base",
-      "enabled": false,
+      "enabled": true,
       "shift_ms": 200,
       "scale": 1,
-      "color": "b",
+      "color": "navy",
       "linestyle": "-"
     },
     {
@@ -36,27 +36,63 @@
       "linestyle": "-"
     },
     {
+      "path": "cells/PV/tunes/seg_tuned/output_data/_PV_base_noSTP",
+      "label": "PV Base (0 Dep)",
+      "enabled": false,
+      "shift_ms": 200,
+      "scale": 1,
+      "color": "dodgerblue",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/PV/tunes/seg_tuned/output_data/_PV_base_200STP",
+      "label": "PV Base (200 Dep)",
+      "enabled": false,
+      "shift_ms": 200,
+      "scale": 1,
+      "color": "navy",
+      "linestyle": "-"
+    },
+    {
       "path": "cells/SST/tunes/seg_tuned/output_data/_final_SST_base_1000tr",
       "label": "SST base",
       "enabled": false,
       "scale": 1,
-      "color": "m",
+      "color": "darkmagenta",
       "linestyle": "-"
     },
     {
       "path": "cells/SST/tunes/seg_tuned/output_data/_final_SST_VIPinh2_1000tr",
       "label": "SST VIPinh",
-      "enabled": true,
+      "enabled": false,
       "scale": 1,
-      "color": "m",
+      "color": "magenta",
       "linestyle": "-"
     },
     {
       "path": "cells/SST/tunes/seg_tuned/output_data/_final_SST_GABAB_1000tr",
       "label": "SST GABABinh",
-      "enabled": true,
+      "enabled": false,
       "scale": 1,
-      "color": "purple",
+      "color": "darkmagenta",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_SST_VIPinh_noSTP",
+      "label": "SST VIPinh (0 Fac)",
+      "enabled": false,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "violet",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_SST_VIPinh_140STP",
+      "label": "SST VIPinh (140 Fac)",
+      "enabled": false,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "darkmagenta",
       "linestyle": "-"
     },
 
@@ -72,25 +108,25 @@
     {
       "path": "external_data/SSTFiringRateAvg.csv",
       "label": "SST bio",
-      "enabled": true,
+      "enabled": false,
       "shift_ms": 500,
-      "scale": 1,
-      "color": "k",
-      "linestyle": "--"
-    },
-    {
-      "path": "external_data/SSTFiringRateAvg.csv",
-      "label": "SST bio shifted",
-      "enabled": true,
-      "shift_ms": 525,
       "scale": 1,
       "color": "m",
       "linestyle": "--"
     },
     {
+      "path": "external_data/SSTFiringRateAvg.csv",
+      "label": "SST bio shifted",
+      "enabled": false,
+      "shift_ms": 525,
+      "scale": 1,
+      "color": "k",
+      "linestyle": "--"
+    },
+    {
       "path": "external_data/pyrFiringRateAvg.csv",
       "label": "PN bio",
-      "enabled": true,
+      "enabled": false,
       "shift_ms": 500,
       "scale": 1,
       "color": "r",
