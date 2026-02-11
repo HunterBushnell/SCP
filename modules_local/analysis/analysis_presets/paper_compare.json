@@ -18,25 +18,46 @@
   },
   "entries": [
     {
-      "path": "cells/PV/tunes/seg_tuned/output_data/_final_PV_base_1000tr",
+      "path": "external_data/pyrFiringRateAvg.csv",
+      "label": "PN bio",
+      "enabled": false,
+      "shift_ms": 500,
+      "scale": 1,
+      "color": "r",
+      "linestyle": "--"
+    },
+
+
+
+    {
+      "path": "external_data/PVFiringRateAvg.csv",
+      "label": "PV bio",
+      "enabled": false,
+      "shift_ms": 500,
+      "scale": 1,
+      "color": "b",
+      "linestyle": "--"
+    },
+    {
+      "path": "cells/PV/tunes/seg_tuned/output_data/_final_base_PV",
       "label": "PV base",
-      "enabled": true,
+      "enabled": false,
       "shift_ms": 200,
       "scale": 1,
       "color": "navy",
       "linestyle": "-"
     },
     {
-      "path": "cells/PV/tunes/seg_tuned/output_data/_final_PV_SSTinh_1000tr",
+      "path": "cells/PV/tunes/seg_tuned/output_data/_final_SSTinh_PV",
       "label": "PV SSTinh",
-      "enabled": true,
+      "enabled": false,
       "shift_ms": 200,
       "scale": 1,
       "color": "b",
       "linestyle": "-"
     },
     {
-      "path": "cells/PV/tunes/seg_tuned/output_data/_PV_base_noSTP",
+      "path": "cells/PV/tunes/seg_tuned/output_data/__base_PV",
       "label": "PV Base (0 Dep)",
       "enabled": false,
       "shift_ms": 200,
@@ -44,67 +65,8 @@
       "color": "dodgerblue",
       "linestyle": "-"
     },
-    {
-      "path": "cells/PV/tunes/seg_tuned/output_data/_PV_base_200STP",
-      "label": "PV Base (200 Dep)",
-      "enabled": false,
-      "shift_ms": 200,
-      "scale": 1,
-      "color": "navy",
-      "linestyle": "-"
-    },
-    {
-      "path": "cells/SST/tunes/seg_tuned/output_data/_final_SST_base_1000tr",
-      "label": "SST base",
-      "enabled": false,
-      "scale": 1,
-      "color": "darkmagenta",
-      "linestyle": "-"
-    },
-    {
-      "path": "cells/SST/tunes/seg_tuned/output_data/_final_SST_VIPinh2_1000tr",
-      "label": "SST VIPinh",
-      "enabled": false,
-      "scale": 1,
-      "color": "magenta",
-      "linestyle": "-"
-    },
-    {
-      "path": "cells/SST/tunes/seg_tuned/output_data/_final_SST_GABAB_1000tr",
-      "label": "SST GABABinh",
-      "enabled": false,
-      "scale": 1,
-      "color": "darkmagenta",
-      "linestyle": "-"
-    },
-    {
-      "path": "cells/SST/tunes/seg_tuned/output_data/_SST_VIPinh_noSTP",
-      "label": "SST VIPinh (0 Fac)",
-      "enabled": false,
-      "shift_ms": 0,
-      "scale": 1,
-      "color": "violet",
-      "linestyle": "-"
-    },
-    {
-      "path": "cells/SST/tunes/seg_tuned/output_data/_SST_VIPinh_140STP",
-      "label": "SST VIPinh (140 Fac)",
-      "enabled": false,
-      "shift_ms": 0,
-      "scale": 1,
-      "color": "darkmagenta",
-      "linestyle": "-"
-    },
 
-    {
-      "path": "external_data/PVFiringRateAvg.csv",
-      "label": "PV bio",
-      "enabled": true,
-      "shift_ms": 500,
-      "scale": 1,
-      "color": "b",
-      "linestyle": "--"
-    },
+
     {
       "path": "external_data/SSTFiringRateAvg.csv",
       "label": "SST bio",
@@ -124,13 +86,37 @@
       "linestyle": "--"
     },
     {
-      "path": "external_data/pyrFiringRateAvg.csv",
-      "label": "PN bio",
+      "path": "cells/SST/tunes/seg_tuned/output_data/_final_base_SST",
+      "label": "SST base",
       "enabled": false,
-      "shift_ms": 500,
       "scale": 1,
-      "color": "r",
-      "linestyle": "--"
+      "color": "darkmagenta",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_final_VIPinh_SST",
+      "label": "SST VIPinh",
+      "enabled": false,
+      "scale": 1,
+      "color": "magenta",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_final_GABAB_SST",
+      "label": "SST GABABinh",
+      "enabled": false,
+      "scale": 1,
+      "color": "darkmagenta",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_STP0_VIPinh_SST",
+      "label": "SST VIPinh (0 Fac)",
+      "enabled": false,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "violet",
+      "linestyle": "-"
     }
   ]
 }

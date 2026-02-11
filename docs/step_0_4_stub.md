@@ -1,13 +1,27 @@
-Steps 0-4 (Stub)
+Steps 0-4 (Transition Status)
 
-These steps will be updated after the PV/SST paper to align with the current
-config layout in `cell_configs/`. The notes below are placeholders.
+Step 0 is now updated for the `modules_local` pipeline. Steps 1-4 are still
+legacy/stub and will be migrated next.
 
-0_download.ipynb
-- Purpose: download an AllenDB biophysical bundle into `cells/<CELL>/...`.
-- Inputs: `specimen_id`, `model_type`, `tunes_dir`, optional `model_dir`.
-- Outputs (expected): Allen bundle files including `manifest.json`, morphologies,
-  and `modfiles/` (compiled in 0.2).
+0_download.ipynb / scripts/step0_prepare.py
+- Purpose: bootstrap a tune directory so it is ready for Steps 1-6.
+- Core implementation: `modules_local/step0_prepare.py`.
+- Inputs:
+  - Cell/tune target (`cells/<CELL>/tunes/<TUNE>` or explicit `--tune-dir`)
+  - Allen model identity (`specimen_id`, `model_type`)
+  - Optional toggles for download/compile/scaffold/validation behavior
+- Actions:
+  - Download/cache Allen bundle files (`manifest.json`, morphology, fit json, `modfiles/`)
+  - Compile modfiles (`nrnivmodl`) and optionally load the DLL
+  - Scaffold common files under `cell_configs/`
+- Outputs:
+  - `manifest.json`
+  - `modfiles/` (+ compiled `x86_64/.libs/libnrnmech.so` when compiled)
+  - `cell_configs/cell_config.json`
+  - `cell_configs/sim_config.json`
+  - `cell_configs/geometry.json`
+  - `cell_configs/syn_config.json`
+  - `cell_configs/syn_groups/placeholder_off.json`
 
 1_segment.ipynb
 - Purpose: segment the morphology and build a geometry description.

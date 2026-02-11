@@ -39,7 +39,7 @@ extern double hoc_Exp(double);
 	/*SUPPRESS 762*/
 	/*SUPPRESS 763*/
 	/*SUPPRESS 765*/
-	 extern double *getarg();
+	 extern double *getarg(int);
  /* Thread safe. No static _p or _ppvar. */
  
 #define t _nt->_t
@@ -221,7 +221,7 @@ extern void _cvode_abstol( Symbol**, double*, int);
  	hoc_register_cvode(_mechtype, _ode_count, _ode_map, _ode_spec, _ode_matsol);
  	hoc_register_tolerance(_mechtype, _hoc_state_tol, &_atollist);
  	hoc_register_var(hoc_scdoub, hoc_vdoub, hoc_intfunc);
- 	ivoc_help("help ?1 CaDynamics /home/hrbncv/PV-SST/single_cells/cells/SST/tunes/seg_tuned/modfiles/CaDynamics.mod\n");
+ 	ivoc_help("help ?1 CaDynamics /home/hrbncv/SCP/cells/SST/tunes/seg_tuned/modfiles/CaDynamics.mod\n");
  hoc_register_limits(_mechtype, _hoc_parm_limits);
  hoc_register_units(_mechtype, _hoc_parm_units);
  }
@@ -445,7 +445,7 @@ _first = 0;
 #endif
 
 #if NMODL_TEXT
-static const char* nmodl_filename = "/home/hrbncv/PV-SST/single_cells/cells/SST/tunes/seg_tuned/modfiles/CaDynamics.mod";
+static const char* nmodl_filename = "/home/hrbncv/SCP/cells/SST/tunes/seg_tuned/modfiles/CaDynamics.mod";
 static const char* nmodl_file_text = 
   ": Dynamics that track inside calcium concentration\n"
   ": modified from Destexhe et al. 1994\n"

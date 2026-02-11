@@ -1,10 +1,12 @@
 Pipeline Overview
 
-SCP is a notebook-first pipeline for single-cell simulations. Steps 0-4 are legacy
-and will be updated; Step 5 is the stable pipeline; Step 6 is analysis.
+SCP is a notebook-first pipeline for single-cell simulations.
+Step 0 is now migrated to `modules_local`; Steps 1-4 are still legacy and will
+be updated next; Step 5 is the stable run pipeline; Step 6 is analysis.
 
 Steps (notebooks)
-- 0_download.ipynb: Download AllenDB bundle into `cells/` (stub/min info).
+- 0_download.ipynb: Bootstrap tune directory (download/compile/scaffold/validate).
+- scripts/step0_prepare.py: CLI equivalent of Step 0.
 - 1_segment.ipynb: Segment and prepare morphology (stub/min info).
 - 2_passive.ipynb: Passive parameter tuning (stub/min info).
 - 3_active.ipynb: Active parameter tuning (stub/min info).

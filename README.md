@@ -6,7 +6,7 @@ It is being prepared for extraction into its own repo.
 Goals
 - Provide a repeatable, notebook-first pipeline for single-cell sims and analysis.
 - Keep configs and outputs consistent across notebook and CLI/SLURM runs.
-- Make Step 5 (local pipeline) stable and reusable while Steps 0-4 are updated later.
+- Keep Step 5 (local pipeline) stable while migrating legacy Steps 0-4.
 
 Quickstart (existing tune)
 - Notebook route: open `5_local.ipynb` and run all.
@@ -14,7 +14,8 @@ Quickstart (existing tune)
   `python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 1`
 
 Pipeline map
-- 0_download.ipynb: Download AllenDB cell bundle (legacy helper, minimal for now)
+- 0_download.ipynb: Step-0 bootstrap (download + compile + scaffold + validate)
+- scripts/step0_prepare.py: CLI for Step-0 bootstrap
 - 1_segment.ipynb: Segment cell (stub/min info for now)
 - 2_passive.ipynb: Passive tuning (stub/min info for now)
 - 3_active.ipynb: Active tuning (stub/min info for now)
@@ -61,5 +62,6 @@ Contracts
 - Contracts are descriptive; only inputs and outputs should be treated as authoritative.
 
 Status notes
-- Steps 0-4 will be updated after the PV/SST paper to align with the new config layout.
+- Step 0 now uses `modules_local` and writes/validates `cell_configs/` scaffolds.
+- Steps 1-4 are still legacy and will be migrated next.
 - `5_colab.ipynb` bootstraps a clean environment and can compile modfiles as needed.

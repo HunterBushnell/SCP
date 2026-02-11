@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 STATUS_FILE="${STATUS_FILE:-}"
 STATUS_LATEST_FILE="${STATUS_LATEST_FILE:-}"
 STATUS_PRIMARY_FILE="${STATUS_PRIMARY_FILE:-}"
@@ -68,7 +70,7 @@ write_status() {
 
 write_status "MERGING" "merge_start"
 
-if python /home/hrbncv/SCP/scripts/merge_array_results.py "$@"; then
+if python "${SCRIPT_DIR}/merge_array_results.py" "$@"; then
     write_status "SUCCESS" "merged"
     if [[ -n "${PARTS_DIR}" && -d "${PARTS_DIR}" ]]; then
         rm -rf "${PARTS_DIR}"

@@ -40,7 +40,7 @@ extern double hoc_Exp(double);
 	/*SUPPRESS 762*/
 	/*SUPPRESS 763*/
 	/*SUPPRESS 765*/
-	 extern double *getarg();
+	 extern double *getarg(int);
  /* Thread safe. No static _p or _ppvar. */
  
 #define t _nt->_t
@@ -232,7 +232,7 @@ extern void _cvode_abstol( Symbol**, double*, int);
  	hoc_register_cvode(_mechtype, _ode_count, _ode_map, _ode_spec, _ode_matsol);
  	hoc_register_tolerance(_mechtype, _hoc_state_tol, &_atollist);
  	hoc_register_var(hoc_scdoub, hoc_vdoub, hoc_intfunc);
- 	ivoc_help("help ?1 Ca_LVA /home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/modfiles/Ca_LVA.mod\n");
+ 	ivoc_help("help ?1 Ca_LVA /home/hrbncv/SCP/cells/PV/tunes/seg_tuned/modfiles/Ca_LVA.mod\n");
  hoc_register_limits(_mechtype, _hoc_parm_limits);
  hoc_register_units(_mechtype, _hoc_parm_units);
  }
@@ -505,7 +505,7 @@ _first = 0;
 #endif
 
 #if NMODL_TEXT
-static const char* nmodl_filename = "/home/hrbncv/PV-SST/single_cells/cells/PV/tunes/seg_tuned/modfiles/Ca_LVA.mod";
+static const char* nmodl_filename = "/home/hrbncv/SCP/cells/PV/tunes/seg_tuned/modfiles/Ca_LVA.mod";
 static const char* nmodl_file_text = 
   ": Comment: LVA ca channel. Note: mtau is an approximation from the plots\n"
   ": Reference:		Avery and Johnston 1996, tau from Randall 1997\n"

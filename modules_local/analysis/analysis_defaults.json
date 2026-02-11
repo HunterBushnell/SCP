@@ -12,7 +12,10 @@
   "plot_spike_stats": false,
   "plot_raster": false,
   "raster_style": "dot",
-  "plot_window": [500, 1100],
+  "plot_window": [200, 900],
+  "input_plot_window": [200,900],
+  "output_stim_start_ms": null,
+  "output_stim_stop_ms": null,
   "win_size": 25,
   "multi_plot_type": "line",
   "multi_shade_mode": null,
@@ -40,8 +43,6 @@
   "output_show_metric_points": true,
   "output_metric_label_points": false,
   "output_metric_marker_size": 36.0,
-  "output_stim_start_ms": 500.0,
-  "output_stim_stop_ms": 1000.0,
   "output_bin_ms": 5.0,
   "output_smooth_mode": "center",
 
@@ -51,8 +52,8 @@
     {"path": "/home/hrbncv/SCP/external_data/pyrFiringRateAvg.csv@500;color=k;linestyle=--", "enabled": false},
     {"path": "/home/hrbncv/SCP/external_data/bio_cell_output/pyrFiringRateAvg_gabab_tau200ms_delay50ms.csv@500;color=k;linestyle=-.", "enabled": false},
     {"path": "/home/hrbncv/SCP/external_data/SSTFiringRateAvg.csv@525;color=m;linestyle=--;label=SST_bio_shifted", "enabled": false},
-    {"path": "/home/hrbncv/SCP/external_data/SSTFiringRateAvg.csv@500;color=k;linestyle=--;label=SST_bio", "enabled": true},
-    {"path": "/home/hrbncv/SCP/external_data/PVFiringRateAvg.csv@300;color=b;linestyle=--;label=PV_bio", "enabled": false},
+    {"path": "/home/hrbncv/SCP/external_data/SSTFiringRateAvg.csv@500;color=k;linestyle=--;label=SST_bio", "enabled": false},
+    {"path": "/home/hrbncv/SCP/external_data/PVFiringRateAvg.csv@300;color=b;linestyle=--;label=PV_bio", "enabled": true},
     {"path": "/home/hrbncv/SCP/cells/SST/tunes/seg_tuned/output_data/_final_SST_base_1000tr@color=m;linestyle=--;label=SST_model_base", "enabled": false}
   ],
   "compare_list_dir_paths": [
@@ -75,10 +76,6 @@
   "input_raster_max_trains": 200,
   "input_raster_win_size": 25.0,
   "input_raster_style": "dot",
-  "input_plot_window": [
-    400,
-    1100
-  ],
   "input_legend_loc": "upper left",
   "compare_input_layout": "side-by-side",
   "compare_show_input_std": false,

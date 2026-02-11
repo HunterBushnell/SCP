@@ -1,0 +1,17 @@
+{
+  "distance_origin": {
+    "kind": "soma",
+    "x": 0.5
+  },
+  "thresholds_um": {
+    "proximal": {
+      "low": 20.0,
+      "high": 100.0
+    },
+    "distal": {
+      "low": 100.0,
+      "high": null
+    }
+  },
+  "label": "PV_2_default_geometry"
+}

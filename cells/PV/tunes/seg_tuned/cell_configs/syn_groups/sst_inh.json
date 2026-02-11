@@ -1,6 +1,6 @@
 {
   "sst_inh": {
-    "state": true,
+    "state": false,
     "mode": "precomputed",
     "color": "#ff7f0e",
     "source": {

@@ -15,7 +15,8 @@ STATE_TO_CODE = {
     "MERGING": "G",
 }
 
-DEFAULT_REMOTE_PATH = "/home/hrbncv/SCP/logs/status/pvsst_latest.status"
+# Keep default host path user-agnostic. This is resolved on the remote host.
+DEFAULT_REMOTE_PATH = "SCP/logs/status/pvsst_latest.status"
 
 
 def run_ssh(ssh_bin, ssh_opts, host, remote_path, timeout):

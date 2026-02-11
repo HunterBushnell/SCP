@@ -39,7 +39,7 @@ extern double hoc_Exp(double);
 	/*SUPPRESS 762*/
 	/*SUPPRESS 763*/
 	/*SUPPRESS 765*/
-	 extern double *getarg();
+	 extern double *getarg(int);
  /* Thread safe. No static _p or _ppvar. */
  
 #define t _nt->_t
@@ -313,7 +313,7 @@ extern void _cvode_abstol( Symbol**, double*, int);
  pnt_receive_init[_mechtype] = _net_init;
  pnt_receive_size[_mechtype] = 4;
  	hoc_register_var(hoc_scdoub, hoc_vdoub, hoc_intfunc);
- 	ivoc_help("help ?1 GABA_A_STP /home/hrbncv/PV-SST/single_cells/cells/SST/tunes/seg_tuned/modfiles/GABA_A_STP.mod\n");
+ 	ivoc_help("help ?1 GABA_A_STP /home/hrbncv/SCP/cells/SST/tunes/seg_tuned/modfiles/GABA_A_STP.mod\n");
  hoc_register_limits(_mechtype, _hoc_parm_limits);
  hoc_register_units(_mechtype, _hoc_parm_units);
  }
@@ -353,7 +353,7 @@ static int _ode_spec1(_threadargsproto_);
 static void _net_receive (Point_process* _pnt, double* _args, double _lflag) 
 {  double* _p; Datum* _ppvar; Datum* _thread; NrnThread* _nt;
    _thread = (Datum*)0; _nt = (NrnThread*)_pnt->_vnt;   _p = _pnt->_prop->param; _ppvar = _pnt->_prop->dparam;
-  if (_tsav > t){ extern char* hoc_object_name(); hoc_execerror(hoc_object_name(_pnt->ob), ":Event arrived out of order. Must call ParallelContext.set_maxstep AFTER assigning minimum NetCon.delay");}
+  if (_tsav > t){ extern char* hoc_object_name(Object*); hoc_execerror(hoc_object_name(_pnt->ob), ":Event arrived out of order. Must call ParallelContext.set_maxstep AFTER assigning minimum NetCon.delay");}
  _tsav = t; {
    double _lPr , _lweight_GABAA ;
  if ( t < 0.0 ) {
@@ -635,7 +635,7 @@ _first = 0;
 #endif
 
 #if NMODL_TEXT
-static const char* nmodl_filename = "/home/hrbncv/PV-SST/single_cells/cells/SST/tunes/seg_tuned/modfiles/GABA_A_STP.mod";
+static const char* nmodl_filename = "/home/hrbncv/SCP/cells/SST/tunes/seg_tuned/modfiles/GABA_A_STP.mod";
 static const char* nmodl_file_text = 
   "COMMENT\n"
   "/**\n"
@@ -685,7 +685,7 @@ static const char* nmodl_file_text =
   "    Fac          = 10    (ms) :  relaxation time constant from facilitation\n"
   "    e_GABAA      = -75   (mV) : GABAA reversal potential was -80mv change to -75 never heard of e_gaba not -75 - Greg\n"
   "    gmax         = .001  (uS) : weight conversion factor (from nS to uS)\n"
-  "    u0           = 0          :initial value of u, which is the running value of release probability\n"
+  "    u0           = 0          : initial value of u, which is the running value of release probability\n"
   "    synapseID    = 0\n"
   "    verboseLevel = 0\n"
   "    conductance  = 0.0\n"

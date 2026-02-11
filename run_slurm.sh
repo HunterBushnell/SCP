@@ -19,6 +19,10 @@
 
 set -euo pipefail
 
+# Resolve SCP repo root from this script location unless overridden.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="${REPO_ROOT:-${SCRIPT_DIR}}"
+
 # Capture submit dir before changing cwd (SLURM writes logs relative to submit dir).
 SUBMIT_DIR="${SLURM_SUBMIT_DIR:-$(pwd)}"
 LOG_SRC_DIR="${SUBMIT_DIR}/logs"
@@ -184,7 +188,7 @@ fi
 #   - Set CELL and TUNE (defaults below)
 CELL=${CELL:-SST}
 TUNE=${TUNE:-seg_tuned}
-TUNE_DIR=${TUNE_DIR:-/home/hrbncv/SCP/cells/${CELL}/tunes/${TUNE}}
+TUNE_DIR=${TUNE_DIR:-${REPO_ROOT}/cells/${CELL}/tunes/${TUNE}}
 
 OUTPUT_DIR=${OUTPUT_DIR:-${TUNE_DIR}/output_data}
 MODE=${MODE:-}              # leave empty to auto-pick based on n_trials
@@ -343,7 +347,7 @@ fi
 
 export STATUS_FILE STATUS_LATEST_FILE STATUS_PRIMARY_FILE STATUS_IS_PRIMARY RUN_TAG
 
-CMD=(python /home/hrbncv/SCP/run_pipeline.py
+CMD=(python "${REPO_ROOT}/run_pipeline.py"
     --tune-dir "$TUNE_DIR"
     --output-dir "$RESULTS_DIR")
 
@@ -401,7 +405,7 @@ fi
 if [[ -n "${SLURM_ARRAY_TASK_ID:-}" && "${SLURM_ARRAY_TASK_ID}" == "0" && "${MERGE_ARRAY}" == "1" ]]; then
     MERGED_STEM=${MERGED_STEM:-"results"}
     mkdir -p "${RUN_ROOT}/logs"
-    MERGE_CMD=(/home/hrbncv/SCP/scripts/merge_array_results_with_status.sh
+    MERGE_CMD=("${REPO_ROOT}/scripts/merge_array_results_with_status.sh"
         --input-dir "$PARTS_DIR"
         --output-dir "$RUN_ROOT"
         --job-id "$ARRAY_JOB_ID"

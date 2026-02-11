@@ -1,0 +1,13 @@
+{
+  "cell_name": "PV_2",
+  "tune": "adb",
+  "color": "b",
+  "specimen_id": 333604946,
+  "model_type": "perisomatic",
+  "paths": {
+    "manifest": "manifest.json"
+  },
+  "tuning": {
+    "soma_diam_multiplier": 1.0
+  }
+}
