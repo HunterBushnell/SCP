@@ -4,7 +4,12 @@ First check
 - Run `python scripts/check_setup.py --steps 0 1 2 3 4 5 --cell PV --tune seg_tuned`.
 
 Missing modfiles or NEURON errors
+- Local notebooks (Steps 2-5) expect precompiled mechanisms from Step 0.
+- Prepare/refresh with Step 0 (`0_download.ipynb` or `scripts/step0_prepare.py`)
+  if the tune bundle is incomplete.
 - Build modfiles: `cd <tune_dir>/modfiles && nrnivmodl`.
+- In Colab notebooks, rerun the bootstrap cell first (it installs deps and
+  can compile mechanisms automatically).
 
 Missing configs
 - Confirm `cell_configs/` contains `cell_config.json`, `sim_config.json`, `syn_config.json`.

@@ -8,10 +8,136 @@ runtime behavior used in local and Colab workflows.
 from __future__ import annotations
 
 import json
+import os
+import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Sequence
 
 from modules_local.load_cell import load_cell
+
+
+def is_scp_repo_root(path: Path) -> bool:
+    """Return True when `path` looks like the SCP repository root."""
+    return (path / "modules_local").is_dir() and (path / "run_pipeline.py").is_file()
+
+
+def find_scp_repo_root(start: Path | None = None) -> Path:
+    """
+    Locate the SCP repository root from current context.
+
+    Resolution order:
+    1. `SCP_ROOT` environment variable (if valid)
+    2. Current working directory and its parents
+    3. Direct child directories of cwd and cwd.parent (for parent-launched kernels)
+    """
+    env_root = os.environ.get("SCP_ROOT")
+    if env_root:
+        env_path = Path(env_root).expanduser().resolve()
+        if is_scp_repo_root(env_path):
+            return env_path
+        raise FileNotFoundError(
+            f"SCP_ROOT does not point to an SCP repo root: {env_path}. "
+            "Expected modules_local/ and run_pipeline.py."
+        )
+
+    start_path = (start or Path.cwd()).resolve()
+    for cand in (start_path, *start_path.parents):
+        if is_scp_repo_root(cand):
+            return cand
+
+    for base in (start_path, start_path.parent):
+        try:
+            for child in base.iterdir():
+                if child.is_dir() and is_scp_repo_root(child):
+                    return child.resolve()
+        except Exception:
+            pass
+
+    raise FileNotFoundError(
+        f"Could not locate SCP repo root from {start_path}. "
+        "Set SCP_ROOT or launch Jupyter from inside the repo."
+    )
+
+
+def ensure_scp_repo_on_syspath(start: Path | None = None) -> Path:
+    """Find SCP repo root and prepend it to `sys.path` if missing."""
+    repo_root = find_scp_repo_root(start=start)
+    repo_str = str(repo_root)
+    if repo_str not in sys.path:
+        sys.path.insert(0, repo_str)
+    return repo_root
+
+
+def resolve_external_repo(
+    repo_name: str,
+    marker_rel: Path,
+    env_vars: Sequence[str],
+    repo_root: Path,
+) -> Path:
+    """
+    Resolve a sibling external repository used by SCP notebooks (e.g., ACT/bmtool).
+    """
+    candidates: list[Path] = []
+    for var in env_vars:
+        raw = os.environ.get(var)
+        if raw:
+            candidates.append(Path(raw).expanduser())
+
+    cwd = Path.cwd()
+    candidates.extend(
+        [
+            repo_root.parent / "mods" / repo_name,
+            repo_root / "mods" / repo_name,
+            Path.home() / "mods" / repo_name,
+            (cwd / ".." / "mods" / repo_name).resolve(),
+            (cwd / "mods" / repo_name).resolve(),
+        ]
+    )
+
+    seen: set[Path] = set()
+    for cand in candidates:
+        try:
+            resolved = cand.resolve()
+        except Exception:
+            resolved = cand
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if (resolved / marker_rel).is_file():
+            return resolved
+
+    raise FileNotFoundError(
+        f"{repo_name} repo not found. Set {', '.join(env_vars)} "
+        f"or place it at ../mods/{repo_name} relative to SCP."
+    )
+
+
+def ensure_external_repo_on_syspath(
+    repo_name: str,
+    marker_rel: Path,
+    env_vars: Sequence[str],
+    repo_root: Path | None = None,
+    prepend: bool = False,
+) -> Path:
+    """
+    Resolve an external repo and add it to `sys.path`.
+
+    Set `prepend=True` to prioritize it over installed packages.
+    """
+    root = repo_root if repo_root is not None else find_scp_repo_root()
+    external_path = resolve_external_repo(
+        repo_name=repo_name,
+        marker_rel=marker_rel,
+        env_vars=env_vars,
+        repo_root=root,
+    )
+    ext_str = str(external_path)
+    if ext_str not in sys.path:
+        if prepend:
+            sys.path.insert(0, ext_str)
+        else:
+            sys.path.append(ext_str)
+    return external_path
 
 
 def resolve_cell_config_for_notebook(cell_name: str, tune_dir: Path | None = None) -> Dict[str, Any]:
@@ -68,4 +194,3 @@ def build_cell_for_notebook(cell_config: Dict[str, Any]):
         loaded.axon = list(loaded.h.axon) if hasattr(loaded.h, "axon") else []
 
     return loaded
-

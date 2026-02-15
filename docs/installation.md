@@ -40,3 +40,6 @@ Manual modfile build (per tune)
 
 Colab/Linux bootstrapped notebooks
 - `2_colab.ipynb`, `3_colab.ipynb`, and `5_colab.ipynb` install dependencies and clone required repos in a fresh Colab session.
+- Optional Colab environment overrides:
+  - SCP repo: `SCP_REPO_URL`, `SCP_REPO_BRANCH`, `SCP_REPO_DIR`, `SCP_GIT_TOKEN`.
+  - ACT repo (Steps 2/3): `SCP_ACT_REPO_URL`, `SCP_ACT_REPO_BRANCH`, `SCP_ACT_DIR`, `SCP_ACT_PATH`.

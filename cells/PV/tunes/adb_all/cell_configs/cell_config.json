@@ -6,6 +6,6 @@
     "manifest": "manifest.json"
   },
   "tuning": {
-    "soma_diam_multiplier": 6.0
+    "soma_diam_multiplier": 1.0
   }
 }
