@@ -13,7 +13,7 @@
   "plot_raster": false,
   "raster_style": "dot",
   "plot_window": [200, 900],
-  "input_plot_window": [200,900],
+  "input_plot_window": [200, 900],
   "output_stim_start_ms": null,
   "output_stim_stop_ms": null,
   "win_size": 25,
@@ -49,12 +49,12 @@
   "compare_preset_path": null,
   "compare_list_paths_enabled": true,
   "compare_list_paths": [
-    {"path": "/home/hrbncv/SCP/external_data/pyrFiringRateAvg.csv@500;color=k;linestyle=--", "enabled": false},
-    {"path": "/home/hrbncv/SCP/external_data/bio_cell_output/pyrFiringRateAvg_gabab_tau200ms_delay50ms.csv@500;color=k;linestyle=-.", "enabled": false},
-    {"path": "/home/hrbncv/SCP/external_data/SSTFiringRateAvg.csv@525;color=m;linestyle=--;label=SST_bio_shifted", "enabled": false},
-    {"path": "/home/hrbncv/SCP/external_data/SSTFiringRateAvg.csv@500;color=k;linestyle=--;label=SST_bio", "enabled": false},
-    {"path": "/home/hrbncv/SCP/external_data/PVFiringRateAvg.csv@300;color=b;linestyle=--;label=PV_bio", "enabled": true},
-    {"path": "/home/hrbncv/SCP/cells/SST/tunes/seg_tuned/output_data/_final_SST_base_1000tr@color=m;linestyle=--;label=SST_model_base", "enabled": false}
+    {"path": "external_data/pyrFiringRateAvg.csv@500;color=k;linestyle=--", "enabled": false},
+    {"path": "external_data/bio_cell_output/pyrFiringRateAvg_gabab_tau200ms_delay50ms.csv@500;color=k;linestyle=-.", "enabled": false},
+    {"path": "external_data/SSTFiringRateAvg.csv@525;color=m;linestyle=--;label=SST_bio_shifted", "enabled": false},
+    {"path": "external_data/SSTFiringRateAvg.csv@500;color=k;linestyle=--;label=SST_bio", "enabled": false},
+    {"path": "external_data/PVFiringRateAvg.csv@300;color=b;linestyle=--;label=PV_bio", "enabled": true},
+    {"path": "cells/SST/tunes/seg_tuned/output_data/_final_SST_base_1000tr@color=m;linestyle=--;label=SST_model_base", "enabled": false}
   ],
   "compare_list_dir_paths": [
   "external_data"

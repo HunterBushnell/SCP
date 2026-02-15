@@ -40,7 +40,7 @@ extern double hoc_Exp(double);
 	/*SUPPRESS 762*/
 	/*SUPPRESS 763*/
 	/*SUPPRESS 765*/
-	 extern double *getarg(int);
+	 extern double *getarg();
  static double *_p; static Datum *_ppvar;
  
 #define t nrn_threads->_t
@@ -228,7 +228,7 @@ static int play();
  
 static void _net_receive (Point_process* _pnt, double* _args, double _lflag) 
 {    _p = _pnt->_prop->param; _ppvar = _pnt->_prop->dparam;
-  if (_tsav > t){ extern char* hoc_object_name(Object*); hoc_execerror(hoc_object_name(_pnt->ob), ":Event arrived out of order. Must call ParallelContext.set_maxstep AFTER assigning minimum NetCon.delay");}
+  if (_tsav > t){ extern char* hoc_object_name(); hoc_execerror(hoc_object_name(_pnt->ob), ":Event arrived out of order. Must call ParallelContext.set_maxstep AFTER assigning minimum NetCon.delay");}
  _tsav = t;   if (_lflag == 1. ) {*(_tqitem) = 0;}
  {
    if ( _lflag  == 1.0 ) {

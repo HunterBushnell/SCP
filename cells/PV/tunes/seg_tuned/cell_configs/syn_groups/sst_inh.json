@@ -1,12 +1,12 @@
 {
   "sst_inh": {
-    "state": false,
+    "state": true,
     "mode": "precomputed",
     "color": "#ff7f0e",
     "source": {
       "freq": null,
       "baseline": 3.5,
-      "path": "cells/SST/tunes/seg_tuned/output_data/_final_SST_VIPinh2_1000tr/results/spikes.npz",
+      "path": "cells/SST/tunes/seg_tuned/output_data/_final_VIPinh_SST/results/spikes.npz",
       "bin_ms": null,
       "key": "base tune"
     },
@@ -19,7 +19,7 @@
     },
     "syns": {
       "type": "GABA_A",
-      "N_syn": 15,
+      "N_syn": 150,
       "segs": "proximal",
       "dist_func": {
         "kind": "linear",

@@ -1,5 +1,8 @@
 # Step 2.3 – Input Generation Module Contract (PV–SST, v3)
 
+> Historical draft: kept for design history. For current behavior, prefer
+> `modules_local/inputs.py` and `docs/configs_reference.md`.
+
 This document specifies the design and behavior of **Step 2.3 – Input Generation** in the PV–SST single‑cell pipeline.
 
 Step 2.3 is responsible for generating **spike‑train inputs** for each synapse group defined in a JSON config, *without* touching NEURON directly. All synapse creation and attachment are handled later in **Step 2.4**.
@@ -629,7 +632,8 @@ Notebook sets tune directory and config path:
 from pathlib import Path
 from modules_local import inputs as stim_inputs
 
-TUNE_DIR = Path("/home/hrbncv/SCP/cells/SST/tunes/seg_tuned")
+REPO_ROOT = Path("<repo_root>")
+TUNE_DIR = REPO_ROOT / "cells" / "SST" / "tunes" / "seg_tuned"
 syn_cfg_path = TUNE_DIR / "cell_configs" / "syn_config.json"
 
 sim_cfg_preview, groups_cfg_preview = stim_inputs.check_inputs(syn_cfg_path)

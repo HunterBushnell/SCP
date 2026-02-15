@@ -27,6 +27,7 @@ from modules_local.load_cell import load_cell
 
 
 CONFIG_MODE_VALUES = ("fill", "overwrite", "skip")
+DEFAULT_GENOME_SECTION_ORDER = ("glob", "soma", "axon", "apic", "dend")
 
 
 @contextmanager
@@ -149,8 +150,6 @@ def default_cell_config(
         "cell_name": cell_name,
         "tune": tune_name,
         "color": color if color is not None else guess_cell_color(cell_name),
-        "specimen_id": int(specimen_id),
-        "model_type": model_type,
         "paths": {
             "manifest": "manifest.json",
         },
@@ -210,9 +209,6 @@ def default_sim_config(*, cell_name: str, specimen_id: int, model_type: str) -> 
             "save_all_traces": True,
             "save_syn_records_by_trial": True,
         },
-        # Convenience metadata used by legacy preview cells.
-        "specimen_id": int(specimen_id),
-        "model_type": model_type,
         "soma_diam_multiplier": float(guess_soma_multiplier(cell_name)),
     }
 
@@ -289,6 +285,134 @@ def resolve_step0_paths(tune_dir: Path) -> Step0Paths:
     )
 
 
+def find_fit_json(tune_dir: Path) -> Optional[Path]:
+    """
+    Locate the Allen fit JSON associated with this tune directory.
+
+    Priority:
+    1) `manifest.json` -> `biophys[*].model_file` entry ending in `_fit.json`
+    2) fallback to first `*_fit.json` file in tune root
+    """
+    tune_dir = Path(tune_dir).expanduser().resolve()
+    manifest_path = tune_dir / "manifest.json"
+
+    if manifest_path.is_file():
+        try:
+            manifest_data = _read_json(manifest_path)
+            biophys = manifest_data.get("biophys", [])
+            if isinstance(biophys, list):
+                for entry in biophys:
+                    if not isinstance(entry, dict):
+                        continue
+                    model_file = entry.get("model_file")
+                    model_file_items = model_file if isinstance(model_file, list) else [model_file]
+                    for item in model_file_items:
+                        if not isinstance(item, str):
+                            continue
+                        cand = Path(item)
+                        if not cand.name.endswith("_fit.json"):
+                            continue
+                        cand = (tune_dir / cand).resolve() if not cand.is_absolute() else cand.resolve()
+                        if cand.is_file():
+                            return cand
+        except Exception:
+            # Fall back to glob search below.
+            pass
+
+    fit_candidates = sorted(tune_dir.glob("*_fit.json"))
+    if fit_candidates:
+        return fit_candidates[0].resolve()
+    return None
+
+
+def sort_genome_by_section(
+    tune_dir: Path,
+    *,
+    section_order: Tuple[str, ...] = DEFAULT_GENOME_SECTION_ORDER,
+) -> Dict[str, Any]:
+    """
+    Optionally reorder fit JSON `genome` entries by section.
+
+    Sort key groups entries by `section`, preserving relative order within each
+    section bucket. This is cosmetic/readability-oriented and does not alter
+    parameter values.
+    """
+    tune_dir = Path(tune_dir).expanduser().resolve()
+    fit_json = find_fit_json(tune_dir)
+    if fit_json is None:
+        return {
+            "status": "skipped",
+            "reason": "fit_json_not_found",
+        }
+
+    fit_data = _read_json(fit_json)
+    genome = fit_data.get("genome", [])
+    if not isinstance(genome, list):
+        return {
+            "status": "skipped",
+            "reason": "genome_not_list",
+            "fit_json": str(fit_json),
+        }
+
+    order = tuple(section_order) if section_order else DEFAULT_GENOME_SECTION_ORDER
+    order_map = {sec: idx for idx, sec in enumerate(order)}
+
+    indexed = list(enumerate(genome))
+
+    def _sort_key(item):
+        i, entry = item
+        section = ""
+        if isinstance(entry, dict):
+            raw = entry.get("section", "")
+            if raw is not None:
+                section = str(raw)
+        return (order_map.get(section, len(order_map)), section, i)
+
+    sorted_genome = [entry for _, entry in sorted(indexed, key=_sort_key)]
+    changed = sorted_genome != genome
+
+    if changed:
+        fit_data["genome"] = sorted_genome
+        _write_json(fit_json, fit_data)
+
+    return {
+        "status": "updated" if changed else "unchanged",
+        "fit_json": str(fit_json),
+        "n_genome_entries": int(len(genome)),
+        "section_order": list(order),
+    }
+
+
+def mechanisms_declared_in_fit_json(tune_dir: Path) -> set[str]:
+    """
+    Return non-empty mechanism names declared in fit JSON genome entries.
+    """
+    tune_dir = Path(tune_dir).expanduser().resolve()
+    fit_json = find_fit_json(tune_dir)
+    if fit_json is None:
+        return set()
+
+    try:
+        fit_data = _read_json(fit_json)
+    except Exception:
+        return set()
+
+    genome = fit_data.get("genome", [])
+    if not isinstance(genome, list):
+        return set()
+
+    mechs: set[str] = set()
+    for entry in genome:
+        if not isinstance(entry, dict):
+            continue
+        mech = entry.get("mechanism")
+        if isinstance(mech, str):
+            mech = mech.strip()
+            if mech:
+                mechs.add(mech)
+    return mechs
+
+
 def find_compiled_mechanism_dll(tune_dir: Path) -> Optional[Path]:
     tune_dir = Path(tune_dir)
     candidates = [
@@ -331,12 +455,31 @@ def compile_modfiles(
         )
 
     loaded = False
+    dll_preloaded = False
     if load_dll:
         from neuron import h
 
         h.load_file("stdrun.hoc")
-        h.nrn_load_dll(str(dll))
-        loaded = True
+        try:
+            h.nrn_load_dll(str(dll))
+            loaded = True
+        except RuntimeError as exc:
+            # Common when rerunning Step-0 in a live kernel/session. NEURON can
+            # emit only a generic hocobj_call RuntimeError; verify required
+            # mechanisms are already present before deciding to continue.
+            required_mechs = mechanisms_declared_in_fit_json(tune_dir)
+            missing = sorted(m for m in required_mechs if not hasattr(h, m))
+            if not missing:
+                loaded = True
+                dll_preloaded = True
+            else:
+                raise RuntimeError(
+                    "Failed to load compiled NEURON mechanisms from "
+                    f"{dll}. Missing mechanisms after load attempt: {missing}. "
+                    "If another mechanism library is already loaded in this "
+                    "session, restart the kernel/process or rerun with "
+                    "load_compiled_dll=False."
+                ) from exc
 
     return {
         "modfiles_dir": str(mod_dir),
@@ -344,6 +487,7 @@ def compile_modfiles(
         "dll": str(dll),
         "compiled_now": bool(compiled_now),
         "loaded": bool(loaded),
+        "dll_preloaded": bool(dll_preloaded),
     }
 
 
@@ -389,8 +533,9 @@ def scaffold_common_configs(
         cell_cfg_data.setdefault("paths", {})
         cell_cfg_data["cell_name"] = cell_name
         cell_cfg_data["tune"] = tune_name
-        cell_cfg_data["specimen_id"] = int(specimen_id)
-        cell_cfg_data["model_type"] = model_type
+        # Canonical model identity is the tune directory itself.
+        cell_cfg_data.pop("specimen_id", None)
+        cell_cfg_data.pop("model_type", None)
         if color is not None or "color" not in cell_cfg_data:
             cell_cfg_data["color"] = color if color is not None else guess_cell_color(cell_name)
         cell_cfg_data["paths"]["manifest"] = "manifest.json"
@@ -413,7 +558,16 @@ def scaffold_common_configs(
     )
     sim_cfg_defaults["soma_diam_multiplier"] = float(soma_diam_multiplier)
     sim_cfg_path = paths.config_dir / "sim_config.json"
-    sim_status, _ = _write_scaffold_json(sim_cfg_path, sim_cfg_defaults, config_mode)
+    sim_status, sim_cfg_data = _write_scaffold_json(sim_cfg_path, sim_cfg_defaults, config_mode)
+    # Keep sim config focused on simulation controls; remove identity metadata.
+    if isinstance(sim_cfg_data, dict):
+        before_sim = copy.deepcopy(sim_cfg_data)
+        sim_cfg_data.pop("specimen_id", None)
+        sim_cfg_data.pop("model_type", None)
+        if sim_cfg_data != before_sim:
+            _write_json(sim_cfg_path, sim_cfg_data)
+            if sim_status == "unchanged":
+                sim_status = "updated"
     statuses["sim_config"] = {
         "path": str(sim_cfg_path),
         "status": sim_status,
@@ -522,6 +676,7 @@ def prepare_tune(
     do_compile_modfiles: bool = True,
     recompile_modfiles: bool = False,
     load_compiled_dll: bool = True,
+    sort_genome_entries_by_section: bool = False,
     do_scaffold_configs: bool = True,
     config_mode: str = "fill",
     sync_cell_metadata: bool = True,
@@ -571,6 +726,11 @@ def prepare_tune(
         }
     else:
         summary["actions"]["download"] = {"status": "skipped"}
+
+    if sort_genome_entries_by_section:
+        summary["actions"]["sort_genome"] = sort_genome_by_section(tune_dir)
+    else:
+        summary["actions"]["sort_genome"] = {"status": "skipped"}
 
     if do_compile_modfiles:
         compile_info = compile_modfiles(

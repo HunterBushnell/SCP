@@ -1,5 +1,8 @@
 # PV–SST Step 2.3 – Input Generation Contract (v4)
 
+> Historical draft: kept for design history. For current behavior, prefer
+> `modules_local/inputs.py` and `docs/configs_reference.md`.
+
 This document fixes the contract for **Step 2.3 – synaptic input generation** as implemented in `inputs.py` plus the default mode handlers in `input_modes_core.py`.
 
 It is written as an interface / behavior spec, not as exact code.

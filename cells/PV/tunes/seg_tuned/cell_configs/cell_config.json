@@ -2,12 +2,10 @@
   "cell_name": "PV",
   "tune": "seg_tuned",
   "color": "b",
-  "specimen_id": 484635029,
-  "model_type": "perisomatic",
   "paths": {
     "manifest": "manifest.json"
   },
   "tuning": {
-    "soma_diam_multiplier": 9.0
+    "soma_diam_multiplier": 6.0
   }
 }

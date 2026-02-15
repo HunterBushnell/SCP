@@ -40,7 +40,7 @@ extern double hoc_Exp(double);
 	/*SUPPRESS 762*/
 	/*SUPPRESS 763*/
 	/*SUPPRESS 765*/
-	 extern double *getarg(int);
+	 extern double *getarg();
  /* Thread safe. No static _p or _ppvar. */
  
 #define t _nt->_t

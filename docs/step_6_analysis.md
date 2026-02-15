@@ -30,6 +30,4 @@ Notes
 - `shift` is in ms, `scale` is multiplicative.
 - `@shift` alone is allowed; `@shift:scale` or `@shift,scale` both work.
 - Keys are `color`, `label`, `linestyle`, `shift`, `scale`.
-
-Notes
 - Older references to `5_analysis.ipynb` should be replaced with `6_analysis.ipynb`.

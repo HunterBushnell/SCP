@@ -14,12 +14,12 @@ extern void _GABA_A_reg(void);
 extern void _GABA_A_STP_reg(void);
 extern void _Ih_reg(void);
 extern void _Im_v2_reg(void);
-extern void _Kd_reg(void);
 extern void _K_T_reg(void);
+extern void _Kd_reg(void);
 extern void _Kv2like_reg(void);
 extern void _Kv3_1_reg(void);
-extern void _Nap_reg(void);
 extern void _NaTa_reg(void);
+extern void _Nap_reg(void);
 extern void _SK_reg(void);
 extern void _vecstim_reg(void);
 
@@ -34,12 +34,12 @@ void modl_reg() {
     fprintf(stderr, " \"GABA_A_STP.mod\"");
     fprintf(stderr, " \"Ih.mod\"");
     fprintf(stderr, " \"Im_v2.mod\"");
-    fprintf(stderr, " \"Kd.mod\"");
     fprintf(stderr, " \"K_T.mod\"");
+    fprintf(stderr, " \"Kd.mod\"");
     fprintf(stderr, " \"Kv2like.mod\"");
     fprintf(stderr, " \"Kv3_1.mod\"");
-    fprintf(stderr, " \"Nap.mod\"");
     fprintf(stderr, " \"NaTa.mod\"");
+    fprintf(stderr, " \"Nap.mod\"");
     fprintf(stderr, " \"SK.mod\"");
     fprintf(stderr, " \"vecstim.mod\"");
     fprintf(stderr, "\n");
@@ -52,12 +52,12 @@ void modl_reg() {
   _GABA_A_STP_reg();
   _Ih_reg();
   _Im_v2_reg();
-  _Kd_reg();
   _K_T_reg();
+  _Kd_reg();
   _Kv2like_reg();
   _Kv3_1_reg();
-  _Nap_reg();
   _NaTa_reg();
+  _Nap_reg();
   _SK_reg();
   _vecstim_reg();
 }

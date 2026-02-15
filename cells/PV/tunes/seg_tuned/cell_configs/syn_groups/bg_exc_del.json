@@ -1,6 +1,6 @@
 {
   "bg_exc_del": {
-    "state": false,
+    "state": true,
     "mode": "homogeneous_poisson",
     "color": "#17becf",
     "source": {
@@ -30,7 +30,7 @@
       },
       "params": {
         "wt_mean": 1.5,
-        "wt_std": 0.3333333333333333,
+        "wt_std": 0.34,
         "initW": 1.0,
         "gmax_AMPA": 0.001,
         "gmax_NMDA": 0.001,

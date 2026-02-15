@@ -8,12 +8,14 @@ If per-trial progress is enabled (see below), the panel also shows a progress li
 From the server (SSH), in a separate terminal window:
 
 ```bash
-python /home/hrbncv/SCP/scripts/status_panel.py
+cd <repo_root>
+python scripts/status_panel.py
 ```
 
 If you submit jobs from a different directory, point at that status file:
 ```bash
-python /home/hrbncv/SCP/scripts/status_panel.py \
+cd <repo_root>
+python scripts/status_panel.py \
   --status-file /path/to/submit_dir/logs/status/pvsst_latest.status
 ```
 

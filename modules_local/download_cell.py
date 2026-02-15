@@ -1,17 +1,18 @@
 """
 Helpers for downloading Allen Cell Types biophysical bundles.
 
-This module is a maintained copy of the legacy download helper, kept in
-`modules_local` so Step 0 can prepare tune directories without relying on
-`modules_old`.
+This module provides the Step 0 download interface used by the current
+`modules_local` pipeline.
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 __all__ = ["list_ADB_models", "download_ADB_cell"]
+DOWNLOAD_META_FILENAME = ".adb_download_meta.json"
 
 
 def _require_allensdk() -> None:
@@ -48,6 +49,63 @@ def _match_name(name: str, target: str, match: str) -> bool:
         "all active": ["all active", "all-active", "all_active"],
     }
     return any(alias in name_n for alias in synonyms.get(target_n, []))
+
+
+def _canonical_model_type(value: Optional[str]) -> str:
+    token = _norm(value)
+    if token in {"all active", "all-active", "all_active"}:
+        return "all active"
+    if token in {"perisomatic", "peri-somatic"}:
+        return "perisomatic"
+    return token
+
+
+def _same_model_type(a: Optional[str], b: Optional[str]) -> bool:
+    return _canonical_model_type(a) == _canonical_model_type(b)
+
+
+def _load_download_meta(path: Path) -> Optional[Dict[str, Any]]:
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _infer_specimen_from_fit_filename(target: Path) -> Optional[int]:
+    for fit_json in sorted(target.glob("*_fit.json")):
+        stem = fit_json.stem
+        if stem.endswith("_fit"):
+            specimen = stem[: -len("_fit")]
+            if specimen.isdigit():
+                return int(specimen)
+    return None
+
+
+def _infer_model_type_from_fit_json(target: Path) -> Optional[str]:
+    fit_candidates = sorted(target.glob("*_fit.json"))
+    if not fit_candidates:
+        return None
+    try:
+        fit_data = json.loads(fit_candidates[0].read_text())
+    except Exception:
+        return None
+
+    passive = fit_data.get("passive", [])
+    if not isinstance(passive, list) or not passive:
+        return None
+    p0 = passive[0]
+    if not isinstance(p0, dict):
+        return None
+
+    has_e_pas = "e_pas" in p0
+    cm_cfg = p0.get("cm")
+    has_cm = isinstance(cm_cfg, list) and len(cm_cfg) > 0
+    if has_e_pas and has_cm:
+        return "perisomatic"
+    return "all active"
 
 
 def list_ADB_models(
@@ -163,18 +221,94 @@ def download_ADB_cell(
     target.mkdir(parents=True, exist_ok=True)
 
     has_files = any(target.iterdir())
+    downloaded_now = False
+    meta_path = target / DOWNLOAD_META_FILENAME
+    existing_meta = _load_download_meta(meta_path)
     if has_files and not force:
+        mismatch: List[str] = []
+        if existing_meta:
+            meta_specimen = existing_meta.get("specimen_id")
+            if meta_specimen is not None:
+                try:
+                    if int(meta_specimen) != int(specimen_id):
+                        mismatch.append(
+                            f"specimen_id={meta_specimen} (existing) != {int(specimen_id)} (requested)"
+                        )
+                except Exception:
+                    pass
+            meta_type = existing_meta.get("model_type")
+            if meta_type is not None and not _same_model_type(meta_type, model_type):
+                mismatch.append(
+                    f"model_type={meta_type!r} (existing) != {model_type!r} (requested)"
+                )
+        else:
+            inferred_specimen = _infer_specimen_from_fit_filename(target)
+            inferred_model_type = _infer_model_type_from_fit_json(target)
+            if (
+                inferred_specimen is not None
+                and inferred_specimen != int(specimen_id)
+            ):
+                mismatch.append(
+                    f"specimen_id={inferred_specimen} inferred from existing fit JSON "
+                    f"!= {int(specimen_id)} (requested)"
+                )
+            if (
+                inferred_model_type is not None
+                and not _same_model_type(inferred_model_type, model_type)
+            ):
+                mismatch.append(
+                    f"model_type={inferred_model_type!r} inferred from existing fit JSON "
+                    f"!= {model_type!r} (requested)"
+                )
+
+        if mismatch:
+            details = "\n".join(f"  - {item}" for item in mismatch)
+            raise ValueError(
+                "Target tune directory already contains another model bundle:\n"
+                f"{details}\n"
+                f"Target: {target}\n"
+                "Use a different tune folder or rerun with force=True to overwrite."
+            )
+
         if not quiet:
             print(f"[download_ADB_cell] Found existing cache at: {target} - skipping download.")
+        if existing_meta is None:
+            inferred_specimen = _infer_specimen_from_fit_filename(target)
+            inferred_model_type = _infer_model_type_from_fit_json(target)
+            if inferred_specimen is not None or inferred_model_type is not None:
+                inferred_payload: Dict[str, Any] = {
+                    "specimen_id": inferred_specimen if inferred_specimen is not None else int(specimen_id),
+                    "model_type": inferred_model_type,
+                    "model_id": None,
+                    "model_name": None,
+                    "inferred_from_fit_json": True,
+                }
+                try:
+                    meta_path.write_text(json.dumps(inferred_payload, indent=2, sort_keys=True))
+                    existing_meta = inferred_payload
+                except Exception:
+                    pass
     else:
         if has_files and force and not quiet:
             print(f"[download_ADB_cell] Re-downloading into existing target: {target}")
         bp.cache_data(model_id, working_directory=str(target))
+        downloaded_now = True
         if not quiet:
             print(
                 f"Downloaded model_id={model_id} ({model_name}) "
                 f"for specimen_id={specimen_id}"
             )
+    if downloaded_now:
+        meta_payload = {
+            "specimen_id": int(specimen_id),
+            "model_type": model_type,
+            "model_id": model_id,
+            "model_name": model_name,
+        }
+        try:
+            meta_path.write_text(json.dumps(meta_payload, indent=2, sort_keys=True))
+        except Exception:
+            pass
 
     files = sorted(str(p) for p in target.rglob("*") if p.is_file())
 
@@ -183,5 +317,6 @@ def download_ADB_cell(
         "model_id": model_id,
         "model_name": model_name,
         "tunes_dir": str(target),
+        "meta_path": str(meta_path) if meta_path.is_file() else None,
         "files": files,
     }

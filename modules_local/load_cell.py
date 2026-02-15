@@ -58,6 +58,101 @@ class LoadedCell:
         return f"LoadedCell(label={label!r})"
 
 
+def _apply_genome_based_parameters(utils: Utils) -> None:
+    """
+    Fallback parameter loader for all-active Allen models.
+
+    AllenSDK's Utils.load_cell_parameters() expects `passive[0]` to contain
+    `e_pas` and `cm`, which is true for perisomatic models but not for some
+    all-active fits. In those cases, passive/channel parameters are carried in
+    the genome list by section.
+    """
+    h = utils.h
+    data = utils.description.data
+
+    passive_list = data.get("passive", [])
+    passive = passive_list[0] if isinstance(passive_list, list) and passive_list else {}
+    if not isinstance(passive, dict):
+        passive = {}
+
+    genome = data.get("genome", [])
+    if not isinstance(genome, list):
+        genome = []
+
+    conditions_list = data.get("conditions", [])
+    conditions = (
+        conditions_list[0]
+        if isinstance(conditions_list, list) and conditions_list
+        else {}
+    )
+    if not isinstance(conditions, dict):
+        conditions = {}
+
+    h("access soma")
+
+    # Baseline passive setup.
+    for sec in h.allsec():
+        if "ra" in passive:
+            sec.Ra = float(passive["ra"])
+        sec.insert("pas")
+        if "e_pas" in passive:
+            e_pas = float(passive["e_pas"])
+            for seg in sec:
+                seg.pas.e = e_pas
+
+    # Per-section cm overrides if present in passive block.
+    cm_entries = passive.get("cm", [])
+    if isinstance(cm_entries, list):
+        for cm_cfg in cm_entries:
+            if not isinstance(cm_cfg, dict):
+                continue
+            section = cm_cfg.get("section")
+            cm_val = cm_cfg.get("cm")
+            if section is None or cm_val is None:
+                continue
+            h('forsec "' + str(section) + '" { cm = %g }' % float(cm_val))
+
+    # Apply channel/passive/genome parameters.
+    for p in genome:
+        if not isinstance(p, dict):
+            continue
+        section = p.get("section")
+        name = p.get("name")
+        mechanism = p.get("mechanism", "")
+        if not name:
+            continue
+
+        try:
+            val = float(p.get("value"))
+        except (TypeError, ValueError):
+            continue
+
+        if section == "glob":
+            h(str(name) + " = %g " % val)
+            continue
+
+        if not section:
+            continue
+
+        if mechanism:
+            h('forsec "' + str(section) + '" { insert ' + str(mechanism) + " }")
+        h('forsec "' + str(section) + '" { ' + str(name) + " = %g }" % val)
+
+    # Reversal potentials, if present.
+    erev_entries = conditions.get("erev", [])
+    if isinstance(erev_entries, list):
+        for erev in erev_entries:
+            if not isinstance(erev, dict):
+                continue
+            section = erev.get("section")
+            if not section:
+                continue
+            if "ek" in erev:
+                h('forsec "' + str(section) + '" { ek = %g }' % float(erev["ek"]))
+            if "ena" in erev:
+                h('forsec "' + str(section) + '" { ena = %g }' % float(erev["ena"]))
+
+
 def load_cell(cell_config: Dict[str, Any]) -> LoadedCell:
     """
     Build and return a NEURON Allen cell based on `cell_config`.
@@ -117,7 +212,16 @@ def load_cell(cell_config: Dict[str, Any]) -> LoadedCell:
     # Configure morphology and load cell parameters (your reused pattern)
     morphology_path = description.manifest.get_path("MORPHOLOGY")
     utils.generate_morphology(morphology_path.encode("ascii", "ignore"))
-    utils.load_cell_parameters()
+    used_fallback_loader = False
+    try:
+        utils.load_cell_parameters()
+    except KeyError as exc:
+        # All-active fit files can omit passive e_pas/cm and store them in genome.
+        if str(exc).strip("'\"") in {"e_pas", "cm"}:
+            _apply_genome_based_parameters(utils)
+            used_fallback_loader = True
+        else:
+            raise
 
     # Optional soma diameter scaling (your PV tuning behavior)
     if hasattr(h, "soma") and len(h.soma) > 0:
@@ -141,9 +245,26 @@ def load_cell(cell_config: Dict[str, Any]) -> LoadedCell:
         config=cell_config,
     )
 
+    # Backward-compat aliases for legacy notebook code that used direct
+    # section lists on the cell object (e.g., cell.soma[0]).
+    if not hasattr(cell, "soma") and hasattr(h, "soma"):
+        cell.soma = h.soma
+    if not hasattr(cell, "dend") and hasattr(h, "dend"):
+        cell.dend = h.dend
+    if not hasattr(cell, "apic") and hasattr(h, "apic"):
+        cell.apic = h.apic
+    if not hasattr(cell, "axon") and hasattr(h, "axon"):
+        cell.axon = h.axon
+    if not hasattr(cell, "all"):
+        all_secs = h.SectionList()
+        for sec in h.allsec():
+            all_secs.append(sec)
+        cell.all = all_secs
+
     print(
         f"Loaded Allen cell for {cell_name!r} from {manifest_path}, "
-        f"soma_diam_multiplier={soma_diam_multiplier}, Vinit={Vinit}"
+        f"soma_diam_multiplier={soma_diam_multiplier}, Vinit={Vinit}, "
+        f"loader={'genome_fallback' if used_fallback_loader else 'allensdk_default'}"
     )
 
     return cell

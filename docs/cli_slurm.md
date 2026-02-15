@@ -1,5 +1,9 @@
 CLI and SLURM
 
+Prerequisite
+- Complete `installation.md`.
+- Run `python scripts/check_setup.py --steps 5 --cell PV --tune seg_tuned`.
+
 Step 0 Prep CLI (scripts/step0_prepare.py)
 - Minimal:
   `python scripts/step0_prepare.py --cell PV --tune seg_tuned --specimen-id 484635029`
@@ -41,16 +45,23 @@ Merge control
 
 Common env vars
 - `CELL`, `TUNE`, `TUNE_DIR`
+- `REPO_ROOT` (optional explicit repo path override)
 - `OUTPUT_DIR`
 - `OUTPUT_STEM`
 - `N_TRIALS`, `TOTAL_TRIALS`, `MODE`, `SEED`, `BASE_SEED`, `TASKS`
 - `BATCH_STEM`, `MERGED_STEM`, `MERGE_PATTERN`, `MERGE_ARRAY`
 - `FORCE_SAVE` (default on)
 - `ICLAMP`, `SNAPSHOT`
+- `ROTATE_LOGS` (default `1`; set `0` to keep old `logs/pvsst_*.out|err` files in place)
 
 Notes
 - `run_slurm.sh` auto-builds modfiles if missing.
 - When arrays are merged, per-task outputs go to `output_data/<batch>/parts/` and
   are cleaned up after merge.
 - Logs are copied into the run folder when possible.
+- Old root log files are rotated to `logs/old/<timestamp>/` by default.
+- To clean rotated logs manually:
+  - Dry run: `bash scripts/clean_old_logs.sh`
+  - Delete rotated logs: `bash scripts/clean_old_logs.sh --force`
+  - Also clean per-run status files: `bash scripts/clean_old_logs.sh --force --status`
 - The pipeline prefers `cell_configs/` when resolving `sim_config.json` and `syn_config.json`.

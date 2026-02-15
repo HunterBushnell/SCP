@@ -1,3 +1,14 @@
 external_data/bio_cell_output/
 logs/
 cells/**/output_data/
+
+# Python cache/build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# NEURON compiled artifacts (build as needed per tune)
+cells/**/modfiles/x86_64/

@@ -1,17 +1,42 @@
 Installation
 
-SCP assumes a working NEURON environment and compiled modfiles.
+Recommended local setup (Conda)
+1. Clone SCP and enter the repo:
+   `git clone <SCP_REPO_URL> && cd SCP`
+2. Create and activate the environment:
+   `conda env create -f environment.yml`
+   `conda activate scp-py311`
+3. Register a Jupyter kernel:
+   `python -m ipykernel install --user --name scp-py311 --display-name "Python (SCP)"`
 
-Local environment
-- Python 3.9+ recommended.
-- Core packages: numpy, scipy, pandas, matplotlib.
-- NEURON with Python bindings must be installed and importable.
+Alternative local setup (venv + pip)
+1. Create and activate a virtual environment:
+   `python -m venv .venv`
+   `source .venv/bin/activate`
+2. Install dependencies:
+   `pip install -r requirements.txt`
+3. Register a Jupyter kernel:
+   `python -m ipykernel install --user --name scp-venv --display-name "Python (SCP venv)"`
 
-Modfiles
-- Each tune has a `modfiles/` folder.
-- Build once per tune:
-  `cd <tune_dir>/modfiles && nrnivmodl`
+External repos for steps 1-4
+1. Clone ACT and bmtool next to SCP (default discovery path):
+   `mkdir -p ../mods`
+   `git clone https://github.com/V-Marco/ACT.git ../mods/ACT`
+   `git clone https://github.com/cyneuro/bmtool.git ../mods/bmtool`
+2. If stored elsewhere, set env vars before running notebooks:
+   `export SCP_ACT_PATH=/path/to/ACT`
+   `export SCP_BMTOOL_PATH=/path/to/bmtool`
 
-Colab/Linux (bootstrapped)
-- `5_colab.ipynb` can bootstrap a clean environment
-  (install deps, compile modfiles, and run the pipeline end-to-end).
+Validate environment + workspace
+1. Run the setup checker:
+   `python scripts/check_setup.py --steps 0 1 2 3 4 5 --cell PV --tune seg_tuned`
+2. If mechanisms are missing, build during check:
+   `python scripts/check_setup.py --steps 5 --cell PV --tune seg_tuned --compile-modfiles`
+3. Lint notebooks for portability and duplicate-key config issues:
+   `python scripts/check_notebooks.py`
+
+Manual modfile build (per tune)
+- `cd <tune_dir>/modfiles && nrnivmodl`
+
+Colab/Linux bootstrapped notebooks
+- `2_colab.ipynb`, `3_colab.ipynb`, and `5_colab.ipynb` install dependencies and clone required repos in a fresh Colab session.

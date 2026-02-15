@@ -52,7 +52,7 @@ basic.forever(function () {
 Download the .hex from MakeCode and copy it to the micro:bit drive.
 
 ## Local bridge (Windows)
-The bridge script lives at `SCP/scripts/microbit_status_bridge.py`. It runs on your local machine.
+The bridge script lives at `scripts/microbit_status_bridge.py` in this repo. It runs on your local machine.
 
 1) Install Python 3 and pyserial:
 ```bash
@@ -61,14 +61,16 @@ pip install pyserial
 
 2) Run the bridge:
 ```bash
-python SCP/scripts/microbit_status_bridge.py --host user@server \
-  --path /home/hrbncv/SCP/logs/status/pvsst_latest.status \
+cd <repo_root>
+python scripts/microbit_status_bridge.py --host user@server \
+  --path /path/to/repo/logs/status/pvsst_latest.status \
   --port COM5 --poll 5 --print
 ```
 
 If you are unsure which port is the micro:bit:
 ```bash
-python SCP/scripts/microbit_status_bridge.py --list-ports
+cd <repo_root>
+python scripts/microbit_status_bridge.py --list-ports
 ```
 
 Notes:

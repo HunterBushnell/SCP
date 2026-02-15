@@ -15,17 +15,54 @@
 
 # Optional: load modules / activate env if needed
 # module load python/3.10
-# source ~/miniconda3/bin/activate <env-name>
+# source <conda_root>/bin/activate <env-name>
 
 set -euo pipefail
-
-# Resolve SCP repo root from this script location unless overridden.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="${REPO_ROOT:-${SCRIPT_DIR}}"
 
 # Capture submit dir before changing cwd (SLURM writes logs relative to submit dir).
 SUBMIT_DIR="${SLURM_SUBMIT_DIR:-$(pwd)}"
 LOG_SRC_DIR="${SUBMIT_DIR}/logs"
+
+# Resolve SCP repo root robustly in both direct `sbatch run_slurm.sh` and
+# wrapped/spooled executions (where BASH_SOURCE may point to /var/spool/...).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+resolve_repo_root() {
+    local candidates=()
+    local job_cmd=""
+    if [[ -n "${REPO_ROOT:-}" ]]; then
+        candidates+=("${REPO_ROOT}")
+    fi
+    if [[ -n "${SLURM_JOB_ID:-}" ]] && command -v scontrol >/dev/null 2>&1; then
+        job_cmd="$(scontrol show job "${SLURM_JOB_ID}" 2>/dev/null | tr ' ' '\n' | awk -F= '/^Command=/{print $2; exit}')"
+        if [[ -n "${job_cmd}" ]]; then
+            candidates+=("$(dirname "${job_cmd}")")
+        fi
+    fi
+    candidates+=(
+        "${SUBMIT_DIR}"
+        "${SUBMIT_DIR}/SCP"
+        "${SCRIPT_DIR}"
+        "${SCRIPT_DIR}/.."
+        "$(pwd)"
+    )
+
+    local cand
+    for cand in "${candidates[@]}"; do
+        [[ -z "${cand}" ]] && continue
+        if [[ -f "${cand}/run_pipeline.py" && -d "${cand}/cells" ]]; then
+            (cd "${cand}" && pwd)
+            return 0
+        fi
+    done
+    return 1
+}
+
+if ! REPO_ROOT="$(resolve_repo_root)"; then
+    echo "Could not resolve REPO_ROOT." >&2
+    echo "Tried REPO_ROOT='${REPO_ROOT:-}', SUBMIT_DIR='${SUBMIT_DIR}', SCRIPT_DIR='${SCRIPT_DIR}'." >&2
+    echo "Set REPO_ROOT explicitly, e.g. REPO_ROOT=/path/to/SCP sbatch run_slurm.sh" >&2
+    exit 1
+fi
 
 # For arrays, SLURM_JOB_ID is per-task; SLURM_ARRAY_JOB_ID is the shared batch id.
 ARRAY_JOB_ID="${SLURM_ARRAY_JOB_ID:-${SLURM_JOB_ID:-}}"
@@ -147,8 +184,8 @@ write_status "RUNNING" "starting"
 
 # Rotate old logs so the latest run is easy to find (keep current job logs in logs/)
 # For job arrays, rotate only on task 0 to avoid races.
-# Set ROTATE_LOGS=1 in the environment to re-enable moving logs to logs/old.
-ROTATE_LOGS="${ROTATE_LOGS:-0}"
+# Set ROTATE_LOGS=0 to disable moving old logs to logs/old.
+ROTATE_LOGS="${ROTATE_LOGS:-1}"
 if [[ -n "${SLURM_ARRAY_TASK_ID:-}" && "${SLURM_ARRAY_TASK_ID}" != "0" ]]; then
     ROTATE_LOGS=0
 fi

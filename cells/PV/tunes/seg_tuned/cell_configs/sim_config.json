@@ -6,25 +6,31 @@
   "jitter": 100.0,
   "stim_start_ms": 300.0,
   "stim_duration_ms": 500.0,
-
   "n_trials": 1,
   "n_traces_to_save": 1,
   "n_inputs_to_save": 1,
-
-  "load": [false, null],
-  "save": [false, "slurm_test", "pkl", false],
-  "append": [false, null],
-
+  "load": [
+    false,
+    null
+  ],
+  "save": [
+    false,
+    "slurm_test",
+    "pkl",
+    false
+  ],
+  "append": [
+    false,
+    null
+  ],
   "input_stats_bin_ms": 5.0,
   "avg_rate_curve_smooth_ms": 25.0,
   "avg_rate_curve_smooth_mode": "causal",
   "plots_win_size": 25.0,
   "plots_input_smooth_ms": 25.0,
   "plots_profile": "off",
-
   "randomness_mode": "random",
   "random_seed": null,
-
   "param_study": {
     "input_type": null,
     "param_type": null,
@@ -46,6 +52,7 @@
     "save_all_inputs": true,
     "save_all_traces": true,
     "save_syn_records_by_trial": true
-  }
-
+  },
+  "save_input_stats": true,
+  "soma_diam_multiplier": 6.0
 }

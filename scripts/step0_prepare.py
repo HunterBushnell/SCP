@@ -76,6 +76,11 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--no-compile", dest="do_compile", action="store_false", help="Skip nrnivmodl compile")
     ap.add_argument("--recompile-modfiles", action="store_true", help="Delete modfiles/x86_64 before compile")
     ap.add_argument("--no-load-dll", dest="load_dll", action="store_false", help="Do not load compiled DLL")
+    ap.add_argument(
+        "--sort-genome-by-section",
+        action="store_true",
+        help="Reorder fit JSON genome entries by section before validation",
+    )
 
     ap.add_argument("--no-scaffold", dest="do_scaffold", action="store_false", help="Skip config scaffold")
     ap.add_argument(
@@ -160,6 +165,7 @@ def main() -> None:
         do_compile_modfiles=bool(args.do_compile),
         recompile_modfiles=bool(args.recompile_modfiles),
         load_compiled_dll=bool(args.load_dll),
+        sort_genome_entries_by_section=bool(args.sort_genome_by_section),
         do_scaffold_configs=bool(args.do_scaffold),
         config_mode=args.config_mode,
         sync_cell_metadata=bool(args.sync_cell_metadata),

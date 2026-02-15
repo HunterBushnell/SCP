@@ -2,8 +2,6 @@
   "cell_name": "PV_2",
   "tune": "adb",
   "color": "b",
-  "specimen_id": 333604946,
-  "model_type": "perisomatic",
   "paths": {
     "manifest": "manifest.json"
   },

@@ -389,10 +389,6 @@ def main() -> None:
 
     if sim_cfg_for_cell.get("soma_diam_multiplier") is not None:
         tuning["soma_diam_multiplier"] = sim_cfg_for_cell.get("soma_diam_multiplier", 1.0)
-    if sim_cfg_for_cell.get("specimen_id") is not None:
-        cell_cfg["specimen_id"] = sim_cfg_for_cell.get("specimen_id")
-    if sim_cfg_for_cell.get("model_type") is not None:
-        cell_cfg["model_type"] = sim_cfg_for_cell.get("model_type")
     cell = load_cell(cell_cfg)
     # Geometry: use tune-specific geometry config when present (notebook parity)
     geom_config_path = tune_dir / "cell_configs" / "geometry.json"

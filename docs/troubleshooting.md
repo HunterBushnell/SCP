@@ -1,5 +1,8 @@
 Troubleshooting
 
+First check
+- Run `python scripts/check_setup.py --steps 0 1 2 3 4 5 --cell PV --tune seg_tuned`.
+
 Missing modfiles or NEURON errors
 - Build modfiles: `cd <tune_dir>/modfiles && nrnivmodl`.
 
@@ -18,3 +21,6 @@ Notebook vs SLURM mismatch
 Input file not found
 - Paths in `syn_config.json` are resolved relative to `cell_configs/`.
 - Verify precomputed `source.path` files exist on the same machine.
+
+ACT or bmtool not found (legacy Steps 1-4)
+- Set `SCP_ACT_PATH` and/or `SCP_BMTOOL_PATH`, or place repos at `../mods/ACT` and `../mods/bmtool`.

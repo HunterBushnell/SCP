@@ -1,23 +1,29 @@
-Docs Index
+# Docs Index
 
-Start here
-- `quickstart.md`: minimal run instructions
-- `pipeline_overview.md`: map of steps 0-6
+## Start Here
+- `installation.md`: environment setup and readiness checks.
+- `quickstart.md`: shortest path to run an existing tune.
+- `pipeline_overview.md`: notebook and CLI map for steps 0-6.
 
-Core usage
-- `step_5_local_pipeline.md`: stable pipeline details
-- `step_6_analysis.md`: analysis notebook usage
-- `cli_slurm.md`: CLI and SLURM runs
-- `configs_reference.md`: config layout and fields
-- `outputs_layout.md`: output folders and sidecars
+## Core Usage
+- `step_5_local_pipeline.md`: stable Step 5 pipeline details.
+- `step_6_analysis.md`: analysis notebook usage and expected outputs.
+- `cli_slurm.md`: CLI and SLURM execution.
+- `configs_reference.md`: config layout and field reference.
+- `outputs_layout.md`: output folders, manifests, and sidecars.
+- `status_panel.md`: terminal monitor for SLURM status files.
 
-Supporting
-- `installation.md`: environment and modfiles
-- `reproducibility.md`: seeds, snapshots, append
-- `troubleshooting.md`: common issues
-- `glossary.md`: terms
-- `step_0_4_stub.md`: placeholders for legacy steps
-- `naming_conventions.md`: suggested naming scheme
-- `roadmap.md`: short future plan
-- `example_run.md`: minimal end-to-end run
-- `config_cookbook.md`: common config tweaks
+## Supporting References
+- `reproducibility.md`: seeds, snapshots, and append behavior.
+- `troubleshooting.md`: common setup and runtime issues.
+- `glossary.md`: SCP terms and definitions.
+- `step_0_4_stub.md`: Steps 0-4 prerequisites and outputs.
+- `naming_conventions.md`: recommended naming patterns.
+- `roadmap.md`: short future plan.
+- `example_run.md`: minimal end-to-end run.
+- `config_cookbook.md`: common config tweaks.
+- `microbit_status.md`: optional hardware status bridge.
+
+## Validation Tools
+- `../scripts/check_setup.py`: environment + workspace readiness checks.
+- `../scripts/check_notebooks.py`: notebook lint for portability and duplicate keys.

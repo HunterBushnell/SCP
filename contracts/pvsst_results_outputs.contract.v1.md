@@ -7,11 +7,11 @@ SCP results and outputs contract (v1)
 
 * **Output locations (defaults)**
   * **Run folders:** `{tune_dir}/output_data/<output_stem>/`
-    * `tune_dir` is the cell tune folder, e.g. `SCP/cells/SST/tunes/seg_tuned`.
+    * `tune_dir` is the cell tune folder, e.g. `<repo_root>/cells/SST/tunes/seg_tuned`.
     * Override: `run_pipeline.py --output-dir ...` or `OUTPUT_DIR=...` in `run_slurm.sh`.
   * **SLURM logs (per run):** `{tune_dir}/output_data/<output_stem>/logs/`
     * `run_slurm.sh` moves each task’s `pvsst_*` logs into its run folder.
-    * Rotated logs may still appear under `SCP/logs/old/<YYYYMMDD_HHMMSS>/`.
+    * Rotated logs may still appear under `<repo_root>/logs/old/<YYYYMMDD_HHMMSS>/`.
   * **Compiled mechanisms (nrnivmodl):** `{tune_dir}/modfiles/x86_64/` (e.g. `libnrnmech.so`).
 
 * **Saved outputs**
@@ -94,7 +94,7 @@ SCP results and outputs contract (v1)
     * `group_means`: per-group means across trials with the same fields prefixed by `mean_`.
 
 * **Runtime log output (run_slurm)**
-  * `run_slurm.sh` writes stdout/stderr to `logs/pvsst_%j.out/.err`.
+  * `run_slurm.sh` writes stdout/stderr to `logs/pvsst_*.out/.err` via SLURM filename templates.
   * Log rotation is handled only by `run_slurm.sh` (not by `run_pipeline.py`).
   * Logs include:
     * command line,
@@ -153,4 +153,4 @@ from modules_local.analysis import plotting
 results = run_sim.load_results("cells/SST/tunes/seg_tuned/output_data/slurm_20251218_231500")
 plotting.plot_results(results)
 ```
-  * Notebook alternative: `SCP/6_analysis.ipynb`
+  * Notebook alternative: `<repo_root>/6_analysis.ipynb`

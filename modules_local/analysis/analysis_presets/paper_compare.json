@@ -44,7 +44,7 @@
       "enabled": false,
       "shift_ms": 200,
       "scale": 1,
-      "color": "navy",
+      "color": "blue",
       "linestyle": "-"
     },
     {
@@ -57,20 +57,30 @@
       "linestyle": "-"
     },
     {
-      "path": "cells/PV/tunes/seg_tuned/output_data/__base_PV",
-      "label": "PV Base (0 Dep)",
+      "path": "cells/PV/tunes/seg_tuned/output_data/_STP200_base_PV",
+      "label": "PV High STP",
       "enabled": false,
       "shift_ms": 200,
       "scale": 1,
       "color": "dodgerblue",
       "linestyle": "-"
     },
+    {
+      "path": "cells/PV/tunes/seg_tuned/output_data/_STP0_base_PV",
+      "label": "PV NO STP",
+      "enabled": false,
+      "shift_ms": 200,
+      "scale": 1,
+      "color": "navy",
+      "linestyle": "-"
+    },
+
 
 
     {
       "path": "external_data/SSTFiringRateAvg.csv",
       "label": "SST bio",
-      "enabled": false,
+      "enabled": true,
       "shift_ms": 500,
       "scale": 1,
       "color": "m",
@@ -88,9 +98,9 @@
     {
       "path": "cells/SST/tunes/seg_tuned/output_data/_final_base_SST",
       "label": "SST base",
-      "enabled": false,
+      "enabled": true,
       "scale": 1,
-      "color": "darkmagenta",
+      "color": "magenta",
       "linestyle": "-"
     },
     {
@@ -110,12 +120,39 @@
       "linestyle": "-"
     },
     {
-      "path": "cells/SST/tunes/seg_tuned/output_data/_STP0_VIPinh_SST",
-      "label": "SST VIPinh (0 Fac)",
+      "path": "cells/SST/tunes/seg_tuned/output_data/_tauhigh1.2_base_SST",
+      "label": "SST High Tau",
+      "enabled": true,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "violet",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_tauPV0.45_base_SST",
+      "label": "SST Low Tau",
+      "enabled": true,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "darkmagenta",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_NMDA3_base_SST",
+      "label": "SST High NMDA (3.0)",
       "enabled": false,
       "shift_ms": 0,
       "scale": 1,
       "color": "violet",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_NMDA0_base_SST",
+      "label": "SST Low NMDA (0)",
+      "enabled": false,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "darkmagenta",
       "linestyle": "-"
     }
   ]

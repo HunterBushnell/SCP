@@ -2,8 +2,6 @@
   "cell_name": "SST",
   "tune": "seg_tuned",
   "color": "m",
-  "specimen_id": 485466109,
-  "model_type": "perisomatic",
   "paths": {
     "manifest": "manifest.json"
   },

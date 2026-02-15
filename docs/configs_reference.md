@@ -5,7 +5,6 @@ The pipeline prefers `cell_configs/` but still supports legacy paths during tran
 
 cell_config.json
 - Identity: `cell_name`, `tune`, `color`.
-- Model metadata: `specimen_id`, `model_type`.
 - Paths: `paths.manifest`.
 - Tuning: `tuning.soma_diam_multiplier` and related fields.
 
@@ -53,4 +52,6 @@ syn_groups/
 Notes
 - Keep cell identity in `cell_config.json` and sim-only settings in
   `sim_config.json` to avoid duplication.
+- `specimen_id` and `model_type` are Step-0/download inputs and are not required
+  in `cell_config.json` or `sim_config.json`.
 - Paths in `syn_config.json` resolve relative to `cell_configs/`.
