@@ -383,6 +383,67 @@ def sort_genome_by_section(
     }
 
 
+def coerce_fit_genome_values_to_numeric(tune_dir: Path) -> Dict[str, Any]:
+    """
+    Convert numeric-like string values in fit JSON genome entries to floats.
+
+    Allen all-active bundles often serialize `genome[*].value` as strings.
+    This helper normalizes those values so downstream loaders expecting numeric
+    types can use the fit JSON directly.
+    """
+    tune_dir = Path(tune_dir).expanduser().resolve()
+    fit_json = find_fit_json(tune_dir)
+    if fit_json is None:
+        return {
+            "status": "skipped",
+            "reason": "fit_json_not_found",
+        }
+
+    fit_data = _read_json(fit_json)
+    genome = fit_data.get("genome", [])
+    if not isinstance(genome, list):
+        return {
+            "status": "skipped",
+            "reason": "genome_not_list",
+            "fit_json": str(fit_json),
+        }
+
+    converted = 0
+    skipped = 0
+
+    for entry in genome:
+        if not isinstance(entry, dict) or "value" not in entry:
+            continue
+
+        value = entry["value"]
+        if isinstance(value, bool):
+            skipped += 1
+            continue
+        if isinstance(value, (int, float)):
+            continue
+
+        try:
+            new_value = float(value)
+        except (TypeError, ValueError):
+            skipped += 1
+            continue
+
+        entry["value"] = new_value
+        converted += 1
+
+    if converted > 0:
+        fit_data["genome"] = genome
+        _write_json(fit_json, fit_data)
+
+    return {
+        "status": "updated" if converted > 0 else "unchanged",
+        "fit_json": str(fit_json),
+        "n_genome_entries": int(len(genome)),
+        "n_converted": int(converted),
+        "n_skipped_non_numeric": int(skipped),
+    }
+
+
 def mechanisms_declared_in_fit_json(tune_dir: Path) -> set[str]:
     """
     Return non-empty mechanism names declared in fit JSON genome entries.
@@ -676,6 +737,7 @@ def prepare_tune(
     do_compile_modfiles: bool = True,
     recompile_modfiles: bool = False,
     load_compiled_dll: bool = True,
+    coerce_genome_values_to_numeric: bool = False,
     sort_genome_entries_by_section: bool = False,
     do_scaffold_configs: bool = True,
     config_mode: str = "fill",
@@ -726,6 +788,11 @@ def prepare_tune(
         }
     else:
         summary["actions"]["download"] = {"status": "skipped"}
+
+    if coerce_genome_values_to_numeric:
+        summary["actions"]["coerce_genome_values"] = coerce_fit_genome_values_to_numeric(tune_dir)
+    else:
+        summary["actions"]["coerce_genome_values"] = {"status": "skipped"}
 
     if sort_genome_entries_by_section:
         summary["actions"]["sort_genome"] = sort_genome_by_section(tune_dir)

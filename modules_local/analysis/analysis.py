@@ -138,6 +138,118 @@ def summarize_spike_trials(
     return stats
 
 
+def _coerce_spike_trials(spikes: Any) -> list[np.ndarray]:
+    if spikes is None:
+        return []
+
+    if isinstance(spikes, np.ndarray):
+        if spikes.dtype == object:
+            if spikes.ndim == 0:
+                return [np.asarray(spikes.item(), dtype=float).ravel()]
+            return [np.asarray(tr, dtype=float).ravel() for tr in spikes.tolist()]
+        if spikes.ndim <= 1:
+            return [np.asarray(spikes, dtype=float).ravel()]
+        return [np.asarray(tr, dtype=float).ravel() for tr in spikes]
+
+    if isinstance(spikes, (list, tuple)):
+        if not spikes:
+            return []
+        first = spikes[0]
+        if np.isscalar(first):
+            return [np.asarray(spikes, dtype=float).ravel()]
+        return [np.asarray(tr, dtype=float).ravel() for tr in spikes]
+
+    return [np.asarray(spikes, dtype=float).ravel()]
+
+
+def _resolve_spikes_npz_path(path: Union[str, Path]) -> Path:
+    p = Path(path).expanduser().resolve()
+    if p.is_file():
+        return p
+    if not p.exists():
+        raise FileNotFoundError(f"Path not found: {p}")
+
+    candidates = [
+        p / "spikes.npz",
+        p / "results" / "spikes.npz",
+    ]
+    for cand in candidates:
+        if cand.is_file():
+            return cand
+    raise FileNotFoundError(f"Could not find spikes.npz under: {p}")
+
+
+def _format_float_series(values: np.ndarray, *, precision: int, delimiter: str) -> str:
+    if values.size == 0:
+        return ""
+    fmt = f"{{:.{int(max(1, precision))}g}}"
+    return delimiter.join(fmt.format(float(v)) for v in values)
+
+
+def export_spikes_trials_csv(
+    spikes_npz_or_run: Union[str, Path],
+    out_csv: Optional[Union[str, Path]] = None,
+    *,
+    delimiter: str = "|",
+    precision: int = 10,
+    overwrite: bool = False,
+    trial_prefix: str = "trial_",
+) -> Path:
+    """
+    Export spikes as one CSV row per trial.
+
+    Output columns:
+      - trial_n: trial label (e.g. trial_0)
+      - n_spikes: number of spikes in the trial
+      - spike_times_ms: delimiter-separated spike times in ms
+    """
+    if not delimiter:
+        raise ValueError("delimiter must be a non-empty string")
+
+    spikes_path = _resolve_spikes_npz_path(spikes_npz_or_run)
+    with np.load(spikes_path, allow_pickle=True) as data:
+        if "spikes" in data.files:
+            spikes_obj = data["spikes"]
+        elif len(data.files) == 1:
+            spikes_obj = data[data.files[0]]
+        else:
+            raise ValueError(
+                f"Could not determine spikes array in {spikes_path}; keys={list(data.files)}"
+            )
+
+    trials = _coerce_spike_trials(spikes_obj)
+
+    if out_csv is None:
+        out_path = spikes_path.with_name(f"{spikes_path.stem}_trials.csv")
+    else:
+        out_path = Path(out_csv).expanduser()
+        if not out_path.suffix:
+            out_path = out_path.with_suffix(".csv")
+        if not out_path.is_absolute():
+            out_path = (Path.cwd() / out_path).resolve()
+        else:
+            out_path = out_path.resolve()
+
+    if out_path.exists() and not overwrite:
+        raise FileExistsError(f"Output CSV already exists: {out_path}")
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["trial_n", "n_spikes", "spike_times_ms"])
+        for idx, tr in enumerate(trials):
+            arr = np.asarray(tr, dtype=float).ravel()
+            arr = arr[np.isfinite(arr)]
+            writer.writerow(
+                [
+                    f"{trial_prefix}{idx}",
+                    int(arr.size),
+                    _format_float_series(arr, precision=precision, delimiter=delimiter),
+                ]
+            )
+    return out_path
+
+
 def _moving_average(values: np.ndarray, win_bins: int) -> np.ndarray:
     if win_bins <= 1:
         return values
@@ -332,6 +444,55 @@ def _smooth_rate_curve(
     return centers, rates
 
 
+def _smooth_curve_nanmean(
+    centers: np.ndarray,
+    values: np.ndarray,
+    bin_ms: float,
+    smooth_ms: Optional[float],
+    *,
+    mode: str = "center",
+) -> tuple[np.ndarray, np.ndarray]:
+    if smooth_ms is None:
+        return centers, values
+    try:
+        smooth_ms = float(smooth_ms)
+    except Exception:
+        return centers, values
+    if smooth_ms <= 0 or bin_ms <= 0:
+        return centers, values
+
+    k = int(round(smooth_ms / bin_ms))
+    if k <= 1 or values.size < k:
+        return centers, values
+    if mode == "center" and k % 2 == 0:
+        k += 1
+
+    valid = np.isfinite(values)
+    numer = np.where(valid, values, 0.0)
+    denom = valid.astype(float)
+    kernel = np.ones(k, dtype=float)
+
+    if mode == "center":
+        numer_sm = np.convolve(numer, kernel, mode="valid")
+        denom_sm = np.convolve(denom, kernel, mode="valid")
+        with np.errstate(invalid="ignore", divide="ignore"):
+            out = np.where(denom_sm > 0, numer_sm / denom_sm, np.nan)
+        drop = (len(centers) - len(out)) // 2
+        if drop < 0:
+            return centers, values
+        return centers[drop : drop + len(out)], out
+
+    if mode == "causal":
+        pad = (k - 1, 0)
+        numer_sm = np.convolve(np.pad(numer, pad), kernel, mode="valid")
+        denom_sm = np.convolve(np.pad(denom, pad), kernel, mode="valid")
+        with np.errstate(invalid="ignore", divide="ignore"):
+            out = np.where(denom_sm > 0, numer_sm / denom_sm, np.nan)
+        return centers[: len(out)], out
+
+    return centers, values
+
+
 def compute_output_curve_from_results(
     results: Dict[str, Any],
     *,
@@ -404,6 +565,112 @@ def compute_output_curve_from_results(
         "smooth_mode": smooth_mode,
         "t_ms": centers.tolist(),
         "rate_hz": mean_rate.tolist(),
+    }
+
+
+def compute_output_isi_curve_from_results(
+    results: Dict[str, Any],
+    *,
+    bin_ms: Optional[float] = None,
+    smooth_ms: Optional[float] = None,
+    smooth_mode: str = "causal",
+) -> Optional[Dict[str, Any]]:
+    sim_cfg = results.get("sim_cfg", {}) or {}
+    tstart = float(sim_cfg.get("tstart", 0.0))
+    tstop = sim_cfg.get("tstop")
+    if tstop is None:
+        traces = results.get("traces", {}) or {}
+        T = traces.get("T")
+        if T is not None and len(T) > 0:
+            tstop = float(T[-1])
+    if tstop is None or tstop <= tstart:
+        return None
+
+    bin_width = float(bin_ms if bin_ms is not None else sim_cfg.get("bins", 25.0))
+    if bin_width <= 0:
+        return None
+
+    bins = np.arange(tstart, tstop + bin_width, bin_width, dtype=float)
+    if bins.size < 2:
+        return None
+    centers = bins[:-1] + 0.5 * bin_width
+    n_bins = centers.size
+
+    spikes = results.get("spikes")
+    if spikes is None:
+        return None
+
+    if results.get("mode") == "multi":
+        if isinstance(spikes, np.ndarray):
+            spikes_by_trial = list(spikes.tolist())
+        elif isinstance(spikes, (list, tuple)):
+            spikes_by_trial = list(spikes)
+        else:
+            spikes_by_trial = [spikes]
+    else:
+        spikes_by_trial = [spikes]
+
+    trial_isis: list[np.ndarray] = []
+    for tr in spikes_by_trial:
+        sp = np.asarray(tr, dtype=float)
+        if sp.size < 2:
+            continue
+        sp = sp[np.isfinite(sp)]
+        if sp.size < 2:
+            continue
+        sp = np.sort(sp)
+        sp = sp[(sp >= tstart) & (sp < tstop)]
+        if sp.size < 2:
+            continue
+
+        isi = np.diff(sp)
+        if isi.size == 0:
+            continue
+        t_mid = sp[:-1] + 0.5 * isi
+        weighted_sum, _ = np.histogram(t_mid, bins=bins, weights=isi)
+        counts, _ = np.histogram(t_mid, bins=bins)
+        trial_curve = np.full(n_bins, np.nan, dtype=float)
+        valid = counts > 0
+        if np.any(valid):
+            trial_curve[valid] = weighted_sum[valid] / counts[valid]
+            trial_isis.append(trial_curve)
+
+    if not trial_isis:
+        return None
+
+    mat = np.vstack(trial_isis)
+    valid_mask = np.isfinite(mat)
+    mean_isi = np.full(mat.shape[1], np.nan, dtype=float)
+    counts = np.sum(valid_mask, axis=0)
+    has_vals = counts > 0
+    if np.any(has_vals):
+        numer = np.sum(np.where(valid_mask, mat, 0.0), axis=0)
+        mean_isi[has_vals] = numer[has_vals] / counts[has_vals]
+    if not np.isfinite(mean_isi).any():
+        return None
+
+    smooth_mode = str(smooth_mode or "center").lower()
+    centers, mean_isi = _smooth_curve_nanmean(
+        centers,
+        mean_isi,
+        bin_width,
+        smooth_ms,
+        mode=smooth_mode,
+    )
+
+    try:
+        smooth_ms_val = float(smooth_ms) if smooth_ms is not None else 0.0
+    except Exception:
+        smooth_ms_val = 0.0
+
+    return {
+        "bin_ms": bin_width,
+        "smooth_ms": smooth_ms_val,
+        "smooth_mode": smooth_mode,
+        "t_ms": centers.tolist(),
+        "isi_ms": mean_isi.tolist(),
+        "units": "ms",
+        "n_trials_with_isi": int(len(trial_isis)),
     }
 
 

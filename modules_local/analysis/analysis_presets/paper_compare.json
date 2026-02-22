@@ -20,7 +20,7 @@
     {
       "path": "external_data/pyrFiringRateAvg.csv",
       "label": "PN bio",
-      "enabled": false,
+      "enabled": true,
       "shift_ms": 500,
       "scale": 1,
       "color": "r",
@@ -39,12 +39,12 @@
       "linestyle": "--"
     },
     {
-      "path": "cells/PV/tunes/seg_tuned/output_data/_final_base_PV",
+      "path": "cells/PV/tunes/seg_tuned/output_data/_active_base_STP0_PV",
       "label": "PV base",
-      "enabled": false,
+      "enabled": true,
       "shift_ms": 200,
       "scale": 1,
-      "color": "blue",
+      "color": "royalblue",
       "linestyle": "-"
     },
     {
@@ -53,7 +53,7 @@
       "enabled": false,
       "shift_ms": 200,
       "scale": 1,
-      "color": "b",
+      "color": "dodgerblue",
       "linestyle": "-"
     },
     {
@@ -74,13 +74,49 @@
       "color": "navy",
       "linestyle": "-"
     },
+    {
+      "path": "cells/PV/tunes/seg_tuned/output_data/_Rin140soma3_base_PV",
+      "label": "PV High Rin",
+      "enabled": false,
+      "shift_ms": 200,
+      "scale": 1,
+      "color": "dodgerblue",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/PV/tunes/seg_tuned/output_data/_Rin57soma12_base_PV",
+      "label": "PV Low Rin",
+      "enabled": false,
+      "shift_ms": 200,
+      "scale": 1,
+      "color": "navy",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/PV/tunes/seg_tuned/output_data/_tauSST_base_PV",
+      "label": "PV High Tau",
+      "enabled": false,
+      "shift_ms": 200,
+      "scale": 1,
+      "color": "dodgerblue",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/PV/tunes/seg_tuned/output_data/_taulow_base_PV",
+      "label": "PV Low Tau",
+      "enabled": false,
+      "shift_ms": 200,
+      "scale": 1,
+      "color": "navy",
+      "linestyle": "-"
+    },
 
 
 
     {
       "path": "external_data/SSTFiringRateAvg.csv",
       "label": "SST bio",
-      "enabled": true,
+      "enabled": false,
       "shift_ms": 500,
       "scale": 1,
       "color": "m",
@@ -96,11 +132,11 @@
       "linestyle": "--"
     },
     {
-      "path": "cells/SST/tunes/seg_tuned/output_data/_final_base_SST",
+      "path": "cells/SST/tunes/seg_tuned/output_data/_active_base_SST",
       "label": "SST base",
       "enabled": true,
       "scale": 1,
-      "color": "magenta",
+      "color": "m",
       "linestyle": "-"
     },
     {
@@ -108,7 +144,7 @@
       "label": "SST VIPinh",
       "enabled": false,
       "scale": 1,
-      "color": "magenta",
+      "color": "darkmagenta",
       "linestyle": "-"
     },
     {
@@ -116,13 +152,13 @@
       "label": "SST GABABinh",
       "enabled": false,
       "scale": 1,
-      "color": "darkmagenta",
+      "color": "violet",
       "linestyle": "-"
     },
     {
       "path": "cells/SST/tunes/seg_tuned/output_data/_tauhigh1.2_base_SST",
       "label": "SST High Tau",
-      "enabled": true,
+      "enabled": false,
       "shift_ms": 0,
       "scale": 1,
       "color": "violet",
@@ -131,7 +167,7 @@
     {
       "path": "cells/SST/tunes/seg_tuned/output_data/_tauPV0.45_base_SST",
       "label": "SST Low Tau",
-      "enabled": true,
+      "enabled": false,
       "shift_ms": 0,
       "scale": 1,
       "color": "darkmagenta",
@@ -149,6 +185,42 @@
     {
       "path": "cells/SST/tunes/seg_tuned/output_data/_NMDA0_base_SST",
       "label": "SST Low NMDA (0)",
+      "enabled": false,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "darkmagenta",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_Rin255-350soma4_base_SST",
+      "label": "SST High Rin",
+      "enabled": false,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "violet",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_Rin143-157soma16_base_SST",
+      "label": "SST Low Rin",
+      "enabled": false,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "darkmagenta",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_STP140_base_SST",
+      "label": "SST High STP (2x)",
+      "enabled": false,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "violet",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/_STP0_base_SST",
+      "label": "SST Low STP (0)",
       "enabled": false,
       "shift_ms": 0,
       "scale": 1,

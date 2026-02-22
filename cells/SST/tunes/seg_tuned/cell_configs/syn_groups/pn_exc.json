@@ -18,7 +18,7 @@
     },
     "syns": {
       "type": "AMPA_NMDA_STP",
-      "N_syn": 50,
+      "N_syn": 22,
       "segs": "all",
       "dist_func": {
         "kind": "uniform",
@@ -27,7 +27,7 @@
         }
       },
       "params": {
-        "wt_mean": 0.5,
+        "wt_mean": 1.5,
         "wt_std": 0.34,
         "initW": 1.0,
         "gmax_AMPA": 0.001,

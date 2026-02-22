@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple
 
+import csv
+from datetime import datetime
 import json
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import colors as mcolors
+from matplotlib.collections import LineCollection, PathCollection, PolyCollection
 from pathlib import Path
 import textwrap
 
@@ -32,10 +36,12 @@ HELP_OUTPUTS = textwrap.dedent(
     Outputs UI
     - Uses the current Selection and Compare list/paths.
     - Plot window, stim start/stop are in ms.
-    - Curve mode: raw vs normalized; Norm mode: avg/peak; Norm FR optional override.
+    - Curve mode: raw vs normalized; Curve plot: Rate, ISI, or stacked Rate+ISI; Norm mode: avg/peak.
     - Curve bin/smooth controls binned rate and moving-average window.
     - Compare layout: overlay/stacked/side-by-side; Shade adds std/sem band.
     - Paper compare toggles presets from analysis_presets/paper_compare.json.
+    - CSV export saves plotted data (including raster/shaded artists when shown).
+    - Format toggle: Trace rows (one row per trace) or Long rows (one row per point).
     """
 ).strip()
 
@@ -48,6 +54,8 @@ HELP_INPUTS = textwrap.dedent(
     - Bin/smooth apply to input rate curves; raster settings affect raster plots.
     - Compare layout controls multi-run plotting.
     - Legend: matplotlib location for input legends (e.g., best, upper left, none).
+    - CSV export saves plotted data (including raster/shaded artists when shown).
+    - Format toggle: Trace rows (one row per trace) or Long rows (one row per point).
     """
 ).strip()
 
@@ -55,6 +63,8 @@ HELP_EXTRA = textwrap.dedent(
     """
     Extra UI
     - Output metrics: summary table for selected runs/curves.
+    - Output metrics spread: choose std or sem across saved trials.
+    - Metric dist plot: box/whisker by run for selected metrics; curve-only entries show mean markers.
     - Compare configs: diff cell/geom/syn configs across runs.
     - Compare outputs/inputs: reuse plot logic with the current selection.
     - Input sampling: synthesize input curves from synapse configs.
@@ -140,6 +150,591 @@ def _save_json(data: dict, out_path, *, enabled: bool) -> None:
     analysis.save_json(data, out_path, enabled=enabled)
 
 
+_PLOT_DATA_FIELDS = [
+    "figure_type",
+    "mode",
+    "plot_name",
+    "axis_index",
+    "trace_label",
+    "series_kind",
+    "run_label",
+    "units",
+    "time_ms",
+    "value",
+    "value_low",
+    "value_high",
+]
+
+_PLOT_DATA_TRACE_FIELDS = [
+    "trace_name",
+    "trace_label",
+    "series_kind",
+    "figure_type",
+    "mode",
+    "plot_name",
+    "axis_index",
+    "run_label",
+    "units",
+    "n_points",
+    "time_ms",
+    "value",
+    "value_low",
+    "value_high",
+]
+
+
+def _safe_float(value: Any) -> Optional[float]:
+    try:
+        out = float(value)
+    except Exception:
+        return None
+    if not np.isfinite(out):
+        return None
+    return out
+
+
+def _normalize_label(value: Any, fallback: str) -> str:
+    text = str(value).strip() if value is not None else ""
+    if not text or text.startswith("_"):
+        return fallback
+    return text
+
+
+def _slug_token(value: str) -> str:
+    chars = []
+    for ch in str(value):
+        if ch.isalnum() or ch in ("-", "_"):
+            chars.append(ch)
+        else:
+            chars.append("_")
+    token = "".join(chars).strip("_")
+    while "__" in token:
+        token = token.replace("__", "_")
+    return token or "plot"
+
+
+def _entry_label_for_name(entry: Any) -> str:
+    spec = _parse_compare_list_item(entry)
+    label = spec.get("label")
+    if label:
+        return _slug_token(str(label))
+    path_raw = spec.get("path")
+    if path_raw:
+        p = Path(str(path_raw))
+        if p.suffix:
+            return _slug_token(p.stem)
+        return _slug_token(p.name)
+    return "entry"
+
+
+def _selection_name_tokens(selection: Dict[str, Any]) -> list[str]:
+    entries = _compare_list_entries(selection)
+    if entries:
+        labels = [_entry_label_for_name(v) for v in entries[:4]]
+        return [v for v in labels if v]
+    if compare_enabled(selection):
+        run_a = selection.get("run_a_path") or selection.get("run_a") or "run_a"
+        run_b = selection.get("run_b_path") or selection.get("run_b") or "run_b"
+        a_lbl = Path(str(run_a)).stem if str(run_a).endswith((".csv", ".tsv", ".txt")) else Path(str(run_a)).name
+        b_lbl = Path(str(run_b)).stem if str(run_b).endswith((".csv", ".tsv", ".txt")) else Path(str(run_b)).name
+        return [_slug_token(a_lbl), _slug_token(b_lbl)]
+    run_single = selection.get("run_single") or "single"
+    return [_slug_token(Path(str(run_single)).name)]
+
+
+def _default_plot_data_filename(
+    selection: Dict[str, Any],
+    *,
+    figure_type: str,
+    mode: str,
+) -> str:
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    tokens = _selection_name_tokens(selection)[:4]
+    token_text = "_".join(tokens) if tokens else "plot"
+    return f"{_slug_token(figure_type)}_{_slug_token(mode)}_{token_text}_{stamp}.csv"
+
+
+def _resolve_plot_data_target_path(
+    selection: Dict[str, Any],
+    requested_path: Any,
+    *,
+    figure_type: str,
+    mode: str,
+) -> Path:
+    base_dir = selection.get("base")
+    if base_dir is None:
+        base_dir = Path.cwd()
+    base_dir = Path(base_dir)
+    default_dir = base_dir / "plot_data"
+    requested = str(requested_path or "").strip()
+    if not requested:
+        return default_dir / _default_plot_data_filename(selection, figure_type=figure_type, mode=mode)
+
+    p = Path(requested).expanduser()
+    if not p.suffix:
+        p = p.with_suffix(".csv")
+    if p.is_absolute():
+        return p
+    if p.parent == Path("."):
+        return default_dir / p.name
+    return p.resolve()
+
+
+def _new_plot_data_row(
+    *,
+    figure_type: str,
+    mode: str,
+    plot_name: str,
+    axis_index: int,
+    trace_label: str,
+    series_kind: str,
+    run_label: str,
+    units: str,
+    time_ms: Any,
+    value: Any = None,
+    value_low: Any = None,
+    value_high: Any = None,
+) -> Dict[str, Any]:
+    return {
+        "figure_type": str(figure_type),
+        "mode": str(mode),
+        "plot_name": str(plot_name),
+        "axis_index": int(axis_index),
+        "trace_label": str(trace_label),
+        "series_kind": str(series_kind),
+        "run_label": str(run_label),
+        "units": str(units or ""),
+        "time_ms": _safe_float(time_ms),
+        "value": _safe_float(value),
+        "value_low": _safe_float(value_low),
+        "value_high": _safe_float(value_high),
+    }
+
+
+def _trace_cell_value(value: Any) -> str:
+    num = _safe_float(value)
+    if num is None:
+        return ""
+    return f"{num:.10g}"
+
+
+def _encode_trace_series(values: list[Any]) -> str:
+    return "|".join(_trace_cell_value(v) for v in values)
+
+
+def _normalize_plot_data_format(value: Any) -> str:
+    token = str(value or "").strip().lower()
+    if token in {"long", "long_rows", "tidy", "point_rows", "points"}:
+        return "long_rows"
+    return "trace_rows"
+
+
+def _rows_to_trace_rows(rows: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
+    grouped: Dict[Tuple[str, str, str, int, str, str, str, str], list[Dict[str, Any]]] = {}
+    order: list[Tuple[str, str, str, int, str, str, str, str]] = []
+
+    for row in rows:
+        figure_type = str(row.get("figure_type") or "")
+        mode = str(row.get("mode") or "")
+        plot_name = str(row.get("plot_name") or "")
+        axis_index = int(row.get("axis_index") or 0)
+        trace_label = str(row.get("trace_label") or "")
+        series_kind = str(row.get("series_kind") or "")
+        run_label = str(row.get("run_label") or "")
+        units = str(row.get("units") or "")
+        key = (
+            figure_type,
+            mode,
+            plot_name,
+            axis_index,
+            trace_label,
+            series_kind,
+            run_label,
+            units,
+        )
+        if key not in grouped:
+            grouped[key] = []
+            order.append(key)
+        grouped[key].append(row)
+
+    trace_rows: list[Dict[str, Any]] = []
+    name_counts: Dict[str, int] = {}
+    for key in order:
+        figure_type, mode, plot_name, axis_index, trace_label, series_kind, run_label, units = key
+        points = grouped.get(key, [])
+        if not points:
+            continue
+
+        def _sort_key(item: Dict[str, Any]) -> tuple[float, int]:
+            t = _safe_float(item.get("time_ms"))
+            if t is None:
+                return (float("inf"), 1)
+            return (t, 0)
+
+        points_sorted = sorted(points, key=_sort_key)
+        time_vals = [pt.get("time_ms") for pt in points_sorted]
+        value_vals = [pt.get("value") for pt in points_sorted]
+        low_vals = [pt.get("value_low") for pt in points_sorted]
+        high_vals = [pt.get("value_high") for pt in points_sorted]
+
+        base_name = trace_label.strip() or f"{series_kind}_trace"
+        count = name_counts.get(base_name, 0) + 1
+        name_counts[base_name] = count
+        trace_name = base_name if count == 1 else f"{base_name} ({count})"
+
+        trace_rows.append(
+            {
+                "trace_name": trace_name,
+                "trace_label": trace_label,
+                "series_kind": series_kind,
+                "figure_type": figure_type,
+                "mode": mode,
+                "plot_name": plot_name,
+                "axis_index": axis_index,
+                "run_label": run_label,
+                "units": units,
+                "n_points": len(points_sorted),
+                "time_ms": _encode_trace_series(time_vals),
+                "value": _encode_trace_series(value_vals),
+                "value_low": _encode_trace_series(low_vals),
+                "value_high": _encode_trace_series(high_vals),
+            }
+        )
+    return trace_rows
+
+
+def _rows_from_line(
+    line,
+    *,
+    figure_type: str,
+    mode: str,
+    plot_name: str,
+    axis_index: int,
+    run_label: str,
+    units: str,
+    fallback_label: str,
+) -> list[Dict[str, Any]]:
+    x_raw = np.asarray(line.get_xdata(), dtype=float)
+    y_raw = np.asarray(line.get_ydata(), dtype=float)
+    if x_raw.size == 0 or y_raw.size == 0:
+        return []
+    n = min(x_raw.size, y_raw.size)
+    x = x_raw[:n]
+    y = y_raw[:n]
+    if x.size == 0:
+        return []
+    label = _normalize_label(line.get_label(), fallback_label)
+    if x.size == 2 and np.isfinite(x[0]) and np.isfinite(x[1]) and np.isclose(x[0], x[1]):
+        return [
+            _new_plot_data_row(
+                figure_type=figure_type,
+                mode=mode,
+                plot_name=plot_name,
+                axis_index=axis_index,
+                trace_label=label,
+                series_kind="vline",
+                run_label=run_label,
+                units=units,
+                time_ms=x[0],
+                value_low=min(y[0], y[1]),
+                value_high=max(y[0], y[1]),
+            )
+        ]
+    rows: list[Dict[str, Any]] = []
+    for xi, yi in zip(x, y):
+        rows.append(
+            _new_plot_data_row(
+                figure_type=figure_type,
+                mode=mode,
+                plot_name=plot_name,
+                axis_index=axis_index,
+                trace_label=label,
+                series_kind="line",
+                run_label=run_label,
+                units=units,
+                time_ms=xi,
+                value=yi,
+            )
+        )
+    return rows
+
+
+def _rows_from_path_collection(
+    collection,
+    *,
+    figure_type: str,
+    mode: str,
+    plot_name: str,
+    axis_index: int,
+    run_label: str,
+    units: str,
+    fallback_label: str,
+) -> list[Dict[str, Any]]:
+    try:
+        offsets = np.asarray(collection.get_offsets(), dtype=float)
+    except Exception:
+        return []
+    if offsets.size == 0:
+        return []
+    offsets = offsets.reshape((-1, 2))
+    label = _normalize_label(collection.get_label(), fallback_label)
+    rows: list[Dict[str, Any]] = []
+    for xi, yi in offsets:
+        rows.append(
+            _new_plot_data_row(
+                figure_type=figure_type,
+                mode=mode,
+                plot_name=plot_name,
+                axis_index=axis_index,
+                trace_label=label,
+                series_kind="scatter",
+                run_label=run_label,
+                units=units,
+                time_ms=xi,
+                value=yi,
+            )
+        )
+    return rows
+
+
+def _rows_from_line_collection(
+    collection,
+    *,
+    figure_type: str,
+    mode: str,
+    plot_name: str,
+    axis_index: int,
+    run_label: str,
+    units: str,
+    fallback_label: str,
+) -> list[Dict[str, Any]]:
+    try:
+        segments = collection.get_segments()
+    except Exception:
+        return []
+    if not segments:
+        return []
+    label = _normalize_label(collection.get_label(), fallback_label)
+    rows: list[Dict[str, Any]] = []
+    for seg in segments:
+        pts = np.asarray(seg, dtype=float)
+        if pts.ndim != 2 or pts.shape[0] < 2:
+            continue
+        x0, y0 = pts[0]
+        x1, y1 = pts[-1]
+        if np.isclose(x0, x1):
+            rows.append(
+                _new_plot_data_row(
+                    figure_type=figure_type,
+                    mode=mode,
+                    plot_name=plot_name,
+                    axis_index=axis_index,
+                    trace_label=label,
+                    series_kind="vline_segment",
+                    run_label=run_label,
+                    units=units,
+                    time_ms=x0,
+                    value_low=min(y0, y1),
+                    value_high=max(y0, y1),
+                )
+            )
+            continue
+        rows.append(
+            _new_plot_data_row(
+                figure_type=figure_type,
+                mode=mode,
+                plot_name=plot_name,
+                axis_index=axis_index,
+                trace_label=label,
+                series_kind="segment_start",
+                run_label=run_label,
+                units=units,
+                time_ms=x0,
+                value=y0,
+            )
+        )
+        rows.append(
+            _new_plot_data_row(
+                figure_type=figure_type,
+                mode=mode,
+                plot_name=plot_name,
+                axis_index=axis_index,
+                trace_label=label,
+                series_kind="segment_end",
+                run_label=run_label,
+                units=units,
+                time_ms=x1,
+                value=y1,
+            )
+        )
+    return rows
+
+
+def _rows_from_poly_collection(
+    collection,
+    *,
+    figure_type: str,
+    mode: str,
+    plot_name: str,
+    axis_index: int,
+    run_label: str,
+    units: str,
+    fallback_label: str,
+) -> list[Dict[str, Any]]:
+    rows: list[Dict[str, Any]] = []
+    label = _normalize_label(collection.get_label(), fallback_label)
+    try:
+        paths = collection.get_paths()
+    except Exception:
+        return rows
+    for path in paths:
+        verts = np.asarray(path.vertices, dtype=float)
+        if verts.ndim != 2 or verts.shape[1] != 2 or verts.shape[0] < 3:
+            continue
+        if np.allclose(verts[0], verts[-1]):
+            verts = verts[:-1]
+        if verts.shape[0] < 2:
+            continue
+        x_vals = np.round(verts[:, 0], 9)
+        uniq_x = np.unique(x_vals)
+        for x_val in uniq_x:
+            ys = verts[x_vals == x_val, 1]
+            if ys.size == 0:
+                continue
+            rows.append(
+                _new_plot_data_row(
+                    figure_type=figure_type,
+                    mode=mode,
+                    plot_name=plot_name,
+                    axis_index=axis_index,
+                    trace_label=label,
+                    series_kind="shade_band",
+                    run_label=run_label,
+                    units=units,
+                    time_ms=float(x_val),
+                    value_low=float(np.min(ys)),
+                    value_high=float(np.max(ys)),
+                )
+            )
+    return rows
+
+
+def _rows_from_figures(
+    figures: list[tuple[Any, str]],
+    *,
+    figure_type: str,
+    mode: str,
+    run_label: str,
+) -> list[Dict[str, Any]]:
+    rows: list[Dict[str, Any]] = []
+    for fig_obj, plot_name in figures:
+        fig = analysis.resolve_figure(fig_obj)
+        axes = list(fig.axes or [])
+        for ax_idx, ax in enumerate(axes):
+            units = str(ax.get_ylabel() or "")
+            for line_idx, line in enumerate(ax.get_lines()):
+                rows.extend(
+                    _rows_from_line(
+                        line,
+                        figure_type=figure_type,
+                        mode=mode,
+                        plot_name=plot_name,
+                        axis_index=ax_idx,
+                        run_label=run_label,
+                        units=units,
+                        fallback_label=f"line_{ax_idx}_{line_idx}",
+                    )
+                )
+            for coll_idx, coll in enumerate(ax.collections):
+                fallback = f"collection_{ax_idx}_{coll_idx}"
+                if isinstance(coll, PathCollection):
+                    rows.extend(
+                        _rows_from_path_collection(
+                            coll,
+                            figure_type=figure_type,
+                            mode=mode,
+                            plot_name=plot_name,
+                            axis_index=ax_idx,
+                            run_label=run_label,
+                            units=units,
+                            fallback_label=fallback,
+                        )
+                    )
+                elif isinstance(coll, LineCollection):
+                    rows.extend(
+                        _rows_from_line_collection(
+                            coll,
+                            figure_type=figure_type,
+                            mode=mode,
+                            plot_name=plot_name,
+                            axis_index=ax_idx,
+                            run_label=run_label,
+                            units=units,
+                            fallback_label=fallback,
+                        )
+                    )
+                elif isinstance(coll, PolyCollection):
+                    rows.extend(
+                        _rows_from_poly_collection(
+                            coll,
+                            figure_type=figure_type,
+                            mode=mode,
+                            plot_name=plot_name,
+                            axis_index=ax_idx,
+                            run_label=run_label,
+                            units=units,
+                            fallback_label=fallback,
+                        )
+                    )
+    return rows
+
+
+def _save_plot_data_rows(
+    rows: list[Dict[str, Any]],
+    *,
+    selection: Dict[str, Any],
+    requested_path: Any,
+    figure_type: str,
+    mode: str,
+    export_format: Any = "trace_rows",
+) -> Optional[Path]:
+    if not rows:
+        print("Plot data CSV not saved: no plotted data captured in the current figure(s).")
+        return None
+    fmt = _normalize_plot_data_format(export_format)
+    out_path = _resolve_plot_data_target_path(
+        selection,
+        requested_path,
+        figure_type=figure_type,
+        mode=mode,
+    )
+    if out_path.exists():
+        print(f"Plot data CSV not saved: file already exists: {out_path}")
+        return None
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if fmt == "long_rows":
+        with out_path.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=_PLOT_DATA_FIELDS)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({key: row.get(key) for key in _PLOT_DATA_FIELDS})
+        print(f"Saved plot data CSV: {out_path} ({len(rows)} rows, format=long_rows)")
+        return out_path
+
+    trace_rows = _rows_to_trace_rows(rows)
+    if not trace_rows:
+        print("Plot data CSV not saved: no trace rows were generated from plotted data.")
+        return None
+    with out_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=_PLOT_DATA_TRACE_FIELDS)
+        writer.writeheader()
+        for row in trace_rows:
+            writer.writerow({key: row.get(key) for key in _PLOT_DATA_TRACE_FIELDS})
+    print(f"Saved plot data CSV: {out_path} ({len(trace_rows)} traces, {len(rows)} points, format=trace_rows)")
+    return out_path
+
+
 def _stim_window(sim_cfg: Dict[str, Any]) -> Tuple[Optional[float], Optional[float]]:
     stim_start = sim_cfg.get("stim_start_ms")
     stim_stop = sim_cfg.get("stim_stop_ms")
@@ -198,6 +793,7 @@ def _plot_metric_points(
         lab = None
         if show_labels:
             lab = f"{label_prefix} {label}" if label_prefix else label
+            lab = _legend_safe_label(lab)
             any_label = True
         ax.scatter(
             [t_val],
@@ -254,11 +850,32 @@ def _parse_plot_scale(scale: Any) -> float:
         return 1.0
 
 
+def _legend_safe_label(label: Any) -> Optional[str]:
+    if label is None:
+        return None
+    txt = str(label)
+    if not txt:
+        return None
+    # Matplotlib ignores labels that start with "_"
+    if txt.startswith("_"):
+        return f" {txt}"
+    return txt
+
+
 def _curve_smooth_ms(opts: Dict[str, Any]) -> Optional[float]:
     smooth = opts.get("win_size")
     if smooth is None:
         smooth = opts.get("output_smooth_ms")
     return smooth
+
+
+def _output_curve_plot_mode(opts: Dict[str, Any]) -> str:
+    mode = str(opts.get("output_curve_plot_mode", "rate") or "rate").strip().lower()
+    if mode in ("isi", "isi_only"):
+        return "isi"
+    if mode in ("rate_isi", "rate+isi", "both", "stacked"):
+        return "rate_isi"
+    return "rate"
 
 
 def _unique_compare_colors(n: int) -> list:
@@ -377,6 +994,248 @@ def _compute_output_metrics(
     )
 
 
+def _output_metrics_std_mode(opts: Dict[str, Any]) -> str:
+    mode = str(opts.get("output_metrics_std_mode", "std") or "std").strip().lower()
+    return mode if mode in ("std", "sem") else "std"
+
+
+def _output_metric_overrides(opts: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "peak_window_ms": opts.get("output_peak_window_ms", 100.0),
+        "drop_window_ms": opts.get("output_drop_window_ms", 100.0),
+        "rebound_window_ms": opts.get("output_rebound_window_ms", 300.0),
+        "auc_window": opts.get("output_auc_window", "stim"),
+    }
+
+
+def _extract_spike_trials(results: Optional[Dict[str, Any]]) -> list[Any]:
+    if not isinstance(results, dict):
+        return []
+    spikes = results.get("spikes")
+    if spikes is None:
+        return []
+    if results.get("mode") != "multi":
+        return [spikes]
+    if isinstance(spikes, np.ndarray):
+        if spikes.dtype == object:
+            return list(spikes.tolist())
+        if spikes.ndim > 1:
+            return list(spikes)
+        return [spikes]
+    if isinstance(spikes, (list, tuple)):
+        if not spikes:
+            return []
+        first = spikes[0]
+        if isinstance(first, (int, float, np.integer, np.floating)):
+            return [spikes]
+        return list(spikes)
+    return [spikes]
+
+
+def _run_output_curve_from_results(
+    results: Dict[str, Any],
+    opts: Dict[str, Any],
+    *,
+    shift_ms: Optional[float] = None,
+) -> Optional[Dict[str, Any]]:
+    curve = analysis.compute_output_curve_from_results(
+        results,
+        bin_ms=opts.get("output_bin_ms"),
+        smooth_ms=_curve_smooth_ms(opts),
+        smooth_mode=opts.get("output_smooth_mode", "causal"),
+    )
+    if not curve:
+        return None
+    curve = analysis.normalize_output_curve(
+        curve,
+        results.get("sim_cfg", {}) or {},
+        mode=opts.get("output_curve_mode", "raw"),
+        norm_mode=opts.get("output_norm_mode", "avg"),
+        baseline_ms=opts.get("output_metric_window_ms", 100.0),
+        baseline_mode=opts.get("output_metric_mode", "point"),
+        baseline_center_ms=opts.get("output_baseline_center_ms"),
+        norm_window=opts.get("output_norm_window", "stim"),
+    )
+    if shift_ms is not None:
+        t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
+        if t_ms.size:
+            curve = dict(curve)
+            curve["t_ms"] = (t_ms + float(shift_ms)).tolist()
+    return curve
+
+
+def _run_output_isi_curve_from_results(
+    results: Dict[str, Any],
+    opts: Dict[str, Any],
+    *,
+    shift_ms: Optional[float] = None,
+) -> Optional[Dict[str, Any]]:
+    curve = analysis.compute_output_isi_curve_from_results(
+        results,
+        bin_ms=opts.get("output_bin_ms"),
+        smooth_ms=_curve_smooth_ms(opts),
+        smooth_mode=opts.get("output_smooth_mode", "causal"),
+    )
+    if not curve:
+        return None
+    if shift_ms is not None:
+        t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
+        if t_ms.size:
+            curve = dict(curve)
+            curve["t_ms"] = (t_ms + float(shift_ms)).tolist()
+    return curve
+
+
+def _compute_output_trial_metrics(
+    results: Optional[Dict[str, Any]],
+    sim_cfg: Dict[str, Any],
+    opts: Dict[str, Any],
+    *,
+    shift_ms: Optional[float] = None,
+    **metric_overrides: Any,
+) -> list[Dict[str, Any]]:
+    if not isinstance(results, dict):
+        return []
+    trial_spikes = _extract_spike_trials(results)
+    if not trial_spikes:
+        return []
+
+    trial_metrics: list[Dict[str, Any]] = []
+    for spikes_trial in trial_spikes:
+        trial_results: Dict[str, Any] = {
+            "mode": "single",
+            "spikes": spikes_trial,
+            "sim_cfg": sim_cfg or {},
+        }
+        traces = results.get("traces")
+        if traces is not None:
+            trial_results["traces"] = traces
+
+        trial_curve = analysis.compute_output_curve_from_results(
+            trial_results,
+            bin_ms=opts.get("output_bin_ms"),
+            smooth_ms=_curve_smooth_ms(opts),
+            smooth_mode=opts.get("output_smooth_mode", "causal"),
+        )
+        if not trial_curve:
+            continue
+        trial_curve = analysis.normalize_output_curve(
+            trial_curve,
+            sim_cfg or {},
+            mode=opts.get("output_curve_mode", "raw"),
+            norm_mode=opts.get("output_norm_mode", "avg"),
+            baseline_ms=opts.get("output_metric_window_ms", 100.0),
+            baseline_mode=opts.get("output_metric_mode", "point"),
+            baseline_center_ms=opts.get("output_baseline_center_ms"),
+            norm_window=opts.get("output_norm_window", "stim"),
+        )
+        if shift_ms is not None:
+            t_ms = np.asarray(trial_curve.get("t_ms", []) or [], dtype=float)
+            if t_ms.size:
+                trial_curve = dict(trial_curve)
+                trial_curve["t_ms"] = (t_ms + float(shift_ms)).tolist()
+
+        trial_metrics.append(_compute_output_metrics(trial_curve, sim_cfg, opts, **metric_overrides))
+    return trial_metrics
+
+
+def _coerce_metric_numeric(value: Any) -> Optional[float]:
+    try:
+        out = float(value)
+    except Exception:
+        return None
+    if not np.isfinite(out):
+        return None
+    return out
+
+
+def _extract_output_color_from_results(results: Optional[Dict[str, Any]]) -> Optional[str]:
+    if not isinstance(results, dict):
+        return None
+    sim_cfg = results.get("sim_cfg") or {}
+    if isinstance(sim_cfg, dict):
+        for key in ("color", "cell_color", "plot_color"):
+            val = sim_cfg.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+    return None
+
+
+def _coerce_plot_color(value: Any, fallback: Any) -> Any:
+    if isinstance(value, str) and value.strip():
+        try:
+            mcolors.to_rgba(value.strip())
+            return value.strip()
+        except Exception:
+            pass
+    return fallback
+
+
+def _attach_output_metric_spread(
+    metrics: Dict[str, Any],
+    *,
+    results: Optional[Dict[str, Any]],
+    sim_cfg: Dict[str, Any],
+    opts: Dict[str, Any],
+    shift_ms: Optional[float] = None,
+    **metric_overrides: Any,
+) -> Dict[str, Any]:
+    out = dict(metrics)
+    spread_mode = _output_metrics_std_mode(opts)
+    out["output_metrics_std_mode"] = spread_mode
+    if not isinstance(results, dict):
+        out["output_metrics_n_trials"] = None
+        return out
+
+    trial_metrics = _compute_output_trial_metrics(
+        results,
+        sim_cfg,
+        opts,
+        shift_ms=shift_ms,
+        **metric_overrides,
+    )
+    out["output_metrics_n_trials"] = len(trial_metrics)
+    if not trial_metrics:
+        return out
+
+    for key in _OUTPUT_METRIC_VALUE_ORDER:
+        if key == "output_metrics_n_trials":
+            continue
+        vals: list[float] = []
+        for trial in trial_metrics:
+            val = _coerce_metric_numeric(trial.get(key))
+            if val is not None:
+                vals.append(val)
+        if not vals:
+            continue
+        spread = float(np.std(np.asarray(vals, dtype=float)))
+        if spread_mode == "sem":
+            spread = spread / float(np.sqrt(len(vals)))
+        out[f"{key}_spread"] = spread
+
+    return out
+
+
+def _compute_output_metrics_with_spread(
+    curve: Optional[Dict[str, Any]],
+    sim_cfg: Dict[str, Any],
+    opts: Dict[str, Any],
+    *,
+    results: Optional[Dict[str, Any]] = None,
+    shift_ms: Optional[float] = None,
+    **overrides: Any,
+) -> Dict[str, Any]:
+    metrics = _compute_output_metrics(curve, sim_cfg, opts, **overrides)
+    return _attach_output_metric_spread(
+        metrics,
+        results=results,
+        sim_cfg=sim_cfg,
+        opts=opts,
+        shift_ms=shift_ms,
+        **overrides,
+    )
+
+
 def _smooth_curve_if_requested(
     curve: Optional[Dict[str, Any]],
     *,
@@ -471,6 +1330,123 @@ def _curve_from_xy(t_ms: np.ndarray, rate: np.ndarray, *, units: str = "Hz") -> 
         "rate_hz": np.asarray(rate, dtype=float).tolist(),
         "units": units,
     }
+
+
+def _curve_has_series(curve: Optional[Dict[str, Any]], y_key: str) -> bool:
+    if not curve:
+        return False
+    t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
+    y = np.asarray(curve.get(y_key, []) or [], dtype=float)
+    if t_ms.size == 0 or y.size == 0:
+        return False
+    return bool(np.isfinite(y).any())
+
+
+def _plot_output_curve_mode_figure(
+    *,
+    mode: str,
+    rate_curves: list[Optional[Dict[str, Any]]],
+    isi_curves: list[Optional[Dict[str, Any]]],
+    labels: list[str],
+    colors: Optional[list[Optional[str]]] = None,
+    linestyles: Optional[list[Optional[str]]] = None,
+    plot_window: Optional[Tuple[Optional[float], Optional[float]]] = None,
+    stim_start: Optional[float] = None,
+    stim_stop: Optional[float] = None,
+    title: str = "Output curve",
+    line_width: float = 2.0,
+    stim_linewidth: float = 1.0,
+    figsize: Optional[tuple[float, float]] = None,
+) -> tuple[Any, Dict[str, Any]]:
+    mode_norm = mode if mode in ("rate", "isi", "rate_isi") else "rate"
+    show_rate = mode_norm in ("rate", "rate_isi")
+    show_isi = mode_norm in ("isi", "rate_isi")
+    n_series = max(len(labels), len(rate_curves), len(isi_curves))
+
+    if show_rate and show_isi:
+        if figsize is None:
+            figsize = (6.0, 6.0)
+        fig, axes_arr = plt.subplots(2, 1, figsize=figsize, sharex=True)
+        axes = np.atleast_1d(axes_arr)
+        ax_rate = axes[0]
+        ax_isi = axes[1]
+    else:
+        if figsize is None:
+            figsize = (6.0, 4.0)
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        ax_rate = ax if show_rate else None
+        ax_isi = ax if show_isi else None
+        axes = np.asarray([ax])
+
+    color_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    plotted_rate = False
+    plotted_isi = False
+
+    for idx in range(n_series):
+        label = labels[idx] if idx < len(labels) else None
+        plot_label = _legend_safe_label(label)
+        col = None
+        if colors is not None and idx < len(colors):
+            col = colors[idx]
+        if col is None:
+            col = color_cycle[idx % len(color_cycle)] if color_cycle else None
+        ls = "-"
+        if linestyles is not None and idx < len(linestyles) and linestyles[idx]:
+            ls = str(linestyles[idx])
+
+        rate_curve = rate_curves[idx] if idx < len(rate_curves) else None
+        if ax_rate is not None and _curve_has_series(rate_curve, "rate_hz"):
+            t_rate = np.asarray(rate_curve.get("t_ms", []) or [], dtype=float)
+            y_rate = np.asarray(rate_curve.get("rate_hz", []) or [], dtype=float)
+            ax_rate.plot(t_rate, y_rate, lw=float(line_width), color=col, linestyle=ls, label=plot_label)
+            plotted_rate = True
+
+        isi_curve = isi_curves[idx] if idx < len(isi_curves) else None
+        if ax_isi is not None and _curve_has_series(isi_curve, "isi_ms"):
+            t_isi = np.asarray(isi_curve.get("t_ms", []) or [], dtype=float)
+            y_isi = np.asarray(isi_curve.get("isi_ms", []) or [], dtype=float)
+            ax_isi.plot(t_isi, y_isi, lw=float(line_width), color=col, linestyle=ls, label=plot_label)
+            plotted_isi = True
+
+    if ax_rate is not None:
+        units = None
+        for curve in rate_curves:
+            if curve:
+                units = curve.get("units")
+                if units is not None:
+                    break
+        y_label = "Rate (Hz)" if str(units or "Hz") == "Hz" else "Rate (normalized)"
+        ax_rate.set_ylabel(y_label)
+        ax_rate.set_title(title if ax_isi is None else f"{title} - rate")
+        if plotted_rate:
+            handles, labels_ax = ax_rate.get_legend_handles_labels()
+            if any(str(lbl).strip() and not str(lbl).startswith("_") for lbl in labels_ax):
+                ax_rate.legend()
+        else:
+            ax_rate.text(0.5, 0.5, "No rate data", transform=ax_rate.transAxes, ha="center", va="center")
+
+    if ax_isi is not None:
+        ax_isi.set_ylabel("ISI (ms)")
+        ax_isi.set_title(title if ax_rate is None else f"{title} - ISI")
+        if plotted_isi:
+            handles, labels_ax = ax_isi.get_legend_handles_labels()
+            if any(str(lbl).strip() and not str(lbl).startswith("_") for lbl in labels_ax):
+                ax_isi.legend()
+        else:
+            ax_isi.text(0.5, 0.5, "No ISI data", transform=ax_isi.transAxes, ha="center", va="center")
+
+    for ax in axes:
+        if plot_window is not None:
+            ax.set_xlim(plot_window[0], plot_window[1])
+        if stim_start is not None:
+            ax.axvline(float(stim_start), color="k", linestyle="-", linewidth=float(stim_linewidth))
+        if stim_stop is not None:
+            ax.axvline(float(stim_stop), color="k", linestyle="-", linewidth=float(stim_linewidth))
+        ax.grid(True)
+
+    axes[-1].set_xlabel("Time (ms)")
+    plt.tight_layout()
+    return fig, {"rate": ax_rate, "isi": ax_isi}
 
 
 def _parse_figsize(value: Any) -> Optional[tuple[float, float]]:
@@ -811,7 +1787,25 @@ def run_output_plots(
     save_plots: bool = False,
     save_analysis: bool = False,
     plots_dpi: int = 150,
-) -> None:
+) -> Dict[str, Any]:
+    export_figures: list[tuple[Any, str]] = []
+    export_mode = "single"
+    export_run_label = ""
+
+    def _remember_figure(fig_obj: Any, plot_name: str) -> None:
+        if fig_obj is None:
+            return
+        export_figures.append((analysis.resolve_figure(fig_obj), str(plot_name)))
+
+    def _payload() -> Dict[str, Any]:
+        rows = _rows_from_figures(
+            export_figures,
+            figure_type="output",
+            mode=export_mode,
+            run_label=export_run_label,
+        )
+        return {"rows": rows, "mode": export_mode, "run_label": export_run_label}
+
     output_scale = 1.0
     external_scale = 1.0
     base_dir = selection.get("base")
@@ -821,6 +1815,8 @@ def run_output_plots(
     preset_entries = _load_compare_preset(selection.get("compare_preset_path"), base_dir)
     list_entries = _compare_list_entries(selection) if not preset_entries else []
     if preset_entries or list_entries:
+        export_mode = "compare_list"
+        export_run_label = "compare_list"
         paths: list[Path] = []
         shifts: list[Optional[float]] = []
         scales: list[Optional[float]] = []
@@ -880,6 +1876,7 @@ def run_output_plots(
             selection["compare_list_paths"] = []
         else:
             curves = []
+            isi_curves = []
             labels = []
             colors = []
             linestyles = []
@@ -896,6 +1893,7 @@ def run_output_plots(
                     color_override = colors_override[idx] if idx < len(colors_override) else None
                     linestyle_override = linestyles_override[idx] if idx < len(linestyles_override) else None
                     curves.append(curve)
+                    isi_curves.append(None)
                     labels.append(label_override or Path(path).stem)
                     colors.append(color_override)
                     linestyles.append(linestyle_override)
@@ -908,32 +1906,15 @@ def run_output_plots(
                     if res is None:
                         print(f"Skipping missing run: {path}")
                         continue
-                    curve = analysis.compute_output_curve_from_results(
-                        res,
-                        bin_ms=opts.get("output_bin_ms"),
-                        smooth_ms=_curve_smooth_ms(opts),
-                        smooth_mode=opts.get("output_smooth_mode", "causal"),
-                    )
+                    curve = _run_output_curve_from_results(res, opts, shift_ms=shift_ms)
                     if not curve:
                         continue
-                    curve = analysis.normalize_output_curve(
-                        curve,
-                        res.get("sim_cfg", {}) or {},
-                        mode=opts.get("output_curve_mode", "raw"),
-                        norm_mode=opts.get("output_norm_mode", "avg"),
-                        baseline_ms=opts.get("output_metric_window_ms", 100.0),
-                        baseline_mode=opts.get("output_metric_mode", "point"),
-                        baseline_center_ms=opts.get("output_baseline_center_ms"),
-                        norm_window=opts.get("output_norm_window", "stim"),
-                    )
-                    if shift_ms is not None:
-                        t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float) + float(shift_ms)
-                        curve = dict(curve)
-                        curve["t_ms"] = t_ms.tolist()
+                    isi_curve = _run_output_isi_curve_from_results(res, opts, shift_ms=shift_ms)
                     label_override = labels_override[idx] if idx < len(labels_override) else None
                     color_override = colors_override[idx] if idx < len(colors_override) else None
                     linestyle_override = linestyles_override[idx] if idx < len(linestyles_override) else None
                     curves.append(curve)
+                    isi_curves.append(isi_curve)
                     labels.append(label_override or analysis.run_label(path))
                     colors.append(color_override or (res.get("sim_cfg", {}) or {}).get("color", None))
                     linestyles.append(linestyle_override)
@@ -944,7 +1925,7 @@ def run_output_plots(
 
             if not curves:
                 print("No valid curves found in compare list.")
-                return
+                return _payload()
 
             run_indices = [i for i, p in enumerate(curve_paths) if not _is_curve_path(p)]
             selected_run_indices = [
@@ -978,7 +1959,81 @@ def run_output_plots(
             compare_figsize = _parse_figsize(opts.get("output_compare_figsize"))
             compare_panel = _parse_figsize(opts.get("output_compare_panel_size"))
 
+            curve_plot_mode = _output_curve_plot_mode(opts)
             stim_start, stim_stop = _stim_window_for_opts(sim_cfgs[0] or {}, opts)
+            if curve_plot_mode != "rate":
+                if curve_plot_mode == "isi" and not any(_curve_has_series(c, "isi_ms") for c in isi_curves):
+                    print("Output ISI compare skipped: no ISI data available in selected runs.")
+                    return _payload()
+
+                rate_curves_plot: list[Optional[Dict[str, Any]]] = []
+                for idx, curve in enumerate(curves):
+                    scale_val = curve_scales[idx] if curve_scales[idx] is not None else (
+                        external_scale if _is_curve_path(curve_paths[idx]) else output_scale
+                    )
+                    rate_curves_plot.append(_scale_curve_for_plot(curve, scale_val))
+
+                curve_figsize = compare_figsize
+                if curve_plot_mode == "rate_isi":
+                    if compare_figsize:
+                        curve_figsize = (compare_figsize[0], max(compare_figsize[1] * 1.6, compare_figsize[1] + 1.6))
+                    else:
+                        curve_figsize = (6.0, 6.0)
+
+                fig_curve, axes_map = _plot_output_curve_mode_figure(
+                    mode=curve_plot_mode,
+                    rate_curves=rate_curves_plot,
+                    isi_curves=isi_curves,
+                    labels=labels,
+                    colors=colors,
+                    linestyles=linestyles,
+                    plot_window=opts.get("plot_window", (None, None)),
+                    stim_start=stim_start,
+                    stim_stop=stim_stop,
+                    title=compare_title,
+                    line_width=float(opts.get("output_linewidth", 2.0)),
+                    stim_linewidth=float(opts.get("output_stim_linewidth", 1.0)),
+                    figsize=curve_figsize,
+                )
+                if curve_plot_mode == "rate_isi" and opts.get("output_show_metric_points", True):
+                    ax_rate = axes_map.get("rate")
+                    if ax_rate is not None:
+                        for idx, (curve, label) in enumerate(zip(curves, labels)):
+                            scale_val = curve_scales[idx] if curve_scales[idx] is not None else (
+                                external_scale if _is_curve_path(curve_paths[idx]) else output_scale
+                            )
+                            metrics = _compute_output_metrics(
+                                curve,
+                                sim_cfgs[idx] or {},
+                                opts,
+                                peak_window_ms=opts.get("output_peak_window_ms", 100.0),
+                                drop_window_ms=opts.get("output_drop_window_ms", 100.0),
+                                rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
+                                auc_window=opts.get("output_auc_window", "stim"),
+                                stim_start_ms=stim_start,
+                                stim_stop_ms=stim_stop,
+                            )
+                            metrics_plot = _scale_metrics_for_plot(metrics, scale_val)
+                            col = colors[idx] if idx < len(colors) and colors[idx] is not None else None
+                            _plot_metric_points(
+                                ax_rate,
+                                metrics_plot,
+                                color=col,
+                                label_prefix=label,
+                                show_labels=bool(opts.get("output_metric_label_points", False)),
+                                size=float(opts.get("output_metric_marker_size", 36.0)),
+                            )
+                            if opts.get("output_metric_window_markers", False):
+                                _plot_metric_window_markers(ax_rate, metrics_plot, color=col, **_metric_window_kwargs(opts))
+                _save_fig(
+                    fig_curve,
+                    analysis.plot_dir_for_compare(selection["base"], Path("compare_list"), Path("curves")) / "compare_output_curve_list.png",
+                    enabled=save_plots,
+                    dpi=plots_dpi,
+                )
+                _remember_figure(fig_curve, "compare_output_curve_list")
+                return _payload()
+
             fig_curve = None
             ax = None
             color_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
@@ -1010,7 +2065,8 @@ def run_output_plots(
                     y = np.asarray(curve_plot.get("rate_hz", []) or [], dtype=float)
                     col = colors[idx] if colors[idx] is not None else color_cycle[idx % len(color_cycle)]
                     ls = linestyles[idx] if idx < len(linestyles) and linestyles[idx] else "-"
-                    ax_i.plot(t_ms, y, lw=float(opts.get("output_linewidth", 2.0)), color=col, linestyle=ls, label=label)
+                    plot_label = _legend_safe_label(label)
+                    ax_i.plot(t_ms, y, lw=float(opts.get("output_linewidth", 2.0)), color=col, linestyle=ls, label=plot_label)
                     stim_start_i, stim_stop_i = _stim_window_for_opts(sim_cfgs[idx] or {}, opts)
                     if opts.get("output_show_metric_points", True):
                         metrics = _compute_output_metrics(
@@ -1042,7 +2098,7 @@ def run_output_plots(
                     if opts.get("plot_window") is not None:
                         ax_i.set_xlim(opts.get("plot_window")[0], opts.get("plot_window")[1])
                     ax_i.set_title(label)
-                    if label:
+                    if plot_label:
                         ax_i.legend()
                     ax_i.grid(True)
                     if layout in side_layouts:
@@ -1065,7 +2121,8 @@ def run_output_plots(
                     y = np.asarray(curve_plot.get("rate_hz", []) or [], dtype=float)
                     col = colors[idx] if colors[idx] is not None else color_cycle[idx % len(color_cycle)]
                     ls = linestyles[idx] if idx < len(linestyles) and linestyles[idx] else "-"
-                    ax.plot(t_ms, y, lw=float(opts.get("output_linewidth", 2.0)), color=col, linestyle=ls, label=label)
+                    plot_label = _legend_safe_label(label)
+                    ax.plot(t_ms, y, lw=float(opts.get("output_linewidth", 2.0)), color=col, linestyle=ls, label=plot_label)
                     if opts.get("output_show_metric_points", True):
                         metrics = _compute_output_metrics(
                             curve,
@@ -1100,7 +2157,9 @@ def run_output_plots(
                 ax.set_ylabel(y_label)
                 ax.set_title(compare_title)
                 ax.grid(True)
-                ax.legend()
+                handles, labels_ax = ax.get_legend_handles_labels()
+                if any(str(lbl).strip() and not str(lbl).startswith("_") for lbl in labels_ax):
+                    ax.legend()
                 plt.tight_layout()
             _save_fig(
                 fig_curve,
@@ -1108,21 +2167,24 @@ def run_output_plots(
                 enabled=save_plots,
                 dpi=plots_dpi,
             )
-            return
+            _remember_figure(fig_curve, "compare_output_curve_list")
+            return _payload()
 
     if compare_enabled(selection):
+        export_mode = "compare"
         run_a, run_b, res_a, res_b = resolve_compare(selection)
         if run_b is None or res_a is None or res_b is None:
             if run_b is None:
                 print("Comparison disabled (set Compare B to a run name).")
-                return
+                return _payload()
         curve_only_a = res_a is None
         curve_only_b = res_b is None
         if curve_only_a and curve_only_b and (run_a is None or run_b is None):
             print("Comparison disabled (set Compare A/B to a run name or curve path).")
-            return
+            return _payload()
         label_a = analysis.run_label(run_a) if not curve_only_a else Path(run_a).stem
         label_b = analysis.run_label(run_b) if not curve_only_b else Path(run_b).stem
+        export_run_label = f"{label_a}_vs_{label_b}"
         if res_a is not None:
             smooth_mode = (res_a.get("sim_cfg", {}) or {}).get("avg_rate_curve_smooth_mode", "center")
         elif res_b is not None:
@@ -1307,28 +2369,21 @@ def run_output_plots(
                     enabled=save_plots,
                     dpi=plots_dpi,
                 )
+                _remember_figure(fig_cmp, "compare_outputs")
 
         if opts.get("plot_output_curve", True):
             curve_a = _load_curve_from_path(
                 Path(run_a),
                 opts,
                 fallback_sim_cfg=(res_b.get("sim_cfg") if res_b else None),
-            ) if curve_only_a else analysis.compute_output_curve_from_results(
-                res_a,
-                bin_ms=opts.get("output_bin_ms"),
-                smooth_ms=_curve_smooth_ms(opts),
-                smooth_mode=opts.get("output_smooth_mode", "causal"),
-            )
+            ) if curve_only_a else _run_output_curve_from_results(res_a, opts)
             curve_b = _load_curve_from_path(
                 Path(run_b),
                 opts,
                 fallback_sim_cfg=(res_a.get("sim_cfg") if res_a else None),
-            ) if curve_only_b else analysis.compute_output_curve_from_results(
-                res_b,
-                bin_ms=opts.get("output_bin_ms"),
-                smooth_ms=_curve_smooth_ms(opts),
-                smooth_mode=opts.get("output_smooth_mode", "causal"),
-            )
+            ) if curve_only_b else _run_output_curve_from_results(res_b, opts)
+            isi_a = None if curve_only_a else _run_output_isi_curve_from_results(res_a, opts)
+            isi_b = None if curve_only_b else _run_output_isi_curve_from_results(res_b, opts)
             scatter_curve = analysis.load_scatter_curve_optional(
                 enabled=opts.get("output_scatter_enabled", False),
                 path=opts.get("output_scatter_path", ""),
@@ -1340,46 +2395,48 @@ def run_output_plots(
                 quiet=True,
             )
             if curve_a and curve_b:
-                if not curve_only_a:
-                    curve_a = analysis.normalize_output_curve(
-                        curve_a,
-                        res_a.get("sim_cfg", {}) or {},
-                        mode=opts.get("output_curve_mode", "raw"),
-                        norm_mode=opts.get("output_norm_mode", "avg"),
-                        baseline_ms=opts.get("output_metric_window_ms", 100.0),
-                        baseline_mode=opts.get("output_metric_mode", "point"),
-                        baseline_center_ms=opts.get("output_baseline_center_ms"),
-                        norm_window=opts.get("output_norm_window", "stim"),
-                    )
-                if not curve_only_b:
-                    curve_b = analysis.normalize_output_curve(
-                        curve_b,
-                        res_b.get("sim_cfg", {}) or {},
-                        mode=opts.get("output_curve_mode", "raw"),
-                        norm_mode=opts.get("output_norm_mode", "avg"),
-                        baseline_ms=opts.get("output_metric_window_ms", 100.0),
-                        baseline_mode=opts.get("output_metric_mode", "point"),
-                        baseline_center_ms=opts.get("output_baseline_center_ms"),
-                        norm_window=opts.get("output_norm_window", "stim"),
-                    )
+                curve_mode = _output_curve_plot_mode(opts)
                 sim_cfg_a = (res_a.get("sim_cfg") if res_a else _default_sim_cfg_for_curve(curve_a, fallback=(res_b.get("sim_cfg") if res_b else None))) or {}
+                sim_cfg_b = (res_b.get("sim_cfg") if res_b else _default_sim_cfg_for_curve(curve_b, fallback=(res_a.get("sim_cfg") if res_a else None))) or {}
                 stim_start, stim_stop = _stim_window_for_opts(sim_cfg_a, opts)
                 scale_a = external_scale if curve_only_a else output_scale
                 scale_b = external_scale if curve_only_b else output_scale
                 curve_a_plot = _scale_curve_for_plot(curve_a, scale_a)
                 curve_b_plot = _scale_curve_for_plot(curve_b, scale_b)
-                fig_curve, _ = plotting.plot_compare_output_curves(
-                    curve_a_plot,
-                    curve_b_plot,
-                    labels=(label_a, label_b),
-                    plot_window=opts.get("plot_window", (None, None)),
-                    stim_start=stim_start,
-                    stim_stop=stim_stop,
-                    title="Output curves",
-                    line_width=float(opts.get("output_linewidth", 2.0)),
-                    stim_linewidth=float(opts.get("output_stim_linewidth", 1.0)),
-                )
-                if opts.get("output_show_metric_points", True):
+                fig_curve = None
+                ax_rate = None
+                if curve_mode == "rate":
+                    fig_curve, _ = plotting.plot_compare_output_curves(
+                        curve_a_plot,
+                        curve_b_plot,
+                        labels=(label_a, label_b),
+                        plot_window=opts.get("plot_window", (None, None)),
+                        stim_start=stim_start,
+                        stim_stop=stim_stop,
+                        title="Output curves",
+                        line_width=float(opts.get("output_linewidth", 2.0)),
+                        stim_linewidth=float(opts.get("output_stim_linewidth", 1.0)),
+                    )
+                    ax_rate = fig_curve.axes[0] if fig_curve.axes else None
+                else:
+                    if curve_mode == "isi" and not any(_curve_has_series(c, "isi_ms") for c in (isi_a, isi_b)):
+                        print("Output ISI compare skipped: no ISI data available in selected runs.")
+                    else:
+                        fig_curve, axes_map = _plot_output_curve_mode_figure(
+                            mode=curve_mode,
+                            rate_curves=[curve_a_plot, curve_b_plot],
+                            isi_curves=[isi_a, isi_b],
+                            labels=[label_a, label_b],
+                            plot_window=opts.get("plot_window", (None, None)),
+                            stim_start=stim_start,
+                            stim_stop=stim_stop,
+                            title="Output curves",
+                            line_width=float(opts.get("output_linewidth", 2.0)),
+                            stim_linewidth=float(opts.get("output_stim_linewidth", 1.0)),
+                        )
+                        ax_rate = axes_map.get("rate")
+
+                if fig_curve is not None and ax_rate is not None and opts.get("output_show_metric_points", True):
                     metrics_a = _compute_output_metrics(
                         curve_a,
                         sim_cfg_a,
@@ -1393,7 +2450,7 @@ def run_output_plots(
                     )
                     metrics_b = _compute_output_metrics(
                         curve_b,
-                        (res_b.get("sim_cfg") if res_b else _default_sim_cfg_for_curve(curve_b, fallback=(res_a.get("sim_cfg") if res_a else None))) or {},
+                        sim_cfg_b,
                         opts,
                         peak_window_ms=opts.get("output_peak_window_ms", 100.0),
                         drop_window_ms=opts.get("output_drop_window_ms", 100.0),
@@ -1404,86 +2461,88 @@ def run_output_plots(
                     )
                     metrics_a_plot = _scale_metrics_for_plot(metrics_a, scale_a)
                     metrics_b_plot = _scale_metrics_for_plot(metrics_b, scale_b)
-                    ax = fig_curve.axes[0] if fig_curve.axes else None
-                    if ax is not None:
-                        line_colors = [line.get_color() for line in ax.lines]
-                        color_a = line_colors[0] if len(line_colors) > 0 else None
-                        color_b = line_colors[1] if len(line_colors) > 1 else None
-                        _plot_metric_points(
-                            ax,
-                            metrics_a_plot,
-                            color=color_a,
-                            label_prefix=label_a,
-                            show_labels=bool(opts.get("output_metric_label_points", False)),
-                            size=float(opts.get("output_metric_marker_size", 36.0)),
+                    line_colors = [line.get_color() for line in ax_rate.lines]
+                    color_a = line_colors[0] if len(line_colors) > 0 else None
+                    color_b = line_colors[1] if len(line_colors) > 1 else None
+                    _plot_metric_points(
+                        ax_rate,
+                        metrics_a_plot,
+                        color=color_a,
+                        label_prefix=label_a,
+                        show_labels=bool(opts.get("output_metric_label_points", False)),
+                        size=float(opts.get("output_metric_marker_size", 36.0)),
+                    )
+                    if opts.get("output_metric_window_markers", False):
+                        _plot_metric_window_markers(ax_rate, metrics_a_plot, color=color_a, **_metric_window_kwargs(opts))
+                    _plot_metric_points(
+                        ax_rate,
+                        metrics_b_plot,
+                        color=color_b,
+                        label_prefix=label_b,
+                        show_labels=bool(opts.get("output_metric_label_points", False)),
+                        size=float(opts.get("output_metric_marker_size", 36.0)),
+                    )
+                    if opts.get("output_metric_window_markers", False):
+                        _plot_metric_window_markers(ax_rate, metrics_b_plot, color=color_b, **_metric_window_kwargs(opts))
+
+                if fig_curve is not None and scatter_curve and ax_rate is not None:
+                    scatter_plot = _scale_curve_for_plot(scatter_curve, external_scale)
+                    ax_rate.plot(
+                        np.asarray(scatter_plot.get("t_ms", []), dtype=float),
+                        np.asarray(scatter_plot.get("rate_hz", []), dtype=float),
+                        color=opts.get("output_scatter_color", "0.4"),
+                        lw=float(opts.get("output_linewidth", 2.0)),
+                        ls="--",
+                        label=opts.get("output_scatter_label", "External curve"),
+                    )
+                    if opts.get("output_show_metric_points", True):
+                        scatter_metrics = _compute_output_metrics(
+                            scatter_curve,
+                            sim_cfg_a,
+                            opts,
+                            peak_window_ms=opts.get("output_peak_window_ms", 100.0),
+                            drop_window_ms=opts.get("output_drop_window_ms", 100.0),
+                            rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
+                            auc_window=opts.get("output_auc_window", "stim"),
+                            stim_start_ms=stim_start,
+                            stim_stop_ms=stim_stop,
                         )
-                        if opts.get("output_metric_window_markers", False):
-                            _plot_metric_window_markers(ax, metrics_a_plot, color=color_a, **_metric_window_kwargs(opts))
+                        scatter_metrics_plot = _scale_metrics_for_plot(scatter_metrics, external_scale)
                         _plot_metric_points(
-                            ax,
-                            metrics_b_plot,
-                            color=color_b,
-                            label_prefix=label_b,
-                            show_labels=bool(opts.get("output_metric_label_points", False)),
-                            size=float(opts.get("output_metric_marker_size", 36.0)),
-                        )
-                        if opts.get("output_metric_window_markers", False):
-                            _plot_metric_window_markers(ax, metrics_b_plot, color=color_b, **_metric_window_kwargs(opts))
-                if scatter_curve:
-                    ax = fig_curve.axes[0] if fig_curve.axes else None
-                    if ax is not None:
-                        scatter_plot = _scale_curve_for_plot(scatter_curve, external_scale)
-                        ax.plot(
-                            np.asarray(scatter_plot.get("t_ms", []), dtype=float),
-                            np.asarray(scatter_plot.get("rate_hz", []), dtype=float),
+                            ax_rate,
+                            scatter_metrics_plot,
                             color=opts.get("output_scatter_color", "0.4"),
-                            lw=float(opts.get("output_linewidth", 2.0)),
-                            ls="--",
-                            label=opts.get("output_scatter_label", "External curve"),
+                            label_prefix=opts.get("output_scatter_label", "External curve"),
+                            show_labels=bool(opts.get("output_metric_label_points", False)),
+                            size=float(opts.get("output_metric_marker_size", 36.0)),
                         )
-                        if opts.get("output_show_metric_points", True):
-                            scatter_metrics = _compute_output_metrics(
-                                scatter_curve,
-                                sim_cfg_a,
-                                opts,
-                                peak_window_ms=opts.get("output_peak_window_ms", 100.0),
-                                drop_window_ms=opts.get("output_drop_window_ms", 100.0),
-                                rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
-                                auc_window=opts.get("output_auc_window", "stim"),
-                                stim_start_ms=stim_start,
-                                stim_stop_ms=stim_stop,
-                            )
-                            scatter_metrics_plot = _scale_metrics_for_plot(scatter_metrics, external_scale)
-                            _plot_metric_points(
-                                ax,
+                        if opts.get("output_metric_window_markers", False):
+                            _plot_metric_window_markers(
+                                ax_rate,
                                 scatter_metrics_plot,
                                 color=opts.get("output_scatter_color", "0.4"),
-                                label_prefix=opts.get("output_scatter_label", "External curve"),
-                                show_labels=bool(opts.get("output_metric_label_points", False)),
-                                size=float(opts.get("output_metric_marker_size", 36.0)),
+                                **_metric_window_kwargs(opts),
                             )
-                            if opts.get("output_metric_window_markers", False):
-                                _plot_metric_window_markers(
-                                    ax,
-                                    scatter_metrics_plot,
-                                    color=opts.get("output_scatter_color", "0.4"),
-                                    **_metric_window_kwargs(opts),
-                                )
-                        ax.legend()
-                _save_fig(
-                    fig_curve,
-                    analysis.plot_dir_for_compare(selection["base"], run_a, run_b) / "compare_output_curve.png",
-                    enabled=save_plots,
-                    dpi=plots_dpi,
-                )
+                    ax_rate.legend()
+
+                if fig_curve is not None:
+                    _save_fig(
+                        fig_curve,
+                        analysis.plot_dir_for_compare(selection["base"], run_a, run_b) / "compare_output_curve.png",
+                        enabled=save_plots,
+                        dpi=plots_dpi,
+                    )
+                    _remember_figure(fig_curve, "compare_output_curve")
             else:
                 print("Output curve compare skipped: missing spikes in one run.")
 
         if opts.get("plot_spike_stats", False):
             print("Spike stats are only shown for single runs.")
-        return
+        return _payload()
 
     run_dir, res = resolve_single(selection)
+    export_mode = "single"
+    export_run_label = analysis.run_label(run_dir)
     smooth_mode = (res.get("sim_cfg", {}) or {}).get("avg_rate_curve_smooth_mode", "center")
     smooth_mode = opts.get("output_smooth_mode") or smooth_mode
 
@@ -1626,6 +2685,7 @@ def run_output_plots(
                 enabled=save_plots,
                 dpi=plots_dpi,
             )
+            _remember_figure(plt.gcf(), "output_plot")
         else:
             in_vivo_curve_plot = in_vivo_curve
             if in_vivo_curve_plot is not None and external_scale not in (None, 1.0):
@@ -1653,14 +2713,11 @@ def run_output_plots(
                 enabled=save_plots,
                 dpi=plots_dpi,
             )
+            _remember_figure(fig_out, "output_plot")
 
     if opts.get("plot_output_curve", True):
-        curve_single = analysis.compute_output_curve_from_results(
-            res,
-            bin_ms=opts.get("output_bin_ms"),
-            smooth_ms=_curve_smooth_ms(opts),
-            smooth_mode=opts.get("output_smooth_mode", "causal"),
-        )
+        curve_single = _run_output_curve_from_results(res, opts)
+        isi_single = _run_output_isi_curve_from_results(res, opts)
         scatter_curve = analysis.load_scatter_curve_optional(
             enabled=opts.get("output_scatter_enabled", False),
             path=opts.get("output_scatter_path", ""),
@@ -1672,30 +2729,45 @@ def run_output_plots(
             quiet=True,
         )
         if curve_single:
-            curve_single = analysis.normalize_output_curve(
-                curve_single,
-                res.get("sim_cfg", {}) or {},
-                mode=opts.get("output_curve_mode", "raw"),
-                norm_mode=opts.get("output_norm_mode", "avg"),
-                baseline_ms=opts.get("output_metric_window_ms", 100.0),
-                baseline_mode=opts.get("output_metric_mode", "point"),
-                baseline_center_ms=opts.get("output_baseline_center_ms"),
-                norm_window=opts.get("output_norm_window", "stim"),
-            )
+            curve_mode = _output_curve_plot_mode(opts)
             stim_start, stim_stop = _stim_window_for_opts(res.get("sim_cfg", {}) or {}, opts)
             curve_single_plot = _scale_curve_for_plot(curve_single, output_scale)
-            fig_curve, _ = plotting.plot_output_curve(
-                curve_single_plot,
-                label=analysis.run_label(run_dir),
-                color=(res.get("sim_cfg", {}) or {}).get("color", None),
-                plot_window=opts.get("plot_window", (None, None)),
-                stim_start=stim_start,
-                stim_stop=stim_stop,
-                title="Output curve (avg)",
-                line_width=float(opts.get("output_linewidth", 2.0)),
-                stim_linewidth=float(opts.get("output_stim_linewidth", 1.0)),
-            )
-            if opts.get("output_show_metric_points", True):
+            run_color = (res.get("sim_cfg", {}) or {}).get("color", None)
+            fig_curve = None
+            ax_rate = None
+            if curve_mode == "rate":
+                fig_curve, _ = plotting.plot_output_curve(
+                    curve_single_plot,
+                    label=analysis.run_label(run_dir),
+                    color=run_color,
+                    plot_window=opts.get("plot_window", (None, None)),
+                    stim_start=stim_start,
+                    stim_stop=stim_stop,
+                    title="Output curve (avg)",
+                    line_width=float(opts.get("output_linewidth", 2.0)),
+                    stim_linewidth=float(opts.get("output_stim_linewidth", 1.0)),
+                )
+                ax_rate = fig_curve.axes[0] if fig_curve.axes else None
+            else:
+                if curve_mode == "isi" and not _curve_has_series(isi_single, "isi_ms"):
+                    print("Output ISI plot skipped: no ISI data available in this run.")
+                else:
+                    fig_curve, axes_map = _plot_output_curve_mode_figure(
+                        mode=curve_mode,
+                        rate_curves=[curve_single_plot],
+                        isi_curves=[isi_single],
+                        labels=[analysis.run_label(run_dir)],
+                        colors=[run_color],
+                        plot_window=opts.get("plot_window", (None, None)),
+                        stim_start=stim_start,
+                        stim_stop=stim_stop,
+                        title="Output curve (avg)",
+                        line_width=float(opts.get("output_linewidth", 2.0)),
+                        stim_linewidth=float(opts.get("output_stim_linewidth", 1.0)),
+                    )
+                    ax_rate = axes_map.get("rate")
+
+            if fig_curve is not None and ax_rate is not None and opts.get("output_show_metric_points", True):
                 metrics_single = _compute_output_metrics(
                     curve_single,
                     res.get("sim_cfg", {}) or {},
@@ -1708,66 +2780,65 @@ def run_output_plots(
                     stim_stop_ms=stim_stop,
                 )
                 metrics_single_plot = _scale_metrics_for_plot(metrics_single, output_scale)
-                ax = fig_curve.axes[0] if fig_curve.axes else None
-                if ax is not None:
-                    line_color = ax.lines[0].get_color() if ax.lines else None
+                line_color = ax_rate.lines[0].get_color() if ax_rate.lines else run_color
+                _plot_metric_points(
+                    ax_rate,
+                    metrics_single_plot,
+                    color=line_color,
+                    label_prefix=analysis.run_label(run_dir),
+                    show_labels=bool(opts.get("output_metric_label_points", False)),
+                    size=float(opts.get("output_metric_marker_size", 36.0)),
+                )
+                if opts.get("output_metric_window_markers", False):
+                    _plot_metric_window_markers(ax_rate, metrics_single_plot, color=line_color, **_metric_window_kwargs(opts))
+            if fig_curve is not None and scatter_curve and ax_rate is not None:
+                scatter_plot = _scale_curve_for_plot(scatter_curve, external_scale)
+                ax_rate.plot(
+                    np.asarray(scatter_plot.get("t_ms", []), dtype=float),
+                    np.asarray(scatter_plot.get("rate_hz", []), dtype=float),
+                    color=opts.get("output_scatter_color", "0.4"),
+                    lw=float(opts.get("output_linewidth", 2.0)),
+                    ls="--",
+                    label=opts.get("output_scatter_label", "External curve"),
+                )
+                if opts.get("output_show_metric_points", True):
+                    scatter_metrics = _compute_output_metrics(
+                        scatter_curve,
+                        res.get("sim_cfg", {}) or {},
+                        opts,
+                        peak_window_ms=opts.get("output_peak_window_ms", 100.0),
+                        drop_window_ms=opts.get("output_drop_window_ms", 100.0),
+                        rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
+                        auc_window=opts.get("output_auc_window", "stim"),
+                        stim_start_ms=stim_start,
+                        stim_stop_ms=stim_stop,
+                    )
+                    scatter_metrics_plot = _scale_metrics_for_plot(scatter_metrics, external_scale)
                     _plot_metric_points(
-                        ax,
-                        metrics_single_plot,
-                        color=line_color,
-                        label_prefix=analysis.run_label(run_dir),
+                        ax_rate,
+                        scatter_metrics_plot,
+                        color=opts.get("output_scatter_color", "0.4"),
+                        label_prefix=opts.get("output_scatter_label", "External curve"),
                         show_labels=bool(opts.get("output_metric_label_points", False)),
                         size=float(opts.get("output_metric_marker_size", 36.0)),
                     )
                     if opts.get("output_metric_window_markers", False):
-                        _plot_metric_window_markers(ax, metrics_single_plot, color=line_color, **_metric_window_kwargs(opts))
-            if scatter_curve:
-                ax = fig_curve.axes[0] if fig_curve.axes else None
-                if ax is not None:
-                    scatter_plot = _scale_curve_for_plot(scatter_curve, external_scale)
-                    ax.plot(
-                        np.asarray(scatter_plot.get("t_ms", []), dtype=float),
-                        np.asarray(scatter_plot.get("rate_hz", []), dtype=float),
-                        color=opts.get("output_scatter_color", "0.4"),
-                        lw=float(opts.get("output_linewidth", 2.0)),
-                        ls="--",
-                        label=opts.get("output_scatter_label", "External curve"),
-                    )
-                    if opts.get("output_show_metric_points", True):
-                        scatter_metrics = _compute_output_metrics(
-                            scatter_curve,
-                            res.get("sim_cfg", {}) or {},
-                            opts,
-                            peak_window_ms=opts.get("output_peak_window_ms", 100.0),
-                            drop_window_ms=opts.get("output_drop_window_ms", 100.0),
-                            rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
-                            auc_window=opts.get("output_auc_window", "stim"),
-                            stim_start_ms=stim_start,
-                            stim_stop_ms=stim_stop,
-                        )
-                        scatter_metrics_plot = _scale_metrics_for_plot(scatter_metrics, external_scale)
-                        _plot_metric_points(
-                            ax,
+                        _plot_metric_window_markers(
+                            ax_rate,
                             scatter_metrics_plot,
                             color=opts.get("output_scatter_color", "0.4"),
-                            label_prefix=opts.get("output_scatter_label", "External curve"),
-                            show_labels=bool(opts.get("output_metric_label_points", False)),
-                            size=float(opts.get("output_metric_marker_size", 36.0)),
+                            **_metric_window_kwargs(opts),
                         )
-                        if opts.get("output_metric_window_markers", False):
-                            _plot_metric_window_markers(
-                                ax,
-                                scatter_metrics_plot,
-                                color=opts.get("output_scatter_color", "0.4"),
-                                **_metric_window_kwargs(opts),
-                            )
-                    ax.legend()
-            _save_fig(
-                fig_curve,
-                analysis.plot_dir_for_run(run_dir) / "output_curve.png",
-                enabled=save_plots,
-                dpi=plots_dpi,
-            )
+                ax_rate.legend()
+
+            if fig_curve is not None:
+                _save_fig(
+                    fig_curve,
+                    analysis.plot_dir_for_run(run_dir) / "output_curve.png",
+                    enabled=save_plots,
+                    dpi=plots_dpi,
+                )
+                _remember_figure(fig_curve, "output_curve")
             _save_json(
                 curve_single,
                 analysis.analysis_dir_for_run(run_dir) / "output_curve.json",
@@ -1784,11 +2855,14 @@ def run_output_plots(
             enabled=save_plots,
             dpi=plots_dpi,
         )
+        _remember_figure(plt.gcf(), "spike_stats")
         _save_json(
             stats_single,
             analysis.analysis_dir_for_run(run_dir) / "spike_stats.json",
             enabled=save_analysis,
         )
+
+    return _payload()
 
 
 def run_input_plots(
@@ -1798,18 +2872,38 @@ def run_input_plots(
     save_plots: bool = False,
     save_analysis: bool = False,
     plots_dpi: int = 150,
-) -> None:
+) -> Dict[str, Any]:
+    export_figures: list[tuple[Any, str]] = []
+    export_mode = "single"
+    export_run_label = ""
+
+    def _remember_figure(fig_obj: Any, plot_name: str) -> None:
+        if fig_obj is None:
+            return
+        export_figures.append((analysis.resolve_figure(fig_obj), str(plot_name)))
+
+    def _payload() -> Dict[str, Any]:
+        rows = _rows_from_figures(
+            export_figures,
+            figure_type="input",
+            mode=export_mode,
+            run_label=export_run_label,
+        )
+        return {"rows": rows, "mode": export_mode, "run_label": export_run_label}
+
     compare_runs = _compare_list_run_paths(selection)
     if len(compare_runs) >= 2:
+        export_mode = "compare"
         run_a, run_b = compare_runs[0], compare_runs[1]
         res_a = _safe_load_results(run_a)
         res_b = _safe_load_results(run_b)
         if res_a is None or res_b is None:
             print("Comparison disabled (missing input data in one or more runs).")
-            return
+            return _payload()
 
         label_a = analysis.run_label(run_a)
         label_b = analysis.run_label(run_b)
+        export_run_label = f"{label_a}_vs_{label_b}"
         group_colors = analysis.merge_group_colors(res_a, res_b)
 
         if opts.get("plot_inputs_mean", True):
@@ -1853,9 +2947,10 @@ def run_input_plots(
                 enabled=save_plots,
                 dpi=plots_dpi,
             )
+            _remember_figure(fig_cmp_in, "compare_inputs")
         if opts.get("plot_input_raster", False):
             print("Input raster is only available for single runs.")
-        return
+        return _payload()
     if len(compare_runs) == 1:
         selection = dict(selection)
         selection["run_single"] = compare_runs[0]
@@ -1863,6 +2958,8 @@ def run_input_plots(
         selection["compare_list_paths"] = []
 
     run_dir, res = resolve_single(selection)
+    export_mode = "single"
+    export_run_label = analysis.run_label(run_dir)
     group_colors = analysis.group_colors_from_results(res)
 
     if opts.get("plot_inputs_mean", True):
@@ -1894,6 +2991,7 @@ def run_input_plots(
             enabled=save_plots,
             dpi=plots_dpi,
         )
+        _remember_figure(fig_in, "inputs_mean")
         _save_json(
             summary_single,
             analysis.analysis_dir_for_run(run_dir) / "inputs_summary.json",
@@ -1925,8 +3023,11 @@ def run_input_plots(
                 enabled=save_plots,
                 dpi=plots_dpi,
             )
+            _remember_figure(plt.gcf(), "inputs_raster")
         else:
             print("No saved inputs available for raster plot.")
+
+    return _payload()
 
 
 def run_output_metrics(
@@ -1939,6 +3040,7 @@ def run_output_metrics(
     preset_defaults = _load_compare_preset_defaults(selection.get("compare_preset_path"), base_dir)
     if preset_defaults:
         opts = _merge_preset_defaults(opts, preset_defaults)
+    metric_overrides = _output_metric_overrides(opts)
     preset_entries = _load_compare_preset(selection.get("compare_preset_path"), base_dir)
     list_entries = _compare_list_entries(selection) if not preset_entries else []
     if preset_entries or list_entries:
@@ -2001,40 +3103,20 @@ def run_output_metrics(
                     if res is None:
                         print(f"Skipping missing run: {path}")
                         continue
-                    curve = analysis.compute_output_curve_from_results(
-                        res,
-                        bin_ms=opts.get("output_bin_ms"),
-                        smooth_ms=_curve_smooth_ms(opts),
-                        smooth_mode=opts.get("output_smooth_mode", "causal"),
-                    )
+                    curve = _run_output_curve_from_results(res, opts, shift_ms=shift_ms)
                     if not curve:
                         continue
-                    curve = analysis.normalize_output_curve(
-                        curve,
-                        res.get("sim_cfg", {}) or {},
-                        mode=opts.get("output_curve_mode", "raw"),
-                        norm_mode=opts.get("output_norm_mode", "avg"),
-                        baseline_ms=opts.get("output_metric_window_ms", 100.0),
-                        baseline_mode=opts.get("output_metric_mode", "point"),
-                        baseline_center_ms=opts.get("output_baseline_center_ms"),
-                        norm_window=opts.get("output_norm_window", "stim"),
-                    )
-                    if shift_ms is not None:
-                        t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float) + float(shift_ms)
-                        curve = dict(curve)
-                        curve["t_ms"] = t_ms.tolist()
                     label_override = labels_override[idx] if idx < len(labels_override) else None
                     label = label_override or analysis.run_label(path)
                     sim_cfg = res.get("sim_cfg", {}) or {}
 
-                metrics_map[label] = _compute_output_metrics(
+                metrics_map[label] = _compute_output_metrics_with_spread(
                     curve,
                     sim_cfg,
                     opts,
-                    peak_window_ms=opts.get("output_peak_window_ms", 100.0),
-                    drop_window_ms=opts.get("output_drop_window_ms", 100.0),
-                    rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
-                    auc_window=opts.get("output_auc_window", "stim"),
+                    results=None if _is_curve_path(path) else res,
+                    shift_ms=shift_ms,
+                    **metric_overrides,
                 )
 
             if not metrics_map:
@@ -2058,67 +3140,31 @@ def run_output_metrics(
             Path(run_a),
             opts,
             fallback_sim_cfg=(res_b.get("sim_cfg") if res_b else None),
-        ) if curve_only_a else analysis.compute_output_curve_from_results(
-            res_a,
-            bin_ms=opts.get("output_bin_ms"),
-            smooth_ms=_curve_smooth_ms(opts),
-            smooth_mode=opts.get("output_smooth_mode", "causal"),
-        )
+        ) if curve_only_a else _run_output_curve_from_results(res_a, opts)
         curve_b = _load_curve_from_path(
             Path(run_b),
             opts,
             fallback_sim_cfg=(res_a.get("sim_cfg") if res_a else None),
-        ) if curve_only_b else analysis.compute_output_curve_from_results(
-            res_b,
-            bin_ms=opts.get("output_bin_ms"),
-            smooth_ms=_curve_smooth_ms(opts),
-            smooth_mode=opts.get("output_smooth_mode", "causal"),
-        )
+        ) if curve_only_b else _run_output_curve_from_results(res_b, opts)
         if not curve_a or not curve_b:
             print("Output metrics skipped: missing curves in compare selection.")
             return None
-        if not curve_only_a:
-            curve_a = analysis.normalize_output_curve(
-                curve_a,
-                res_a.get("sim_cfg", {}) or {},
-                mode=opts.get("output_curve_mode", "raw"),
-                norm_mode=opts.get("output_norm_mode", "avg"),
-                baseline_ms=opts.get("output_metric_window_ms", 100.0),
-                baseline_mode=opts.get("output_metric_mode", "point"),
-                baseline_center_ms=opts.get("output_baseline_center_ms"),
-                norm_window=opts.get("output_norm_window", "stim"),
-            )
-        if not curve_only_b:
-            curve_b = analysis.normalize_output_curve(
-                curve_b,
-                res_b.get("sim_cfg", {}) or {},
-                mode=opts.get("output_curve_mode", "raw"),
-                norm_mode=opts.get("output_norm_mode", "avg"),
-                baseline_ms=opts.get("output_metric_window_ms", 100.0),
-                baseline_mode=opts.get("output_metric_mode", "point"),
-                baseline_center_ms=opts.get("output_baseline_center_ms"),
-                norm_window=opts.get("output_norm_window", "stim"),
-            )
         sim_cfg_a = res_a.get("sim_cfg", {}) if res_a else _default_sim_cfg_for_curve(curve_a)
         sim_cfg_b = res_b.get("sim_cfg", {}) if res_b else _default_sim_cfg_for_curve(curve_b)
         metrics_map = {
-            analysis.run_label(run_a) if not curve_only_a else Path(run_a).stem: _compute_output_metrics(
+            analysis.run_label(run_a) if not curve_only_a else Path(run_a).stem: _compute_output_metrics_with_spread(
                 curve_a,
                 sim_cfg_a or {},
                 opts,
-                peak_window_ms=opts.get("output_peak_window_ms", 100.0),
-                drop_window_ms=opts.get("output_drop_window_ms", 100.0),
-                rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
-                auc_window=opts.get("output_auc_window", "stim"),
+                results=None if curve_only_a else res_a,
+                **metric_overrides,
             ),
-            analysis.run_label(run_b) if not curve_only_b else Path(run_b).stem: _compute_output_metrics(
+            analysis.run_label(run_b) if not curve_only_b else Path(run_b).stem: _compute_output_metrics_with_spread(
                 curve_b,
                 sim_cfg_b or {},
                 opts,
-                peak_window_ms=opts.get("output_peak_window_ms", 100.0),
-                drop_window_ms=opts.get("output_drop_window_ms", 100.0),
-                rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
-                auc_window=opts.get("output_auc_window", "stim"),
+                results=None if curve_only_b else res_b,
+                **metric_overrides,
             ),
         }
         _save_json(
@@ -2128,33 +3174,16 @@ def run_output_metrics(
         )
         return metrics_map
     run_dir, res = resolve_single(selection)
-    curve = analysis.compute_output_curve_from_results(
-        res,
-        bin_ms=opts.get("output_bin_ms"),
-        smooth_ms=_curve_smooth_ms(opts),
-        smooth_mode=opts.get("output_smooth_mode", "causal"),
-    )
+    curve = _run_output_curve_from_results(res, opts)
     if not curve:
         print("Output metrics skipped: missing spikes in this run.")
         return None
-    curve = analysis.normalize_output_curve(
-        curve,
-        res.get("sim_cfg", {}) or {},
-        mode=opts.get("output_curve_mode", "raw"),
-        norm_mode=opts.get("output_norm_mode", "avg"),
-        baseline_ms=opts.get("output_metric_window_ms", 100.0),
-        baseline_mode=opts.get("output_metric_mode", "point"),
-        baseline_center_ms=opts.get("output_baseline_center_ms"),
-        norm_window=opts.get("output_norm_window", "stim"),
-    )
-    metrics = _compute_output_metrics(
+    metrics = _compute_output_metrics_with_spread(
         curve,
         res.get("sim_cfg", {}) or {},
         opts,
-        peak_window_ms=opts.get("output_peak_window_ms", 100.0),
-        drop_window_ms=opts.get("output_drop_window_ms", 100.0),
-        rebound_window_ms=opts.get("output_rebound_window_ms", 300.0),
-        auc_window=opts.get("output_auc_window", "stim"),
+        results=res,
+        **metric_overrides,
     )
     _save_json(
         metrics,
@@ -2162,6 +3191,446 @@ def run_output_metrics(
         enabled=save_analysis,
     )
     return metrics
+
+
+_OUTPUT_METRIC_DIST_FIELDS = [
+    "metric",
+    "run_label",
+    "source",
+    "point_kind",
+    "trial_index",
+    "value",
+]
+
+
+def _collect_output_metric_distributions(
+    selection: Dict[str, Any],
+    opts: Dict[str, Any],
+) -> Dict[str, Any]:
+    base_dir = selection.get("base")
+    preset_defaults = _load_compare_preset_defaults(selection.get("compare_preset_path"), base_dir)
+    if preset_defaults:
+        opts = _merge_preset_defaults(opts, preset_defaults)
+    metric_overrides = _output_metric_overrides(opts)
+    payload: Dict[str, Any] = {
+        "mode": "single",
+        "by_label": {},
+        "run_dir": None,
+        "run_a": None,
+        "run_b": None,
+    }
+
+    preset_entries = _load_compare_preset(selection.get("compare_preset_path"), base_dir)
+    list_entries = _compare_list_entries(selection) if not preset_entries else []
+    if preset_entries or list_entries:
+        paths: list[Path] = []
+        shifts: list[Optional[float]] = []
+        labels_override: list[Optional[str]] = []
+        colors_override: list[Optional[str]] = []
+        has_curve = False
+        if preset_entries:
+            for entry in preset_entries:
+                path = entry["path"]
+                if _is_curve_path(path):
+                    has_curve = True
+                paths.append(path)
+                shifts.append(entry.get("shift_ms"))
+                labels_override.append(entry.get("label"))
+                colors_override.append(entry.get("color"))
+        else:
+            for item in list_entries:
+                spec = _parse_compare_list_item(item)
+                path = _coerce_run_path(spec.get("path"), base_dir)
+                if path is None:
+                    continue
+                if not path.exists():
+                    print(f"Skipping missing path: {path}")
+                    continue
+                paths.append(path)
+                shifts.append(spec.get("shift_ms"))
+                labels_override.append(spec.get("label"))
+                colors_override.append(spec.get("color"))
+                if _is_curve_path(path):
+                    has_curve = True
+
+        if len(paths) == 1 and not has_curve:
+            selection = dict(selection)
+            selection["run_single"] = paths[0]
+            selection["compare_list"] = []
+            selection["compare_list_paths"] = []
+        else:
+            payload["mode"] = "list"
+            fallback_sim_cfg = None
+            for path in paths:
+                if _is_curve_path(path):
+                    continue
+                res_fb = _safe_load_results(path)
+                if res_fb is not None:
+                    fallback_sim_cfg = (res_fb.get("sim_cfg") or {}) if isinstance(res_fb, dict) else None
+                    break
+            by_label: Dict[str, Any] = {}
+            for idx, (path, shift_ms) in enumerate(zip(paths, shifts)):
+                color_override = colors_override[idx] if idx < len(colors_override) else None
+                res: Optional[Dict[str, Any]] = None
+                if _is_curve_path(path):
+                    curve = _load_curve_from_path(path, opts, shift_ms=shift_ms, fallback_sim_cfg=fallback_sim_cfg)
+                    if not curve:
+                        continue
+                    sim_cfg = _default_sim_cfg_for_curve(curve, fallback=fallback_sim_cfg)
+                    source = "curve"
+                    label = labels_override[idx] if idx < len(labels_override) else None
+                    label = label or Path(path).stem
+                    color_val = color_override
+                else:
+                    res = _safe_load_results(path)
+                    if res is None:
+                        print(f"Skipping missing run: {path}")
+                        continue
+                    curve = _run_output_curve_from_results(res, opts, shift_ms=shift_ms)
+                    if not curve:
+                        continue
+                    sim_cfg = res.get("sim_cfg", {}) or {}
+                    source = "run"
+                    label = labels_override[idx] if idx < len(labels_override) else None
+                    label = label or analysis.run_label(path)
+                    color_val = _extract_output_color_from_results(res) or color_override
+                summary = _compute_output_metrics(curve, sim_cfg, opts, **metric_overrides)
+                by_label[str(label)] = {
+                    "summary": summary,
+                    "trials": _compute_output_trial_metrics(
+                        res,
+                        sim_cfg,
+                        opts,
+                        shift_ms=shift_ms,
+                        **metric_overrides,
+                    ) if res is not None else [],
+                    "source": source,
+                    "color": color_val,
+                }
+            payload["by_label"] = by_label
+            return payload
+
+    if compare_enabled(selection):
+        run_a, run_b, res_a, res_b = resolve_compare(selection)
+        payload["mode"] = "compare"
+        payload["run_a"] = run_a
+        payload["run_b"] = run_b
+        if run_a is None or run_b is None:
+            return payload
+        curve_only_a = res_a is None
+        curve_only_b = res_b is None
+        curve_a = (
+            _load_curve_from_path(
+                Path(run_a),
+                opts,
+                fallback_sim_cfg=(res_b.get("sim_cfg") if res_b else None),
+            )
+            if curve_only_a
+            else _run_output_curve_from_results(res_a, opts)
+        )
+        curve_b = (
+            _load_curve_from_path(
+                Path(run_b),
+                opts,
+                fallback_sim_cfg=(res_a.get("sim_cfg") if res_a else None),
+            )
+            if curve_only_b
+            else _run_output_curve_from_results(res_b, opts)
+        )
+        if not curve_a or not curve_b:
+            return payload
+        sim_cfg_a = res_a.get("sim_cfg", {}) if res_a else _default_sim_cfg_for_curve(curve_a)
+        sim_cfg_b = res_b.get("sim_cfg", {}) if res_b else _default_sim_cfg_for_curve(curve_b)
+        label_a = analysis.run_label(run_a) if not curve_only_a else Path(run_a).stem
+        label_b = analysis.run_label(run_b) if not curve_only_b else Path(run_b).stem
+        payload["by_label"] = {
+            str(label_a): {
+                "summary": _compute_output_metrics(curve_a, sim_cfg_a or {}, opts, **metric_overrides),
+                "trials": _compute_output_trial_metrics(res_a, sim_cfg_a or {}, opts, **metric_overrides),
+                "source": "curve" if curve_only_a else "run",
+                "color": None if curve_only_a else _extract_output_color_from_results(res_a),
+            },
+            str(label_b): {
+                "summary": _compute_output_metrics(curve_b, sim_cfg_b or {}, opts, **metric_overrides),
+                "trials": _compute_output_trial_metrics(res_b, sim_cfg_b or {}, opts, **metric_overrides),
+                "source": "curve" if curve_only_b else "run",
+                "color": None if curve_only_b else _extract_output_color_from_results(res_b),
+            },
+        }
+        return payload
+
+    run_dir, res = resolve_single(selection)
+    payload["mode"] = "single"
+    payload["run_dir"] = run_dir
+    curve = _run_output_curve_from_results(res, opts)
+    if not curve:
+        return payload
+    sim_cfg = res.get("sim_cfg", {}) or {}
+    label = analysis.run_label(run_dir)
+    payload["by_label"] = {
+        str(label): {
+            "summary": _compute_output_metrics(curve, sim_cfg, opts, **metric_overrides),
+            "trials": _compute_output_trial_metrics(res, sim_cfg, opts, **metric_overrides),
+            "source": "run",
+            "color": _extract_output_color_from_results(res),
+        }
+    }
+    return payload
+
+
+def _coerce_output_metric_plot_keys(metric_keys: Any) -> list[str]:
+    options = [key for key in _OUTPUT_METRIC_VALUE_ORDER if key != "output_metrics_n_trials"]
+    if metric_keys is None:
+        requested = list(_OUTPUT_METRIC_PLOT_DEFAULT_KEYS)
+    elif isinstance(metric_keys, str):
+        requested = [metric_keys]
+    else:
+        requested = [str(k) for k in list(metric_keys)]
+    out = [key for key in requested if key in options]
+    if out:
+        return out
+    return [key for key in _OUTPUT_METRIC_PLOT_DEFAULT_KEYS if key in options] or options
+
+
+def _metric_values_from_trials(trials: list[Dict[str, Any]], metric_key: str) -> list[float]:
+    vals: list[float] = []
+    for trial in trials:
+        val = _coerce_metric_numeric(trial.get(metric_key))
+        if val is not None:
+            vals.append(val)
+    return vals
+
+
+def _output_metric_distribution_rows(
+    payload: Dict[str, Any],
+    metric_keys: list[str],
+) -> list[Dict[str, Any]]:
+    rows: list[Dict[str, Any]] = []
+    by_label = payload.get("by_label") or {}
+    for metric_key in metric_keys:
+        for label, entry in by_label.items():
+            source = str(entry.get("source") or "run")
+            trials = _metric_values_from_trials(entry.get("trials") or [], metric_key)
+            for idx, val in enumerate(trials):
+                rows.append({
+                    "metric": metric_key,
+                    "run_label": str(label),
+                    "source": source,
+                    "point_kind": "trial",
+                    "trial_index": idx,
+                    "value": val,
+                })
+            mean_val = _coerce_metric_numeric((entry.get("summary") or {}).get(metric_key))
+            if mean_val is not None:
+                rows.append({
+                    "metric": metric_key,
+                    "run_label": str(label),
+                    "source": source,
+                    "point_kind": "mean",
+                    "trial_index": "",
+                    "value": mean_val,
+                })
+    return rows
+
+
+def _save_output_metric_distribution_rows(
+    rows: list[Dict[str, Any]],
+    *,
+    selection: Dict[str, Any],
+    requested_path: Any,
+) -> Optional[Path]:
+    if not rows:
+        print("Output metric CSV not saved: no metric values were available.")
+        return None
+    out_path = _resolve_plot_data_target_path(
+        selection,
+        requested_path,
+        figure_type="output_metrics_dist",
+        mode="distribution",
+    )
+    if out_path.exists():
+        print(f"Output metric CSV not saved: file already exists: {out_path}")
+        return None
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=_OUTPUT_METRIC_DIST_FIELDS)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: row.get(key) for key in _OUTPUT_METRIC_DIST_FIELDS})
+    print(f"Saved output metric CSV: {out_path} ({len(rows)} rows)")
+    return out_path
+
+
+def _output_metric_distribution_plot_path(
+    selection: Dict[str, Any],
+    payload: Dict[str, Any],
+) -> Path:
+    mode = str(payload.get("mode") or "single")
+    if mode == "single" and payload.get("run_dir") is not None:
+        return analysis.plot_dir_for_run(payload["run_dir"]) / "output_metric_distributions.png"
+    if mode == "compare" and payload.get("run_a") is not None and payload.get("run_b") is not None:
+        return analysis.plot_dir_for_compare(
+            selection["base"],
+            Path(payload["run_a"]),
+            Path(payload["run_b"]),
+        ) / "output_metric_distributions.png"
+    return analysis.plot_dir_for_compare(selection["base"], Path("compare_list"), Path("curves")) / "output_metric_distributions.png"
+
+
+def _plot_output_metric_distributions(
+    payload: Dict[str, Any],
+    *,
+    metric_keys: list[str],
+    jitter_points: bool = True,
+) -> Optional[Any]:
+    by_label = payload.get("by_label") or {}
+    labels = list(by_label.keys())
+    if not labels:
+        print("Output metric plot skipped: no valid runs/curves for current selection.")
+        return None
+    if not metric_keys:
+        print("Output metric plot skipped: no metrics selected.")
+        return None
+
+    n_metrics = len(metric_keys)
+    ncols = 1 if n_metrics == 1 else min(3, n_metrics)
+    nrows = int(np.ceil(float(n_metrics) / float(ncols)))
+    fallback_colors = _unique_compare_colors(len(labels))
+    color_by_label: Dict[str, Any] = {}
+    for idx, label in enumerate(labels):
+        fallback = fallback_colors[idx] if idx < len(fallback_colors) else plt.cm.tab10(idx % 10)
+        entry = by_label.get(label) or {}
+        color_by_label[label] = _coerce_plot_color(entry.get("color"), fallback)
+
+    def _with_alpha(color: Any, alpha: float) -> Any:
+        r, g, b, _ = mcolors.to_rgba(color)
+        return (r, g, b, alpha)
+
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(4.8 * ncols, 3.6 * nrows),
+        squeeze=False,
+    )
+    rng = np.random.default_rng(0)
+    first_ax = None
+    for idx, metric_key in enumerate(metric_keys):
+        r = idx // ncols
+        c = idx % ncols
+        ax = axes[r][c]
+        if first_ax is None:
+            first_ax = ax
+        has_data = False
+        for pos, label in enumerate(labels, start=1):
+            entry = by_label.get(label) or {}
+            source = str(entry.get("source") or "run")
+            series_color = color_by_label.get(label, "#4C72B0")
+            trials = _metric_values_from_trials(entry.get("trials") or [], metric_key)
+            mean_val = _coerce_metric_numeric((entry.get("summary") or {}).get(metric_key))
+            if len(trials) >= 2:
+                has_data = True
+                ax.boxplot(
+                    [trials],
+                    positions=[pos],
+                    widths=0.55,
+                    showfliers=False,
+                    patch_artist=True,
+                    boxprops={"facecolor": _with_alpha(series_color, 0.25), "edgecolor": series_color, "linewidth": 1.1},
+                    medianprops={"color": series_color, "linewidth": 1.4},
+                    whiskerprops={"color": series_color, "linewidth": 1.0},
+                    capprops={"color": series_color, "linewidth": 1.0},
+                )
+            if trials and jitter_points:
+                has_data = True
+                x = np.full(len(trials), float(pos)) + rng.uniform(-0.1, 0.1, size=len(trials))
+                ax.scatter(x, trials, s=18, color=_with_alpha(series_color, 0.75), zorder=3)
+            elif trials:
+                has_data = True
+                ax.scatter(
+                    np.full(len(trials), float(pos)),
+                    trials,
+                    s=18,
+                    color=_with_alpha(series_color, 0.75),
+                    zorder=3,
+                )
+            if mean_val is not None:
+                has_data = True
+                if source == "curve":
+                    ax.scatter([pos], [mean_val], marker="D", s=40, color=series_color, zorder=4)
+                else:
+                    ax.scatter(
+                        [pos],
+                        [mean_val],
+                        marker="o",
+                        s=40,
+                        facecolors="none",
+                        edgecolors=series_color,
+                        linewidths=1.2,
+                        zorder=4,
+                    )
+        ax.set_xticks(list(range(1, len(labels) + 1)))
+        ax.set_xticklabels(labels, rotation=20, ha="right")
+        ax.set_title(metric_key)
+        ax.grid(axis="y", alpha=0.25)
+        if not has_data:
+            ax.text(0.5, 0.5, "No data", transform=ax.transAxes, ha="center", va="center", color="0.45")
+    for idx in range(n_metrics, nrows * ncols):
+        r = idx // ncols
+        c = idx % ncols
+        axes[r][c].set_visible(False)
+
+    if first_ax is not None:
+        from matplotlib.lines import Line2D
+
+        legend_handles = [
+            Line2D([0], [0], marker="o", color="none", markerfacecolor="#2A9D8F", markeredgecolor="#2A9D8F", markersize=6, label="Trials"),
+            Line2D([0], [0], marker="o", color="none", markerfacecolor="none", markeredgecolor="#111111", markersize=6, label="Run mean"),
+            Line2D([0], [0], marker="D", color="none", markerfacecolor="#E07A5F", markeredgecolor="#E07A5F", markersize=6, label="Curve mean"),
+        ]
+        first_ax.legend(handles=legend_handles, loc="best", fontsize=8)
+    fig.suptitle("Output metric distributions", fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    return fig
+
+
+def run_output_metric_distributions(
+    selection: Dict[str, Any],
+    opts: Dict[str, Any],
+    *,
+    metric_keys: Optional[list[str]] = None,
+    jitter_points: bool = True,
+    save_plots: bool = False,
+    save_data: bool = False,
+    plots_dpi: int = 150,
+    data_path: Any = "",
+) -> Optional[Dict[str, Any]]:
+    payload = _collect_output_metric_distributions(selection, opts)
+    metric_keys_use = _coerce_output_metric_plot_keys(metric_keys)
+    fig = _plot_output_metric_distributions(
+        payload,
+        metric_keys=metric_keys_use,
+        jitter_points=bool(jitter_points),
+    )
+    if fig is None:
+        return None
+    rows = _output_metric_distribution_rows(payload, metric_keys_use)
+    payload["metric_keys"] = metric_keys_use
+    payload["rows"] = rows
+    payload["figure"] = analysis.resolve_figure(fig)
+    if save_plots:
+        _save_fig(
+            fig,
+            _output_metric_distribution_plot_path(selection, payload),
+            enabled=True,
+            dpi=plots_dpi,
+        )
+    if save_data:
+        _save_output_metric_distribution_rows(
+            rows,
+            selection=selection,
+            requested_path=data_path,
+        )
+    return payload
 
 
 def _maybe_import_widgets():
@@ -2245,6 +3714,7 @@ def _filter_metrics_for_display(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 _OUTPUT_METRIC_VALUE_ORDER = [
+    "output_metrics_n_trials",
     "baseline_mean",
     "peak_rate_hz_raw",
     "peak_value_raw",
@@ -2257,6 +3727,30 @@ _OUTPUT_METRIC_VALUE_ORDER = [
     "rebound_pct",
     "auc",
 ]
+
+_OUTPUT_METRIC_PLOT_DEFAULT_KEYS = [
+    "baseline_mean",
+    "peak_rate_hz_raw",
+    "peak_latency_ms",
+    "drop_pct",
+    "rebound_pct",
+    "auc",
+]
+
+
+def _format_metric_cell(data: Dict[str, Any], key: str) -> str:
+    val = data.get(key)
+    cell = _format_metric_value(val)
+    spread_key = f"{key}_spread"
+    spread_val = data.get(spread_key)
+    spread_txt = _format_metric_value(spread_val)
+    if spread_txt == "":
+        return cell
+    mode = str(data.get("output_metrics_std_mode", "std") or "std").strip().lower()
+    mode_label = "SEM" if mode == "sem" else "STD"
+    if cell == "":
+        return ""
+    return f"{cell} +/- {spread_txt} ({mode_label})"
 
 
 def _ordered_metric_keys(keys: list[str], order: Optional[list[str]] = None) -> list[str]:
@@ -2278,8 +3772,9 @@ def format_kv_table(
     lines = [f"### {title}", "| Metric | Value |", "| --- | --- |"]
     data = _filter_metrics_for_display(data)
     for key in _ordered_metric_keys(list(data.keys()), order):
-        val = data.get(key)
-        lines.append(f"| {_format_metric_key(key)} | {_format_metric_value(val)} |")
+        if key.endswith("_spread") or key == "output_metrics_std_mode":
+            continue
+        lines.append(f"| {_format_metric_key(key)} | {_format_metric_cell(data, key)} |")
     return "\n".join(lines)
 
 
@@ -2348,6 +3843,11 @@ def format_kv_table_columns(
         for key in filtered[label].keys():
             if key not in metric_keys:
                 metric_keys.append(key)
+    metric_keys = [
+        key
+        for key in metric_keys
+        if not key.endswith("_spread") and key != "output_metrics_std_mode"
+    ]
     metric_keys = _ordered_metric_keys(metric_keys, order)
 
     best_by_metric = _best_labels_by_metric(filtered, reference_label=reference_label) if highlight_best else {}
@@ -2361,7 +3861,7 @@ def format_kv_table_columns(
         row = []
         for label in labels:
             val = filtered[label].get(key, "")
-            cell = _format_metric_value(val)
+            cell = _format_metric_cell(filtered[label], key)
             if show_deltas and reference_label and reference_label in filtered and label != reference_label:
                 ref_val = filtered[reference_label].get(key, None)
                 delta_str = _format_delta(val, ref_val)
@@ -2403,6 +3903,7 @@ _OUTPUT_PARAM_KEYS = {
     "norm_window",
     "norm_scale",
     "avg_norm_scale",
+    "output_metrics_std_mode",
 }
 
 
@@ -2412,6 +3913,8 @@ def split_output_metrics(metrics: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[
     for key, val in metrics.items():
         if key in _OUTPUT_PARAM_KEYS:
             params[key] = val
+            if key == "output_metrics_std_mode":
+                values[key] = val
         else:
             values[key] = val
     return params, values
@@ -2518,7 +4021,16 @@ def get_selection_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
     if compare_list_paths and not compare_list:
         compare_list = ["latest"]
 
-    base_dir = g.get("CELLS_DIR") / cell / tunes / model / "output_data"
+    cells_root = g.get("CELLS_DIR")
+    if cells_root is None:
+        base_root = g.get("BASE_DIR")
+        if base_root is None:
+            base_root = analysis.find_scp_root(Path.cwd())
+            g["BASE_DIR"] = base_root
+        cells_root = Path(base_root) / "cells"
+        g["CELLS_DIR"] = cells_root
+
+    base_dir = Path(cells_root) / cell / tunes / model / "output_data"
     return {
         "cell": cell,
         "tunes": tunes,
@@ -2551,6 +4063,7 @@ def output_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "multi_shade_mode": g.get("multi_shade_mode"),
         "multi_norm_fr": g.get("multi_norm_fr"),
         "output_curve_mode": g.get("output_curve_mode"),
+        "output_curve_plot_mode": g.get("output_curve_plot_mode", "rate"),
         "output_norm_mode": g.get("output_norm_mode"),
         "output_metric_window_ms": g.get("output_metric_window_ms"),
         "output_metric_mode": g.get("output_metric_mode"),
@@ -2573,6 +4086,7 @@ def output_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "output_metric_linewidth": g.get("output_metric_linewidth"),
         "output_metric_window_alpha": g.get("output_metric_window_alpha"),
         "output_shade_alpha": g.get("output_shade_alpha"),
+        "output_metrics_std_mode": g.get("output_metrics_std_mode", "std"),
     }
 
 
@@ -2602,25 +4116,57 @@ def input_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def run_output_plots_from_globals(g: Dict[str, Any]) -> None:
+def run_output_plots_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
     sel = get_selection_from_globals(g)
-    run_output_plots(
+    payload = run_output_plots(
         sel,
         output_opts_from_globals(g),
         save_plots=bool(g.get("save_plots", False)),
         save_analysis=bool(g.get("save_analysis", False)),
         plots_dpi=int(g.get("plots_dpi", 150)),
     )
+    g["_last_output_plot_export"] = payload or {"rows": [], "mode": "single", "run_label": ""}
+    g["_last_output_plot_selection"] = sel
+    return g["_last_output_plot_export"]
 
 
-def run_input_plots_from_globals(g: Dict[str, Any]) -> None:
+def run_input_plots_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
     sel = get_selection_from_globals(g)
-    run_input_plots(
+    payload = run_input_plots(
         sel,
         input_opts_from_globals(g),
         save_plots=bool(g.get("save_plots", False)),
         save_analysis=bool(g.get("save_analysis", False)),
         plots_dpi=int(g.get("plots_dpi", 150)),
+    )
+    g["_last_input_plot_export"] = payload or {"rows": [], "mode": "single", "run_label": ""}
+    g["_last_input_plot_selection"] = sel
+    return g["_last_input_plot_export"]
+
+
+def save_output_plot_data_from_globals(g: Dict[str, Any]) -> Optional[Path]:
+    payload = g.get("_last_output_plot_export") or {"rows": [], "mode": "single"}
+    selection = g.get("_last_output_plot_selection") or get_selection_from_globals(g)
+    return _save_plot_data_rows(
+        payload.get("rows") or [],
+        selection=selection,
+        requested_path=g.get("output_plot_data_path", ""),
+        figure_type="output",
+        mode=str(payload.get("mode") or "single"),
+        export_format=g.get("output_plot_data_format", "trace_rows"),
+    )
+
+
+def save_input_plot_data_from_globals(g: Dict[str, Any]) -> Optional[Path]:
+    payload = g.get("_last_input_plot_export") or {"rows": [], "mode": "single"}
+    selection = g.get("_last_input_plot_selection") or get_selection_from_globals(g)
+    return _save_plot_data_rows(
+        payload.get("rows") or [],
+        selection=selection,
+        requested_path=g.get("input_plot_data_path", ""),
+        figure_type="input",
+        mode=str(payload.get("mode") or "single"),
+        export_format=g.get("input_plot_data_format", "trace_rows"),
     )
 
 
@@ -2640,6 +4186,32 @@ def run_output_metrics_from_globals(g: Dict[str, Any]) -> Optional[Dict[str, Any
         opts,
         save_analysis=bool(g.get("save_analysis", False)),
     )
+
+
+def run_output_metric_distributions_from_globals(g: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    sel = get_selection_from_globals(g)
+    opts = output_opts_from_globals(g)
+    opts.update({
+        "output_peak_window_ms": g.get("output_peak_window_ms"),
+        "output_drop_window_ms": g.get("output_drop_window_ms"),
+        "output_rebound_window_ms": g.get("output_rebound_window_ms"),
+        "output_auc_window": g.get("output_auc_window"),
+        "output_metric_mode": g.get("output_metric_mode"),
+        "output_metric_window_ms": g.get("output_metric_window_ms"),
+    })
+    payload = run_output_metric_distributions(
+        sel,
+        opts,
+        metric_keys=list(g.get("output_metrics_plot_keys") or []),
+        jitter_points=bool(g.get("output_metrics_plot_jitter", True)),
+        save_plots=bool(g.get("output_metrics_plot_save_plot", False)),
+        save_data=bool(g.get("output_metrics_plot_save_data", False)),
+        plots_dpi=int(g.get("plots_dpi", 150)),
+        data_path=g.get("output_metrics_plot_data_path", ""),
+    )
+    g["_last_output_metric_dist_export"] = payload or {"rows": [], "mode": "single", "metric_keys": []}
+    g["_last_output_metric_dist_selection"] = sel
+    return payload
 
 
 def run_spike_stats_from_globals(g: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -2687,12 +4259,43 @@ def build_selection_ui(g: Dict[str, Any]) -> None:
     out_selection = widgets.Output()
 
     base_dir = g.get("BASE_DIR")
-    cells = analysis.list_cells(base_dir) or [g.get("cell_name")]
-    cell_dd = widgets.Dropdown(options=cells, value=g.get("cell_name"), description="Cell")
-    tunes = analysis.list_tunes(base_dir, cell_dd.value) or [g.get("tunes_dir")]
-    tunes_dd = widgets.Dropdown(options=tunes, value=g.get("tunes_dir"), description="Tunes")
-    models = analysis.list_models(base_dir, cell_dd.value, tunes_dd.value) or [g.get("model_dir")]
-    model_dd = widgets.Dropdown(options=models, value=g.get("model_dir"), description="Model")
+    if base_dir is None:
+        base_dir = analysis.find_scp_root(Path.cwd())
+        g["BASE_DIR"] = base_dir
+    cells_dir = g.get("CELLS_DIR")
+    if cells_dir is None:
+        cells_dir = Path(base_dir) / "cells"
+        g["CELLS_DIR"] = cells_dir
+
+    def _sanitize_options(raw: Any, fallback: Any) -> list[Any]:
+        opts = [v for v in (list(raw) if raw is not None else []) if v not in (None, "")]
+        if not opts and fallback not in (None, ""):
+            opts = [fallback]
+        if not opts:
+            opts = [""]
+        return opts
+
+    def _pick_value(options: list[Any], preferred: Any) -> Any:
+        return preferred if preferred in options else options[0]
+
+    cells = _sanitize_options(analysis.list_cells(base_dir), g.get("cell_name"))
+    cell_dd = widgets.Dropdown(
+        options=cells,
+        value=_pick_value(cells, g.get("cell_name")),
+        description="Cell",
+    )
+    tunes = _sanitize_options(analysis.list_tunes(base_dir, cell_dd.value), g.get("tunes_dir"))
+    tunes_dd = widgets.Dropdown(
+        options=tunes,
+        value=_pick_value(tunes, g.get("tunes_dir")),
+        description="Tunes",
+    )
+    models = _sanitize_options(analysis.list_models(base_dir, cell_dd.value, tunes_dd.value), g.get("model_dir"))
+    model_dd = widgets.Dropdown(
+        options=models,
+        value=_pick_value(models, g.get("model_dir")),
+        description="Model",
+    )
 
     compare_list_sel = widgets.SelectMultiple(
         options=[],
@@ -2715,7 +4318,7 @@ def build_selection_ui(g: Dict[str, Any]) -> None:
     selection_help_btn.layout = widgets.Layout(width="80px", flex="0 0 auto")
 
     def _refresh_runs(*_):
-        base = g.get("CELLS_DIR") / cell_dd.value / tunes_dd.value / model_dd.value / "output_data"
+        base = Path(g.get("CELLS_DIR")) / cell_dd.value / tunes_dd.value / model_dd.value / "output_data"
         names = [analysis.run_label(p) for p in analysis.collect_run_candidates(base)]
         options: list[tuple[str, str]] = [(n, n) for n in names]
         options.extend(_compare_list_dir_options(g, base_dir))
@@ -2724,10 +4327,13 @@ def build_selection_ui(g: Dict[str, Any]) -> None:
         compare_list_sel.value = tuple([n for n in compare_list_sel.value if n in valid_vals])
 
     def _refresh_models(*_):
-        models = analysis.list_models(base_dir, cell_dd.value, tunes_dd.value) or [g.get("model_dir")]
+        models = _sanitize_options(
+            analysis.list_models(base_dir, cell_dd.value, tunes_dd.value),
+            g.get("model_dir"),
+        )
         model_dd.options = models
         if model_dd.value not in model_dd.options:
-            model_dd.value = model_dd.options[0]
+            model_dd.value = _pick_value(models, g.get("model_dir"))
         _refresh_runs()
 
     cell_dd.observe(_refresh_models, names="value")
@@ -2786,6 +4392,15 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
     )
 
     output_curve_mode_dd = widgets.Dropdown(options=["raw", "normalized"], value=g.get("output_curve_mode"), description="Curve mode")
+    output_curve_plot_mode_dd = widgets.Dropdown(
+        options=[
+            ("Rate", "rate"),
+            ("ISI", "isi"),
+            ("Rate + ISI (stacked)", "rate_isi"),
+        ],
+        value=_output_curve_plot_mode(g),
+        description="Curve plot",
+    )
     output_norm_mode_dd = widgets.Dropdown(options=["avg", "peak"], value=g.get("output_norm_mode"), description="Norm mode")
     outputs_norm_txt = widgets.Text(value="" if g.get("multi_norm_fr") is None else str(g.get("multi_norm_fr")), description="Norm FR")
     output_bin_txt = widgets.Text(value="" if g.get("output_bin_ms") is None else str(g.get("output_bin_ms")), description="Curve bin ms")
@@ -2805,6 +4420,25 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
     outputs_btn.layout = widgets.Layout(width="160px", flex="0 0 auto")
     outputs_help_btn = widgets.Button(description="Help")
     outputs_help_btn.layout = widgets.Layout(width="80px", flex="0 0 auto")
+    output_csv_path_txt = widgets.Text(
+        value=str(g.get("output_plot_data_path", "") or ""),
+        description="CSV path",
+        layout=widgets.Layout(width="60%"),
+    )
+    output_csv_format_dd = widgets.Dropdown(
+        options=[
+            ("Trace rows", "trace_rows"),
+            ("Long rows", "long_rows"),
+        ],
+        value=_normalize_plot_data_format(g.get("output_plot_data_format", "trace_rows")),
+        description="Format",
+    )
+    output_csv_auto_cb = widgets.Checkbox(
+        value=bool(g.get("output_plot_data_auto_save", False)),
+        description="Auto-save CSV",
+    )
+    output_csv_btn = widgets.Button(description="Save plotted CSV")
+    output_csv_btn.layout = widgets.Layout(width="150px", flex="0 0 auto")
 
     def _on_outputs(_):
         sync_common_from_globals(g)
@@ -2821,6 +4455,7 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
         g["output_stim_start_ms"] = analysis.parse_optional_float(output_stim_start_txt.value)
         g["output_stim_stop_ms"] = analysis.parse_optional_float(output_stim_stop_txt.value)
         g["output_curve_mode"] = output_curve_mode_dd.value
+        g["output_curve_plot_mode"] = output_curve_plot_mode_dd.value
         g["output_norm_mode"] = output_norm_mode_dd.value
         g["output_bin_ms"] = analysis.parse_optional_float(output_bin_txt.value)
         g["output_smooth_mode"] = output_smooth_mode_dd.value
@@ -2828,12 +4463,24 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
         g["multi_shade_mode"] = None if shade_val_local in ("none", "", None) else shade_val_local
         g["multi_norm_fr"] = analysis.parse_optional_float(outputs_norm_txt.value)
         g["compare_output_layout"] = outputs_compare_layout_dd.value
+        g["output_plot_data_path"] = str(output_csv_path_txt.value or "").strip()
+        g["output_plot_data_format"] = output_csv_format_dd.value
+        g["output_plot_data_auto_save"] = bool(output_csv_auto_cb.value)
 
         with out_outputs:
             out_outputs.clear_output()
             run_output_plots_from_globals(g)
+            if g.get("output_plot_data_auto_save", False):
+                save_output_plot_data_from_globals(g)
+
+    def _on_save_output_csv(_):
+        g["output_plot_data_path"] = str(output_csv_path_txt.value or "").strip()
+        g["output_plot_data_format"] = output_csv_format_dd.value
+        with out_outputs:
+            save_output_plot_data_from_globals(g)
 
     outputs_btn.on_click(_on_outputs)
+    output_csv_btn.on_click(_on_save_output_csv)
     outputs_help_btn.on_click(lambda *_: _print_help(out_outputs, HELP_OUTPUTS))
 
     g["out_outputs"] = out_outputs
@@ -2844,7 +4491,8 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
             widgets.HBox([outputs_btn, outputs_help_btn, compare_preset_cb, outputs_raster_cb, outputs_style_dd, outputs_win_txt]),
             widgets.HBox([output_bin_txt, output_smooth_mode_dd, outputs_shade_dd, outputs_compare_layout_dd]),
             widgets.HBox([window_start_txt, window_end_txt, output_stim_start_txt, output_stim_stop_txt]),
-            widgets.HBox([output_curve_mode_dd, output_norm_mode_dd, outputs_norm_txt]),
+            widgets.HBox([output_curve_mode_dd, output_curve_plot_mode_dd, output_norm_mode_dd, outputs_norm_txt]),
+            widgets.HBox([output_csv_path_txt, output_csv_format_dd, output_csv_auto_cb, output_csv_btn]),
             out_outputs,
         ])
     )
@@ -2922,6 +4570,25 @@ def build_inputs_ui(g: Dict[str, Any]) -> None:
     inputs_btn.layout = widgets.Layout(width="160px", flex="0 0 auto")
     inputs_help_btn = widgets.Button(description="Help")
     inputs_help_btn.layout = widgets.Layout(width="80px", flex="0 0 auto")
+    input_csv_path_txt = widgets.Text(
+        value=str(g.get("input_plot_data_path", "") or ""),
+        description="CSV path",
+        layout=widgets.Layout(width="60%"),
+    )
+    input_csv_format_dd = widgets.Dropdown(
+        options=[
+            ("Trace rows", "trace_rows"),
+            ("Long rows", "long_rows"),
+        ],
+        value=_normalize_plot_data_format(g.get("input_plot_data_format", "trace_rows")),
+        description="Format",
+    )
+    input_csv_auto_cb = widgets.Checkbox(
+        value=bool(g.get("input_plot_data_auto_save", False)),
+        description="Auto-save CSV",
+    )
+    input_csv_btn = widgets.Button(description="Save plotted CSV")
+    input_csv_btn.layout = widgets.Layout(width="150px", flex="0 0 auto")
 
     def _on_inputs(_):
         sync_common_from_globals(g)
@@ -2944,12 +4611,24 @@ def build_inputs_ui(g: Dict[str, Any]) -> None:
         g["input_legend_loc"] = inputs_legend_dd.value
         g["compare_input_layout"] = compare_layout_dd.value
         g["compare_show_input_std"] = compare_std_cb.value
+        g["input_plot_data_path"] = str(input_csv_path_txt.value or "").strip()
+        g["input_plot_data_format"] = input_csv_format_dd.value
+        g["input_plot_data_auto_save"] = bool(input_csv_auto_cb.value)
 
         with out_inputs:
             out_inputs.clear_output()
             run_input_plots_from_globals(g)
+            if g.get("input_plot_data_auto_save", False):
+                save_input_plot_data_from_globals(g)
+
+    def _on_save_input_csv(_):
+        g["input_plot_data_path"] = str(input_csv_path_txt.value or "").strip()
+        g["input_plot_data_format"] = input_csv_format_dd.value
+        with out_inputs:
+            save_input_plot_data_from_globals(g)
 
     inputs_btn.on_click(_on_inputs)
+    input_csv_btn.on_click(_on_save_input_csv)
     inputs_help_btn.on_click(lambda *_: _print_help(out_inputs, HELP_INPUTS))
 
     g["out_inputs"] = out_inputs
@@ -2962,6 +4641,7 @@ def build_inputs_ui(g: Dict[str, Any]) -> None:
             widgets.HBox([raster_trial_txt, raster_max_txt, raster_win_txt, raster_style_dd]),
             widgets.HBox([input_window_start_txt, input_window_end_txt]),
             widgets.HBox([compare_layout_dd, compare_std_cb]),
+            widgets.HBox([input_csv_path_txt, input_csv_format_dd, input_csv_auto_cb, input_csv_btn]),
             out_inputs,
         ])
     )
@@ -3109,6 +4789,15 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         value=bool(g.get("output_metrics_show_params", True)),
         description="Show params",
     )
+    metrics_std_mode_val = str(g.get("output_metrics_std_mode", "std") or "std").lower()
+    if metrics_std_mode_val not in ("std", "sem"):
+        metrics_std_mode_val = "std"
+    metrics_std_mode_dd = widgets.Dropdown(
+        options=["std", "sem"],
+        value=metrics_std_mode_val,
+        description="Spread",
+        layout=widgets.Layout(width="220px"),
+    )
     metrics_show_delta_cb = widgets.Checkbox(
         value=bool(g.get("output_metrics_show_delta", True)),
         description="Show deltas",
@@ -3117,9 +4806,43 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         value=bool(g.get("output_metrics_highlight_best", True)),
         description="Highlight best",
     )
+    metric_plot_options = [k for k in _OUTPUT_METRIC_VALUE_ORDER if k != "output_metrics_n_trials"]
+    metrics_plot_default = list(g.get("output_metrics_plot_keys") or _OUTPUT_METRIC_PLOT_DEFAULT_KEYS)
+    metrics_plot_default = [k for k in metrics_plot_default if k in metric_plot_options]
+    if not metrics_plot_default:
+        metrics_plot_default = [k for k in _OUTPUT_METRIC_PLOT_DEFAULT_KEYS if k in metric_plot_options]
+    metrics_plot_sel = widgets.SelectMultiple(
+        options=metric_plot_options,
+        value=tuple(metrics_plot_default),
+        description="Plot metrics",
+        rows=min(8, max(6, len(metric_plot_options))),
+        layout=widgets.Layout(width="96%"),
+    )
+    metrics_plot_btn = widgets.Button(description="Plot metric dist")
+    metrics_plot_btn.layout = widgets.Layout(width="150px", flex="0 0 auto")
+    metrics_plot_jitter_cb = widgets.Checkbox(
+        value=bool(g.get("output_metrics_plot_jitter", True)),
+        description="Trial points",
+    )
+    metrics_plot_save_plot_cb = widgets.Checkbox(
+        value=bool(g.get("output_metrics_plot_save_plot", False)),
+        description="Save plot",
+    )
+    metrics_plot_save_data_cb = widgets.Checkbox(
+        value=bool(g.get("output_metrics_plot_save_data", False)),
+        description="Save CSV",
+    )
+    metrics_plot_data_path_txt = widgets.Text(
+        value=str(g.get("output_metrics_plot_data_path", "") or ""),
+        description="CSV path",
+        layout=widgets.Layout(width="70%"),
+    )
     metrics_box = widgets.VBox([
-        widgets.HBox([metrics_ref_dd, metrics_show_params_cb]),
+        widgets.HBox([metrics_ref_dd, metrics_std_mode_dd, metrics_show_params_cb]),
         widgets.HBox([metrics_show_delta_cb, metrics_highlight_cb]),
+        widgets.HBox([metrics_plot_btn, metrics_plot_jitter_cb, metrics_plot_save_plot_cb, metrics_plot_save_data_cb]),
+        metrics_plot_sel,
+        metrics_plot_data_path_txt,
     ])
 
     def _initial_sample_runs() -> list[str]:
@@ -3328,8 +5051,14 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         if list_val is not None:
             g["snapshot_compare_max_list_items"] = int(list_val)
         g["output_metrics_show_params"] = metrics_show_params_cb.value
+        g["output_metrics_std_mode"] = metrics_std_mode_dd.value
         g["output_metrics_show_delta"] = metrics_show_delta_cb.value
         g["output_metrics_highlight_best"] = metrics_highlight_cb.value
+        g["output_metrics_plot_keys"] = list(metrics_plot_sel.value)
+        g["output_metrics_plot_jitter"] = bool(metrics_plot_jitter_cb.value)
+        g["output_metrics_plot_save_plot"] = bool(metrics_plot_save_plot_cb.value)
+        g["output_metrics_plot_save_data"] = bool(metrics_plot_save_data_cb.value)
+        g["output_metrics_plot_data_path"] = str(metrics_plot_data_path_txt.value or "").strip()
         ref_val = metrics_ref_dd.value
         g["output_metrics_ref_label"] = None if ref_val in (None, "", "(none)") else ref_val
         g["input_sample_path"] = sample_path_txt.value.strip() or None
@@ -3398,7 +5127,29 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
                         label = analysis.run_label(analysis.resolve_run(sel["base"], sel["run_single"]))
                         show_md(format_output_metrics_tables(metrics, title=f"Output metrics ({label})", show_params=show_params))
 
+    def _on_plot_metrics(_):
+        _refresh_metrics_refs()
+        _refresh_sample_runs()
+        _refresh_sample_groups()
+        _apply_extra_opts()
+        with out_extra:
+            out_extra.clear_output()
+            payload = run_output_metric_distributions_from_globals(g)
+            if not payload:
+                return
+            metric_keys = payload.get("metric_keys") or []
+            if len(metric_keys) > 1:
+                print(f"Plotted {len(metric_keys)} metrics as a panel grid.")
+            curve_labels = [
+                label
+                for label, entry in (payload.get("by_label") or {}).items()
+                if str((entry or {}).get("source") or "") == "curve"
+            ]
+            if curve_labels:
+                print("Curve-only entries are shown as mean markers (no trial boxes).")
+
     run_btn.on_click(_on_run)
+    metrics_plot_btn.on_click(_on_plot_metrics)
     extra_help_btn.on_click(lambda *_: _print_help(out_extra, HELP_EXTRA))
 
     g["extra_mode_dd"] = mode_dd

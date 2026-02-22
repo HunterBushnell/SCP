@@ -1,6 +1,6 @@
 {
   "sst_inh": {
-    "state": true,
+    "state": false,
     "mode": "precomputed",
     "color": "#ff7f0e",
     "source": {
@@ -19,7 +19,7 @@
     },
     "syns": {
       "type": "GABA_A",
-      "N_syn": 150,
+      "N_syn": 15,
       "segs": "proximal",
       "dist_func": {
         "kind": "linear",
@@ -30,8 +30,8 @@
         }
       },
       "params": {
-        "wt_mean": 0.5,
-        "wt_std": 0.34,
+        "wt_mean": 0.25,
+        "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,
         "tau_r_GABAA": 0.5,

@@ -27,6 +27,8 @@ Inputs (tune directory)
 Outputs
 - `output_data/<output_stem>/` with `run_manifest.json` and sidecars.
 - Optional plots in `output_data/<output_stem>/plots/`.
+- Optional row-per-trial spikes CSV:
+  - `python scripts/export_spikes_csv.py --input output_data/<output_stem>/results/spikes.npz`
 
 IClamp mode
 - Enable via `cell_configs/sim_config.json -> iclamp.enabled: true`.

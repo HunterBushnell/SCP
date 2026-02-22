@@ -11,7 +11,7 @@
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 550,
+      "stim_tstart_ms": 530,
       "duration_ms": null,
       "input_stim_tstart_ms": 300,
       "input_duration_ms": null

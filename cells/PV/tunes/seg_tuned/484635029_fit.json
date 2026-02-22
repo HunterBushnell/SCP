@@ -38,6 +38,16 @@
           "ena": 53.0, 
           "section": "soma", 
           "ek": -107.0
+        },
+        {
+          "ena": 53.0,
+          "section": "axon",
+          "ek": -107.0
+        },
+        {
+          "ena": 53.0,
+          "section": "dend",
+          "ek": -107.0
         }
       ], 
       "v_init": -71
@@ -65,7 +75,7 @@
     {
       "section": "soma", 
       "name": "gbar_Kd", 
-      "value": 0.038, 
+      "value": 0.06, 
       "mechanism": "Kd"
     }, 
     {
@@ -77,7 +87,7 @@
     {
       "section": "soma", 
       "name": "gbar_Kv3_1", 
-      "value": 0.045, 
+      "value": 0.09, 
       "mechanism": "Kv3_1"
     }, 
     {
@@ -128,17 +138,95 @@
       "value": 0.000175, 
       "mechanism": ""
     }, 
+
+
+
     {
       "section": "axon", 
       "name": "g_pas", 
       "value": 0.000175, 
       "mechanism": ""
-    }, 
+    },
+    {
+      "section": "axon",
+      "name": "gbar_K_T",
+      "value": 0.000204706,
+      "mechanism": "K_T"
+    },
+    {
+      "section": "axon",
+      "name": "gbar_Kd",
+      "value": 0.00411686,
+      "mechanism": "Kd"
+    },
+    {
+      "section": "axon",
+      "name": "gbar_Kv2like",
+      "value": 0.0526085,
+      "mechanism": "Kv2like"
+    },
+    {
+      "section": "axon",
+      "name": "gbar_Kv3_1",
+      "value": 0.764996,
+      "mechanism": "Kv3_1"
+    },
+    {
+      "section": "axon",
+      "name": "gbar_SK",
+      "value": 0.00001,
+      "mechanism": "SK"
+    },
+    {
+      "section": "axon",
+      "name": "gbar_Ca_HVA",
+      "value": 9.55129e-05,
+      "mechanism": "Ca_HVA"
+    },
+    {
+      "section": "axon",
+      "name": "gbar_Ca_LVA",
+      "value": 0.00380961,
+      "mechanism": "Ca_LVA"
+    },
+    {
+      "section": "axon",
+      "name": "gamma_CaDynamics",
+      "value": 0.00800242,
+      "mechanism": "CaDynamics"
+    },
+    {
+      "section": "axon",
+      "name": "decay_CaDynamics",
+      "value": 330.547,
+      "mechanism": "CaDynamics"
+    },
+
+
+
     {
       "section": "dend", 
       "name": "g_pas", 
       "value": 0.000175, 
       "mechanism": ""
+    },
+    {
+      "section": "dend",
+      "name": "gbar_Kv3_1",
+      "value": 0.71,
+      "mechanism": "Kv3_1"
+    },
+    {
+      "section": "dend",
+      "name": "gbar_Im_v2",
+      "value": 0.002,
+      "mechanism": "Im_v2"
+    },
+    {
+      "section": "dend",
+      "name": "gbar_Ih",
+      "value": 0.0,
+      "mechanism": "Ih"
     }
   ]
 }

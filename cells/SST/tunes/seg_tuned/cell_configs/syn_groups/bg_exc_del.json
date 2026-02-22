@@ -4,13 +4,13 @@
     "mode": "homogeneous_poisson",
     "color": "#17becf",
     "source": {
-      "freq": 1.0,
+      "freq": 3.0,
       "baseline": null,
       "path": null,
       "bin_ms": null
     },
     "timing": {
-      "onset_ms": 800,
+      "onset_ms": 700,
       "stim_tstart_ms": null,
       "duration_ms": null,
       "input_stim_tstart_ms": null,

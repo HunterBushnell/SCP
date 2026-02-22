@@ -187,9 +187,9 @@ def plot_looped_currents(cell_name,trial_amp,currents,looped_records,window):
     plt.xlabel("Time (ms)")
     plt.xlim(window[0],window[1])
     plt.ylabel("Current (A/cm²)")
-    plt.ylim(-0.01,0.01)
+    # plt.ylim(-0.01,0.01)
     plt.title(f"{cell_name} currents @ {trial_amp} pA")
-    plt.legend() #loc='upper right')
+    plt.legend(loc='upper left')
     plt.grid()
     plt.show()
 

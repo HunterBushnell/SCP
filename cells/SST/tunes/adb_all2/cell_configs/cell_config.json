@@ -1,0 +1,11 @@
+{
+  "cell_name": "SST",
+  "tune": "adb_all2",
+  "color": "magenta",
+  "paths": {
+    "manifest": "manifest.json"
+  },
+  "tuning": {
+    "soma_diam_multiplier": 1.0
+  }
+}

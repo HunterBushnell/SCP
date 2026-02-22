@@ -56,13 +56,28 @@ def _align_centers(centers, y_smooth, mode='center'):
         return centers[:len(y_smooth)]
 
 def _apply_legend(ax, legend_loc=None):
+    handles, labels = ax.get_legend_handles_labels()
+    if not handles:
+        return
     if legend_loc is None or str(legend_loc).strip() == "":
-        ax.legend()
+        ax.legend(handles=handles, labels=labels)
         return
     loc_val = str(legend_loc).strip()
     if loc_val.lower() in ("none", "off", "false"):
         return
-    ax.legend(loc=loc_val)
+    ax.legend(handles=handles, labels=labels, loc=loc_val)
+
+
+def _legend_safe_label(label):
+    if label is None:
+        return None
+    txt = str(label)
+    if not txt:
+        return None
+    # Matplotlib ignores labels that start with "_"
+    if txt.startswith("_"):
+        return f" {txt}"
+    return txt
 
 # ────────────────────────────────────────────────────────────────────────────
 #  Normalization helper
@@ -98,11 +113,12 @@ def plot_output_curve(
     y = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
     units = curve.get("units", "Hz")
     y_label = "Rate (Hz)" if units == "Hz" else "Rate (normalized)"
+    label_plot = _legend_safe_label(label)
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.plot(t_ms, y, lw=float(line_width), color=color, label=label)
-    if label:
-        ax.legend()
+    ax.plot(t_ms, y, lw=float(line_width), color=color, label=label_plot)
+    if label_plot:
+        _apply_legend(ax)
     if plot_window is not None:
         ax.set_xlim(plot_window[0], plot_window[1])
     if stim_start is not None:
@@ -142,12 +158,13 @@ def plot_compare_output_curves(
         t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
         y = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
         lab = labels[idx] if labels and idx < len(labels) else None
+        lab = _legend_safe_label(lab)
         ls = "--" if same_color and idx == 1 else "-"
         ax.plot(t_ms, y, lw=float(line_width), color=colors[idx % len(colors)], linestyle=ls, label=lab)
     units = (curve_a or curve_b or {}).get("units", "Hz")
     y_label = "Rate (Hz)" if units == "Hz" else "Rate (normalized)"
     if labels:
-        ax.legend()
+        _apply_legend(ax)
     if plot_window is not None:
         ax.set_xlim(plot_window[0], plot_window[1])
     if stim_start is not None:

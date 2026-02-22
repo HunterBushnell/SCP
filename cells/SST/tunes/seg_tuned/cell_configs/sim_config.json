@@ -32,12 +32,14 @@
   "plots_profile": "off",
   "randomness_mode": "random",
   "random_seed": null,
+
   "param_study": {
     "input_type": null,
     "param_type": null,
     "param_vals": [],
     "n_trials": null
   },
+  
   "iclamp": {
     "enabled": false,
     "amp_nA": 0.2,

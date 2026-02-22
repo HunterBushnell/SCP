@@ -1,6 +1,6 @@
 {
   "cell_name": "SST",
-  "tune": "seg_tuned",
+  "tune": "seg_tuned_all",
   "color": "m",
   "paths": {
     "manifest": "manifest.json"

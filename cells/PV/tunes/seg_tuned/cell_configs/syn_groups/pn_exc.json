@@ -4,7 +4,7 @@
     "mode": "inhomogeneous_poisson",
     "source": {
       "freq": null,
-      "baseline": 2.3,
+      "baseline": 2.0,
       "path": "external_data/pyrFiringRateAvg.csv",
       "bin_ms": 5
     },
@@ -17,7 +17,7 @@
     },
     "syns": {
       "type": "AMPA_NMDA_STP",
-      "N_syn": 50,
+      "N_syn": 22,
       "segs": "all",
       "dist_func": {
         "kind": "linear",
@@ -28,7 +28,7 @@
       },
       "params": {
         "wt_mean": 1.5,
-        "wt_std": 0.3333333333333333,
+        "wt_std": 0.33,
         "initW": 1.0,
         "gmax_AMPA": 0.001,
         "gmax_NMDA": 0.001,

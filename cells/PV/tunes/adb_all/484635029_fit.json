@@ -37,7 +37,7 @@
           "ek": -107.0
         }
       ],
-      "v_init": -90
+      "v_init": -71.25
     }
   ],
   "genome": [
@@ -50,7 +50,7 @@
     {
       "section": "soma",
       "name": "e_pas",
-      "value": "-94.9354",
+      "value": "-68.25",
       "mechanism": ""
     },
     {
@@ -122,7 +122,7 @@
     {
       "section": "axon",
       "name": "e_pas",
-      "value": "-109.47",
+      "value": "-68.25",
       "mechanism": ""
     },
     {
@@ -206,7 +206,7 @@
     {
       "section": "apic",
       "name": "e_pas",
-      "value": "-60.0448",
+      "value": "-68.25",
       "mechanism": ""
     },
     {
@@ -254,7 +254,7 @@
     {
       "section": "dend",
       "name": "e_pas",
-      "value": "-63.7231",
+      "value": "-68.25",
       "mechanism": ""
     },
     {

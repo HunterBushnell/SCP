@@ -1,0 +1,17 @@
+{
+  "cell_name": "PV",
+  "tune": "seg_tuned",
+  "color": "b",
+  "paths": {
+    "manifest": "manifest.json"
+  },
+  "tuning": {
+    "soma_diam_multiplier": 6,
+    "desired": {
+      "R_in": 100.0,
+      "tau_m": 5.9,
+      "sag_ratio": 0.99,
+      "v_rest": -71.25
+    }
+  }
+}

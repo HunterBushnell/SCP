@@ -1,7 +1,7 @@
 {
   "cell_name": "PV",
   "tune": "seg_tuned",
-  "color": "b",
+  "color": "royalblue",
   "paths": {
     "manifest": "manifest.json"
   },
