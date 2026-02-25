@@ -1305,6 +1305,561 @@ def summarize_synapse_records(
     return summary
 
 
+def _unwrap_object_scalar(value: Any) -> Any:
+    if isinstance(value, np.ndarray) and value.dtype == object and value.ndim == 0:
+        try:
+            return value.item()
+        except Exception:
+            return value
+    return value
+
+
+def _resolve_time_axis(
+    results: Dict[str, Any],
+    *,
+    n_hint: Optional[int] = None,
+) -> np.ndarray:
+    traces = results.get("traces", {}) or {}
+    t_raw = traces.get("T")
+    if t_raw is not None:
+        try:
+            t_ms = np.asarray(t_raw, dtype=float).ravel()
+            if t_ms.size:
+                return t_ms
+        except Exception:
+            pass
+
+    sim_cfg = results.get("sim_cfg", {}) or {}
+    dt = sim_cfg.get("dt")
+    tstart = sim_cfg.get("tstart", 0.0)
+    if n_hint is None or n_hint <= 0 or dt is None:
+        return np.array([], dtype=float)
+    try:
+        dt = float(dt)
+        tstart = float(tstart)
+    except Exception:
+        return np.array([], dtype=float)
+    if dt <= 0:
+        return np.array([], dtype=float)
+    return tstart + dt * np.arange(int(n_hint), dtype=float)
+
+
+def _window_masks(
+    t_ms: np.ndarray,
+    *,
+    stim_start_ms: Optional[float],
+    stim_stop_ms: Optional[float],
+    baseline_ms: float,
+) -> tuple[np.ndarray, np.ndarray, Optional[float], Optional[float], Optional[float], Optional[float]]:
+    stim_mask = _select_window_mask(t_ms, stim_start_ms, stim_stop_ms)
+    baseline_start = None
+    baseline_stop = None
+    if stim_start_ms is not None:
+        baseline_stop = float(stim_start_ms)
+        baseline_start = baseline_stop - float(max(0.0, baseline_ms))
+        baseline_mask = _select_window_mask(t_ms, baseline_start, baseline_stop)
+    else:
+        baseline_mask = np.zeros_like(t_ms, dtype=bool)
+    return (
+        baseline_mask,
+        stim_mask,
+        baseline_start,
+        baseline_stop,
+        stim_start_ms,
+        stim_stop_ms,
+    )
+
+
+def _summarize_series_metrics(
+    values: np.ndarray,
+    t_ms: np.ndarray,
+    *,
+    baseline_mask: np.ndarray,
+    stim_mask: np.ndarray,
+) -> Dict[str, Any]:
+    arr = np.asarray(values, dtype=float).ravel()
+    arr = arr[np.isfinite(arr)]
+    metrics: Dict[str, Any] = {
+        "n_samples": int(len(values)),
+        "n_finite": int(arr.size),
+        "mean": None,
+        "std": None,
+        "min": None,
+        "max": None,
+        "mean_abs": None,
+        "peak_abs": None,
+        "baseline_mean": None,
+        "stim_mean": None,
+        "stim_delta_from_baseline": None,
+        "stim_peak_abs": None,
+        "stim_auc": None,
+    }
+    if arr.size == 0:
+        return metrics
+
+    metrics["mean"] = float(np.mean(arr))
+    metrics["std"] = float(np.std(arr))
+    metrics["min"] = float(np.min(arr))
+    metrics["max"] = float(np.max(arr))
+    metrics["mean_abs"] = float(np.mean(np.abs(arr)))
+    metrics["peak_abs"] = float(np.max(np.abs(arr)))
+
+    n = min(len(values), len(t_ms), len(baseline_mask), len(stim_mask))
+    if n <= 0:
+        return metrics
+
+    vec = np.asarray(values, dtype=float).ravel()[:n]
+    t_use = np.asarray(t_ms, dtype=float).ravel()[:n]
+    base = np.asarray(baseline_mask[:n], dtype=bool)
+    stim = np.asarray(stim_mask[:n], dtype=bool)
+
+    if np.any(base):
+        base_vals = vec[base]
+        base_vals = base_vals[np.isfinite(base_vals)]
+        if base_vals.size:
+            metrics["baseline_mean"] = float(np.mean(base_vals))
+
+    if np.any(stim):
+        stim_vals = vec[stim]
+        stim_vals = stim_vals[np.isfinite(stim_vals)]
+        if stim_vals.size:
+            metrics["stim_mean"] = float(np.mean(stim_vals))
+            metrics["stim_peak_abs"] = float(np.max(np.abs(stim_vals)))
+            baseline_mean = metrics.get("baseline_mean")
+            if baseline_mean is not None:
+                metrics["stim_delta_from_baseline"] = float(metrics["stim_mean"] - baseline_mean)
+        if np.sum(stim) >= 2:
+            try:
+                metrics["stim_auc"] = float(np.trapz(vec[stim], t_use[stim] / 1000.0))
+            except Exception:
+                metrics["stim_auc"] = None
+
+    return metrics
+
+
+def _select_cell_recording_payload(
+    results: Dict[str, Any],
+    *,
+    trial_idx: Optional[int] = None,
+) -> tuple[Optional[Dict[str, Any]], Optional[int]]:
+    direct = _unwrap_object_scalar(results.get("cell_recordings"))
+    if isinstance(direct, dict):
+        chosen_trial = 0 if trial_idx is None else int(trial_idx)
+        return direct, chosen_trial
+
+    by_trial = _unwrap_object_scalar(results.get("cell_recordings_by_trial"))
+    if by_trial is None:
+        return None, None
+
+    if isinstance(by_trial, np.ndarray):
+        by_trial = list(by_trial.tolist())
+    if not isinstance(by_trial, (list, tuple)) or not by_trial:
+        return None, None
+
+    entries = list(by_trial)
+    chosen: Optional[Any] = None
+    chosen_trial_idx: Optional[int] = None
+
+    if trial_idx is not None:
+        for entry in entries:
+            entry = _unwrap_object_scalar(entry)
+            if isinstance(entry, dict):
+                eidx = entry.get("trial_idx")
+                if eidx is not None and int(eidx) == int(trial_idx):
+                    chosen = entry
+                    chosen_trial_idx = int(trial_idx)
+                    break
+        if chosen is None:
+            return None, int(trial_idx)
+    else:
+        chosen = _unwrap_object_scalar(entries[0])
+
+    payload = chosen
+    if isinstance(chosen, dict) and "recordings" in chosen:
+        payload = chosen.get("recordings")
+        if chosen_trial_idx is None and chosen.get("trial_idx") is not None:
+            try:
+                chosen_trial_idx = int(chosen.get("trial_idx"))
+            except Exception:
+                chosen_trial_idx = None
+    payload = _unwrap_object_scalar(payload)
+    if not isinstance(payload, dict):
+        return None, chosen_trial_idx
+    if chosen_trial_idx is None:
+        chosen_trial_idx = 0 if trial_idx is None else int(trial_idx)
+    return payload, chosen_trial_idx
+
+
+def summarize_cell_recordings(
+    results: Dict[str, Any],
+    *,
+    trial_idx: Optional[int] = None,
+    baseline_ms: float = 100.0,
+    stim_start_ms: Optional[float] = None,
+    stim_stop_ms: Optional[float] = None,
+    sites: Optional[Iterable[str]] = None,
+    vars: Optional[Iterable[str]] = None,
+) -> Dict[str, Any]:
+    payload, chosen_trial = _select_cell_recording_payload(results, trial_idx=trial_idx)
+    if payload is None:
+        return {
+            "available": False,
+            "trial_idx": chosen_trial,
+            "sites": {},
+            "site_count": 0,
+            "series_count": 0,
+            "message": "No cell_recordings payload found in results.",
+        }
+
+    site_filter = set(sites) if sites is not None else None
+    var_filter = set(vars) if vars is not None else None
+
+    n_hint = None
+    for recs in payload.values():
+        if isinstance(recs, dict) and recs:
+            first = next(iter(recs.values()))
+            try:
+                n_hint = int(np.asarray(first).size)
+            except Exception:
+                n_hint = None
+            break
+    t_ms = _resolve_time_axis(results, n_hint=n_hint)
+
+    sim_cfg = results.get("sim_cfg", {}) or {}
+    stim_start, stim_stop = _resolve_stim_window(sim_cfg)
+    if stim_start_ms is not None:
+        stim_start = float(stim_start_ms)
+    if stim_stop_ms is not None:
+        stim_stop = float(stim_stop_ms)
+
+    (
+        baseline_mask,
+        stim_mask,
+        baseline_start,
+        baseline_stop,
+        stim_start,
+        stim_stop,
+    ) = _window_masks(
+        t_ms,
+        stim_start_ms=stim_start,
+        stim_stop_ms=stim_stop,
+        baseline_ms=float(baseline_ms),
+    )
+
+    out_sites: Dict[str, Dict[str, Any]] = {}
+    series_count = 0
+    for site_name in sorted(payload.keys(), key=str):
+        if site_filter is not None and site_name not in site_filter:
+            continue
+        vars_raw = payload.get(site_name)
+        if not isinstance(vars_raw, dict):
+            continue
+        site_out: Dict[str, Any] = {}
+        for var_name in sorted(vars_raw.keys(), key=str):
+            if var_filter is not None and var_name not in var_filter:
+                continue
+            values = np.asarray(vars_raw[var_name], dtype=float).ravel()
+            if t_ms.size:
+                n = min(values.size, t_ms.size)
+                vals = values[:n]
+                t_use = t_ms[:n]
+                base = baseline_mask[:n]
+                stim = stim_mask[:n]
+            else:
+                vals = values
+                t_use = np.array([], dtype=float)
+                base = np.zeros(vals.shape, dtype=bool)
+                stim = np.zeros(vals.shape, dtype=bool)
+            site_out[var_name] = _summarize_series_metrics(
+                vals,
+                t_use,
+                baseline_mask=base,
+                stim_mask=stim,
+            )
+            series_count += 1
+        if site_out:
+            out_sites[site_name] = site_out
+
+    dt_mean = None
+    if t_ms.size >= 2:
+        dt_mean = float(np.mean(np.diff(t_ms)))
+
+    return {
+        "available": bool(out_sites),
+        "trial_idx": chosen_trial,
+        "site_count": int(len(out_sites)),
+        "series_count": int(series_count),
+        "time_start_ms": float(t_ms[0]) if t_ms.size else None,
+        "time_stop_ms": float(t_ms[-1]) if t_ms.size else None,
+        "time_n": int(t_ms.size),
+        "time_dt_ms": dt_mean,
+        "stim_start_ms": stim_start,
+        "stim_stop_ms": stim_stop,
+        "baseline_start_ms": baseline_start,
+        "baseline_stop_ms": baseline_stop,
+        "sites": out_sites,
+    }
+
+
+def _flatten_cell_recording_summary(summary: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    flat: Dict[str, Dict[str, Any]] = {}
+    for site, vars_map in (summary.get("sites", {}) or {}).items():
+        if not isinstance(vars_map, dict):
+            continue
+        for var, metrics in vars_map.items():
+            key = f"{site} | {var}"
+            flat[key] = metrics if isinstance(metrics, dict) else {}
+    return flat
+
+
+def format_cell_recording_summary_table(
+    summary: Dict[str, Any],
+    *,
+    title: Optional[str] = None,
+    max_rows: int = 200,
+) -> str:
+    lines: list[str] = []
+    if title:
+        lines.append(f"**{title}**")
+    lines.extend(
+        [
+            "| Site | Variable | n | mean | std | min | max | baseline_mean | stim_mean | stim_delta | stim_peak_abs | stim_auc |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+    rows = 0
+    for site in sorted((summary.get("sites") or {}).keys(), key=str):
+        vars_map = (summary.get("sites") or {}).get(site) or {}
+        for var in sorted(vars_map.keys(), key=str):
+            metrics = vars_map.get(var) or {}
+            lines.append(
+                f"| {site} | {var} | {_format_value(metrics.get('n_finite'))} | "
+                f"{_format_value(metrics.get('mean'))} | {_format_value(metrics.get('std'))} | "
+                f"{_format_value(metrics.get('min'))} | {_format_value(metrics.get('max'))} | "
+                f"{_format_value(metrics.get('baseline_mean'))} | {_format_value(metrics.get('stim_mean'))} | "
+                f"{_format_value(metrics.get('stim_delta_from_baseline'))} | {_format_value(metrics.get('stim_peak_abs'))} | "
+                f"{_format_value(metrics.get('stim_auc'))} |"
+            )
+            rows += 1
+            if max_rows and rows >= int(max_rows):
+                lines.append("| ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |")
+                return "\n".join(lines)
+    if rows == 0:
+        lines.append("| (no cell recordings found) | — | — | — | — | — | — | — | — | — | — | — |")
+    return "\n".join(lines)
+
+
+def format_cell_recording_summary_compare(
+    summary_a: Dict[str, Any],
+    summary_b: Dict[str, Any],
+    *,
+    labels: tuple[str, str] = ("A", "B"),
+    diff_only: bool = True,
+    title: Optional[str] = None,
+) -> str:
+    fields = [
+        "n_finite",
+        "mean",
+        "std",
+        "min",
+        "max",
+        "baseline_mean",
+        "stim_mean",
+        "stim_delta_from_baseline",
+        "stim_peak_abs",
+        "stim_auc",
+    ]
+    flat_a = _flatten_cell_recording_summary(summary_a)
+    flat_b = _flatten_cell_recording_summary(summary_b)
+    return _format_group_field_compare(
+        flat_a,
+        flat_b,
+        fields=fields,
+        labels=labels,
+        groups=None,
+        diff_only=diff_only,
+        title=title,
+    )
+
+
+def _select_trace_trial_series(value: Any, *, trial_idx: Optional[int] = None) -> Optional[np.ndarray]:
+    value = _unwrap_object_scalar(value)
+    if value is None:
+        return None
+    if isinstance(value, np.ndarray):
+        if value.dtype == object:
+            if value.ndim == 0:
+                return _select_trace_trial_series(value.item(), trial_idx=trial_idx)
+            return _select_trace_trial_series(list(value.tolist()), trial_idx=trial_idx)
+        if value.ndim == 1:
+            return np.asarray(value, dtype=float).ravel()
+        idx = 0 if trial_idx is None else int(trial_idx)
+        idx = max(0, min(idx, value.shape[0] - 1))
+        return np.asarray(value[idx], dtype=float).ravel()
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return None
+        first = value[0]
+        if np.isscalar(first):
+            return np.asarray(value, dtype=float).ravel()
+        idx = 0 if trial_idx is None else int(trial_idx)
+        idx = max(0, min(idx, len(value) - 1))
+        return np.asarray(value[idx], dtype=float).ravel()
+    try:
+        return np.asarray(value, dtype=float).ravel()
+    except Exception:
+        return None
+
+
+def summarize_total_synaptic_traces(
+    results: Dict[str, Any],
+    *,
+    trial_idx: Optional[int] = None,
+    baseline_ms: float = 100.0,
+    stim_start_ms: Optional[float] = None,
+    stim_stop_ms: Optional[float] = None,
+) -> Dict[str, Any]:
+    traces = results.get("traces", {}) or {}
+    i_trace = _select_trace_trial_series(traces.get("I"), trial_idx=trial_idx)
+    g_trace = _select_trace_trial_series(traces.get("G"), trial_idx=trial_idx)
+    if i_trace is None and g_trace is None:
+        return {
+            "available": False,
+            "trial_idx": trial_idx,
+            "series": {},
+            "message": "No total synaptic traces (I/G) found in results['traces'].",
+        }
+
+    n_hint = 0
+    if i_trace is not None:
+        n_hint = max(n_hint, int(i_trace.size))
+    if g_trace is not None:
+        n_hint = max(n_hint, int(g_trace.size))
+    t_ms = _resolve_time_axis(results, n_hint=n_hint)
+    if t_ms.size == 0 and n_hint > 0:
+        t_ms = np.arange(n_hint, dtype=float)
+
+    sim_cfg = results.get("sim_cfg", {}) or {}
+    stim_start, stim_stop = _resolve_stim_window(sim_cfg)
+    if stim_start_ms is not None:
+        stim_start = float(stim_start_ms)
+    if stim_stop_ms is not None:
+        stim_stop = float(stim_stop_ms)
+
+    (
+        baseline_mask,
+        stim_mask,
+        baseline_start,
+        baseline_stop,
+        stim_start,
+        stim_stop,
+    ) = _window_masks(
+        t_ms,
+        stim_start_ms=stim_start,
+        stim_stop_ms=stim_stop,
+        baseline_ms=float(baseline_ms),
+    )
+
+    series: Dict[str, Any] = {}
+    for key, arr in (("I", i_trace), ("G", g_trace)):
+        if arr is None:
+            continue
+        n = min(arr.size, t_ms.size) if t_ms.size else arr.size
+        vals = arr[:n]
+        t_use = t_ms[:n] if t_ms.size else np.array([], dtype=float)
+        base = baseline_mask[:n] if baseline_mask.size else np.zeros(n, dtype=bool)
+        stim = stim_mask[:n] if stim_mask.size else np.zeros(n, dtype=bool)
+        series[key] = _summarize_series_metrics(
+            vals,
+            t_use,
+            baseline_mask=base,
+            stim_mask=stim,
+        )
+
+    dt_mean = None
+    if t_ms.size >= 2:
+        dt_mean = float(np.mean(np.diff(t_ms)))
+
+    return {
+        "available": bool(series),
+        "trial_idx": trial_idx,
+        "time_start_ms": float(t_ms[0]) if t_ms.size else None,
+        "time_stop_ms": float(t_ms[-1]) if t_ms.size else None,
+        "time_n": int(t_ms.size),
+        "time_dt_ms": dt_mean,
+        "stim_start_ms": stim_start,
+        "stim_stop_ms": stim_stop,
+        "baseline_start_ms": baseline_start,
+        "baseline_stop_ms": baseline_stop,
+        "series": series,
+    }
+
+
+def format_total_synaptic_trace_table(
+    summary: Dict[str, Any],
+    *,
+    title: Optional[str] = None,
+) -> str:
+    lines: list[str] = []
+    if title:
+        lines.append(f"**{title}**")
+    lines.extend(
+        [
+            "| Trace | n | mean | std | min | max | baseline_mean | stim_mean | stim_delta | stim_peak_abs | stim_auc |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+    rows = 0
+    for key in ("I", "G"):
+        metrics = (summary.get("series") or {}).get(key)
+        if not isinstance(metrics, dict):
+            continue
+        lines.append(
+            f"| {key} | {_format_value(metrics.get('n_finite'))} | {_format_value(metrics.get('mean'))} | "
+            f"{_format_value(metrics.get('std'))} | {_format_value(metrics.get('min'))} | {_format_value(metrics.get('max'))} | "
+            f"{_format_value(metrics.get('baseline_mean'))} | {_format_value(metrics.get('stim_mean'))} | "
+            f"{_format_value(metrics.get('stim_delta_from_baseline'))} | {_format_value(metrics.get('stim_peak_abs'))} | "
+            f"{_format_value(metrics.get('stim_auc'))} |"
+        )
+        rows += 1
+    if rows == 0:
+        lines.append("| (no total synaptic traces found) | — | — | — | — | — | — | — | — | — | — |")
+    return "\n".join(lines)
+
+
+def format_total_synaptic_trace_compare(
+    summary_a: Dict[str, Any],
+    summary_b: Dict[str, Any],
+    *,
+    labels: tuple[str, str] = ("A", "B"),
+    diff_only: bool = True,
+    title: Optional[str] = None,
+) -> str:
+    fields = [
+        "n_finite",
+        "mean",
+        "std",
+        "min",
+        "max",
+        "baseline_mean",
+        "stim_mean",
+        "stim_delta_from_baseline",
+        "stim_peak_abs",
+        "stim_auc",
+    ]
+    a_map = (summary_a.get("series") or {}) if isinstance(summary_a, dict) else {}
+    b_map = (summary_b.get("series") or {}) if isinstance(summary_b, dict) else {}
+    return _format_group_field_compare(
+        a_map,
+        b_map,
+        fields=fields,
+        labels=labels,
+        groups=None,
+        diff_only=diff_only,
+        title=title,
+    )
+
+
 def load_inputs_sample(run_dir: Union[str, Path]) -> Dict[str, Any]:
     """
     Load inputs_sample.pkl from a run directory (or run/results).

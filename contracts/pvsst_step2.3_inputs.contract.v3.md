@@ -66,6 +66,12 @@ Required keys (normalized in `_normalize_sim_config`):
 - `tstart: float` – simulation start time [ms].
 - `tstop: float` – simulation end time [ms].
 - `jitter: float | null` – reserved for future jitter logic; currently unused in core modes.
+- `cell_recording: dict | bool | str | null` (optional) – normalized recording spec used by runtime simulation.
+  - `enabled: bool`
+  - `n_trials: int` (normalized trace/sample cap; merged with legacy `sim.n_traces_to_save`)
+  - `sites: list` of section targets (`"soma[0](0.5)"` or `{"sec","idx","x"}`)
+  - `vars: dict` toggles (`v`, `i_cap`, ion/mechanism current classes, etc.)
+  - Back-compat aliases accepted in raw sim config: `rec_sec_list`, `rec_var_toggles` / `rec_vars`.
 
 #### 1.1.2 `synapse_groups` block
 

@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Mapping, Tuple
 import json, copy, os, pickle, math, random, time, sys, hashlib
+import re
 import numpy as np
 import matplotlib.pyplot as plt
 from neuron import h, gui  # gui not needed in headless scripts
@@ -234,6 +235,188 @@ def _get_soma_segment(cell):
     raise AttributeError("run_sim: could not find soma on cell or cell.h")
 
 
+_SITE_SPEC_RE = re.compile(
+    r"^(?P<sec>[A-Za-z_]\w*)(?:\[(?P<idx>\d+)\])?(?:\((?P<x>[-+]?(?:\d+(?:\.\d*)?|\.\d+))\))?$"
+)
+
+
+def _parse_bool_like(value: Any, *, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in {"true", "1", "yes", "on"}:
+            return True
+        if v in {"false", "0", "no", "off", ""}:
+            return False
+    return bool(value)
+
+
+def _normalize_runtime_recording_site(site_raw: Any) -> Dict[str, Any]:
+    if isinstance(site_raw, str):
+        m = _SITE_SPEC_RE.match(site_raw.strip())
+        if not m:
+            raise ValueError(
+                f"run_cell: invalid site spec {site_raw!r}; expected 'sec', 'sec[idx]' or 'sec[idx](x)'"
+            )
+        return {
+            "sec": m.group("sec"),
+            "idx": int(m.group("idx") or 0),
+            "x": float(m.group("x") or 0.5),
+        }
+    if isinstance(site_raw, (list, tuple)):
+        if not site_raw:
+            raise ValueError("run_cell: empty site list/tuple is invalid")
+        site_raw = {
+            "sec": site_raw[0],
+            "idx": site_raw[1] if len(site_raw) > 1 else 0,
+            "x": site_raw[2] if len(site_raw) > 2 else 0.5,
+        }
+    if not isinstance(site_raw, dict):
+        raise TypeError(
+            f"run_cell: site must be string/dict/[sec,idx,x] (got {type(site_raw)!r})"
+        )
+
+    sec = site_raw.get("sec", site_raw.get("section", site_raw.get("name")))
+    if sec in (None, ""):
+        raise ValueError("run_cell: site is missing 'sec' (or 'section'/'name')")
+    idx_raw = site_raw.get("idx", site_raw.get("index", 0))
+    x_raw = site_raw.get("x", 0.5)
+    label = site_raw.get("label")
+
+    idx = int(idx_raw)
+    x = float(x_raw)
+    if idx < 0:
+        raise ValueError(f"run_cell: site idx must be >= 0 (got {idx})")
+    if x < 0.0 or x > 1.0:
+        raise ValueError(f"run_cell: site x must be in [0, 1] (got {x})")
+
+    out = {"sec": str(sec), "idx": idx, "x": x}
+    if label not in (None, ""):
+        out["label"] = str(label)
+    return out
+
+
+def _get_cell_recording_cfg(sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    default_vars = {
+        "v": True,
+        "i_cap": False,
+        "ion_currents": False,
+        "mech_currents": False,
+        "ion_concentrations": False,
+        "ion_reversals": False,
+        "mech_conductances": False,
+        "mech_states": False,
+    }
+    cfg_raw = sim_cfg.get("cell_recording", {})
+    if cfg_raw is None:
+        cfg_raw = {}
+    if isinstance(cfg_raw, (bool, str)):
+        cfg_raw = {"enabled": cfg_raw}
+    if not isinstance(cfg_raw, dict):
+        raise TypeError("run_cell: sim_cfg['cell_recording'] must be a dict/bool/string")
+
+    enabled = _parse_bool_like(cfg_raw.get("enabled", False), default=False)
+    vars_raw = cfg_raw.get("vars", {}) or {}
+    if not isinstance(vars_raw, dict):
+        raise TypeError("run_cell: sim_cfg['cell_recording']['vars'] must be a dict")
+
+    vars_cfg = dict(default_vars)
+    for key, val in vars_raw.items():
+        if key not in vars_cfg:
+            allowed = ", ".join(sorted(vars_cfg.keys()))
+            raise ValueError(
+                f"run_cell: unknown cell_recording vars key {key!r}; allowed: {allowed}"
+            )
+        vars_cfg[key] = _parse_bool_like(val, default=vars_cfg[key])
+
+    sites_raw = cfg_raw.get("sites", [{"sec": "soma", "idx": 0, "x": 0.5}])
+    if isinstance(sites_raw, (str, dict, tuple)):
+        sites_raw = [sites_raw]
+    if not isinstance(sites_raw, list):
+        raise TypeError("run_cell: sim_cfg['cell_recording']['sites'] must be a list")
+    if not sites_raw:
+        sites_raw = [{"sec": "soma", "idx": 0, "x": 0.5}]
+
+    sites = [_normalize_runtime_recording_site(site) for site in sites_raw]
+    n_trials_raw = cfg_raw.get("n_trials", cfg_raw.get("n_traces_to_save", None))
+    if n_trials_raw is None:
+        n_trials_raw = sim_cfg.get("n_traces_to_save", 1)
+    try:
+        n_trials = int(n_trials_raw)
+    except Exception:
+        n_trials = int(sim_cfg.get("n_traces_to_save", 1))
+    if n_trials < 0:
+        n_trials = 0
+    return {"enabled": bool(enabled), "n_trials": int(n_trials), "vars": vars_cfg, "sites": sites}
+
+
+def _resolve_recording_site(cell: Any, site: Dict[str, Any]) -> Tuple[Any, str]:
+    hoc = _get_hoc(cell)
+    sec_name = str(site["sec"])
+    if not hasattr(hoc, sec_name):
+        raise ValueError(f"run_cell: section list '{sec_name}' not found on cell")
+    sec_list = getattr(hoc, sec_name)
+    idx = int(site["idx"])
+    if idx < 0 or idx >= len(sec_list):
+        raise ValueError(
+            f"run_cell: section index out of range for '{sec_name}' (idx={idx}, n={len(sec_list)})"
+        )
+    x = float(site["x"])
+    seg = sec_list[idx](x)
+    default_label = f"{sec_name}[{idx}]({x:.3f})"
+    return seg, str(site.get("label", default_label))
+
+
+def _build_cell_recorders_for_site(seg: Any, vars_cfg: Dict[str, bool]) -> Dict[str, Any]:
+    recorders: Dict[str, Any] = {}
+
+    if vars_cfg.get("v", True) and hasattr(seg, "_ref_v"):
+        recorders["v"] = h.Vector().record(seg._ref_v)
+    if vars_cfg.get("i_cap", False) and hasattr(seg, "_ref_i_cap"):
+        recorders["i_cap"] = h.Vector().record(seg._ref_i_cap)
+
+    if vars_cfg.get("ion_currents", False):
+        for name in ("ina", "ik", "ica", "ih"):
+            ref_name = f"_ref_{name}"
+            if hasattr(seg, ref_name):
+                recorders[name] = h.Vector().record(getattr(seg, ref_name))
+
+    if vars_cfg.get("ion_concentrations", False):
+        for name in ("nai", "ki", "cai", "nao", "ko", "cao"):
+            ref_name = f"_ref_{name}"
+            if hasattr(seg, ref_name):
+                recorders[name] = h.Vector().record(getattr(seg, ref_name))
+
+    if vars_cfg.get("ion_reversals", False):
+        for name in ("ena", "ek", "eca"):
+            ref_name = f"_ref_{name}"
+            if hasattr(seg, ref_name):
+                recorders[name] = h.Vector().record(getattr(seg, ref_name))
+
+    if vars_cfg.get("mech_currents", False) or vars_cfg.get("mech_conductances", False) or vars_cfg.get("mech_states", False):
+        density_mechs = seg.sec.psection().get("density_mechs", {})
+        for mech in sorted(density_mechs.keys()):
+            attr = getattr(seg, mech, None)
+            if attr is None:
+                continue
+            for param in sorted(density_mechs[mech].keys()):
+                want = False
+                if vars_cfg.get("mech_currents", False) and param.startswith("i"):
+                    want = True
+                elif vars_cfg.get("mech_conductances", False) and param.startswith("g"):
+                    want = True
+                elif vars_cfg.get("mech_states", False) and not param.startswith("i") and not param.startswith("g"):
+                    want = True
+                if not want:
+                    continue
+                ref_name = f"_ref_{param}"
+                if hasattr(attr, ref_name):
+                    recorders[f"{mech}.{param}"] = h.Vector().record(getattr(attr, ref_name))
+
+    return recorders
+
+
 def run_cell(cell, sim_cfg):
     sim_traces = {}
 
@@ -247,6 +430,20 @@ def run_cell(cell, sim_cfg):
     if hasattr(cell, "synapses") and len(cell.synapses) > 0:
         isynvec = h.Vector().record(cell.synapses[0]._ref_i)
         gsynvec = h.Vector().record(cell.synapses[0]._ref_g)
+
+    cell_recording_cfg = _get_cell_recording_cfg(sim_cfg)
+    cell_recorders: Dict[str, Dict[str, Any]] = {}
+    if cell_recording_cfg.get("enabled", False):
+        for site in cell_recording_cfg.get("sites", []):
+            seg, label = _resolve_recording_site(cell, site)
+            label_base = label
+            dupe_idx = 2
+            while label in cell_recorders:
+                label = f"{label_base}#{dupe_idx}"
+                dupe_idx += 1
+            site_recorders = _build_cell_recorders_for_site(seg, cell_recording_cfg.get("vars", {}))
+            if site_recorders:
+                cell_recorders[label] = site_recorders
 
     # Simulation parameters (ms)
     dt     = float(sim_cfg.get("dt", 0.025))
@@ -266,6 +463,11 @@ def run_cell(cell, sim_cfg):
     if isynvec is not None:
         sim_traces["I"] = np.array(isynvec)
         sim_traces["G"] = np.array(gsynvec)
+    if cell_recorders:
+        sim_traces["cell_recordings"] = {
+            site: {name: np.array(vec) for name, vec in recs.items()}
+            for site, recs in cell_recorders.items()
+        }
 
     return sim_traces
 
@@ -609,10 +811,36 @@ def _snapshot_synapse_params(
     return snapshot
 
 
+def _resolve_trace_trials_to_save(sim_cfg: Dict[str, Any], fallback: int) -> int:
+    raw = None
+    cell_rec = sim_cfg.get("cell_recording")
+    if isinstance(cell_rec, dict):
+        raw = cell_rec.get("n_trials", None)
+    if raw is None:
+        raw = sim_cfg.get("n_traces_to_save", fallback)
+    try:
+        n = int(raw)
+    except Exception:
+        return max(0, int(fallback))
+    if n < 0:
+        return max(0, int(fallback))
+    return max(0, n)
+
+
+def _set_trace_trials_to_save(sim_cfg: Dict[str, Any], n_traces: int) -> None:
+    n = max(0, int(n_traces))
+    sim_cfg["n_traces_to_save"] = n
+    cell_rec = sim_cfg.get("cell_recording")
+    if isinstance(cell_rec, dict):
+        cell_rec = dict(cell_rec)
+        cell_rec["n_trials"] = n
+        sim_cfg["cell_recording"] = cell_rec
+
+
 def _resolve_inputs_to_save(sim_cfg: Dict[str, Any], n_trials: int, fallback: int) -> int:
     raw = sim_cfg.get("n_inputs_to_save", None)
     if raw is None:
-        raw = sim_cfg.get("n_traces_to_save", fallback)
+        raw = _resolve_trace_trials_to_save(sim_cfg, fallback=fallback)
     if isinstance(raw, str):
         if raw.strip().lower() in ("all",):
             return max(0, int(n_trials))
@@ -825,10 +1053,12 @@ def run_single(
     if snapshot_enabled:
         _apply_snapshot_deterministic(sim_cfg_local, snapshot_cfg)
     trial_rng = rm.trial(0) if rm is not None else None
-    n_traces_to_save = int(sim_cfg_local.get("n_traces_to_save", 1))
+    n_traces_to_save = _resolve_trace_trials_to_save(sim_cfg_local, fallback=1)
     if snapshot_enabled and snapshot_cfg.get("save_all_traces", True):
         n_traces_to_save = max(n_traces_to_save, 1)
-        sim_cfg_local["n_traces_to_save"] = n_traces_to_save
+        _set_trace_trials_to_save(sim_cfg_local, n_traces_to_save)
+    else:
+        _set_trace_trials_to_save(sim_cfg_local, n_traces_to_save)
     n_inputs_to_save = _resolve_inputs_to_save(sim_cfg_local, 1, n_traces_to_save)
     tstart = float(sim_cfg_local.get("tstart", 0.0))
     tstop = float(sim_cfg_local.get("tstop", tstart))
@@ -872,6 +1102,7 @@ def run_single(
     T = np.asarray(sim_traces.get("T", []), dtype=float)
     V = np.asarray(sim_traces.get("V", []), dtype=float)
     spikes = _detect_spikes(T, V) if T.size and V.size else np.array([], dtype=float)
+    cell_recordings = sim_traces.get("cell_recordings")
 
     traces_out: Dict[str, Any] = {}
     if n_traces_to_save > 0 and T.size and V.size:
@@ -892,6 +1123,7 @@ def run_single(
         "sim_cfg": sim_cfg_local,
         "spikes": spikes,
         "traces": traces_out,
+        "cell_recordings": cell_recordings,
         "syn_records": syn_records,
         "syn_records_by_trial": syn_records_by_trial,
         "inputs": inputs_out,
@@ -942,7 +1174,7 @@ def run_multi(
         "spikes": [np.ndarray, ...],      # one per trial
         "traces": {
            "T": 1D np.ndarray,
-           "V": [np.ndarray, ...]         # up to n_traces_to_save entries
+           "V": [np.ndarray, ...]         # up to cell_recording.n_trials (legacy: n_traces_to_save)
         } or {},
         "meta": {
            "n_trials": int,
@@ -955,10 +1187,12 @@ def run_multi(
     if snapshot_enabled:
         _apply_snapshot_deterministic(sim_cfg_local, snapshot_cfg)
     n_trials = int(sim_cfg_local.get("n_trials", 1))
-    n_traces_to_save = int(sim_cfg_local.get("n_traces_to_save", 1))
+    n_traces_to_save = _resolve_trace_trials_to_save(sim_cfg_local, fallback=1)
     if snapshot_enabled and snapshot_cfg.get("save_all_traces", True):
         n_traces_to_save = max(n_traces_to_save, n_trials)
-        sim_cfg_local["n_traces_to_save"] = n_traces_to_save
+        _set_trace_trials_to_save(sim_cfg_local, n_traces_to_save)
+    else:
+        _set_trace_trials_to_save(sim_cfg_local, n_traces_to_save)
     trial_offset = int(sim_cfg_local.get("trial_offset", 0) or 0)
 
     regen_inputs = _as_bool(sim_cfg_local.get("regen_inputs_each_trial", True), default=True)
@@ -977,6 +1211,7 @@ def run_multi(
 
     spikes_by_trial: List[np.ndarray] = []
     trace_V_store: List[np.ndarray] = []
+    cell_recordings_store: List[Dict[str, Any]] = []
     T_ref: Optional[np.ndarray] = None
     input_summaries: List[Dict[str, Any]] = []
     inputs_store: List[Dict[str, Any]] = []
@@ -1077,6 +1312,13 @@ def run_multi(
             if T_ref is None:
                 T_ref = T
             trace_V_store.append(V)
+            if sim_traces.get("cell_recordings") is not None:
+                cell_recordings_store.append(
+                    {
+                        "trial_idx": trial_idx,
+                        "recordings": sim_traces.get("cell_recordings"),
+                    }
+                )
 
         if trial_callback is not None:
             try:
@@ -1159,6 +1401,7 @@ def run_multi(
         "sim_cfg": sim_cfg_local,
         "spikes": spikes_by_trial,
         "traces": traces_out,
+        "cell_recordings_by_trial": cell_recordings_store if cell_recordings_store else None,
         "inputs_by_trial": inputs_store if inputs_store else None,
         "syn_records_by_trial": syn_records_by_trial if syn_records_by_trial else None,
         "meta": {
@@ -1441,6 +1684,20 @@ def _save_sidecars(results: Dict[str, Any], run_dir: Path) -> Dict[str, str]:
             )
         files["traces"] = "traces.npz"
 
+    cell_recordings = results.get("cell_recordings")
+    if cell_recordings is not None:
+        cell_rec_path = run_dir / "cell_recordings.pkl"
+        with cell_rec_path.open("wb") as f:
+            pickle.dump(cell_recordings, f)
+        files["cell_recordings"] = "cell_recordings.pkl"
+
+    cell_recordings_by_trial = results.get("cell_recordings_by_trial")
+    if cell_recordings_by_trial:
+        cell_rec_trial_path = run_dir / "cell_recordings_by_trial.pkl"
+        with cell_rec_trial_path.open("wb") as f:
+            pickle.dump(cell_recordings_by_trial, f)
+        files["cell_recordings_by_trial"] = "cell_recordings_by_trial.pkl"
+
     inputs_payload = {}
     if results.get("inputs") is not None:
         inputs_payload["inputs"] = results.get("inputs")
@@ -1526,11 +1783,17 @@ def save_results(
                 payload["V"] = traces["V"]
             if spikes is not None:
                 payload["spikes"] = spikes
+            if results.get("cell_recordings") is not None:
+                payload["cell_recordings"] = np.array(results.get("cell_recordings"), dtype=object)
         elif mode == "multi":
             if spikes is not None:
                 payload["spikes"] = np.array(spikes, dtype=object)
             if "V" in traces:
                 payload["V_trials"] = np.array(traces["V"], dtype=object)
+            if results.get("cell_recordings_by_trial") is not None:
+                payload["cell_recordings_by_trial"] = np.array(
+                    results.get("cell_recordings_by_trial"), dtype=object
+                )
 
         np.savez(out_path, **payload)
         manifest["files"]["results_npz"] = out_path.name
@@ -1600,6 +1863,7 @@ def _ensure_multi_results(results: Dict[str, Any]) -> Dict[str, Any]:
     sim_cfg = copy.deepcopy(results.get("sim_cfg", {}))
     traces = results.get("traces", {}) or {}
     inputs = results.get("inputs", None)
+    cell_recordings = results.get("cell_recordings", None)
 
     spikes = results.get("spikes", None)
     spikes_list = [spikes] if spikes is not None else []
@@ -1609,6 +1873,7 @@ def _ensure_multi_results(results: Dict[str, Any]) -> Dict[str, Any]:
         "sim_cfg": sim_cfg,
         "spikes": spikes_list,
         "traces": {},
+        "cell_recordings_by_trial": None,
         "inputs_by_trial": None,
         "meta": copy.deepcopy(results.get("meta", {})),
     }
@@ -1618,6 +1883,10 @@ def _ensure_multi_results(results: Dict[str, Any]) -> Dict[str, Any]:
 
     if inputs:
         multi["inputs_by_trial"] = [{"trial_idx": 0, "inputs": inputs}]
+    if cell_recordings is not None:
+        multi["cell_recordings_by_trial"] = [
+            {"trial_idx": 0, "recordings": cell_recordings}
+        ]
 
     meta = multi.setdefault("meta", {})
     meta["n_trials"] = len(spikes_list)
@@ -1648,11 +1917,17 @@ def _write_results_file(results: Dict[str, Any], out_path: Path, fmt: str) -> No
                 payload["V"] = traces["V"]
             if spikes is not None:
                 payload["spikes"] = spikes
+            if results.get("cell_recordings") is not None:
+                payload["cell_recordings"] = np.array(results.get("cell_recordings"), dtype=object)
         elif mode == "multi":
             if spikes is not None:
                 payload["spikes"] = np.array(spikes, dtype=object)
             if "V" in traces:
                 payload["V_trials"] = np.array(traces["V"], dtype=object)
+            if results.get("cell_recordings_by_trial") is not None:
+                payload["cell_recordings_by_trial"] = np.array(
+                    results.get("cell_recordings_by_trial"), dtype=object
+                )
 
         np.savez(out_path, **payload)
     else:
@@ -1804,7 +2079,7 @@ def append_multi_results(
     new_traces  = new_results.get("traces", {}) or {}
     T_base = base_traces.get("T")
     T_new  = new_traces.get("T")
-    max_traces = int(sim_cfg.get("n_traces_to_save", 1))
+    max_traces = _resolve_trace_trials_to_save(sim_cfg, fallback=1)
     max_inputs = _resolve_inputs_to_save(sim_cfg, n_trials, max_traces)
 
     if max_traces <= 0:
@@ -1847,6 +2122,24 @@ def append_multi_results(
                 _offset_trial_idx(new_entry, base_trial_count, idx)
             dst_inputs.append(new_entry)
         merged["inputs_by_trial"] = dst_inputs if dst_inputs else None
+
+    def _merge_cell_recordings_by_trial() -> None:
+        if max_traces <= 0:
+            merged["cell_recordings_by_trial"] = None
+            return
+        dst_recs = list(merged.get("cell_recordings_by_trial") or [])[:max_traces]
+        src_recs = new_results.get("cell_recordings_by_trial") or []
+        if not src_recs:
+            merged["cell_recordings_by_trial"] = dst_recs if dst_recs else None
+            return
+        for idx, entry in enumerate(src_recs):
+            if len(dst_recs) >= max_traces:
+                break
+            new_entry = copy.deepcopy(entry)
+            if isinstance(new_entry, dict):
+                _offset_trial_idx(new_entry, base_trial_count, idx)
+            dst_recs.append(new_entry)
+        merged["cell_recordings_by_trial"] = dst_recs if dst_recs else None
 
     def _merge_input_summaries() -> None:
         src_meta = new_results.get("meta", {}) or {}
@@ -1949,6 +2242,7 @@ def append_multi_results(
     appended = len(new_spikes)
     meta["appended_trials"] = meta.get("appended_trials", 0) + appended
     _merge_inputs_by_trial()
+    _merge_cell_recordings_by_trial()
     _merge_input_summaries()
     _merge_input_stats()
     _recompute_avg_rate()
@@ -2017,6 +2311,15 @@ def _load_from_manifest(manifest_path: Path) -> Dict[str, Any]:
             if "V" in tr.files:
                 traces["V"] = tr["V"]
 
+    cell_recordings = None
+    if files.get("cell_recordings"):
+        with (run_dir / files["cell_recordings"]).open("rb") as f:
+            cell_recordings = pickle.load(f)
+    cell_recordings_by_trial = None
+    if files.get("cell_recordings_by_trial"):
+        with (run_dir / files["cell_recordings_by_trial"]).open("rb") as f:
+            cell_recordings_by_trial = pickle.load(f)
+
     inputs_payload = None
     if files.get("inputs_sample"):
         with (run_dir / files["inputs_sample"]).open("rb") as f:
@@ -2047,6 +2350,10 @@ def _load_from_manifest(manifest_path: Path) -> Dict[str, Any]:
         results["syn_records"] = syn_records
     if syn_records_by_trial is not None:
         results["syn_records_by_trial"] = syn_records_by_trial
+    if cell_recordings is not None:
+        results["cell_recordings"] = cell_recordings
+    if cell_recordings_by_trial is not None:
+        results["cell_recordings_by_trial"] = cell_recordings_by_trial
 
     return results
 
@@ -2079,6 +2386,8 @@ def load_results(path: Union[str, Path]) -> Dict[str, Any]:
 
         traces: Dict[str, Any] = {}
         spikes = None
+        cell_recordings = None
+        cell_recordings_by_trial = None
 
         if "T" in data.files:
             traces["T"] = data["T"]
@@ -2088,19 +2397,31 @@ def load_results(path: Union[str, Path]) -> Dict[str, Any]:
                 traces["V"] = data["V"]
             if "spikes" in data.files:
                 spikes = data["spikes"]
+            if "cell_recordings" in data.files:
+                try:
+                    cell_recordings = data["cell_recordings"].item()
+                except Exception:
+                    cell_recordings = data["cell_recordings"]
         elif mode == "multi":
             if "V_trials" in data.files:
                 traces["V"] = list(data["V_trials"])
             if "spikes" in data.files:
                 spikes = list(data["spikes"])
+            if "cell_recordings_by_trial" in data.files:
+                cell_recordings_by_trial = list(data["cell_recordings_by_trial"])
 
-        return {
+        out = {
             "mode": mode,
             "sim_cfg": sim_cfg,
             "traces": traces,
             "spikes": spikes,
             "meta": meta,
         }
+        if cell_recordings is not None:
+            out["cell_recordings"] = cell_recordings
+        if cell_recordings_by_trial is not None:
+            out["cell_recordings_by_trial"] = cell_recordings_by_trial
+        return out
 
     with p.open("rb") as f:
         payload = pickle.load(f)

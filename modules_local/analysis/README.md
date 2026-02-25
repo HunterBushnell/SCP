@@ -10,6 +10,15 @@ This folder holds the analysis helpers used by `6_analysis.ipynb`.
 - `analysis_defaults.json`: default UI/options (used by `6_analysis.ipynb`)
 - `analysis_presets/`: optional presets (ex: `paper_compare.json`)
 
+## Recording summaries
+- `analysis.summarize_cell_recordings(results, ...)`: per-site/per-variable summary for `cell_recordings`.
+- `analysis.summarize_total_synaptic_traces(results, ...)`: summary for total synaptic `I`/`G` traces (if saved).
+- Formatting helpers:
+  - `analysis.format_cell_recording_summary_table(...)`
+  - `analysis.format_cell_recording_summary_compare(...)`
+  - `analysis.format_total_synaptic_trace_table(...)`
+  - `analysis.format_total_synaptic_trace_compare(...)`
+
 ## Defaults + presets
 - Defaults are loaded in `6_analysis.ipynb` from `modules_local/analysis/analysis_defaults.json`.
 - Presets can be toggled via the Outputs UI (Paper compare) or set in the JSON.

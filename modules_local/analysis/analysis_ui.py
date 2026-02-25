@@ -69,6 +69,7 @@ HELP_EXTRA = textwrap.dedent(
     - Compare outputs/inputs: reuse plot logic with the current selection.
     - Input sampling: synthesize input curves from synapse configs.
     - Snapshot compare: compare notebook vs slurm outputs.
+    - Recording tables: summarize cell-recorded traces and total synaptic I/G.
     """
 ).strip()
 
@@ -4687,6 +4688,14 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         value=bool(g.get("extra_compare_synapse_tables", True)),
         description="Synapse tables",
     )
+    cfg_rec_cb = widgets.Checkbox(
+        value=bool(g.get("extra_recording_tables", True)),
+        description="Recording tables",
+    )
+    cfg_rec_cmp_cb = widgets.Checkbox(
+        value=bool(g.get("extra_compare_recording_tables", True)),
+        description="Recording compare",
+    )
     cfg_diff_cb = widgets.Checkbox(
         value=bool(g.get("extra_compare_diff_only", True)),
         description="Diff only",
@@ -4756,8 +4765,8 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
     out_extra = widgets.Output()
 
     cfg_box = widgets.VBox([
-        widgets.HBox([cfg_cell_cb, cfg_geom_cb, cfg_syn_cb, cfg_diff_cb]),
-        widgets.HBox([syn_weight_cb, syn_dist_cb, syn_density_cb]),
+        widgets.HBox([cfg_cell_cb, cfg_geom_cb, cfg_syn_cb, cfg_rec_cb, cfg_diff_cb]),
+        widgets.HBox([cfg_rec_cmp_cb, syn_weight_cb, syn_dist_cb, syn_density_cb]),
         widgets.HBox([syn_groups_txt, syn_weight_bin_txt, syn_dist_bin_txt]),
     ])
     def _initial_metrics_ref_options() -> list[str]:
@@ -5026,6 +5035,8 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         g["extra_compare_cell_tables"] = cfg_cell_cb.value
         g["extra_compare_geometry_tables"] = cfg_geom_cb.value
         g["extra_compare_synapse_tables"] = cfg_syn_cb.value
+        g["extra_recording_tables"] = cfg_rec_cb.value
+        g["extra_compare_recording_tables"] = cfg_rec_cmp_cb.value
         g["extra_compare_diff_only"] = cfg_diff_cb.value
 
         g["extra_synapse_weight_plot"] = syn_weight_cb.value
@@ -5273,29 +5284,42 @@ def _list_groups_for_sampling(path: Optional[Path]) -> list[str]:
 
 def run_extra_tables_from_globals(g: Dict[str, Any]) -> None:
     sel, run_dir, res = resolve_single_from_globals(g)
-    if not g.get("load_cell_for_analysis"):
-        print("Cell loading disabled; enable load_cell_for_analysis to run this section.")
-        return
+    load_cell = bool(g.get("load_cell_for_analysis"))
+    need_cell = bool(g.get("extra_cell_tables") or g.get("extra_geometry_tables") or g.get("extra_synapse_tables"))
+    cell = None
+    geom = None
+    geom_cfg = None
 
-    tune_dir = (g.get("CELLS_DIR") / sel["cell"] / sel["tunes"] / sel["model"]).resolve()
-    try:
-        cell, geom, geom_cfg = analysis.load_cell_and_geometry(tune_dir)
-    except Exception as exc:
-        print("Cell/geometry load failed:", exc)
-        return
+    if load_cell and need_cell:
+        tune_dir = (g.get("CELLS_DIR") / sel["cell"] / sel["tunes"] / sel["model"]).resolve()
+        try:
+            cell, geom, geom_cfg = analysis.load_cell_and_geometry(tune_dir)
+        except Exception as exc:
+            print("Cell/geometry load failed:", exc)
+    elif need_cell and not load_cell:
+        if g.get("extra_cell_tables"):
+            print("Cell tables skipped: set load_cell_for_analysis=True to enable.")
+        if g.get("extra_geometry_tables"):
+            print("Geometry tables skipped: set load_cell_for_analysis=True to enable.")
 
     if g.get("extra_cell_tables"):
-        cell_sections = analysis.summarize_cell_sections(cell)
-        mech_summary = analysis.summarize_mechanisms(cell)
-        show_md(analysis.format_section_summary_table(cell_sections, title=f"{analysis.run_label(run_dir)} cell sections"))
-        show_md(analysis.format_mechanism_summary_table(mech_summary, title="Mechanisms (per section group)"))
-        analysis.save_json(cell_sections, analysis.analysis_dir_for_run(run_dir) / "cell_sections.json", enabled=bool(g.get("save_analysis", False)))
-        analysis.save_json(mech_summary, analysis.analysis_dir_for_run(run_dir) / "cell_mechanisms.json", enabled=bool(g.get("save_analysis", False)))
+        if cell is None:
+            print("Cell tables skipped: cell object not available.")
+        else:
+            cell_sections = analysis.summarize_cell_sections(cell)
+            mech_summary = analysis.summarize_mechanisms(cell)
+            show_md(analysis.format_section_summary_table(cell_sections, title=f"{analysis.run_label(run_dir)} cell sections"))
+            show_md(analysis.format_mechanism_summary_table(mech_summary, title="Mechanisms (per section group)"))
+            analysis.save_json(cell_sections, analysis.analysis_dir_for_run(run_dir) / "cell_sections.json", enabled=bool(g.get("save_analysis", False)))
+            analysis.save_json(mech_summary, analysis.analysis_dir_for_run(run_dir) / "cell_mechanisms.json", enabled=bool(g.get("save_analysis", False)))
 
     if g.get("extra_geometry_tables"):
-        geom_summary = analysis.summarize_geometry(geom, geom_config=geom_cfg)
-        show_md(analysis.format_geometry_summary_table(geom_summary, title="Geometry distances"))
-        analysis.save_json(geom_summary, analysis.analysis_dir_for_run(run_dir) / "geometry_summary.json", enabled=bool(g.get("save_analysis", False)))
+        if geom is None:
+            print("Geometry tables skipped: geometry object not available.")
+        else:
+            geom_summary = analysis.summarize_geometry(geom, geom_config=geom_cfg)
+            show_md(analysis.format_geometry_summary_table(geom_summary, title="Geometry distances"))
+            analysis.save_json(geom_summary, analysis.analysis_dir_for_run(run_dir) / "geometry_summary.json", enabled=bool(g.get("save_analysis", False)))
 
     if g.get("extra_synapse_tables"):
         syn_summary = analysis.summarize_synapse_records(
@@ -5308,6 +5332,29 @@ def run_extra_tables_from_globals(g: Dict[str, Any]) -> None:
             analysis.save_json(syn_summary, analysis.analysis_dir_for_run(run_dir) / "synapse_summary.json", enabled=bool(g.get("save_analysis", False)))
         else:
             print("No synapse records found for this run.")
+
+    if g.get("extra_recording_tables", True):
+        cell_rec_summary = analysis.summarize_cell_recordings(res)
+        syn_trace_summary = analysis.summarize_total_synaptic_traces(res)
+        any_recordings = False
+        if cell_rec_summary.get("available"):
+            any_recordings = True
+            show_md(analysis.format_cell_recording_summary_table(cell_rec_summary, title="Cell recordings summary"))
+            analysis.save_json(
+                cell_rec_summary,
+                analysis.analysis_dir_for_run(run_dir) / "cell_recording_summary.json",
+                enabled=bool(g.get("save_analysis", False)),
+            )
+        if syn_trace_summary.get("available"):
+            any_recordings = True
+            show_md(analysis.format_total_synaptic_trace_table(syn_trace_summary, title="Total synaptic trace summary"))
+            analysis.save_json(
+                syn_trace_summary,
+                analysis.analysis_dir_for_run(run_dir) / "syn_trace_summary.json",
+                enabled=bool(g.get("save_analysis", False)),
+            )
+        if not any_recordings:
+            print("No cell_recordings or total synaptic I/G traces found for this run.")
 
 
 def run_extra_compare_from_globals(g: Dict[str, Any]) -> None:
@@ -5388,6 +5435,33 @@ def run_extra_compare_from_globals(g: Dict[str, Any]) -> None:
                 title="Synapse summary",
             )
         )
+
+    if g.get("extra_compare_recording_tables", True):
+        cell_rec_a = analysis.summarize_cell_recordings(res_a)
+        cell_rec_b = analysis.summarize_cell_recordings(res_b)
+        if cell_rec_a.get("available") or cell_rec_b.get("available"):
+            show_md(
+                analysis.format_cell_recording_summary_compare(
+                    cell_rec_a,
+                    cell_rec_b,
+                    labels=(label_a, label_b),
+                    diff_only=g.get("extra_compare_diff_only"),
+                    title="Cell recording summary",
+                )
+            )
+
+        syn_trace_a = analysis.summarize_total_synaptic_traces(res_a)
+        syn_trace_b = analysis.summarize_total_synaptic_traces(res_b)
+        if syn_trace_a.get("available") or syn_trace_b.get("available"):
+            show_md(
+                analysis.format_total_synaptic_trace_compare(
+                    syn_trace_a,
+                    syn_trace_b,
+                    labels=(label_a, label_b),
+                    diff_only=g.get("extra_compare_diff_only"),
+                    title="Total synaptic traces (I/G)",
+                )
+            )
 
     if g.get("extra_synapse_weight_plot") or g.get("extra_synapse_distance_plot"):
         syn_groups = g.get("extra_synapse_groups")

@@ -18,12 +18,12 @@ SCP results and outputs contract (v1)
   * **Run folder:** `{tune_dir}/output_data/<output_stem>/`
   * **Manifest:** `run_manifest.json` (authoritative index)
   * **Sidecars (default):** `sim_cfg.json`, `meta.json`, `syn_config.json`, `spikes.npz`, `traces.npz`, etc.
-    * Optional snapshot extras: `syn_records_by_trial.pkl`, `cell_config.json`, `geometry_config.json`.
+    * Optional snapshot extras: `syn_records_by_trial.pkl`, `cell_recordings_by_trial.pkl`, `cell_config.json`, `geometry_config.json`.
   * **Plots (optional):** `plots/output_plot.png`, `plots/inputs_mean.png`, etc. (only when `save_plots: true`).
   * **Full results bundle (default off; set `save_full_results: true` to write):**
     * `{cell}_{tune}_{output_stem}.{pkl|npz}`
     * Written only if `save_full_results: true`.
-    * `npz` is compact (mode, sim_cfg_json, meta_json, T, V/V_trials, spikes).
+    * `npz` is compact (mode, sim_cfg_json, meta_json, T, V/V_trials, spikes, optional cell-recording payloads).
       * Does not include `syn_records`, `inputs`, or `inputs_by_trial`.
   * **Uniqueness rule:** if a run folder exists, `_1`, `_2`, ... are appended to `output_stem`.
   * **When files are saved:**
@@ -38,19 +38,22 @@ SCP results and outputs contract (v1)
       * single: `np.ndarray` of spike times (ms).
       * multi: `List[np.ndarray]`, one per trial.
     * `traces`:
-      * if `n_traces_to_save > 0`: includes `T` and `V`.
+      * if `cell_recording.n_trials > 0` (legacy alias: `n_traces_to_save`): includes `T` and `V`.
       * else: `{}`.
     * If `sim_cfg["load"]` is set, results are loaded from disk and
       `meta["loaded_from"]` is added with the resolved path.
   * **Single-only**
     * `syn_records`: dict `{group: List[SynapseRecord]}` (see below).
+    * `cell_recordings`: dict `{site_label: {var_name: np.ndarray}}` when cell recording is enabled.
     * `inputs`: dict `{group: {mode, spike_trains, meta}}` if `n_inputs_to_save > 0`, else `None`.
       * `meta` includes timing anchors (`time_anchors_ms`) and `time_blocks`.
   * **Multi-only**
     * `inputs_by_trial`: list of up to `n_inputs_to_save` trials (or all if `"all"`), each:
       * `{"trial_idx": int, "inputs": {group: {mode, spike_trains, meta}}}`.
-    * `traces["V"]` is a list of at most `n_traces_to_save` trials (not all trials).
+    * `traces["V"]` is a list of at most `cell_recording.n_trials` trials (legacy alias: `n_traces_to_save`).
     * `syn_records_by_trial` (snapshot/debug): list of `{trial_idx, records}`.
+    * `cell_recordings_by_trial`: list of sampled trial payloads
+      (`{"trial_idx": int, "recordings": {site_label: {var_name: trace}}}`), bounded by `cell_recording.n_trials` (legacy alias: `n_traces_to_save`).
   * **meta (always present)**
     * `cell`: cell name.
     * `tune`: tune name.
@@ -107,6 +110,12 @@ SCP results and outputs contract (v1)
     compiled files in `{tune_dir}/modfiles/x86_64/`.
 
 * **Output control flags (sim_cfg)**
+  * `cell_recording` (optional): enables segment-level cell-variable capture during normal runs.
+    * `n_trials`: sampled trace cap for saved `traces["V"]` and `cell_recordings_by_trial`.
+      * Legacy alias: top-level `n_traces_to_save`.
+    * `sites`: recording locations (e.g. `"soma[0](0.5)"` or `{"sec":"dend","idx":0,"x":0.5}`).
+    * `vars`: toggle classes (`v`, `i_cap`, ion/mechanism currents, concentrations, reversals, conductances, states).
+    * Aliases accepted: `rec_sec_list`, `rec_var_toggles` (or `rec_vars`).
   * `save_sidecars` (default true): write manifest + sidecar files.
   * `save_full_results` (default false): write `{cell}_{tune}_{output_stem}.pkl/.npz`.
   * `save_syn_records_sidecar` (default true): write `syn_records.pkl`.
@@ -116,7 +125,7 @@ SCP results and outputs contract (v1)
       * `save_plots_inputs` (default true): include input mean plots.
       * `save_plots_synapses` (default false): include synapse distribution plots.
       * `plots_win_size`, `plots_input_bin_ms`, `plots_input_smooth_ms`, `plots_raster_style` tune the plots.
-    * `n_traces_to_save` / `n_inputs_to_save` control how many samples are stored.
+    * `cell_recording.n_trials` (legacy: `n_traces_to_save`) and `n_inputs_to_save` control how many samples are stored.
       * `n_inputs_to_save` can be `"all"` to keep inputs for every trial.
   * `randomness_mode` (optional): `fixed`, `derived`, or `random` to auto-fill `randomness`.
     * `fixed`: identical trials; use a fixed seed for reproducibility.

@@ -29,7 +29,7 @@
       },
       "params": {
         "wt_mean": 0.5,
-        "wt_std": 0.34,
+        "wt_std": 1.0,
         "initW": 1.0,
         "gmax_AMPA": 0.001,
         "gmax_NMDA": 0.001,

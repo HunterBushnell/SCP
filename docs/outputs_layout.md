@@ -16,6 +16,8 @@ Optional sidecars
 - `inputs_sample.pkl` (if inputs are saved; used by precomputed sources)
 - `syn_records.pkl` (if `save_syn_records_sidecar`)
 - `syn_records_by_trial.pkl` (if `save_syn_records_by_trial`)
+- `cell_recordings.pkl` (if `cell_recordings` present in single-run results)
+- `cell_recordings_by_trial.pkl` (if `cell_recordings_by_trial` present in multi-run results)
 - `plots/` (if `save_plots` or a plot profile enables it)
 - `{cell}_{tune}_{output_stem}.pkl` (if `save_full_results`)
 

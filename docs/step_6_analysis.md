@@ -14,6 +14,9 @@ Common tasks
 - Normalized firing-rate curves and optional inter-spike-interval (ISI) curves.
 - Bio-curve overlays for comparison.
 - Snapshot comparisons between notebook and SLURM runs.
+- Recording summaries for:
+  - `cell_recordings` (site/variable traces).
+  - total synaptic traces `traces.I` / `traces.G` (if recorded).
 
 Outputs
 - Plots saved by the notebook.
@@ -69,3 +72,17 @@ Notes
 - `@shift` alone is allowed; `@shift:scale` or `@shift,scale` both work.
 - Keys are `color`, `label`, `linestyle`, `shift`, `scale`.
 - Older references to `5_analysis.ipynb` should be replaced with `6_analysis.ipynb`.
+
+Recording summary helpers
+```python
+from modules_local.analysis import analysis
+from modules_local import run_sim
+
+res = run_sim.load_results("cells/SST/tunes/seg_tuned/output_data/<run_name>")
+
+cell_sum = analysis.summarize_cell_recordings(res)
+print(analysis.format_cell_recording_summary_table(cell_sum, title="Cell recordings"))
+
+syn_sum = analysis.summarize_total_synaptic_traces(res)
+print(analysis.format_total_synaptic_trace_table(syn_sum, title="Total synaptic I/G"))
+```
