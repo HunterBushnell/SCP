@@ -73,13 +73,13 @@
     },
     {"section": "soma",
      "name": "gbar_Nap",
-     "value": 0.005,
+     "value": 0.0035,
      "mechanism": "Nap"
     },
 
     {"section": "soma",
      "name": "gbar_NaTa",
-     "value": 0.4,
+     "value": 0.34,
      "mechanism": "NaTa"
     },
 

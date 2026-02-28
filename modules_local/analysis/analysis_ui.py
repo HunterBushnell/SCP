@@ -6,6 +6,7 @@ import csv
 from datetime import datetime
 import json
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 import numpy as np
 from matplotlib import colors as mcolors
 from matplotlib.collections import LineCollection, PathCollection, PolyCollection
@@ -35,10 +36,11 @@ HELP_OUTPUTS = textwrap.dedent(
     """
     Outputs UI
     - Uses the current Selection and Compare list/paths.
-    - Plot window, stim start/stop are in ms.
+    - Plot window, y-window, and stim start/stop are in ms / rate units.
     - Curve mode: raw vs normalized; Curve plot: Rate, ISI, or stacked Rate+ISI; Norm mode: avg/peak.
     - Curve bin/smooth controls binned rate and moving-average window.
     - Compare layout: overlay/stacked/side-by-side; Shade adds std/sem band.
+    - Window origin 0: display x-axis relative to plot-window start (data/metrics unchanged).
     - Paper compare toggles presets from analysis_presets/paper_compare.json.
     - CSV export saves plotted data (including raster/shaded artists when shown).
     - Format toggle: Trace rows (one row per trace) or Long rows (one row per point).
@@ -769,6 +771,104 @@ def _stim_window_for_opts(sim_cfg: Dict[str, Any], opts: Dict[str, Any]) -> Tupl
     return stim_start, stim_stop
 
 
+def _apply_output_window_origin_zero(
+    fig_obj: Any,
+    *,
+    enabled: bool,
+    plot_window: Optional[Tuple[Optional[float], Optional[float]]],
+) -> None:
+    if not enabled or fig_obj is None:
+        return
+    fig = analysis.resolve_figure(fig_obj)
+    if fig is None:
+        return
+
+    offset: Optional[float] = None
+    if isinstance(plot_window, (list, tuple)) and len(plot_window) >= 1:
+        offset = _safe_float(plot_window[0])
+    if offset is None:
+        for ax in fig.axes:
+            try:
+                xmin, _ = ax.get_xlim()
+            except Exception:
+                continue
+            if np.isfinite(xmin):
+                offset = float(xmin)
+                break
+    if offset is None:
+        return
+
+    def _fmt(x: float, _pos: int) -> str:
+        val = float(x) - float(offset)
+        if abs(val) < 1e-9:
+            val = 0.0
+        return f"{val:g}"
+
+    formatter = FuncFormatter(_fmt)
+    for ax in fig.axes:
+        try:
+            ax.xaxis.set_major_formatter(formatter)
+            if str(ax.get_xlabel()).strip() == "Time (ms)":
+                ax.set_xlabel("Time (ms, window-relative)")
+        except Exception:
+            continue
+
+
+def _apply_output_y_window(
+    fig_obj: Any,
+    *,
+    y_window: Optional[Tuple[Optional[float], Optional[float]]],
+) -> None:
+    if fig_obj is None:
+        return
+    if not isinstance(y_window, (list, tuple)) or len(y_window) < 2:
+        return
+    y0 = _safe_float(y_window[0])
+    y1 = _safe_float(y_window[1])
+    if y0 is None and y1 is None:
+        return
+    fig = analysis.resolve_figure(fig_obj)
+    if fig is None:
+        return
+    for ax in fig.axes:
+        # Only clamp firing-rate axes (skip raster/ISI/other panels).
+        y_label = str(ax.get_ylabel() or "").lower()
+        if "rate" not in y_label:
+            continue
+        try:
+            ax.set_ylim(y0, y1)
+        except Exception:
+            continue
+
+
+def _sim_cfg_with_output_stim_overrides(sim_cfg: Dict[str, Any], opts: Dict[str, Any]) -> Dict[str, Any]:
+    cfg = dict(sim_cfg or {})
+    stim_start, stim_stop = _stim_window_for_opts(cfg, opts)
+    if stim_start is not None:
+        cfg["stim_start_ms"] = float(stim_start)
+    if stim_stop is not None:
+        cfg["stim_stop_ms"] = float(stim_stop)
+    return cfg
+
+
+def _sim_cfg_with_shifted_stim(sim_cfg: Dict[str, Any], shift_ms: Optional[float]) -> Dict[str, Any]:
+    cfg = dict(sim_cfg or {})
+    if shift_ms is None:
+        return cfg
+    try:
+        shift_val = float(shift_ms)
+    except Exception:
+        return cfg
+    if shift_val == 0.0:
+        return cfg
+    stim_start, stim_stop = _stim_window(cfg)
+    if stim_start is not None:
+        cfg["stim_start_ms"] = float(stim_start) + shift_val
+    if stim_stop is not None:
+        cfg["stim_stop_ms"] = float(stim_stop) + shift_val
+    return cfg
+
+
 def _plot_metric_points(
     ax,
     metrics: Dict[str, Any],
@@ -1047,9 +1147,10 @@ def _run_output_curve_from_results(
     )
     if not curve:
         return None
+    sim_cfg_norm = _sim_cfg_with_output_stim_overrides(results.get("sim_cfg", {}) or {}, opts)
     curve = analysis.normalize_output_curve(
         curve,
-        results.get("sim_cfg", {}) or {},
+        sim_cfg_norm,
         mode=opts.get("output_curve_mode", "raw"),
         norm_mode=opts.get("output_norm_mode", "avg"),
         baseline_ms=opts.get("output_metric_window_ms", 100.0),
@@ -1103,10 +1204,12 @@ def _compute_output_trial_metrics(
 
     trial_metrics: list[Dict[str, Any]] = []
     for spikes_trial in trial_spikes:
+        sim_cfg_norm = _sim_cfg_with_output_stim_overrides(sim_cfg or {}, opts)
+        sim_cfg_metrics = _sim_cfg_with_shifted_stim(sim_cfg_norm, shift_ms)
         trial_results: Dict[str, Any] = {
             "mode": "single",
             "spikes": spikes_trial,
-            "sim_cfg": sim_cfg or {},
+            "sim_cfg": sim_cfg_norm,
         }
         traces = results.get("traces")
         if traces is not None:
@@ -1122,7 +1225,7 @@ def _compute_output_trial_metrics(
             continue
         trial_curve = analysis.normalize_output_curve(
             trial_curve,
-            sim_cfg or {},
+            sim_cfg_norm,
             mode=opts.get("output_curve_mode", "raw"),
             norm_mode=opts.get("output_norm_mode", "avg"),
             baseline_ms=opts.get("output_metric_window_ms", 100.0),
@@ -1136,7 +1239,7 @@ def _compute_output_trial_metrics(
                 trial_curve = dict(trial_curve)
                 trial_curve["t_ms"] = (t_ms + float(shift_ms)).tolist()
 
-        trial_metrics.append(_compute_output_metrics(trial_curve, sim_cfg, opts, **metric_overrides))
+        trial_metrics.append(_compute_output_metrics(trial_curve, sim_cfg_metrics, opts, **metric_overrides))
     return trial_metrics
 
 
@@ -1226,7 +1329,8 @@ def _compute_output_metrics_with_spread(
     shift_ms: Optional[float] = None,
     **overrides: Any,
 ) -> Dict[str, Any]:
-    metrics = _compute_output_metrics(curve, sim_cfg, opts, **overrides)
+    sim_cfg_metrics = _sim_cfg_with_shifted_stim(sim_cfg or {}, shift_ms)
+    metrics = _compute_output_metrics(curve, sim_cfg_metrics, opts, **overrides)
     return _attach_output_metric_spread(
         metrics,
         results=results,
@@ -1796,6 +1900,17 @@ def run_output_plots(
     def _remember_figure(fig_obj: Any, plot_name: str) -> None:
         if fig_obj is None:
             return
+        if str(plot_name) != "spike_stats":
+            _apply_output_y_window(
+                fig_obj,
+                y_window=opts.get("y_window"),
+            )
+        if str(plot_name) != "spike_stats":
+            _apply_output_window_origin_zero(
+                fig_obj,
+                enabled=bool(opts.get("output_plot_window_zero_origin", False)),
+                plot_window=opts.get("plot_window"),
+            )
         export_figures.append((analysis.resolve_figure(fig_obj), str(plot_name)))
 
     def _payload() -> Dict[str, Any]:
@@ -1898,7 +2013,12 @@ def run_output_plots(
                     labels.append(label_override or Path(path).stem)
                     colors.append(color_override)
                     linestyles.append(linestyle_override)
-                    sim_cfgs.append(_default_sim_cfg_for_curve(curve, fallback=fallback_sim_cfg))
+                    sim_cfgs.append(
+                        _sim_cfg_with_shifted_stim(
+                            _default_sim_cfg_for_curve(curve, fallback=fallback_sim_cfg),
+                            shift_ms,
+                        )
+                    )
                     curve_paths.append(path)
                     curve_scales.append(scale_val)
                     curve_from_compare_list.append(paths_from_compare_list[idx])
@@ -1919,7 +2039,7 @@ def run_output_plots(
                     labels.append(label_override or analysis.run_label(path))
                     colors.append(color_override or (res.get("sim_cfg", {}) or {}).get("color", None))
                     linestyles.append(linestyle_override)
-                    sim_cfgs.append(res.get("sim_cfg", {}) or {})
+                    sim_cfgs.append(_sim_cfg_with_shifted_stim(res.get("sim_cfg", {}) or {}, shift_ms))
                     curve_paths.append(path)
                     curve_scales.append(scale_val)
                     curve_from_compare_list.append(paths_from_compare_list[idx])
@@ -2209,9 +2329,11 @@ def run_output_plots(
                     smooth_mode=smooth_mode,
                 )
                 if curve_a and curve_b:
+                    sim_cfg_a_norm = _sim_cfg_with_output_stim_overrides(res_a.get("sim_cfg", {}) or {}, opts)
+                    sim_cfg_b_norm = _sim_cfg_with_output_stim_overrides(res_b.get("sim_cfg", {}) or {}, opts)
                     norm_a = analysis.normalize_output_curve(
                         curve_a,
-                        res_a.get("sim_cfg", {}) or {},
+                        sim_cfg_a_norm,
                         mode="normalized",
                         norm_mode=opts.get("output_norm_mode", "avg"),
                         baseline_ms=opts.get("output_metric_window_ms", 100.0),
@@ -2221,7 +2343,7 @@ def run_output_plots(
                     )
                     norm_b = analysis.normalize_output_curve(
                         curve_b,
-                        res_b.get("sim_cfg", {}) or {},
+                        sim_cfg_b_norm,
                         mode="normalized",
                         norm_mode=opts.get("output_norm_mode", "avg"),
                         baseline_ms=opts.get("output_metric_window_ms", 100.0),
@@ -2584,9 +2706,10 @@ def run_output_plots(
                     smooth_mode=smooth_mode,
                 )
                 if curve_norm:
+                    sim_cfg_norm = _sim_cfg_with_output_stim_overrides(res.get("sim_cfg", {}) or {}, opts)
                     norm_curve = analysis.normalize_output_curve(
                         curve_norm,
-                        res.get("sim_cfg", {}) or {},
+                        sim_cfg_norm,
                         mode="normalized",
                         norm_mode=opts.get("output_norm_mode", "avg"),
                         baseline_ms=opts.get("output_metric_window_ms", 100.0),
@@ -3295,7 +3418,8 @@ def _collect_output_metric_distributions(
                     label = labels_override[idx] if idx < len(labels_override) else None
                     label = label or analysis.run_label(path)
                     color_val = _extract_output_color_from_results(res) or color_override
-                summary = _compute_output_metrics(curve, sim_cfg, opts, **metric_overrides)
+                sim_cfg_metrics = _sim_cfg_with_shifted_stim(sim_cfg, shift_ms)
+                summary = _compute_output_metrics(curve, sim_cfg_metrics, opts, **metric_overrides)
                 by_label[str(label)] = {
                     "summary": summary,
                     "trials": _compute_output_trial_metrics(
@@ -4056,6 +4180,7 @@ def output_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "plot_raster": g.get("plot_raster"),
         "raster_style": g.get("raster_style"),
         "plot_window": g.get("plot_window"),
+        "y_window": g.get("y_window"),
         "compare_output_layout": g.get("compare_output_layout"),
         "output_compare_figsize": g.get("output_compare_figsize"),
         "output_compare_panel_size": g.get("output_compare_panel_size"),
@@ -4070,6 +4195,7 @@ def output_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "output_metric_mode": g.get("output_metric_mode"),
         "output_baseline_center_ms": g.get("output_baseline_center_ms"),
         "output_metric_window_markers": g.get("output_metric_window_markers", True),
+        "output_plot_window_zero_origin": bool(g.get("output_plot_window_zero_origin", False)),
         "output_norm_window": g.get("output_norm_window"),
         "output_stim_start_ms": g.get("output_stim_start_ms"),
         "output_stim_stop_ms": g.get("output_stim_stop_ms"),
@@ -4379,10 +4505,22 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
     out_outputs = widgets.Output()
 
     outputs_raster_cb = widgets.Checkbox(value=g.get("plot_raster"), description="Output raster")
+    output_window_zero_cb = widgets.Checkbox(
+        value=bool(g.get("output_plot_window_zero_origin", False)),
+        description="Window origin 0",
+    )
     outputs_style_dd = widgets.Dropdown(options=["dot", "line"], value=g.get("raster_style"), description="Raster style")
     outputs_win_txt = widgets.FloatText(value=g.get("win_size"), description="Win size")
-    window_start_txt = widgets.Text(value="" if g.get("plot_window")[0] is None else str(g.get("plot_window")[0]), description="tstart")
-    window_end_txt = widgets.Text(value="" if g.get("plot_window")[1] is None else str(g.get("plot_window")[1]), description="tstop")
+    plot_window = g.get("plot_window")
+    if not isinstance(plot_window, (list, tuple)) or len(plot_window) < 2:
+        plot_window = (None, None)
+    y_window = g.get("y_window")
+    if not isinstance(y_window, (list, tuple)) or len(y_window) < 2:
+        y_window = (None, None)
+    window_start_txt = widgets.Text(value="" if plot_window[0] is None else str(plot_window[0]), description="tstart")
+    window_end_txt = widgets.Text(value="" if plot_window[1] is None else str(plot_window[1]), description="tstop")
+    window_y_start_txt = widgets.Text(value="" if y_window[0] is None else str(y_window[0]), description="ystart")
+    window_y_end_txt = widgets.Text(value="" if y_window[1] is None else str(y_window[1]), description="ystop")
     output_stim_start_txt = widgets.Text(
         value="" if g.get("output_stim_start_ms") is None else str(g.get("output_stim_start_ms")),
         description="Stim start",
@@ -4453,6 +4591,11 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
             analysis.parse_optional_float(window_start_txt.value),
             analysis.parse_optional_float(window_end_txt.value),
         )
+        g["y_window"] = (
+            analysis.parse_optional_float(window_y_start_txt.value),
+            analysis.parse_optional_float(window_y_end_txt.value),
+        )
+        g["output_plot_window_zero_origin"] = bool(output_window_zero_cb.value)
         g["output_stim_start_ms"] = analysis.parse_optional_float(output_stim_start_txt.value)
         g["output_stim_stop_ms"] = analysis.parse_optional_float(output_stim_stop_txt.value)
         g["output_curve_mode"] = output_curve_mode_dd.value
@@ -4489,9 +4632,9 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
 
     display(
         widgets.VBox([
-            widgets.HBox([outputs_btn, outputs_help_btn, compare_preset_cb, outputs_raster_cb, outputs_style_dd, outputs_win_txt]),
+            widgets.HBox([outputs_btn, outputs_help_btn, compare_preset_cb, outputs_raster_cb, output_window_zero_cb, outputs_style_dd, outputs_win_txt]),
             widgets.HBox([output_bin_txt, output_smooth_mode_dd, outputs_shade_dd, outputs_compare_layout_dd]),
-            widgets.HBox([window_start_txt, window_end_txt, output_stim_start_txt, output_stim_stop_txt]),
+            widgets.HBox([window_start_txt, window_end_txt, window_y_start_txt, window_y_end_txt, output_stim_start_txt, output_stim_stop_txt]),
             widgets.HBox([output_curve_mode_dd, output_curve_plot_mode_dd, output_norm_mode_dd, outputs_norm_txt]),
             widgets.HBox([output_csv_path_txt, output_csv_format_dd, output_csv_auto_cb, output_csv_btn]),
             out_outputs,

@@ -11,9 +11,11 @@
   "plot_output_curve": true,
   "plot_spike_stats": false,
   "plot_raster": false,
+  "output_plot_window_zero_origin": false,
   "raster_style": "dot",
-  "plot_window": [400, 1100],
-  "input_plot_window": [400, 1100],
+  "plot_window": [900, 1600],
+  "y_window": [null, null],
+  "input_plot_window": [900, 1600],
   "output_stim_start_ms": null,
   "output_stim_stop_ms": null,
   "win_size": 25,
@@ -55,10 +57,13 @@
   "compare_list_paths": [
     {"path": "external_data/pyrFiringRateAvg.csv@500;color=k;linestyle=--", "enabled": false},
     {"path": "external_data/bio_cell_output/pyrFiringRateAvg_gabab_tau200ms_delay50ms.csv@500;color=k;linestyle=-.", "enabled": false},
-    {"path": "external_data/SSTFiringRateAvg.csv@525;color=m;linestyle=--;label=SST_bio_shifted", "enabled": false},
-    {"path": "external_data/SSTFiringRateAvg.csv@500;color=k;linestyle=--;label=SST_bio", "enabled": true},
+    {"path": "external_data/SSTFiringRateAvg.csv@525;color=k;linestyle=--;label=SST_bio_shifted", "enabled": false},
+    {"path": "external_data/SSTFiringRateAvg.csv@1030;color=k;linestyle=--;label=SST_bio", "enabled": true},
     {"path": "external_data/PVFiringRateAvg.csv@300;color=royalblue;linestyle=--;label=PV_bio", "enabled": false},
-    {"path": "cells/SST/tunes/seg_tuned_peri/output_data/_final_base_SST@color=m;linestyle=--;label=SST_model_base", "enabled": false}
+    {"path": "cells/SST/tunes/seg_tuned_peri/output_data/_final_base_SST@color=m;linestyle=--;label=SST_model_base", "enabled": false},
+    {"path": "cells/SST/tunes/seg_tuned/output_data/_passive_base_SST@500;color=darkmagenta;label=passive_base;linestyle=--", "enabled": true},
+    {"path": "cells/SST/tunes/seg_tuned/output_data/_passive_VIPinh_SST@500;color=darkmagenta;label=passive_tuned;linestyle=--", "enabled": true},
+    {"path": "cells/SST/tunes/seg_tuned/output_data/_active_base_SST@500;color=magenta;label=active_base;linestyle=--", "enabled": true}
   ],
   "compare_list_dir_paths": [
   "external_data"

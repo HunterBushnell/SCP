@@ -913,8 +913,15 @@ def compute_output_metrics(
     metrics["pdp_mode"] = pdp_mode_val
     metrics["pdp_window_ms"] = pdp_window_val
 
-    peak_start = stim_start
-    peak_stop = stim_start + float(peak_window_ms)
+    peak_start = float(stim_start)
+    peak_stop = peak_start + float(peak_window_ms)
+    # Keep peak search inside the stimulation period when stim stop is known.
+    if stim_stop is not None:
+        stim_stop_val = float(stim_stop)
+        if stim_stop_val > peak_start:
+            peak_stop = min(peak_stop, stim_stop_val)
+            if peak_stop <= peak_start:
+                peak_stop = stim_stop_val
     peak_mask = _select_window_mask(t_ms, peak_start, peak_stop)
     if not peak_mask.any():
         return metrics
