@@ -73,13 +73,13 @@
     },
     {"section": "soma",
      "name": "gbar_Nap",
-     "value": 0.0035,
+     "value": 0.000001,
      "mechanism": "Nap"
     },
 
     {"section": "soma",
      "name": "gbar_NaTa",
-     "value": 0.34,
+     "value": 0.1,
      "mechanism": "NaTa"
     },
 
@@ -98,13 +98,13 @@
     {
       "section": "soma",
       "name": "gbar_Ca_HVA",
-      "value": 0,
+      "value": 0.00000,
       "mechanism": "Ca_HVA"
     },
     {
       "section": "soma",
       "name": "gbar_Ca_LVA",
-      "value": 0,
+      "value": 0.000,
       "mechanism": "Ca_LVA"
     },
     {

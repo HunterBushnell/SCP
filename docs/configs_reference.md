@@ -17,7 +17,7 @@ Timing and trials
 Save/load/append
 - `save_output` (bool), `output` or `output_stem` (string).
 - `output_format` (pkl|npz), `save_full_results` (bool).
-- `save_sidecars`, `save_input_stats`, `save_syn_records_sidecar`.
+- `save_sidecars`, `save_input_stats`, `save_syn_records_sidecar`, `save_fit_json_sidecar`.
 - `save_syn_records_by_trial` for per-trial synapse records.
 - `load`, `save`, `append` can be list or dict forms.
 - Back-compat: `append_to` is still accepted.

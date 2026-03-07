@@ -19,6 +19,7 @@ SCP results and outputs contract (v1)
   * **Manifest:** `run_manifest.json` (authoritative index)
   * **Sidecars (default):** `sim_cfg.json`, `meta.json`, `syn_config.json`, `spikes.npz`, `traces.npz`, etc.
     * Optional snapshot extras: `syn_records_by_trial.pkl`, `cell_recordings_by_trial.pkl`, `cell_config.json`, `geometry_config.json`.
+    * Optional provenance sidecar: copied Allen fit file (for example `485466109_fit.json`) when enabled.
   * **Plots (optional):** `plots/output_plot.png`, `plots/inputs_mean.png`, etc. (only when `save_plots: true`).
   * **Full results bundle (default off; set `save_full_results: true` to write):**
     * `{cell}_{tune}_{output_stem}.{pkl|npz}`
@@ -119,6 +120,7 @@ SCP results and outputs contract (v1)
   * `save_sidecars` (default true): write manifest + sidecar files.
   * `save_full_results` (default false): write `{cell}_{tune}_{output_stem}.pkl/.npz`.
   * `save_syn_records_sidecar` (default true): write `syn_records.pkl`.
+  * `save_fit_json_sidecar` (default true): copy the tune's Allen `_fit.json` into the run folder when resolvable.
   * `save_syn_records_by_trial` (default false): include per-trial synapse records in the results dict.
   * `snapshot.enabled` (default false): forces full capture (all inputs/traces + synapse records).
     * `save_plots` (default false): write plots under `plots/`.

@@ -21,7 +21,7 @@
     {
       "path": "external_data/pyrFiringRateAvg.csv",
       "label": "PN bio",
-      "enabled": true,
+      "enabled": false,
       "shift_ms": 1000,
       "scale": 1,
       "color": "r",
@@ -40,7 +40,7 @@
       "linestyle": "--"
     },
     {
-      "path": "cells/PV/tunes/seg_tuned/output_data/_active_base_PV",
+      "path": "cells/PV/tunes/seg_tuned/output_data/_final_base_PV",
       "label": "PV base",
       "enabled": false,
       "shift_ms": 700,
@@ -49,21 +49,12 @@
       "linestyle": "-"
     },
     {
-      "path": "cells/PV/tunes/seg_tuned/output_data/_active_tuned_PV",
+      "path": "cells/PV/tunes/seg_tuned/output_data/_final_tunedSST_PV",
       "label": "PV tuned",
-      "enabled": true,
+      "enabled": false,
       "shift_ms": 700,
       "scale": 1,
       "color": "navy",
-      "linestyle": "-"
-    },
-    {
-      "path": "cells/PV/tunes/seg_tuned/output_data/_final_SSTinh_PV",
-      "label": "PV SSTinh",
-      "enabled": false,
-      "shift_ms": 200,
-      "scale": 1,
-      "color": "dodgerblue",
       "linestyle": "-"
     },
     {
@@ -127,7 +118,7 @@
       "path": "external_data/SSTFiringRateAvg.csv",
       "label": "SST bio",
       "enabled": false,
-      "shift_ms": 1000,
+      "shift_ms": 500,
       "scale": 1,
       "color": "m",
       "linestyle": "--"
@@ -142,7 +133,7 @@
       "linestyle": "--"
     },
     {
-      "path": "cells/SST/tunes/seg_tuned/output_data/_passive+_base_SST",
+      "path": "cells/SST/tunes/seg_tuned_all/output_data/_final_base_SST",
       "label": "SST base",
       "enabled": false,
       "scale": 1,
@@ -150,27 +141,11 @@
       "linestyle": "-"
     },
     {
-      "path": "cells/SST/tunes/seg_tuned/output_data/_passive+_tuned_SST",
+      "path": "cells/SST/tunes/seg_tuned_all/output_data/_final_tuned_SST",
       "label": "SST tuned",
-      "enabled": true,
-      "scale": 1,
-      "color": "darkmagenta",
-      "linestyle": "-"
-    },
-    {
-      "path": "cells/SST/tunes/seg_tuned/output_data/_final_VIPinh_SST",
-      "label": "SST VIPinh",
       "enabled": false,
       "scale": 1,
       "color": "darkmagenta",
-      "linestyle": "-"
-    },
-    {
-      "path": "cells/SST/tunes/seg_tuned/output_data/_final_GABAB_SST",
-      "label": "SST GABABinh",
-      "enabled": false,
-      "scale": 1,
-      "color": "violet",
       "linestyle": "-"
     },
     {

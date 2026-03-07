@@ -18,6 +18,7 @@ Optional sidecars
 - `syn_records_by_trial.pkl` (if `save_syn_records_by_trial`)
 - `cell_recordings.pkl` (if `cell_recordings` present in single-run results)
 - `cell_recordings_by_trial.pkl` (if `cell_recordings_by_trial` present in multi-run results)
+- `<specimen_id>_fit.json` (if `save_fit_json_sidecar`, default on, and fit file is found)
 - `plots/` (if `save_plots` or a plot profile enables it)
 - `{cell}_{tune}_{output_stem}.pkl` (if `save_full_results`)
 

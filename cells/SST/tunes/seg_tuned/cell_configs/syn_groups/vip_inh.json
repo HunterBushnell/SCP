@@ -1,6 +1,6 @@
 {
   "vip_inh": {
-    "state": true,
+    "state": false,
     "mode": "precomputed",
     "color": "#9467bd",
     "source": {
@@ -11,7 +11,7 @@
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 1030,
+      "stim_tstart_ms": 530,
       "duration_ms": null,
       "input_stim_tstart_ms": 300,
       "input_duration_ms": null
@@ -28,7 +28,7 @@
       },
       "params": {
         "wt_mean": 2.0,
-        "wt_std": 1.0,
+        "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,
         "tau_r_GABAA": 0.5,

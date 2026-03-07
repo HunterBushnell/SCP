@@ -12,13 +12,14 @@
     "timing": {
       "onset_ms": null,
       "stim_tstart_ms": 500.0,
+      "stim_jitter": null,
       "duration_ms": null,
       "input_stim_tstart_ms": 0.0,
       "input_duration_ms": null
     },
     "syns": {
       "type": "AMPA_NMDA_STP",
-      "N_syn": 22,
+      "N_syn": 363,
       "segs": "all",
       "dist_func": {
         "kind": "uniform",
@@ -27,8 +28,8 @@
         }
       },
       "params": {
-        "wt_mean": 1.5,
-        "wt_std": 1.0,
+        "wt_mean": 0.025,
+        "wt_std": 0.33,
         "initW": 1.0,
         "gmax_AMPA": 0.001,
         "gmax_NMDA": 0.001,

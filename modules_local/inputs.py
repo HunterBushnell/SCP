@@ -549,6 +549,8 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
       - append/append_to (string path or [enabled, path])
       - output_format ('npz' or 'pkl')
       - plots_profile ('off'|'basic'|'inputs'|'full')
+      - save_plots_mode (optional: 'default'|'single_plot')
+      - save_plots_single_plot_preset (optional path to paper single-plot preset JSON)
       - param_study (dict with standard keys)
       - snapshot (optional dict): enables full debug capture
     """
@@ -926,6 +928,7 @@ def _normalize_group_configs(
     timing_keys = (
         "onset_ms",
         "stim_tstart_ms",
+        "stim_jitter",
         "duration_ms",
         "input_stim_tstart_ms",
         "input_duration_ms",
@@ -953,6 +956,7 @@ def _normalize_group_configs(
             )
 
         gcfg = dict(gcfg_raw)
+        gcfg.setdefault("name", str(gname))
 
         # state: default to True
         state = gcfg.get("state", True)
@@ -1159,6 +1163,53 @@ def _lognormal_mu_sigma(mean: float, std: float) -> Tuple[float, float]:
     sig = math.sqrt(math.log(1 + (std**2 / mean**2)))
     return mu, sig
 
+
+def _resolve_group_stim_jitter_delay_ms(
+    sim_cfg: Dict[str, Any],
+    group_name: str,
+    group_cfg: Dict[str, Any],
+    trial_rng: Optional[randomness.TrialRandomness] = None,
+) -> Optional[float]:
+    """
+    Resolve per-group source start jitter delay (ms) from timing['stim_jitter'].
+
+    The draw uses the same lognormal parameterization as global sim jitter
+    (mean=std=stim_jitter). When trial_rng is provided, the delay can vary per
+    trial deterministically according to the randomness config.
+    """
+    timing = group_cfg.get("timing", {}) or {}
+    stim_jitter_raw = timing.get("stim_jitter", None)
+    if stim_jitter_raw is None:
+        return None
+    try:
+        stim_jitter = float(stim_jitter_raw)
+    except Exception as exc:
+        raise ValueError(
+            f"Group '{group_name}': timing['stim_jitter'] must be numeric or null "
+            f"(got {stim_jitter_raw!r})"
+        ) from exc
+    if stim_jitter < 0.0:
+        raise ValueError(
+            f"Group '{group_name}': timing['stim_jitter'] must be >= 0 (got {stim_jitter!r})"
+        )
+    if stim_jitter <= 0.0:
+        return None
+
+    if trial_rng is not None:
+        jitter_rng = trial_rng.rng("inputs", group=group_name, stream="stim_jitter")
+    else:
+        seed = sim_cfg.get("seed", None)
+        if seed is None:
+            jitter_rng = np.random.default_rng()
+        else:
+            group_hash = randomness.stable_u32_from_str(str(group_name), salt="stim_jitter:")
+            jitter_rng = np.random.default_rng(int(seed) ^ int(group_hash) ^ 0x5A17A5A1)
+
+    mu, sig = _lognormal_mu_sigma(stim_jitter, stim_jitter)
+    jitter_offset = float(jitter_rng.lognormal(mu, sig)) if sig > 0 else stim_jitter
+    return max(0.0, jitter_offset)
+
+
 def _process_all_groups(
     sim_cfg: Dict[str, Any],
     groups_cfg: Dict[str, Dict[str, Any]],
@@ -1239,7 +1290,17 @@ def _process_all_groups(
             )
 
         # 3) Generate timing configuration for this group
-        time_cfg = _calculate_timing(sim_cfg, gcfg)
+        source_jitter_delay_ms = _resolve_group_stim_jitter_delay_ms(
+            sim_cfg=sim_cfg,
+            group_name=gname,
+            group_cfg=gcfg,
+            trial_rng=trial_rng,
+        )
+        time_cfg = _calculate_timing(
+            sim_cfg,
+            gcfg,
+            source_jitter_delay_ms=source_jitter_delay_ms,
+        )
         gcfg["time_cfg"] = time_cfg  # Attach for modes and downstream consumers
 
         # 4) Resolve mode handler
@@ -1489,6 +1550,8 @@ def _resolve_n_syn(
 def _calculate_timing(
     sim_cfg: Dict[str, Any],
     group_cfg: Dict[str, Any],
+    *,
+    source_jitter_delay_ms: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Compute resolved timing information for a single synapse group.
@@ -1504,7 +1567,11 @@ def _calculate_timing(
     This function is mode-agnostic: it does not generate any spikes and
     does not depend on which mode (homogeneous, precomputed, etc.) is used.
     """
-    anchors = _compute_time_anchors(sim_cfg, group_cfg)
+    anchors = _compute_time_anchors(
+        sim_cfg,
+        group_cfg,
+        source_jitter_delay_ms=source_jitter_delay_ms,
+    )
     blocks = _build_time_blocks_from_anchors(anchors)
 
     time_cfg = {
@@ -1518,6 +1585,8 @@ def _calculate_timing(
 def _compute_time_anchors(
     sim_cfg: Dict[str, Any],
     group_cfg: Dict[str, Any],
+    *,
+    source_jitter_delay_ms: Optional[float] = None,
 ) -> Dict[str, Optional[float]]:
     """
     Derive concrete time anchors for this group.
@@ -1549,11 +1618,27 @@ def _compute_time_anchors(
 
     onset_raw = _as_float_or_none(timing.get("onset_ms"), "timing['onset_ms']")
     stim_tstart_raw = _as_float_or_none(timing.get("stim_tstart_ms"), "timing['stim_tstart_ms']")
+    stim_jitter_raw = _as_float_or_none(timing.get("stim_jitter"), "timing['stim_jitter']")
     duration_raw = _as_float_or_none(timing.get("duration_ms"), "timing['duration_ms']")
     input_stim_raw = _as_float_or_none(
         timing.get("input_stim_tstart_ms"), "timing['input_stim_tstart_ms']"
     )
     source_tstart_raw: Optional[float] = None
+    if stim_jitter_raw is not None and stim_jitter_raw < 0.0:
+        raise ValueError(f"timing['stim_jitter'] must be >= 0 (got {stim_jitter_raw!r})")
+    stim_jitter_delay: Optional[float] = None
+    if source_jitter_delay_ms is not None:
+        try:
+            stim_jitter_delay = float(source_jitter_delay_ms)
+        except Exception as exc:
+            raise ValueError(
+                f"resolved source jitter delay must be numeric or null "
+                f"(got {source_jitter_delay_ms!r})"
+            ) from exc
+        if stim_jitter_delay < 0.0:
+            raise ValueError(
+                f"resolved source jitter delay must be >= 0 (got {stim_jitter_delay!r})"
+            )
 
 
     def _parse_baseline_spec(
@@ -1637,6 +1722,13 @@ def _compute_time_anchors(
         if source_tstart > tstop:
             source_tstart = tstop
 
+    # Keep trim bookkeeping tied to alignment/clamping only.
+    # A configured source jitter intentionally shifts the source block and
+    # should not additionally trim source data.
+    source_tstart_for_trim = source_tstart
+    if source_tstart is not None and stim_jitter_delay is not None and stim_jitter_delay > 0.0:
+        source_tstart = min(source_tstart + stim_jitter_delay, tstop)
+
     # Source stop: choose a duration for the main source segment.
     source_tstop: Optional[float] = None
     if source_tstart is not None:
@@ -1666,8 +1758,8 @@ def _compute_time_anchors(
 
     # How much of the source should be trimmed (when raw start < resolved start)
     source_trim_ms: Optional[float] = None
-    if source_tstart is not None and source_tstart_raw is not None:
-        delta = source_tstart - source_tstart_raw
+    if source_tstart_for_trim is not None and source_tstart_raw is not None:
+        delta = source_tstart_for_trim - source_tstart_raw
         source_trim_ms = max(0.0, float(delta))
 
     anchors: Dict[str, Optional[float]] = {
@@ -1680,6 +1772,8 @@ def _compute_time_anchors(
         "baseline_spec": baseline_spec,   # tokenized baseline (if any)
         "source_trim_ms": source_trim_ms,
         "jitter_tstart_ms": _as_float_or_none(sim_cfg.get("_jitter_tstart_ms"), "sim['_jitter_tstart_ms']"),
+        "stim_jitter_ms": stim_jitter_raw,
+        "stim_jitter_delay_ms": stim_jitter_delay,
         # Extra fields for debugging / inspection (not used by block builder):
         "stim_tstart_ms": stim_tstart,
         "input_stim_tstart_ms": input_stim_raw,
@@ -1869,6 +1963,8 @@ def _build_group_inputs(
             "baseline_rate_hz": anchors.get("baseline_rate_hz"),
             "source_trim_ms": anchors.get("source_trim_ms"),
             "jitter_tstart_ms": anchors.get("jitter_tstart_ms"),
+            "stim_jitter_ms": anchors.get("stim_jitter_ms"),
+            "stim_jitter_delay_ms": anchors.get("stim_jitter_delay_ms"),
         }
         meta["time_blocks"] = time_cfg.get("blocks", [])
 

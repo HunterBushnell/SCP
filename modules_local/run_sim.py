@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Mapping, Tuple
 import json, copy, os, pickle, math, random, time, sys, hashlib
+import shutil
 import re
 import numpy as np
 import matplotlib.pyplot as plt
@@ -704,23 +705,84 @@ def _sha256_file(path: Path) -> str:
     return hsh.hexdigest()
 
 
-def _collect_mechanism_info(sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
-    info: Dict[str, Any] = {}
+def _resolve_tune_path(sim_cfg: Dict[str, Any]) -> Optional[Path]:
     tune_dir = sim_cfg.get("tune_dir")
     if tune_dir:
         try:
-            tune_path = Path(str(tune_dir)).expanduser().resolve()
+            return Path(str(tune_dir)).expanduser().resolve()
         except Exception:
-            tune_path = None
-    else:
-        cell = sim_cfg.get("cell")
-        tune = sim_cfg.get("tune")
-        if cell and tune:
-            base = Path(__file__).resolve().parent.parent
-            tune_path = base / "cells" / str(cell) / "tunes" / str(tune)
-        else:
-            tune_path = None
+            return None
 
+    cell = sim_cfg.get("cell")
+    tune = sim_cfg.get("tune")
+    if cell and tune:
+        base = Path(__file__).resolve().parent.parent
+        return base / "cells" / str(cell) / "tunes" / str(tune)
+    return None
+
+
+def _find_fit_json_path(sim_cfg: Dict[str, Any]) -> Optional[Path]:
+    tune_path = _resolve_tune_path(sim_cfg)
+    if tune_path is None or not tune_path.is_dir():
+        return None
+
+    manifest_path = tune_path / "manifest.json"
+    if manifest_path.is_file():
+        try:
+            manifest_data = json.loads(manifest_path.read_text())
+            biophys = manifest_data.get("biophys", [])
+            if isinstance(biophys, list):
+                for entry in biophys:
+                    if not isinstance(entry, dict):
+                        continue
+                    model_file = entry.get("model_file")
+                    model_file_items = model_file if isinstance(model_file, list) else [model_file]
+                    for item in model_file_items:
+                        if not isinstance(item, str):
+                            continue
+                        cand = Path(item)
+                        if not cand.name.endswith("_fit.json"):
+                            continue
+                        cand = (tune_path / cand).resolve() if not cand.is_absolute() else cand.resolve()
+                        if cand.is_file():
+                            return cand
+        except Exception:
+            pass
+
+    fit_candidates = sorted(tune_path.glob("*_fit.json"))
+    if fit_candidates:
+        return fit_candidates[0].resolve()
+    return None
+
+
+def _copy_fit_json_sidecar(sim_cfg: Dict[str, Any], run_dir: Path) -> Optional[Dict[str, str]]:
+    if sim_cfg.get("save_fit_json_sidecar", True) is False:
+        return None
+
+    fit_path = _find_fit_json_path(sim_cfg)
+    if fit_path is None:
+        return None
+
+    target = run_dir / fit_path.name
+    try:
+        shutil.copy2(fit_path, target)
+    except Exception:
+        return None
+
+    fit_info: Dict[str, str] = {
+        "filename": target.name,
+        "source_path": str(fit_path),
+    }
+    try:
+        fit_info["sha256"] = _sha256_file(target)
+    except Exception:
+        pass
+    return fit_info
+
+
+def _collect_mechanism_info(sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    info: Dict[str, Any] = {}
+    tune_path = _resolve_tune_path(sim_cfg)
     if tune_path is None:
         return info
 
@@ -1635,6 +1697,9 @@ def _save_sidecars(results: Dict[str, Any], run_dir: Path) -> Dict[str, str]:
     avg_rate_curve = meta.pop("avg_rate_curve", None)
     input_stats = meta.pop("input_stats", None)
     input_summaries = meta.pop("input_summaries", None)
+    fit_sidecar = _copy_fit_json_sidecar(sim_cfg, run_dir)
+    if fit_sidecar is not None:
+        meta["fit_json"] = fit_sidecar
 
     _write_json(run_dir / "meta.json", meta)
     files["meta"] = "meta.json"
@@ -1657,6 +1722,8 @@ def _save_sidecars(results: Dict[str, Any], run_dir: Path) -> Dict[str, str]:
     if input_summaries is not None:
         _write_json(run_dir / "input_summaries.json", input_summaries)
         files["input_summaries"] = "input_summaries.json"
+    if fit_sidecar is not None:
+        files["fit_json"] = fit_sidecar["filename"]
 
     spikes = results.get("spikes", None)
     if spikes is not None:
@@ -1819,6 +1886,8 @@ def save_results(
                 input_bin_ms=sim_cfg.get("plots_input_bin_ms", None),
                 input_smooth_ms=sim_cfg.get("plots_input_smooth_ms", 25.0),
                 raster_style=str(sim_cfg.get("plots_raster_style", "dot")),
+                plot_mode=str(sim_cfg.get("save_plots_mode", "default")),
+                single_plot_preset=sim_cfg.get("save_plots_single_plot_preset", None),
             )
         except Exception as exc:
             print(f"save_plots failed: {exc}")

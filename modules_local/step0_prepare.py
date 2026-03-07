@@ -185,6 +185,8 @@ def default_sim_config(*, cell_name: str, specimen_id: int, model_type: str) -> 
         "plots_win_size": 25.0,
         "plots_input_smooth_ms": 25.0,
         "plots_profile": "off",
+        "save_plots_mode": "single_plot",
+        "save_plots_single_plot_preset": "modules_local/analysis/analysis_presets/single_plot.json",
         "randomness_mode": "random",
         "random_seed": None,
         "param_study": {

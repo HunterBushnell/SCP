@@ -37,6 +37,7 @@ HELP_OUTPUTS = textwrap.dedent(
     Outputs UI
     - Uses the current Selection and Compare list/paths.
     - Plot window, y-window, and stim start/stop are in ms / rate units.
+    - Auto window: when enabled, uses stim window +/- Window ±ms (falls back to manual if stim bounds are unavailable).
     - Curve mode: raw vs normalized; Curve plot: Rate, ISI, or stacked Rate+ISI; Norm mode: avg/peak.
     - Curve bin/smooth controls binned rate and moving-average window.
     - Compare layout: overlay/stacked/side-by-side; Shade adds std/sem band.
@@ -55,6 +56,7 @@ HELP_INPUTS = textwrap.dedent(
     - Groups: comma-separated synapse groups; leave blank for all.
     - Bin/smooth apply to input rate curves; raster settings affect raster plots.
     - Compare layout controls multi-run plotting.
+    - Auto window reuses stim window +/- Window ±ms for input plots.
     - Legend: matplotlib location for input legends (e.g., best, upper left, none).
     - CSV export saves plotted data (including raster/shaded artists when shown).
     - Format toggle: Trace rows (one row per trace) or Long rows (one row per point).
@@ -66,7 +68,10 @@ HELP_EXTRA = textwrap.dedent(
     Extra UI
     - Output metrics: summary table for selected runs/curves.
     - Output metrics spread: choose std or sem across saved trials.
-    - Metric dist plot: box/whisker by run for selected metrics; curve-only entries show mean markers.
+    - Metric dist plot: box/whisker or bar by run for selected metrics.
+    - Bar mode uses mean bars; optional error bars (std/sem) apply to run entries only.
+    - Trial points and point jitter can be toggled for cleaner panels.
+    - Table metrics can reuse the same metric selection as the distribution plot.
     - Compare configs: diff cell/geom/syn configs across runs.
     - Compare outputs/inputs: reuse plot logic with the current selection.
     - Input sampling: synthesize input curves from synapse configs.
@@ -769,6 +774,40 @@ def _stim_window_for_opts(sim_cfg: Dict[str, Any], opts: Dict[str, Any]) -> Tupl
         except Exception:
             pass
     return stim_start, stim_stop
+
+
+def _coerce_plot_window(window_val: Any) -> Tuple[Optional[float], Optional[float]]:
+    if isinstance(window_val, (list, tuple)) and len(window_val) >= 2:
+        return _safe_float(window_val[0]), _safe_float(window_val[1])
+    return None, None
+
+
+def _resolve_plot_window_for_opts(
+    sim_cfg: Dict[str, Any],
+    opts: Dict[str, Any],
+    *,
+    window_key: str,
+    context: str,
+) -> Tuple[Tuple[Optional[float], Optional[float]], Optional[str]]:
+    manual_window = _coerce_plot_window(opts.get(window_key))
+    if not bool(opts.get("auto_plot_window_from_stim", False)):
+        return manual_window, None
+
+    adjust_ms = _safe_float(opts.get("plot_window_adjustment_ms"))
+    if adjust_ms is None:
+        adjust_ms = 100.0
+    if adjust_ms < 0:
+        adjust_ms = abs(adjust_ms)
+
+    stim_start, stim_stop = _stim_window_for_opts(sim_cfg or {}, opts)
+    if stim_start is None or stim_stop is None:
+        return (
+            manual_window,
+            f"{context}: auto plot window enabled but stim start/stop unavailable; using manual {window_key}.",
+        )
+    if stim_stop < stim_start:
+        stim_start, stim_stop = stim_stop, stim_start
+    return (float(stim_start) - float(adjust_ms), float(stim_stop) + float(adjust_ms)), None
 
 
 def _apply_output_window_origin_zero(
@@ -2082,6 +2121,14 @@ def run_output_plots(
 
             curve_plot_mode = _output_curve_plot_mode(opts)
             stim_start, stim_stop = _stim_window_for_opts(sim_cfgs[0] or {}, opts)
+            plot_window_cmp, plot_window_warn = _resolve_plot_window_for_opts(
+                sim_cfgs[0] or {},
+                opts,
+                window_key="plot_window",
+                context="Output compare list",
+            )
+            if plot_window_warn:
+                print(plot_window_warn)
             if curve_plot_mode != "rate":
                 if curve_plot_mode == "isi" and not any(_curve_has_series(c, "isi_ms") for c in isi_curves):
                     print("Output ISI compare skipped: no ISI data available in selected runs.")
@@ -2108,7 +2155,7 @@ def run_output_plots(
                     labels=labels,
                     colors=colors,
                     linestyles=linestyles,
-                    plot_window=opts.get("plot_window", (None, None)),
+                    plot_window=plot_window_cmp,
                     stim_start=stim_start,
                     stim_stop=stim_stop,
                     title=compare_title,
@@ -2216,8 +2263,8 @@ def run_output_plots(
                         ax_i.axvline(float(stim_start_i), color="k", linestyle="-", linewidth=float(opts.get("output_stim_linewidth", 1.0)))
                     if stim_stop_i is not None:
                         ax_i.axvline(float(stim_stop_i), color="k", linestyle="-", linewidth=float(opts.get("output_stim_linewidth", 1.0)))
-                    if opts.get("plot_window") is not None:
-                        ax_i.set_xlim(opts.get("plot_window")[0], opts.get("plot_window")[1])
+                    if plot_window_cmp is not None:
+                        ax_i.set_xlim(plot_window_cmp[0], plot_window_cmp[1])
                     ax_i.set_title(label)
                     if plot_label:
                         ax_i.legend()
@@ -2272,8 +2319,8 @@ def run_output_plots(
                     ax.axvline(float(stim_start), color="k", linestyle="-", linewidth=float(opts.get("output_stim_linewidth", 1.0)))
                 if stim_stop is not None:
                     ax.axvline(float(stim_stop), color="k", linestyle="-", linewidth=float(opts.get("output_stim_linewidth", 1.0)))
-                if opts.get("plot_window") is not None:
-                    ax.set_xlim(opts.get("plot_window")[0], opts.get("plot_window")[1])
+                if plot_window_cmp is not None:
+                    ax.set_xlim(plot_window_cmp[0], plot_window_cmp[1])
                 ax.set_xlabel("Time (ms)")
                 ax.set_ylabel(y_label)
                 ax.set_title(compare_title)
@@ -2373,6 +2420,15 @@ def run_output_plots(
                     )
 
         if opts.get("plot_outputs", True):
+            compare_window_ref_cfg = (res_a.get("sim_cfg", {}) if res_a else (res_b.get("sim_cfg", {}) if res_b else {})) or {}
+            plot_window_compare, plot_window_warn = _resolve_plot_window_for_opts(
+                compare_window_ref_cfg,
+                opts,
+                window_key="plot_window",
+                context="Output compare",
+            )
+            if plot_window_warn:
+                print(plot_window_warn)
             if curve_only_a or curve_only_b:
                 print("Output plots skipped: curve-only compare uses output curve plot only.")
                 fig_cmp = None
@@ -2383,7 +2439,7 @@ def run_output_plots(
                     labels=(label_a, label_b),
                     win_size=opts.get("win_size", 25),
                     bin_ms=opts.get("output_bin_ms"),
-                    plot_window=opts.get("plot_window", (None, None)),
+                    plot_window=plot_window_compare,
                     smooth_mode=smooth_mode,
                     output_norms=output_norms,
                     layout=opts.get("compare_output_layout", "side-by-side"),
@@ -2522,6 +2578,14 @@ def run_output_plots(
                 sim_cfg_a = (res_a.get("sim_cfg") if res_a else _default_sim_cfg_for_curve(curve_a, fallback=(res_b.get("sim_cfg") if res_b else None))) or {}
                 sim_cfg_b = (res_b.get("sim_cfg") if res_b else _default_sim_cfg_for_curve(curve_b, fallback=(res_a.get("sim_cfg") if res_a else None))) or {}
                 stim_start, stim_stop = _stim_window_for_opts(sim_cfg_a, opts)
+                plot_window_curve_compare, plot_window_warn = _resolve_plot_window_for_opts(
+                    sim_cfg_a,
+                    opts,
+                    window_key="plot_window",
+                    context="Output curve compare",
+                )
+                if plot_window_warn:
+                    print(plot_window_warn)
                 scale_a = external_scale if curve_only_a else output_scale
                 scale_b = external_scale if curve_only_b else output_scale
                 curve_a_plot = _scale_curve_for_plot(curve_a, scale_a)
@@ -2533,7 +2597,7 @@ def run_output_plots(
                         curve_a_plot,
                         curve_b_plot,
                         labels=(label_a, label_b),
-                        plot_window=opts.get("plot_window", (None, None)),
+                        plot_window=plot_window_curve_compare,
                         stim_start=stim_start,
                         stim_stop=stim_stop,
                         title="Output curves",
@@ -2550,7 +2614,7 @@ def run_output_plots(
                             rate_curves=[curve_a_plot, curve_b_plot],
                             isi_curves=[isi_a, isi_b],
                             labels=[label_a, label_b],
-                            plot_window=opts.get("plot_window", (None, None)),
+                            plot_window=plot_window_curve_compare,
                             stim_start=stim_start,
                             stim_stop=stim_stop,
                             title="Output curves",
@@ -2668,6 +2732,14 @@ def run_output_plots(
     export_run_label = analysis.run_label(run_dir)
     smooth_mode = (res.get("sim_cfg", {}) or {}).get("avg_rate_curve_smooth_mode", "center")
     smooth_mode = opts.get("output_smooth_mode") or smooth_mode
+    plot_window_single, plot_window_warn = _resolve_plot_window_for_opts(
+        (res.get("sim_cfg", {}) or {}),
+        opts,
+        window_key="plot_window",
+        context="Output single",
+    )
+    if plot_window_warn:
+        print(plot_window_warn)
 
     if opts.get("plot_outputs", True):
         in_vivo_curve = analysis.load_bio_curve_optional(
@@ -2685,7 +2757,7 @@ def run_output_plots(
         if (res.get("mode") or "single") == "multi":
             all_param_data, sim_params, pw = analysis.build_multi_plot_inputs(
                 res,
-                plot_window=opts.get("plot_window", (None, None)),
+                plot_window=plot_window_single,
             )
             if opts.get("output_bin_ms") is not None:
                 sim_params["bins"] = float(opts.get("output_bin_ms"))
@@ -2825,7 +2897,7 @@ def run_output_plots(
                 win_size=opts.get("win_size", 25),
                 raster_style=opts.get("raster_style", "dot"),
                 plot_raster=opts.get("plot_raster", True),
-                plot_window=opts.get("plot_window", (None, None)),
+                plot_window=plot_window_single,
                 smooth_mode=smooth_mode,
                 bin_ms=opts.get("output_bin_ms"),
                 line_width=opts.get("output_linewidth", 2.0),
@@ -2864,7 +2936,7 @@ def run_output_plots(
                     curve_single_plot,
                     label=analysis.run_label(run_dir),
                     color=run_color,
-                    plot_window=opts.get("plot_window", (None, None)),
+                    plot_window=plot_window_single,
                     stim_start=stim_start,
                     stim_stop=stim_stop,
                     title="Output curve (avg)",
@@ -2882,7 +2954,7 @@ def run_output_plots(
                         isi_curves=[isi_single],
                         labels=[analysis.run_label(run_dir)],
                         colors=[run_color],
-                        plot_window=opts.get("plot_window", (None, None)),
+                        plot_window=plot_window_single,
                         stim_start=stim_start,
                         stim_stop=stim_stop,
                         title="Output curve (avg)",
@@ -3029,6 +3101,14 @@ def run_input_plots(
         label_b = analysis.run_label(run_b)
         export_run_label = f"{label_a}_vs_{label_b}"
         group_colors = analysis.merge_group_colors(res_a, res_b)
+        plot_window_input_compare, plot_window_warn = _resolve_plot_window_for_opts(
+            (res_a.get("sim_cfg", {}) or {}),
+            opts,
+            window_key="input_plot_window",
+            context="Input compare",
+        )
+        if plot_window_warn:
+            print(plot_window_warn)
 
         if opts.get("plot_inputs_mean", True):
             summary_a = analysis.summarize_inputs_from_results(
@@ -3063,7 +3143,7 @@ def run_input_plots(
                 line_width=opts.get("input_linewidth", 2.0),
                 shade_alpha=opts.get("input_shade_alpha", 0.2),
                 output_linewidth=opts.get("input_output_linewidth", 1.5),
-                plot_window=opts.get("input_plot_window"),
+                plot_window=plot_window_input_compare,
             )
             _save_fig(
                 fig_cmp_in,
@@ -3085,6 +3165,14 @@ def run_input_plots(
     export_mode = "single"
     export_run_label = analysis.run_label(run_dir)
     group_colors = analysis.group_colors_from_results(res)
+    plot_window_input_single, plot_window_warn = _resolve_plot_window_for_opts(
+        (res.get("sim_cfg", {}) or {}),
+        opts,
+        window_key="input_plot_window",
+        context="Input single",
+    )
+    if plot_window_warn:
+        print(plot_window_warn)
 
     if opts.get("plot_inputs_mean", True):
         summary_single = analysis.summarize_inputs_from_results(
@@ -3102,7 +3190,7 @@ def run_input_plots(
             groups=opts.get("input_groups"),
             show_std=opts.get("show_input_std", False),
             output_curve=curve_single,
-            plot_window=opts.get("input_plot_window"),
+            plot_window=plot_window_input_single,
             legend_loc=opts.get("input_legend_loc"),
             group_colors=group_colors,
             line_width=opts.get("input_linewidth", 2.0),
@@ -3134,7 +3222,7 @@ def run_input_plots(
                 group_colors=group_colors,
                 raster_style=opts.get("input_raster_style", "dot"),
                 max_trains_per_group=opts.get("input_raster_max_trains", 200),
-                plot_window=opts.get("input_plot_window", (None, None)),
+                plot_window=plot_window_input_single,
                 legend_loc=opts.get("input_legend_loc"),
                 plot_raster=True,
                 line_width=opts.get("input_linewidth", 2.0),
@@ -3517,6 +3605,11 @@ def _coerce_output_metric_plot_keys(metric_keys: Any) -> list[str]:
     return [key for key in _OUTPUT_METRIC_PLOT_DEFAULT_KEYS if key in options] or options
 
 
+def _coerce_output_metric_plot_style(style: Any) -> str:
+    value = str(style or "box").strip().lower()
+    return value if value in ("box", "bar") else "box"
+
+
 def _metric_values_from_trials(trials: list[Dict[str, Any]], metric_key: str) -> list[float]:
     vals: list[float] = []
     for trial in trials:
@@ -3524,6 +3617,19 @@ def _metric_values_from_trials(trials: list[Dict[str, Any]], metric_key: str) ->
         if val is not None:
             vals.append(val)
     return vals
+
+
+def _output_metric_spread_from_trials(
+    trials: list[float],
+    *,
+    std_mode: str,
+) -> Optional[float]:
+    if len(trials) < 2:
+        return None
+    spread = float(np.std(np.asarray(trials, dtype=float)))
+    if std_mode == "sem":
+        spread = spread / float(np.sqrt(len(trials)))
+    return spread
 
 
 def _output_metric_distribution_rows(
@@ -3606,7 +3712,11 @@ def _plot_output_metric_distributions(
     payload: Dict[str, Any],
     *,
     metric_keys: list[str],
+    plot_style: str = "box",
+    show_points: bool = True,
     jitter_points: bool = True,
+    show_error: bool = False,
+    std_mode: str = "std",
 ) -> Optional[Any]:
     by_label = payload.get("by_label") or {}
     labels = list(by_label.keys())
@@ -3616,6 +3726,8 @@ def _plot_output_metric_distributions(
     if not metric_keys:
         print("Output metric plot skipped: no metrics selected.")
         return None
+    plot_style_use = _coerce_output_metric_plot_style(plot_style)
+    std_mode_use = "sem" if str(std_mode or "std").strip().lower() == "sem" else "std"
 
     n_metrics = len(metric_keys)
     ncols = 1 if n_metrics == 1 else min(3, n_metrics)
@@ -3652,47 +3764,76 @@ def _plot_output_metric_distributions(
             series_color = color_by_label.get(label, "#4C72B0")
             trials = _metric_values_from_trials(entry.get("trials") or [], metric_key)
             mean_val = _coerce_metric_numeric((entry.get("summary") or {}).get(metric_key))
-            if len(trials) >= 2:
+            if mean_val is None and trials:
+                mean_val = float(np.mean(np.asarray(trials, dtype=float)))
+
+            if plot_style_use == "box":
+                if len(trials) >= 2:
+                    has_data = True
+                    ax.boxplot(
+                        [trials],
+                        positions=[pos],
+                        widths=0.55,
+                        showfliers=False,
+                        patch_artist=True,
+                        boxprops={"facecolor": _with_alpha(series_color, 0.25), "edgecolor": series_color, "linewidth": 1.1},
+                        medianprops={"color": series_color, "linewidth": 1.4},
+                        whiskerprops={"color": series_color, "linewidth": 1.0},
+                        capprops={"color": series_color, "linewidth": 1.0},
+                    )
+                if mean_val is not None:
+                    has_data = True
+                    if source == "curve":
+                        ax.scatter([pos], [mean_val], marker="D", s=40, color=series_color, zorder=4)
+                    else:
+                        ax.scatter(
+                            [pos],
+                            [mean_val],
+                            marker="o",
+                            s=40,
+                            facecolors="none",
+                            edgecolors=series_color,
+                            linewidths=1.2,
+                            zorder=4,
+                        )
+            else:
+                if mean_val is not None:
+                    has_data = True
+                    spread = None
+                    if show_error and source != "curve":
+                        spread = _output_metric_spread_from_trials(trials, std_mode=std_mode_use)
+                    bar_kwargs: Dict[str, Any] = {}
+                    if spread is not None:
+                        bar_kwargs.update({
+                            "yerr": [spread],
+                            "ecolor": series_color,
+                            "capsize": 3,
+                            "error_kw": {"linewidth": 1.0},
+                        })
+                    ax.bar(
+                        [pos],
+                        [mean_val],
+                        width=0.62,
+                        color=_with_alpha(series_color, 0.25),
+                        edgecolor=series_color,
+                        linewidth=1.1,
+                        zorder=2,
+                        **bar_kwargs,
+                    )
+
+            if show_points and trials:
                 has_data = True
-                ax.boxplot(
-                    [trials],
-                    positions=[pos],
-                    widths=0.55,
-                    showfliers=False,
-                    patch_artist=True,
-                    boxprops={"facecolor": _with_alpha(series_color, 0.25), "edgecolor": series_color, "linewidth": 1.1},
-                    medianprops={"color": series_color, "linewidth": 1.4},
-                    whiskerprops={"color": series_color, "linewidth": 1.0},
-                    capprops={"color": series_color, "linewidth": 1.0},
-                )
-            if trials and jitter_points:
-                has_data = True
-                x = np.full(len(trials), float(pos)) + rng.uniform(-0.1, 0.1, size=len(trials))
-                ax.scatter(x, trials, s=18, color=_with_alpha(series_color, 0.75), zorder=3)
-            elif trials:
-                has_data = True
+                if jitter_points:
+                    x = np.full(len(trials), float(pos)) + rng.uniform(-0.1, 0.1, size=len(trials))
+                else:
+                    x = np.full(len(trials), float(pos))
                 ax.scatter(
-                    np.full(len(trials), float(pos)),
+                    x,
                     trials,
-                    s=18,
+                    s=16,
                     color=_with_alpha(series_color, 0.75),
                     zorder=3,
                 )
-            if mean_val is not None:
-                has_data = True
-                if source == "curve":
-                    ax.scatter([pos], [mean_val], marker="D", s=40, color=series_color, zorder=4)
-                else:
-                    ax.scatter(
-                        [pos],
-                        [mean_val],
-                        marker="o",
-                        s=40,
-                        facecolors="none",
-                        edgecolors=series_color,
-                        linewidths=1.2,
-                        zorder=4,
-                    )
         ax.set_xticks(list(range(1, len(labels) + 1)))
         ax.set_xticklabels(labels, rotation=20, ha="right")
         ax.set_title(metric_key)
@@ -3706,14 +3847,38 @@ def _plot_output_metric_distributions(
 
     if first_ax is not None:
         from matplotlib.lines import Line2D
+        from matplotlib.patches import Patch
 
-        legend_handles = [
-            Line2D([0], [0], marker="o", color="none", markerfacecolor="#2A9D8F", markeredgecolor="#2A9D8F", markersize=6, label="Trials"),
-            Line2D([0], [0], marker="o", color="none", markerfacecolor="none", markeredgecolor="#111111", markersize=6, label="Run mean"),
-            Line2D([0], [0], marker="D", color="none", markerfacecolor="#E07A5F", markeredgecolor="#E07A5F", markersize=6, label="Curve mean"),
-        ]
-        first_ax.legend(handles=legend_handles, loc="best", fontsize=8)
-    fig.suptitle("Output metric distributions", fontsize=12)
+        legend_handles = []
+        if show_points:
+            legend_handles.append(
+                Line2D(
+                    [0],
+                    [0],
+                    marker="o",
+                    color="none",
+                    markerfacecolor="#2A9D8F",
+                    markeredgecolor="#2A9D8F",
+                    markersize=6,
+                    label="Trials",
+                )
+            )
+        if plot_style_use == "box":
+            legend_handles.extend([
+                Line2D([0], [0], marker="o", color="none", markerfacecolor="none", markeredgecolor="#111111", markersize=6, label="Run mean"),
+                Line2D([0], [0], marker="D", color="none", markerfacecolor="#E07A5F", markeredgecolor="#E07A5F", markersize=6, label="Curve mean"),
+            ])
+        else:
+            legend_handles.append(
+                Patch(facecolor=(0.25, 0.25, 0.25, 0.25), edgecolor="#333333", linewidth=1.0, label="Mean bar")
+            )
+            if show_error:
+                legend_handles.append(
+                    Line2D([0], [0], color="#333333", linewidth=1.2, label=f"Run {std_mode_use.upper()}")
+                )
+        if legend_handles:
+            first_ax.legend(handles=legend_handles, loc="best", fontsize=8)
+    fig.suptitle(f"Output metric distributions ({plot_style_use})", fontsize=12)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     return fig
 
@@ -3723,7 +3888,10 @@ def run_output_metric_distributions(
     opts: Dict[str, Any],
     *,
     metric_keys: Optional[list[str]] = None,
+    plot_style: str = "box",
+    show_points: bool = True,
     jitter_points: bool = True,
+    show_error: bool = False,
     save_plots: bool = False,
     save_data: bool = False,
     plots_dpi: int = 150,
@@ -3731,15 +3899,25 @@ def run_output_metric_distributions(
 ) -> Optional[Dict[str, Any]]:
     payload = _collect_output_metric_distributions(selection, opts)
     metric_keys_use = _coerce_output_metric_plot_keys(metric_keys)
+    plot_style_use = _coerce_output_metric_plot_style(plot_style)
+    std_mode = _output_metrics_std_mode(opts)
     fig = _plot_output_metric_distributions(
         payload,
         metric_keys=metric_keys_use,
+        plot_style=plot_style_use,
+        show_points=bool(show_points),
         jitter_points=bool(jitter_points),
+        show_error=bool(show_error),
+        std_mode=std_mode,
     )
     if fig is None:
         return None
     rows = _output_metric_distribution_rows(payload, metric_keys_use)
     payload["metric_keys"] = metric_keys_use
+    payload["plot_style"] = plot_style_use
+    payload["show_points"] = bool(show_points)
+    payload["show_error"] = bool(show_error)
+    payload["std_mode"] = std_mode
     payload["rows"] = rows
     payload["figure"] = analysis.resolve_figure(fig)
     if save_plots:
@@ -3893,12 +4071,20 @@ def format_kv_table(
     *,
     title: str = "Output metrics",
     order: Optional[list[str]] = None,
+    metric_keys: Optional[list[str]] = None,
 ) -> str:
     lines = [f"### {title}", "| Metric | Value |", "| --- | --- |"]
     data = _filter_metrics_for_display(data)
-    for key in _ordered_metric_keys(list(data.keys()), order):
-        if key.endswith("_spread") or key == "output_metrics_std_mode":
-            continue
+    keys = [
+        key
+        for key in _ordered_metric_keys(list(data.keys()), order)
+        if not key.endswith("_spread") and key != "output_metrics_std_mode"
+    ]
+    if metric_keys:
+        selected = [key for key in metric_keys if key in keys]
+        if selected:
+            keys = selected
+    for key in keys:
         lines.append(f"| {_format_metric_key(key)} | {_format_metric_cell(data, key)} |")
     return "\n".join(lines)
 
@@ -3958,22 +4144,27 @@ def format_kv_table_columns(
     show_deltas: bool = False,
     highlight_best: bool = False,
     order: Optional[list[str]] = None,
+    metric_keys: Optional[list[str]] = None,
 ) -> str:
     labels = list(data_by_label.keys())
     if not labels:
         return format_kv_table({}, title=title)
     filtered = {label: _filter_metrics_for_display(data_by_label[label]) for label in labels}
-    metric_keys = list(filtered[labels[0]].keys())
+    metric_keys_all = list(filtered[labels[0]].keys())
     for label in labels[1:]:
         for key in filtered[label].keys():
-            if key not in metric_keys:
-                metric_keys.append(key)
-    metric_keys = [
+            if key not in metric_keys_all:
+                metric_keys_all.append(key)
+    metric_keys_use = [
         key
-        for key in metric_keys
+        for key in metric_keys_all
         if not key.endswith("_spread") and key != "output_metrics_std_mode"
     ]
-    metric_keys = _ordered_metric_keys(metric_keys, order)
+    metric_keys_use = _ordered_metric_keys(metric_keys_use, order)
+    if metric_keys:
+        selected = [key for key in metric_keys if key in metric_keys_use]
+        if selected:
+            metric_keys_use = selected
 
     best_by_metric = _best_labels_by_metric(filtered, reference_label=reference_label) if highlight_best else {}
     header_labels = [
@@ -3982,7 +4173,7 @@ def format_kv_table_columns(
     header = "| Metric | " + " | ".join(header_labels) + " |"
     sep = "| --- | " + " | ".join(["---"] * len(labels)) + " |"
     lines = [f"### {title}", header, sep]
-    for key in metric_keys:
+    for key in metric_keys_use:
         row = []
         for label in labels:
             val = filtered[label].get(key, "")
@@ -4062,11 +4253,12 @@ def format_output_metrics_tables(
     *,
     title: str = "Output metrics",
     show_params: bool = True,
+    metric_keys: Optional[list[str]] = None,
 ) -> str:
     params, values = split_output_metrics(metrics)
     parts = []
     if values:
-        parts.append(format_kv_table(values, title=title, order=_OUTPUT_METRIC_VALUE_ORDER))
+        parts.append(format_kv_table(values, title=title, order=_OUTPUT_METRIC_VALUE_ORDER, metric_keys=metric_keys))
     if show_params and params:
         parts.append(format_kv_table(params, title=f"{title} (params)"))
     return "\n\n".join(parts)
@@ -4080,6 +4272,7 @@ def format_output_metrics_tables_columns(
     reference_label: Optional[str] = None,
     show_deltas: bool = False,
     highlight_best: bool = False,
+    metric_keys: Optional[list[str]] = None,
 ) -> str:
     params_by_label, values_by_label = split_output_metrics_columns(data_by_label)
     parts = []
@@ -4092,6 +4285,7 @@ def format_output_metrics_tables_columns(
                 show_deltas=show_deltas,
                 highlight_best=highlight_best,
                 order=_OUTPUT_METRIC_VALUE_ORDER,
+                metric_keys=metric_keys,
             )
         )
     if show_params and any(params_by_label.values()):
@@ -4214,6 +4408,8 @@ def output_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "output_metric_window_alpha": g.get("output_metric_window_alpha"),
         "output_shade_alpha": g.get("output_shade_alpha"),
         "output_metrics_std_mode": g.get("output_metrics_std_mode", "std"),
+        "auto_plot_window_from_stim": bool(g.get("auto_plot_window_from_stim", False)),
+        "plot_window_adjustment_ms": g.get("plot_window_adjustment_ms"),
     }
 
 
@@ -4240,6 +4436,8 @@ def input_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "input_output_linewidth": g.get("input_output_linewidth"),
         "input_raster_linewidth": g.get("input_raster_linewidth"),
         "input_stim_linewidth": g.get("input_stim_linewidth"),
+        "auto_plot_window_from_stim": bool(g.get("auto_plot_window_from_stim", False)),
+        "plot_window_adjustment_ms": g.get("plot_window_adjustment_ms"),
     }
 
 
@@ -4330,7 +4528,10 @@ def run_output_metric_distributions_from_globals(g: Dict[str, Any]) -> Optional[
         sel,
         opts,
         metric_keys=list(g.get("output_metrics_plot_keys") or []),
+        plot_style=str(g.get("output_metrics_plot_style", "box") or "box"),
+        show_points=bool(g.get("output_metrics_plot_show_points", g.get("output_metrics_plot_jitter", True))),
         jitter_points=bool(g.get("output_metrics_plot_jitter", True)),
+        show_error=bool(g.get("output_metrics_plot_show_error", False)),
         save_plots=bool(g.get("output_metrics_plot_save_plot", False)),
         save_data=bool(g.get("output_metrics_plot_save_data", False)),
         plots_dpi=int(g.get("plots_dpi", 150)),
@@ -4521,6 +4722,17 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
     window_end_txt = widgets.Text(value="" if plot_window[1] is None else str(plot_window[1]), description="tstop")
     window_y_start_txt = widgets.Text(value="" if y_window[0] is None else str(y_window[0]), description="ystart")
     window_y_end_txt = widgets.Text(value="" if y_window[1] is None else str(y_window[1]), description="ystop")
+    window_adjust_default = _safe_float(g.get("plot_window_adjustment_ms"))
+    if window_adjust_default is None:
+        window_adjust_default = 100.0
+    auto_window_cb = widgets.Checkbox(
+        value=bool(g.get("auto_plot_window_from_stim", False)),
+        description="Auto window",
+    )
+    window_adjust_txt = widgets.FloatText(
+        value=float(window_adjust_default),
+        description="Window ±ms",
+    )
     output_stim_start_txt = widgets.Text(
         value="" if g.get("output_stim_start_ms") is None else str(g.get("output_stim_start_ms")),
         description="Stim start",
@@ -4596,6 +4808,8 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
             analysis.parse_optional_float(window_y_end_txt.value),
         )
         g["output_plot_window_zero_origin"] = bool(output_window_zero_cb.value)
+        g["auto_plot_window_from_stim"] = bool(auto_window_cb.value)
+        g["plot_window_adjustment_ms"] = float(window_adjust_txt.value)
         g["output_stim_start_ms"] = analysis.parse_optional_float(output_stim_start_txt.value)
         g["output_stim_stop_ms"] = analysis.parse_optional_float(output_stim_stop_txt.value)
         g["output_curve_mode"] = output_curve_mode_dd.value
@@ -4634,7 +4848,7 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
         widgets.VBox([
             widgets.HBox([outputs_btn, outputs_help_btn, compare_preset_cb, outputs_raster_cb, output_window_zero_cb, outputs_style_dd, outputs_win_txt]),
             widgets.HBox([output_bin_txt, output_smooth_mode_dd, outputs_shade_dd, outputs_compare_layout_dd]),
-            widgets.HBox([window_start_txt, window_end_txt, window_y_start_txt, window_y_end_txt, output_stim_start_txt, output_stim_stop_txt]),
+            widgets.HBox([window_start_txt, window_end_txt, window_y_start_txt, window_y_end_txt, auto_window_cb, window_adjust_txt, output_stim_start_txt, output_stim_stop_txt]),
             widgets.HBox([output_curve_mode_dd, output_curve_plot_mode_dd, output_norm_mode_dd, outputs_norm_txt]),
             widgets.HBox([output_csv_path_txt, output_csv_format_dd, output_csv_auto_cb, output_csv_btn]),
             out_outputs,
@@ -4706,6 +4920,17 @@ def build_inputs_ui(g: Dict[str, Any]) -> None:
     input_window = g.get("input_plot_window")
     input_window_start_txt = widgets.Text(value="" if input_window[0] is None else str(input_window[0]), description="tstart")
     input_window_end_txt = widgets.Text(value="" if input_window[1] is None else str(input_window[1]), description="tstop")
+    window_adjust_default = _safe_float(g.get("plot_window_adjustment_ms"))
+    if window_adjust_default is None:
+        window_adjust_default = 100.0
+    auto_window_cb = widgets.Checkbox(
+        value=bool(g.get("auto_plot_window_from_stim", False)),
+        description="Auto window",
+    )
+    window_adjust_txt = widgets.FloatText(
+        value=float(window_adjust_default),
+        description="Window ±ms",
+    )
 
     compare_layout_dd = widgets.Dropdown(options=["side-by-side", "stacked", "overlay"], value=g.get("compare_input_layout"), description="Layout")
     compare_std_cb = widgets.Checkbox(value=g.get("compare_show_input_std"), description="Compare std")
@@ -4752,6 +4977,8 @@ def build_inputs_ui(g: Dict[str, Any]) -> None:
             analysis.parse_optional_float(input_window_start_txt.value),
             analysis.parse_optional_float(input_window_end_txt.value),
         )
+        g["auto_plot_window_from_stim"] = bool(auto_window_cb.value)
+        g["plot_window_adjustment_ms"] = float(window_adjust_txt.value)
         g["input_legend_loc"] = inputs_legend_dd.value
         g["compare_input_layout"] = compare_layout_dd.value
         g["compare_show_input_std"] = compare_std_cb.value
@@ -4783,7 +5010,7 @@ def build_inputs_ui(g: Dict[str, Any]) -> None:
             widgets.HBox([inputs_btn, inputs_help_btn, inputs_mean_cb, inputs_raster_cb, inputs_std_cb, inputs_source_dd]),
             widgets.HBox([inputs_groups_txt, inputs_bin_txt, inputs_smooth_txt, inputs_std_mode_dd, inputs_legend_dd]),
             widgets.HBox([raster_trial_txt, raster_max_txt, raster_win_txt, raster_style_dd]),
-            widgets.HBox([input_window_start_txt, input_window_end_txt]),
+            widgets.HBox([input_window_start_txt, input_window_end_txt, auto_window_cb, window_adjust_txt]),
             widgets.HBox([compare_layout_dd, compare_std_cb]),
             widgets.HBox([input_csv_path_txt, input_csv_format_dd, input_csv_auto_cb, input_csv_btn]),
             out_inputs,
@@ -4972,9 +5199,24 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
     )
     metrics_plot_btn = widgets.Button(description="Plot metric dist")
     metrics_plot_btn.layout = widgets.Layout(width="150px", flex="0 0 auto")
+    metrics_plot_style_val = _coerce_output_metric_plot_style(g.get("output_metrics_plot_style", "box"))
+    metrics_plot_style_dd = widgets.Dropdown(
+        options=[("Box/whisker", "box"), ("Bar (mean)", "bar")],
+        value=metrics_plot_style_val,
+        description="Style",
+        layout=widgets.Layout(width="220px"),
+    )
+    metrics_plot_show_points_cb = widgets.Checkbox(
+        value=bool(g.get("output_metrics_plot_show_points", g.get("output_metrics_plot_jitter", True))),
+        description="Trial points",
+    )
     metrics_plot_jitter_cb = widgets.Checkbox(
         value=bool(g.get("output_metrics_plot_jitter", True)),
-        description="Trial points",
+        description="Jitter points",
+    )
+    metrics_plot_show_error_cb = widgets.Checkbox(
+        value=bool(g.get("output_metrics_plot_show_error", False)),
+        description="Error bars",
     )
     metrics_plot_save_plot_cb = widgets.Checkbox(
         value=bool(g.get("output_metrics_plot_save_plot", False)),
@@ -4989,10 +5231,27 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         description="CSV path",
         layout=widgets.Layout(width="70%"),
     )
+    metrics_use_plot_keys_cb = widgets.Checkbox(
+        value=bool(g.get("output_metrics_use_plot_keys_for_tables", True)),
+        description="Table uses Plot metrics",
+    )
+    metrics_plot_jitter_cb.disabled = not metrics_plot_show_points_cb.value
+    metrics_plot_show_points_cb.observe(
+        lambda *_: setattr(metrics_plot_jitter_cb, "disabled", not metrics_plot_show_points_cb.value),
+        names="value",
+    )
     metrics_box = widgets.VBox([
         widgets.HBox([metrics_ref_dd, metrics_std_mode_dd, metrics_show_params_cb]),
-        widgets.HBox([metrics_show_delta_cb, metrics_highlight_cb]),
-        widgets.HBox([metrics_plot_btn, metrics_plot_jitter_cb, metrics_plot_save_plot_cb, metrics_plot_save_data_cb]),
+        widgets.HBox([metrics_show_delta_cb, metrics_highlight_cb, metrics_use_plot_keys_cb]),
+        widgets.HBox([
+            metrics_plot_btn,
+            metrics_plot_style_dd,
+            metrics_plot_show_points_cb,
+            metrics_plot_jitter_cb,
+            metrics_plot_show_error_cb,
+            metrics_plot_save_plot_cb,
+            metrics_plot_save_data_cb,
+        ]),
         metrics_plot_sel,
         metrics_plot_data_path_txt,
     ])
@@ -5208,8 +5467,12 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         g["output_metrics_std_mode"] = metrics_std_mode_dd.value
         g["output_metrics_show_delta"] = metrics_show_delta_cb.value
         g["output_metrics_highlight_best"] = metrics_highlight_cb.value
+        g["output_metrics_use_plot_keys_for_tables"] = bool(metrics_use_plot_keys_cb.value)
         g["output_metrics_plot_keys"] = list(metrics_plot_sel.value)
+        g["output_metrics_plot_style"] = metrics_plot_style_dd.value
+        g["output_metrics_plot_show_points"] = bool(metrics_plot_show_points_cb.value)
         g["output_metrics_plot_jitter"] = bool(metrics_plot_jitter_cb.value)
+        g["output_metrics_plot_show_error"] = bool(metrics_plot_show_error_cb.value)
         g["output_metrics_plot_save_plot"] = bool(metrics_plot_save_plot_cb.value)
         g["output_metrics_plot_save_data"] = bool(metrics_plot_save_data_cb.value)
         g["output_metrics_plot_data_path"] = str(metrics_plot_data_path_txt.value or "").strip()
@@ -5265,6 +5528,11 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
                     ref_label = g.get("output_metrics_ref_label")
                     show_delta = bool(g.get("output_metrics_show_delta", False))
                     highlight_best = bool(g.get("output_metrics_highlight_best", False))
+                    table_metric_keys = (
+                        list(g.get("output_metrics_plot_keys") or [])
+                        if bool(g.get("output_metrics_use_plot_keys_for_tables", True))
+                        else None
+                    )
                     if isinstance(metrics, dict) and all(isinstance(v, dict) for v in metrics.values()):
                         show_md(
                             format_output_metrics_tables_columns(
@@ -5274,12 +5542,20 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
                                 reference_label=ref_label,
                                 show_deltas=show_delta,
                                 highlight_best=highlight_best,
+                                metric_keys=table_metric_keys,
                             )
                         )
                     else:
                         sel = get_selection_from_globals(g)
                         label = analysis.run_label(analysis.resolve_run(sel["base"], sel["run_single"]))
-                        show_md(format_output_metrics_tables(metrics, title=f"Output metrics ({label})", show_params=show_params))
+                        show_md(
+                            format_output_metrics_tables(
+                                metrics,
+                                title=f"Output metrics ({label})",
+                                show_params=show_params,
+                                metric_keys=table_metric_keys,
+                            )
+                        )
 
     def _on_plot_metrics(_):
         _refresh_metrics_refs()
@@ -5299,7 +5575,13 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
                 for label, entry in (payload.get("by_label") or {}).items()
                 if str((entry or {}).get("source") or "") == "curve"
             ]
-            if curve_labels:
+            plot_style = str(payload.get("plot_style") or "box")
+            if plot_style == "bar":
+                print("Bar mode shows mean bars per run/curve.")
+                if payload.get("show_error", False):
+                    std_mode = str(payload.get("std_mode") or "std").upper()
+                    print(f"Error bars are shown for run entries ({std_mode}); curve entries have no error bars.")
+            elif curve_labels:
                 print("Curve-only entries are shown as mean markers (no trial boxes).")
 
     run_btn.on_click(_on_run)

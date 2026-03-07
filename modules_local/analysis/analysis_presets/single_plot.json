@@ -1,0 +1,59 @@
+{
+  "title": "single_plot",
+  "defaults": {
+    "trial_idx": 0,
+    "top_input_groups": [],
+    "raster_input_groups": [],
+    "top_input_mode": "average",
+    "top_layout": "overlay",
+    "top_fill_under": false,
+    "top_fill_alpha": 0.28,
+
+    "input_bin_ms": 5.0,
+    "input_smooth_ms": 25.0,
+    "input_source": "stats",
+    "input_raster_style": "dot",
+
+    "include_output_raster": true,
+    "output_raster_style": "dot",
+
+    "output_curve_source": "recompute",
+    "output_recompute_bin_ms": 1.0,
+    "output_recompute_smooth_ms": 25.0,
+    "output_recompute_smooth_mode": "center",
+
+    "output_mode": "raw",
+    "output_norm_kind": "peak",
+    "output_baseline_ms": 100.0,
+    "output_baseline_mode": "window",
+    "output_baseline_center_ms": null,
+    "output_norm_window": "stim",
+
+    "output_fill_under": true,
+    "output_fill_alpha": 0.28,
+    "output_band_mode": null,
+    "output_band_alpha": 0.20,
+
+    "plot_window": [null, null],
+    "auto_plot_window_from_stim": true,
+    "plot_window_adjustment_ms": 100.0,
+    "show_stim_lines": true,
+    "show_y_axes": true,
+    "show_y_axis_titles": true,
+    "show_input_legend": false,
+
+    "figsize": [6, 6],
+    "panel_height_ratios": {
+      "top": 1.5,
+      "input_raster": 0.5,
+      "vm": 2.0,
+      "output_rate": 1.5,
+      "output_raster": 1.0
+    },
+    "show_panel_titles": false,
+
+    "export_path": "paper_panel",
+    "export_formats": ["svg"],
+    "dpi": 300
+  }
+}

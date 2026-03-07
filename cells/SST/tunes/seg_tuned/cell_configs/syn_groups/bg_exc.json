@@ -4,7 +4,7 @@
     "mode": "homogeneous_poisson",
     "color": "#2ca02c",
     "source": {
-      "freq": 0.01,
+      "freq": 0.1,
       "baseline": null,
       "path": null,
       "bin_ms": null
@@ -28,8 +28,8 @@
         }
       },
       "params": {
-        "wt_mean": 1.25,
-        "wt_std": 1.0,
+        "wt_mean": 0.05,
+        "wt_std": 0.33,
         "initW": 1.0,
         "gmax_AMPA": 0.001,
         "gmax_NMDA": 0.001,

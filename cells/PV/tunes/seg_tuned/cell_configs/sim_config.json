@@ -23,12 +23,16 @@
     false,
     null
   ],
+  "save_input_stats": true,
   "input_stats_bin_ms": 5.0,
   "avg_rate_curve_smooth_ms": 25.0,
-  "avg_rate_curve_smooth_mode": "causal",
+  "avg_rate_curve_smooth_mode": "center",
   "plots_win_size": 25.0,
   "plots_input_smooth_ms": 25.0,
   "plots_profile": "off",
+  "save_plots": true,
+  "save_plots_mode": "single_plot",
+  "save_plots_single_plot_preset": "modules_local/analysis/analysis_presets/single_plot.json",
   "randomness_mode": "random",
   "random_seed": null,
   "param_study": {
@@ -99,7 +103,5 @@
     "save_all_inputs": true,
     "save_all_traces": true,
     "save_syn_records_by_trial": true
-  },
-  "save_input_stats": true,
-  "soma_diam_multiplier": 6.0
+  }
 }

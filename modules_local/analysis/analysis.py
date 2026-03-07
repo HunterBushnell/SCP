@@ -2115,9 +2115,15 @@ def save_default_plots(
     input_bin_ms: Optional[float] = None,
     input_smooth_ms: Optional[float] = 25.0,
     raster_style: str = "dot",
+    plot_mode: str = "default",
+    single_plot_preset: Optional[Union[str, Path]] = None,
 ) -> Dict[str, Path]:
     """
     Save a small set of default plots into <run_dir>/plots.
+
+    plot_mode:
+      - "default": legacy output/input/synapse plots
+      - "single_plot": paper-panel single composite plot via preset JSON
 
     Returns a dict of plot name -> file path.
     """
@@ -2128,6 +2134,60 @@ def save_default_plots(
     plot_dir.mkdir(parents=True, exist_ok=True)
 
     saved: Dict[str, Path] = {}
+    mode = str(plot_mode or "default").strip().lower()
+
+    if mode in {"single_plot", "single-panel", "paper_panel", "paper-panel"}:
+        from . import paper_panel  # local import to avoid circular deps
+
+        try:
+            repo_root = find_scp_root(run_dir.resolve())
+        except Exception:
+            repo_root = Path.cwd()
+        preset_path = (
+            repo_root / "modules_local" / "analysis" / "analysis_presets" / "single_plot.json"
+            if single_plot_preset in (None, "", False)
+            else Path(str(single_plot_preset)).expanduser()
+        )
+        if not preset_path.is_absolute():
+            preset_path = (repo_root / preset_path).resolve()
+
+        panel_cfg: Dict[str, Any] = {}
+        try:
+            payload = json.loads(preset_path.read_text())
+            if isinstance(payload, dict):
+                defaults = payload.get("defaults", payload)
+                if isinstance(defaults, dict):
+                    panel_cfg = dict(defaults)
+        except Exception as exc:
+            print(f"save_plots single_plot preset load failed ({preset_path}): {exc}")
+
+        panel_cfg.setdefault("export_path", "paper_panel")
+        panel_cfg.setdefault("export_formats", ["svg"])
+        panel_cfg.setdefault("dpi", 150)
+
+        panel_result = paper_panel.plot_paper_panel_from_results(
+            results,
+            run_dir=run_dir,
+            **panel_cfg,
+        )
+        for w in panel_result.get("warnings", []) or []:
+            print(f"save_plots single_plot warning: {w}")
+
+        exported = [Path(p) for p in (panel_result.get("exported_paths") or [])]
+        if exported:
+            for i, path in enumerate(exported):
+                key = "single_plot" if i == 0 else f"single_plot_{i}"
+                saved[key] = path
+        else:
+            fig = panel_result.get("fig")
+            if fig is not None:
+                fallback_path = plot_dir / "single_plot.png"
+                fig.savefig(fallback_path, dpi=150)
+                saved["single_plot"] = fallback_path
+        return saved
+
+    if mode not in {"default", "legacy"}:
+        print(f"save_default_plots: unknown plot_mode={plot_mode!r}; using default mode.")
 
     # Output plot
     fig_out = plotting.plot_results(

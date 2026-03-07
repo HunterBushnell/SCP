@@ -106,6 +106,5 @@
     "save_all_inputs": true,
     "save_all_traces": true,
     "save_syn_records_by_trial": true
-  },
-  "soma_diam_multiplier": 8.0
+  }
 }
