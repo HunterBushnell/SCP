@@ -297,11 +297,38 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def _normalize_tune_dir(user_tune_dir: str) -> tuple[Path, Optional[str]]:
+    """
+    Resolve user-provided tune directory and auto-fix common `tune` -> `tunes` typo.
+
+    Returns
+    -------
+    (Path, Optional[str])
+        Resolved path and an optional note describing an applied normalization.
+    """
+    raw = Path(user_tune_dir)
+    resolved = (raw if raw.is_absolute() else (Path.cwd() / raw)).resolve()
+    if resolved.is_dir():
+        return resolved, None
+
+    parts = list(resolved.parts)
+    if "tune" in parts:
+        idx = parts.index("tune")
+        alt_parts = parts[:idx] + ["tunes"] + parts[idx + 1:]
+        alt = Path(*alt_parts)
+        if alt.is_dir():
+            return alt.resolve(), f"Normalized --tune-dir from '{resolved}' to '{alt.resolve()}'"
+
+    return resolved, None
+
+
 def main() -> None:
     job_start = time.perf_counter()
     args = parse_args()
     if args.tune_dir:
-        tune_dir = Path(args.tune_dir).resolve()
+        tune_dir, tune_dir_note = _normalize_tune_dir(args.tune_dir)
+        if tune_dir_note:
+            print(tune_dir_note)
     else:
         if not (args.cell and args.tune):
             raise ValueError("Provide either --tune-dir or both --cell and --tune.")
@@ -314,7 +341,10 @@ def main() -> None:
     manifest_path = tune_dir / "manifest.json"
 
     if not sim_path.is_file():
-        raise FileNotFoundError(f"Missing sim_config.json in {config_root}")
+        raise FileNotFoundError(
+            f"Missing sim_config.json in {config_root}. "
+            f"Resolved --tune-dir: {tune_dir}"
+        )
     if not syn_path.is_file():
         raise FileNotFoundError(f"Missing syn_config.json in {config_root}")
     if not manifest_path.is_file():
@@ -382,6 +412,20 @@ def main() -> None:
     cell_cfg.setdefault("cell_name", tune_dir.parent.name)  # e.g., SST or PV
     paths = cell_cfg.setdefault("paths", {})
     paths.setdefault("manifest", "manifest.json")
+
+    # Resolve relative manifest paths to the tune directory instead of CWD.
+    # This keeps CLI behavior consistent regardless of where run_pipeline is launched.
+    raw_manifest = Path(str(paths.get("manifest", "manifest.json")))
+    if raw_manifest.is_absolute():
+        resolved_manifest = raw_manifest
+    else:
+        manifest_candidates = [
+            Path.cwd() / raw_manifest,
+            cell_config_path.parent / raw_manifest,
+            tune_dir / raw_manifest,
+        ]
+        resolved_manifest = next((p for p in manifest_candidates if p.is_file()), manifest_candidates[1])
+    paths["manifest"] = str(resolved_manifest)
 
     tuning = cell_cfg.setdefault("tuning", {})
     if "soma_diam_multiplier" not in tuning:

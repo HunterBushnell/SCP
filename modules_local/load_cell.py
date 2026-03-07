@@ -22,6 +22,7 @@ Those belong in the prep steps (e.g., 0_download or the 5_colab setup cell).
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -199,29 +200,39 @@ def load_cell(cell_config: Dict[str, Any]) -> LoadedCell:
     # ------------------------------------------------------------------
     # AllenSDK: load description and create Utils
     # ------------------------------------------------------------------
-    description = Config().load(str(manifest_path))
-    utils = Utils(description)
-    h = utils.h
-
-    # Cast all genome values to float (your original pattern)
-    genome = utils.description.data.get("genome", [])
-    for d in genome:
-        if "value" in d:
-            d["value"] = float(d["value"])
-
-    # Configure morphology and load cell parameters (your reused pattern)
-    morphology_path = description.manifest.get_path("MORPHOLOGY")
-    utils.generate_morphology(morphology_path.encode("ascii", "ignore"))
+    # AllenSDK manifests often reference additional files with relative paths
+    # (e.g., model_file and morphology entries). Keep CWD pinned to the
+    # manifest directory during AllenSDK loading so these lookups resolve.
+    original_cwd = Path.cwd()
+    manifest_dir = manifest_path.parent
     used_fallback_loader = False
     try:
-        utils.load_cell_parameters()
-    except KeyError as exc:
-        # All-active fit files can omit passive e_pas/cm and store them in genome.
-        if str(exc).strip("'\"") in {"e_pas", "cm"}:
-            _apply_genome_based_parameters(utils)
-            used_fallback_loader = True
-        else:
-            raise
+        os.chdir(manifest_dir)
+
+        description = Config().load(str(manifest_path.name))
+        utils = Utils(description)
+        h = utils.h
+
+        # Cast all genome values to float (your original pattern)
+        genome = utils.description.data.get("genome", [])
+        for d in genome:
+            if "value" in d:
+                d["value"] = float(d["value"])
+
+        # Configure morphology and load cell parameters (your reused pattern)
+        morphology_path = description.manifest.get_path("MORPHOLOGY")
+        utils.generate_morphology(morphology_path.encode("ascii", "ignore"))
+        try:
+            utils.load_cell_parameters()
+        except KeyError as exc:
+            # All-active fit files can omit passive e_pas/cm and store them in genome.
+            if str(exc).strip("'\"") in {"e_pas", "cm"}:
+                _apply_genome_based_parameters(utils)
+                used_fallback_loader = True
+            else:
+                raise
+    finally:
+        os.chdir(original_cwd)
 
     # Optional soma diameter scaling (your PV tuning behavior)
     if hasattr(h, "soma") and len(h.soma) > 0:

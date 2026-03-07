@@ -3,7 +3,7 @@
   "defaults": {
     "trial_idx": 0,
     "top_input_groups": [],
-    "raster_input_groups": [],
+    "raster_input_groups": ["bg_inh"],
     "top_input_mode": "average",
     "top_layout": "overlay",
     "top_fill_under": false,
