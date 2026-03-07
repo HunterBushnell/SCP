@@ -2117,6 +2117,7 @@ def save_default_plots(
     raster_style: str = "dot",
     plot_mode: str = "default",
     single_plot_preset: Optional[Union[str, Path]] = None,
+    overwrite: bool = False,
 ) -> Dict[str, Path]:
     """
     Save a small set of default plots into <run_dir>/plots.
@@ -2164,6 +2165,7 @@ def save_default_plots(
         panel_cfg.setdefault("export_path", "paper_panel")
         panel_cfg.setdefault("export_formats", ["svg"])
         panel_cfg.setdefault("dpi", 150)
+        panel_cfg.setdefault("export_overwrite", bool(overwrite))
 
         panel_result = paper_panel.plot_paper_panel_from_results(
             results,
@@ -2174,16 +2176,24 @@ def save_default_plots(
             print(f"save_plots single_plot warning: {w}")
 
         exported = [Path(p) for p in (panel_result.get("exported_paths") or [])]
+        requested = [Path(p) for p in (panel_result.get("requested_export_paths") or [])]
         if exported:
             for i, path in enumerate(exported):
                 key = "single_plot" if i == 0 else f"single_plot_{i}"
                 saved[key] = path
-        else:
+        elif not requested:
             fig = panel_result.get("fig")
             if fig is not None:
                 fallback_path = plot_dir / "single_plot.png"
-                fig.savefig(fallback_path, dpi=150)
-                saved["single_plot"] = fallback_path
+                saved_path = save_figure(
+                    fig,
+                    fallback_path,
+                    enabled=True,
+                    dpi=150,
+                    overwrite=overwrite,
+                )
+                if saved_path is not None:
+                    saved["single_plot"] = saved_path
         return saved
 
     if mode not in {"default", "legacy"}:
@@ -2199,8 +2209,15 @@ def save_default_plots(
     )
     out_path = plot_dir / "output_plot.png"
     fig_out = fig_out[0] if isinstance(fig_out, tuple) else fig_out
-    fig_out.savefig(out_path, dpi=150)
-    saved["output_plot"] = out_path
+    saved_path = save_figure(
+        fig_out,
+        out_path,
+        enabled=True,
+        dpi=150,
+        overwrite=overwrite,
+    )
+    if saved_path is not None:
+        saved["output_plot"] = saved_path
 
     # Input mean curves
     if save_inputs:
@@ -2220,8 +2237,15 @@ def save_default_plots(
                 group_colors=group_colors,
             )
             in_path = plot_dir / "inputs_mean.png"
-            fig_in.savefig(in_path, dpi=150)
-            saved["inputs_mean"] = in_path
+            saved_path = save_figure(
+                fig_in,
+                in_path,
+                enabled=True,
+                dpi=150,
+                overwrite=overwrite,
+            )
+            if saved_path is not None:
+                saved["inputs_mean"] = saved_path
         except Exception:
             pass
 
@@ -2240,8 +2264,15 @@ def save_default_plots(
                 win_size=0.1,
             )
             syn_path = plot_dir / "syn_weight_prob.png"
-            plt.gcf().savefig(syn_path, dpi=150)
-            saved["syn_weight_prob"] = syn_path
+            saved_path = save_figure(
+                plt.gcf(),
+                syn_path,
+                enabled=True,
+                dpi=150,
+                overwrite=overwrite,
+            )
+            if saved_path is not None:
+                saved["syn_weight_prob"] = saved_path
 
     return saved
 
@@ -3601,8 +3632,19 @@ def resolve_figure(obj=None):
     return plt.gcf()
 
 
-def save_figure(fig, out_path: Path, *, enabled: bool = True, dpi: int = 150) -> Optional[Path]:
+def save_figure(
+    fig,
+    out_path: Path,
+    *,
+    enabled: bool = True,
+    dpi: int = 150,
+    overwrite: bool = False,
+) -> Optional[Path]:
     if not enabled:
+        return None
+    out_path = Path(out_path)
+    if out_path.exists() and not bool(overwrite):
+        print(f"save_figure: exists, skipping (overwrite=False): {out_path}")
         return None
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig = resolve_figure(fig)

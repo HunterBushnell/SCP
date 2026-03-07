@@ -30,6 +30,7 @@
   "plots_win_size": 25.0,
   "plots_input_smooth_ms": 25.0,
   "plots_profile": "off",
+  "save_plots_overwrite": false,
   "randomness_mode": "random",
   "random_seed": null,
 

@@ -33,6 +33,7 @@
   "save_plots": true,
   "save_plots_mode": "single_plot",
   "save_plots_single_plot_preset": "modules_local/analysis/analysis_presets/single_plot.json",
+  "save_plots_overwrite": false,
   "randomness_mode": "random",
   "random_seed": null,
   "param_study": {

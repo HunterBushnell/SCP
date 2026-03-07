@@ -54,6 +54,7 @@
 
     "export_path": "paper_panel",
     "export_formats": ["svg"],
+    "export_overwrite": false,
     "dpi": 300
   }
 }

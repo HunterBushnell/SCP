@@ -551,6 +551,7 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
       - plots_profile ('off'|'basic'|'inputs'|'full')
       - save_plots_mode (optional: 'default'|'single_plot')
       - save_plots_single_plot_preset (optional path to paper single-plot preset JSON)
+      - save_plots_overwrite (optional: overwrite existing plot files when true)
       - param_study (dict with standard keys)
       - snapshot (optional dict): enables full debug capture
     """

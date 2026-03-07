@@ -71,6 +71,7 @@ HELP_EXTRA = textwrap.dedent(
     - Metric dist plot: box/whisker or bar by run for selected metrics.
     - Bar mode uses mean bars; optional error bars (std/sem) apply to run entries only.
     - Trial points and point jitter can be toggled for cleaner panels.
+    - Matrix shape is controlled by columns + panel size; legend can be toggled/relocated.
     - Table metrics can reuse the same metric selection as the distribution plot.
     - Compare configs: diff cell/geom/syn configs across runs.
     - Compare outputs/inputs: reuse plot logic with the current selection.
@@ -150,8 +151,8 @@ def resolve_compare(
     return run_a, run_b, res_a, res_b
 
 
-def _save_fig(fig, out_path, *, enabled: bool, dpi: int) -> None:
-    analysis.save_figure(fig, out_path, enabled=enabled, dpi=dpi)
+def _save_fig(fig, out_path, *, enabled: bool, dpi: int, overwrite: bool = False) -> None:
+    analysis.save_figure(fig, out_path, enabled=enabled, dpi=dpi, overwrite=overwrite)
 
 
 def _save_json(data: dict, out_path, *, enabled: bool) -> None:
@@ -1967,6 +1968,7 @@ def run_output_plots(
     preset_defaults = _load_compare_preset_defaults(selection.get("compare_preset_path"), base_dir)
     if preset_defaults:
         opts = _merge_preset_defaults(opts, preset_defaults)
+    save_overwrite = bool(opts.get("save_overwrite", False))
     preset_entries = _load_compare_preset(selection.get("compare_preset_path"), base_dir)
     list_entries = _compare_list_entries(selection) if not preset_entries else []
     if preset_entries or list_entries:
@@ -2198,6 +2200,7 @@ def run_output_plots(
                     analysis.plot_dir_for_compare(selection["base"], Path("compare_list"), Path("curves")) / "compare_output_curve_list.png",
                     enabled=save_plots,
                     dpi=plots_dpi,
+                    overwrite=save_overwrite,
                 )
                 _remember_figure(fig_curve, "compare_output_curve_list")
                 return _payload()
@@ -2334,6 +2337,7 @@ def run_output_plots(
                 analysis.plot_dir_for_compare(selection["base"], Path("compare_list"), Path("curves")) / "compare_output_curve_list.png",
                 enabled=save_plots,
                 dpi=plots_dpi,
+                overwrite=save_overwrite,
             )
             _remember_figure(fig_curve, "compare_output_curve_list")
             return _payload()
@@ -2547,6 +2551,7 @@ def run_output_plots(
                     analysis.plot_dir_for_compare(selection["base"], run_a, run_b) / "compare_outputs.png",
                     enabled=save_plots,
                     dpi=plots_dpi,
+                    overwrite=save_overwrite,
                 )
                 _remember_figure(fig_cmp, "compare_outputs")
 
@@ -2718,6 +2723,7 @@ def run_output_plots(
                         analysis.plot_dir_for_compare(selection["base"], run_a, run_b) / "compare_output_curve.png",
                         enabled=save_plots,
                         dpi=plots_dpi,
+                        overwrite=save_overwrite,
                     )
                     _remember_figure(fig_curve, "compare_output_curve")
             else:
@@ -2880,6 +2886,7 @@ def run_output_plots(
                 analysis.plot_dir_for_run(run_dir) / "output_plot.png",
                 enabled=save_plots,
                 dpi=plots_dpi,
+                overwrite=save_overwrite,
             )
             _remember_figure(plt.gcf(), "output_plot")
         else:
@@ -2908,6 +2915,7 @@ def run_output_plots(
                 analysis.plot_dir_for_run(run_dir) / "output_plot.png",
                 enabled=save_plots,
                 dpi=plots_dpi,
+                overwrite=save_overwrite,
             )
             _remember_figure(fig_out, "output_plot")
 
@@ -3033,6 +3041,7 @@ def run_output_plots(
                     analysis.plot_dir_for_run(run_dir) / "output_curve.png",
                     enabled=save_plots,
                     dpi=plots_dpi,
+                    overwrite=save_overwrite,
                 )
                 _remember_figure(fig_curve, "output_curve")
             _save_json(
@@ -3050,6 +3059,7 @@ def run_output_plots(
             analysis.plot_dir_for_run(run_dir) / "spike_stats.png",
             enabled=save_plots,
             dpi=plots_dpi,
+            overwrite=save_overwrite,
         )
         _remember_figure(plt.gcf(), "spike_stats")
         _save_json(
@@ -3072,6 +3082,7 @@ def run_input_plots(
     export_figures: list[tuple[Any, str]] = []
     export_mode = "single"
     export_run_label = ""
+    save_overwrite = bool(opts.get("save_overwrite", False))
 
     def _remember_figure(fig_obj: Any, plot_name: str) -> None:
         if fig_obj is None:
@@ -3150,6 +3161,7 @@ def run_input_plots(
                 analysis.plot_dir_for_compare(selection["base"], run_a, run_b) / "compare_inputs.png",
                 enabled=save_plots,
                 dpi=plots_dpi,
+                overwrite=save_overwrite,
             )
             _remember_figure(fig_cmp_in, "compare_inputs")
         if opts.get("plot_input_raster", False):
@@ -3202,6 +3214,7 @@ def run_input_plots(
             analysis.plot_dir_for_run(run_dir) / "inputs_mean.png",
             enabled=save_plots,
             dpi=plots_dpi,
+            overwrite=save_overwrite,
         )
         _remember_figure(fig_in, "inputs_mean")
         _save_json(
@@ -3234,6 +3247,7 @@ def run_input_plots(
                 analysis.plot_dir_for_run(run_dir) / "inputs_raster.png",
                 enabled=save_plots,
                 dpi=plots_dpi,
+                overwrite=save_overwrite,
             )
             _remember_figure(plt.gcf(), "inputs_raster")
         else:
@@ -3717,6 +3731,11 @@ def _plot_output_metric_distributions(
     jitter_points: bool = True,
     show_error: bool = False,
     std_mode: str = "std",
+    ncols: Optional[int] = None,
+    panel_size: tuple[float, float] = (4.8, 3.6),
+    bar_alpha: float = 0.25,
+    show_legend: bool = True,
+    legend_loc: str = "best",
 ) -> Optional[Any]:
     by_label = payload.get("by_label") or {}
     labels = list(by_label.keys())
@@ -3730,8 +3749,26 @@ def _plot_output_metric_distributions(
     std_mode_use = "sem" if str(std_mode or "std").strip().lower() == "sem" else "std"
 
     n_metrics = len(metric_keys)
-    ncols = 1 if n_metrics == 1 else min(3, n_metrics)
-    nrows = int(np.ceil(float(n_metrics) / float(ncols)))
+    try:
+        ncols_use = int(ncols) if ncols is not None else 0
+    except Exception:
+        ncols_use = 0
+    if ncols_use <= 0:
+        ncols_use = 1 if n_metrics == 1 else min(3, n_metrics)
+    ncols_use = max(1, min(ncols_use, n_metrics))
+    nrows = int(np.ceil(float(n_metrics) / float(ncols_use)))
+    panel_w, panel_h = 4.8, 3.6
+    if isinstance(panel_size, (list, tuple)) and len(panel_size) >= 2:
+        panel_w_in = _safe_float(panel_size[0])
+        panel_h_in = _safe_float(panel_size[1])
+        if panel_w_in is not None and panel_w_in > 0:
+            panel_w = float(panel_w_in)
+        if panel_h_in is not None and panel_h_in > 0:
+            panel_h = float(panel_h_in)
+    bar_alpha_use = _safe_float(bar_alpha)
+    if bar_alpha_use is None:
+        bar_alpha_use = 0.25
+    bar_alpha_use = min(1.0, max(0.0, float(bar_alpha_use)))
     fallback_colors = _unique_compare_colors(len(labels))
     color_by_label: Dict[str, Any] = {}
     for idx, label in enumerate(labels):
@@ -3745,15 +3782,15 @@ def _plot_output_metric_distributions(
 
     fig, axes = plt.subplots(
         nrows,
-        ncols,
-        figsize=(4.8 * ncols, 3.6 * nrows),
+        ncols_use,
+        figsize=(panel_w * ncols_use, panel_h * nrows),
         squeeze=False,
     )
     rng = np.random.default_rng(0)
     first_ax = None
     for idx, metric_key in enumerate(metric_keys):
-        r = idx // ncols
-        c = idx % ncols
+        r = idx // ncols_use
+        c = idx % ncols_use
         ax = axes[r][c]
         if first_ax is None:
             first_ax = ax
@@ -3814,7 +3851,7 @@ def _plot_output_metric_distributions(
                         [pos],
                         [mean_val],
                         width=0.62,
-                        color=_with_alpha(series_color, 0.25),
+                        color=_with_alpha(series_color, bar_alpha_use),
                         edgecolor=series_color,
                         linewidth=1.1,
                         zorder=2,
@@ -3840,12 +3877,12 @@ def _plot_output_metric_distributions(
         ax.grid(axis="y", alpha=0.25)
         if not has_data:
             ax.text(0.5, 0.5, "No data", transform=ax.transAxes, ha="center", va="center", color="0.45")
-    for idx in range(n_metrics, nrows * ncols):
-        r = idx // ncols
-        c = idx % ncols
+    for idx in range(n_metrics, nrows * ncols_use):
+        r = idx // ncols_use
+        c = idx % ncols_use
         axes[r][c].set_visible(False)
 
-    if first_ax is not None:
+    if first_ax is not None and show_legend:
         from matplotlib.lines import Line2D
         from matplotlib.patches import Patch
 
@@ -3870,14 +3907,14 @@ def _plot_output_metric_distributions(
             ])
         else:
             legend_handles.append(
-                Patch(facecolor=(0.25, 0.25, 0.25, 0.25), edgecolor="#333333", linewidth=1.0, label="Mean bar")
+                Patch(facecolor=(0.25, 0.25, 0.25, bar_alpha_use), edgecolor="#333333", linewidth=1.0, label="Mean bar")
             )
             if show_error:
                 legend_handles.append(
                     Line2D([0], [0], color="#333333", linewidth=1.2, label=f"Run {std_mode_use.upper()}")
                 )
         if legend_handles:
-            first_ax.legend(handles=legend_handles, loc="best", fontsize=8)
+            first_ax.legend(handles=legend_handles, loc=(str(legend_loc or "best")), fontsize=8)
     fig.suptitle(f"Output metric distributions ({plot_style_use})", fontsize=12)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     return fig
@@ -3892,10 +3929,16 @@ def run_output_metric_distributions(
     show_points: bool = True,
     jitter_points: bool = True,
     show_error: bool = False,
+    ncols: Optional[int] = None,
+    panel_size: tuple[float, float] = (4.8, 3.6),
+    bar_alpha: float = 0.25,
+    show_legend: bool = True,
+    legend_loc: str = "best",
     save_plots: bool = False,
     save_data: bool = False,
     plots_dpi: int = 150,
     data_path: Any = "",
+    overwrite: bool = False,
 ) -> Optional[Dict[str, Any]]:
     payload = _collect_output_metric_distributions(selection, opts)
     metric_keys_use = _coerce_output_metric_plot_keys(metric_keys)
@@ -3909,6 +3952,11 @@ def run_output_metric_distributions(
         jitter_points=bool(jitter_points),
         show_error=bool(show_error),
         std_mode=std_mode,
+        ncols=ncols,
+        panel_size=panel_size,
+        bar_alpha=bar_alpha,
+        show_legend=bool(show_legend),
+        legend_loc=legend_loc,
     )
     if fig is None:
         return None
@@ -3918,6 +3966,11 @@ def run_output_metric_distributions(
     payload["show_points"] = bool(show_points)
     payload["show_error"] = bool(show_error)
     payload["std_mode"] = std_mode
+    payload["ncols"] = ncols
+    payload["panel_size"] = panel_size
+    payload["bar_alpha"] = bar_alpha
+    payload["show_legend"] = bool(show_legend)
+    payload["legend_loc"] = legend_loc
     payload["rows"] = rows
     payload["figure"] = analysis.resolve_figure(fig)
     if save_plots:
@@ -3926,6 +3979,7 @@ def run_output_metric_distributions(
             _output_metric_distribution_plot_path(selection, payload),
             enabled=True,
             dpi=plots_dpi,
+            overwrite=overwrite,
         )
     if save_data:
         _save_output_metric_distribution_rows(
@@ -4410,6 +4464,7 @@ def output_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "output_metrics_std_mode": g.get("output_metrics_std_mode", "std"),
         "auto_plot_window_from_stim": bool(g.get("auto_plot_window_from_stim", False)),
         "plot_window_adjustment_ms": g.get("plot_window_adjustment_ms"),
+        "save_overwrite": bool(g.get("save_overwrite", False)),
     }
 
 
@@ -4438,6 +4493,7 @@ def input_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "input_stim_linewidth": g.get("input_stim_linewidth"),
         "auto_plot_window_from_stim": bool(g.get("auto_plot_window_from_stim", False)),
         "plot_window_adjustment_ms": g.get("plot_window_adjustment_ms"),
+        "save_overwrite": bool(g.get("save_overwrite", False)),
     }
 
 
@@ -4524,6 +4580,15 @@ def run_output_metric_distributions_from_globals(g: Dict[str, Any]) -> Optional[
         "output_metric_mode": g.get("output_metric_mode"),
         "output_metric_window_ms": g.get("output_metric_window_ms"),
     })
+    ncols_raw = _safe_float(g.get("output_metrics_plot_ncols", 0))
+    ncols_val = int(ncols_raw) if ncols_raw is not None else 0
+    panel_size_raw = g.get("output_metrics_plot_panel_size", (4.8, 3.6))
+    if isinstance(panel_size_raw, (list, tuple)) and len(panel_size_raw) >= 2:
+        panel_size_val = (panel_size_raw[0], panel_size_raw[1])
+    else:
+        panel_size_val = (4.8, 3.6)
+    bar_alpha_raw = _safe_float(g.get("output_metrics_plot_bar_alpha", 0.25))
+    bar_alpha_val = float(bar_alpha_raw) if bar_alpha_raw is not None else 0.25
     payload = run_output_metric_distributions(
         sel,
         opts,
@@ -4532,10 +4597,16 @@ def run_output_metric_distributions_from_globals(g: Dict[str, Any]) -> Optional[
         show_points=bool(g.get("output_metrics_plot_show_points", g.get("output_metrics_plot_jitter", True))),
         jitter_points=bool(g.get("output_metrics_plot_jitter", True)),
         show_error=bool(g.get("output_metrics_plot_show_error", False)),
+        ncols=ncols_val,
+        panel_size=panel_size_val,
+        bar_alpha=bar_alpha_val,
+        show_legend=bool(g.get("output_metrics_plot_show_legend", True)),
+        legend_loc=str(g.get("output_metrics_plot_legend_loc", "best") or "best"),
         save_plots=bool(g.get("output_metrics_plot_save_plot", False)),
         save_data=bool(g.get("output_metrics_plot_save_data", False)),
         plots_dpi=int(g.get("plots_dpi", 150)),
         data_path=g.get("output_metrics_plot_data_path", ""),
+        overwrite=bool(g.get("save_overwrite", False)),
     )
     g["_last_output_metric_dist_export"] = payload or {"rows": [], "mode": "single", "metric_keys": []}
     g["_last_output_metric_dist_selection"] = sel
@@ -4551,6 +4622,7 @@ def run_spike_stats_from_globals(g: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         analysis.plot_dir_for_run(run_dir) / "spike_stats.png",
         enabled=bool(g.get("save_plots", False)),
         dpi=int(g.get("plots_dpi", 150)),
+        overwrite=bool(g.get("save_overwrite", False)),
     )
     _save_json(
         stats_single,
@@ -5218,6 +5290,50 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         value=bool(g.get("output_metrics_plot_show_error", False)),
         description="Error bars",
     )
+    ncols_default = _safe_float(g.get("output_metrics_plot_ncols", 0))
+    metrics_plot_ncols_txt = widgets.IntText(
+        value=int(ncols_default) if ncols_default is not None else 0,
+        description="Cols (0=auto)",
+        layout=widgets.Layout(width="170px"),
+    )
+    panel_size_raw = g.get("output_metrics_plot_panel_size", (4.8, 3.6))
+    if isinstance(panel_size_raw, (list, tuple)) and len(panel_size_raw) >= 2:
+        panel_w_default = _safe_float(panel_size_raw[0])
+        panel_h_default = _safe_float(panel_size_raw[1])
+    else:
+        panel_w_default = None
+        panel_h_default = None
+    if panel_w_default is None:
+        panel_w_default = 4.8
+    if panel_h_default is None:
+        panel_h_default = 3.6
+    metrics_plot_panel_w_txt = widgets.FloatText(
+        value=float(panel_w_default),
+        description="Panel w",
+        layout=widgets.Layout(width="150px"),
+    )
+    metrics_plot_panel_h_txt = widgets.FloatText(
+        value=float(panel_h_default),
+        description="Panel h",
+        layout=widgets.Layout(width="150px"),
+    )
+    bar_alpha_default = _safe_float(g.get("output_metrics_plot_bar_alpha", 0.25))
+    if bar_alpha_default is None:
+        bar_alpha_default = 0.25
+    metrics_plot_bar_alpha_txt = widgets.FloatText(
+        value=float(bar_alpha_default),
+        description="Bar alpha",
+        layout=widgets.Layout(width="160px"),
+    )
+    metrics_plot_show_legend_cb = widgets.Checkbox(
+        value=bool(g.get("output_metrics_plot_show_legend", True)),
+        description="Legend",
+    )
+    metrics_plot_legend_loc_txt = widgets.Text(
+        value=str(g.get("output_metrics_plot_legend_loc", "best") or "best"),
+        description="Legend loc",
+        layout=widgets.Layout(width="220px"),
+    )
     metrics_plot_save_plot_cb = widgets.Checkbox(
         value=bool(g.get("output_metrics_plot_save_plot", False)),
         description="Save plot",
@@ -5235,11 +5351,17 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         value=bool(g.get("output_metrics_use_plot_keys_for_tables", True)),
         description="Table uses Plot metrics",
     )
-    metrics_plot_jitter_cb.disabled = not metrics_plot_show_points_cb.value
-    metrics_plot_show_points_cb.observe(
-        lambda *_: setattr(metrics_plot_jitter_cb, "disabled", not metrics_plot_show_points_cb.value),
-        names="value",
-    )
+
+    def _toggle_metric_plot_controls(*_):
+        metrics_plot_jitter_cb.disabled = not metrics_plot_show_points_cb.value
+        metrics_plot_bar_alpha_txt.disabled = metrics_plot_style_dd.value != "bar"
+        metrics_plot_legend_loc_txt.disabled = not metrics_plot_show_legend_cb.value
+
+    _toggle_metric_plot_controls()
+    metrics_plot_show_points_cb.observe(_toggle_metric_plot_controls, names="value")
+    metrics_plot_style_dd.observe(_toggle_metric_plot_controls, names="value")
+    metrics_plot_show_legend_cb.observe(_toggle_metric_plot_controls, names="value")
+
     metrics_box = widgets.VBox([
         widgets.HBox([metrics_ref_dd, metrics_std_mode_dd, metrics_show_params_cb]),
         widgets.HBox([metrics_show_delta_cb, metrics_highlight_cb, metrics_use_plot_keys_cb]),
@@ -5251,6 +5373,14 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
             metrics_plot_show_error_cb,
             metrics_plot_save_plot_cb,
             metrics_plot_save_data_cb,
+        ]),
+        widgets.HBox([
+            metrics_plot_ncols_txt,
+            metrics_plot_panel_w_txt,
+            metrics_plot_panel_h_txt,
+            metrics_plot_bar_alpha_txt,
+            metrics_plot_show_legend_cb,
+            metrics_plot_legend_loc_txt,
         ]),
         metrics_plot_sel,
         metrics_plot_data_path_txt,
@@ -5473,6 +5603,14 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         g["output_metrics_plot_show_points"] = bool(metrics_plot_show_points_cb.value)
         g["output_metrics_plot_jitter"] = bool(metrics_plot_jitter_cb.value)
         g["output_metrics_plot_show_error"] = bool(metrics_plot_show_error_cb.value)
+        g["output_metrics_plot_ncols"] = int(metrics_plot_ncols_txt.value)
+        g["output_metrics_plot_panel_size"] = [
+            float(metrics_plot_panel_w_txt.value),
+            float(metrics_plot_panel_h_txt.value),
+        ]
+        g["output_metrics_plot_bar_alpha"] = float(metrics_plot_bar_alpha_txt.value)
+        g["output_metrics_plot_show_legend"] = bool(metrics_plot_show_legend_cb.value)
+        g["output_metrics_plot_legend_loc"] = str(metrics_plot_legend_loc_txt.value or "best").strip() or "best"
         g["output_metrics_plot_save_plot"] = bool(metrics_plot_save_plot_cb.value)
         g["output_metrics_plot_save_data"] = bool(metrics_plot_save_data_cb.value)
         g["output_metrics_plot_data_path"] = str(metrics_plot_data_path_txt.value or "").strip()

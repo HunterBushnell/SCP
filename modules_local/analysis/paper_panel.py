@@ -445,6 +445,7 @@ def plot_paper_panel_from_results(
     show_panel_titles: bool = False,
     export_path: Optional[Union[str, Path]] = None,
     export_formats: Optional[Sequence[str]] = ("svg",),
+    export_overwrite: bool = False,
     dpi: int = 300,
     vm_color: Optional[str] = None,
     output_color: Optional[str] = None,
@@ -764,20 +765,26 @@ def plot_paper_panel_from_results(
     fig.tight_layout()
 
     # Export
-    exported_paths = _resolve_export_paths(
+    requested_export_paths = _resolve_export_paths(
         export_path,
         run_dir=run_dir,
         export_formats=export_formats,
     )
-    for out_path in exported_paths:
+    exported_paths: list[Path] = []
+    for out_path in requested_export_paths:
+        if out_path.exists() and not bool(export_overwrite):
+            warnings.append(f"Export skipped (exists, overwrite disabled): {out_path}")
+            continue
         out_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out_path, dpi=int(dpi), bbox_inches="tight")
+        exported_paths.append(out_path)
 
     return {
         "fig": fig,
         "axes": axes,
         "warnings": warnings,
         "run_dir": Path(run_dir).resolve() if run_dir is not None else None,
+        "requested_export_paths": [str(p) for p in requested_export_paths],
         "exported_paths": [str(p) for p in exported_paths],
         "used_groups_top": used_groups_top,
         "used_groups_raster": used_groups_raster,

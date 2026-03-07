@@ -1,7 +1,8 @@
 {
   "title": "paper_compare",
   "defaults": {
-    "plot_window": [900, 1600],
+    "save_overwrite": false,
+    "plot_window": [200, 900],
     "y_window": [-0.2, 1.1],
     "compare_output_layout": "overlay",
     "multi_plot_type": "line",
@@ -12,10 +13,10 @@
     "output_baseline_center_ms": 100.0,
     "output_metric_mode": "window",
     "output_metric_window_ms": 0.0,
-    "output_bin_ms": 5.0,
+    "output_bin_ms": 1.0,
     "output_smooth_mode": "center",
-    "output_stim_start_ms": 1000.0,
-    "output_stim_stop_ms": 1500.0
+    "output_stim_start_ms": 300.0,
+    "output_stim_stop_ms": 800.0
   },
   "entries": [
     {
@@ -34,7 +35,7 @@
       "path": "external_data/PVFiringRateAvg.csv",
       "label": "PV bio",
       "enabled": false,
-      "shift_ms": 1000,
+      "shift_ms": 500,
       "scale": 1,
       "color": "b",
       "linestyle": "--"
@@ -42,8 +43,8 @@
     {
       "path": "cells/PV/tunes/seg_tuned/output_data/_final_base_PV",
       "label": "PV base",
-      "enabled": false,
-      "shift_ms": 700,
+      "enabled": true,
+      "shift_ms": 0,
       "scale": 1,
       "color": "royalblue",
       "linestyle": "-"
@@ -51,8 +52,8 @@
     {
       "path": "cells/PV/tunes/seg_tuned/output_data/_final_tunedSST_PV",
       "label": "PV tuned",
-      "enabled": false,
-      "shift_ms": 700,
+      "enabled": true,
+      "shift_ms": 0,
       "scale": 1,
       "color": "navy",
       "linestyle": "-"

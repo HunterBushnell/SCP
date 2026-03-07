@@ -1888,6 +1888,7 @@ def save_results(
                 raster_style=str(sim_cfg.get("plots_raster_style", "dot")),
                 plot_mode=str(sim_cfg.get("save_plots_mode", "default")),
                 single_plot_preset=sim_cfg.get("save_plots_single_plot_preset", None),
+                overwrite=bool(sim_cfg.get("save_plots_overwrite", False)),
             )
         except Exception as exc:
             print(f"save_plots failed: {exc}")
