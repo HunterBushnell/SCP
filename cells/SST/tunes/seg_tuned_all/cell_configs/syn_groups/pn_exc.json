@@ -38,7 +38,7 @@
         "Use": 0.4,
         "Dep": 0,
         "Fac": 70,
-        "NMDA_ratio": 1.5
+        "NMDA_ratio": 0.0
       }
     }
   }

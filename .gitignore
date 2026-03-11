@@ -1,5 +1,6 @@
 external_data/bio_cell_output/
-logs/
+logs/old/
+logs/status/
 cells/**/output_data/
 
 # Python cache/build artifacts
