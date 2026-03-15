@@ -15,7 +15,7 @@
   ],
   "save": [
     false,
-    "slurm_test",
+    "results",
     "pkl",
     false
   ],
@@ -33,7 +33,6 @@
   "save_plots_overwrite": false,
   "randomness_mode": "random",
   "random_seed": null,
-
   "cell_recording": {
     "enabled": false,
     "n_trials": 1,
@@ -81,9 +80,6 @@
     },
     "groups": {}
   },
-
-
-  
   "param_study": {
     "enabled": false,
     "input_type": null,
@@ -91,7 +87,6 @@
     "param_vals": [],
     "n_trials": null
   },
-  
   "iclamp": {
     "enabled": false,
     "amp_nA": 0.2,

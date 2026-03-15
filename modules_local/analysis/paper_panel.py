@@ -417,8 +417,11 @@ def plot_paper_panel_from_results(
     input_smooth_ms: Optional[float] = 25.0,
     input_source: str = "auto",  # "saved" | "stats" | "auto"
     input_raster_style: str = "dot",  # "dot" | "line"
+    input_raster_dot_size: float = 5.0,
+    include_input_raster: bool = True,
     include_output_raster: bool = False,
     output_raster_style: str = "dot",  # "dot" | "line"
+    output_raster_dot_size: float = 5.0,
     output_curve_source: str = "meta",  # "meta" | "recompute" | "auto"
     output_recompute_bin_ms: Optional[float] = None,
     output_recompute_smooth_ms: Optional[float] = None,
@@ -465,6 +468,25 @@ def plot_paper_panel_from_results(
     group_colors = analysis.group_colors_from_results(results)
     palette = plt.rcParams["axes.prop_cycle"].by_key().get("color", ["C0", "C1", "C2", "C3"])
 
+    try:
+        input_raster_dot_size_f = float(input_raster_dot_size)
+        if input_raster_dot_size_f <= 0:
+            raise ValueError
+    except Exception:
+        input_raster_dot_size_f = 5.0
+        warnings.append(
+            f"input_raster_dot_size={input_raster_dot_size!r} invalid; using 5.0."
+        )
+    try:
+        output_raster_dot_size_f = float(output_raster_dot_size)
+        if output_raster_dot_size_f <= 0:
+            raise ValueError
+    except Exception:
+        output_raster_dot_size_f = 5.0
+        warnings.append(
+            f"output_raster_dot_size={output_raster_dot_size!r} invalid; using 5.0."
+        )
+
     # Top input summary
     try:
         summary_top = _build_top_summary(
@@ -490,32 +512,45 @@ def plot_paper_panel_from_results(
     n_top_axes = 1 if top_layout_mode == "overlay" else max(1, len(used_groups_top))
 
     # Raster payload for input spikes
-    payload_raster = analysis.select_inputs_payload(results, trial_idx=trial_idx)
-    if payload_raster is None:
-        warnings.append("Input raster panel: no saved input payload.")
-        raster_avail = []
-    else:
-        raster_avail = list(payload_raster.keys())
-    used_groups_raster = _resolve_groups(
-        raster_input_groups,
-        raster_avail,
-        panel_name="Input raster panel",
-        warnings=warnings,
-    )
+    payload_raster = None
+    used_groups_raster: list[str] = []
+    if include_input_raster:
+        payload_raster = analysis.select_inputs_payload(results, trial_idx=trial_idx)
+        if payload_raster is None:
+            warnings.append("Input raster panel: no saved input payload.")
+            raster_avail = []
+        else:
+            raster_avail = list(payload_raster.keys())
+        used_groups_raster = _resolve_groups(
+            raster_input_groups,
+            raster_avail,
+            panel_name="Input raster panel",
+            warnings=warnings,
+        )
 
     # Panel layout
-    n_panels = n_top_axes + 3 + (1 if include_output_raster else 0)
+    n_panels = n_top_axes + 2 + (1 if include_input_raster else 0) + (1 if include_output_raster else 0)
     if isinstance(panel_height_ratios, dict):
         top_h = float(panel_height_ratios.get("top", 1.0))
         in_r_h = float(panel_height_ratios.get("input_raster", 1.2))
         vm_h = float(panel_height_ratios.get("vm", 1.2))
         out_h = float(panel_height_ratios.get("output_rate", 1.3))
         out_r_h = float(panel_height_ratios.get("output_raster", 1.0))
-        ratios = [top_h] * n_top_axes + [in_r_h, vm_h, out_h] + ([out_r_h] if include_output_raster else [])
+        ratios = [top_h] * n_top_axes
+        if include_input_raster:
+            ratios.append(in_r_h)
+        ratios.extend([vm_h, out_h])
+        if include_output_raster:
+            ratios.append(out_r_h)
     elif isinstance(panel_height_ratios, (list, tuple)) and len(panel_height_ratios) == n_panels:
         ratios = [float(v) for v in panel_height_ratios]
     else:
-        ratios = [1.0] * n_top_axes + [1.2, 1.2, 1.3] + ([1.0] if include_output_raster else [])
+        ratios = [1.0] * n_top_axes
+        if include_input_raster:
+            ratios.append(1.2)
+        ratios.extend([1.2, 1.3])
+        if include_output_raster:
+            ratios.append(1.0)
 
     fig, axes_arr = plt.subplots(
         n_panels,
@@ -583,55 +618,62 @@ def plot_paper_panel_from_results(
                 if show_panel_titles and i == 0:
                     ax.set_title("Input rate")
 
-    # Input raster panel
-    ax_in_raster = axes[panel_idx]
-    panel_idx += 1
-    if payload_raster is None or not used_groups_raster:
-        ax_in_raster.text(0.01, 0.5, "No input raster payload", transform=ax_in_raster.transAxes, va="center")
-    else:
-        style = str(input_raster_style or "dot").lower()
-        if style not in ("dot", "line"):
-            warnings.append(f"input_raster_style={input_raster_style!r} invalid; using 'dot'.")
-            style = "dot"
-        y_cursor = 0
-        group_mids: dict[str, float] = {}
-        for i, g in enumerate(used_groups_raster):
-            gdata = payload_raster.get(g, {}) or {}
-            trains = [np.asarray(tr, dtype=float) for tr in (gdata.get("spike_trains") or [])]
-            if not trains:
-                continue
-            y_start = y_cursor + 1
-            col = group_colors.get(g, palette[i % len(palette)])
-            for tr in trains:
-                y = y_cursor + 1
-                if style == "line":
-                    ax_in_raster.vlines(tr, y - 0.40, y + 0.40, color=col, lw=0.7)
-                else:
-                    ax_in_raster.scatter(tr, np.full_like(tr, y), color=col, s=5, marker=".")
-                y_cursor += 1
-            group_mids[g] = 0.5 * (y_start + y_cursor)
+    # Optional input raster panel
+    if include_input_raster:
+        ax_in_raster = axes[panel_idx]
+        panel_idx += 1
+        if payload_raster is None or not used_groups_raster:
+            ax_in_raster.text(0.01, 0.5, "No input raster payload", transform=ax_in_raster.transAxes, va="center")
+        else:
+            style = str(input_raster_style or "dot").lower()
+            if style not in ("dot", "line"):
+                warnings.append(f"input_raster_style={input_raster_style!r} invalid; using 'dot'.")
+                style = "dot"
+            y_cursor = 0
+            group_mids: dict[str, float] = {}
+            for i, g in enumerate(used_groups_raster):
+                gdata = payload_raster.get(g, {}) or {}
+                trains = [np.asarray(tr, dtype=float) for tr in (gdata.get("spike_trains") or [])]
+                if not trains:
+                    continue
+                y_start = y_cursor + 1
+                col = group_colors.get(g, palette[i % len(palette)])
+                for tr in trains:
+                    y = y_cursor + 1
+                    if style == "line":
+                        ax_in_raster.vlines(tr, y - 0.40, y + 0.40, color=col, lw=0.7)
+                    else:
+                        ax_in_raster.scatter(
+                            tr,
+                            np.full_like(tr, y),
+                            color=col,
+                            s=input_raster_dot_size_f,
+                            marker=".",
+                        )
+                    y_cursor += 1
+                group_mids[g] = 0.5 * (y_start + y_cursor)
 
-        ax_in_raster.set_yticks([])
-        if show_y_axes and show_y_axis_titles:
-            ax_in_raster.set_ylabel("Input\ntrains")
-        if show_panel_titles:
-            ax_in_raster.set_title("Input raster")
+            ax_in_raster.set_yticks([])
+            if show_y_axes and show_y_axis_titles:
+                ax_in_raster.set_ylabel("Input\ntrains")
+            if show_panel_titles:
+                ax_in_raster.set_title("Input raster")
 
-        txt_trans = blended_transform_factory(ax_in_raster.transAxes, ax_in_raster.transData)
-        for i, g in enumerate(used_groups_raster):
-            if g not in group_mids:
-                continue
-            col = group_colors.get(g, palette[i % len(palette)])
-            ax_in_raster.text(
-                -0.015,
-                group_mids[g],
-                g,
-                color=col,
-                ha="right",
-                va="center",
-                transform=txt_trans,
-                clip_on=False,
-            )
+            txt_trans = blended_transform_factory(ax_in_raster.transAxes, ax_in_raster.transData)
+            for i, g in enumerate(used_groups_raster):
+                if g not in group_mids:
+                    continue
+                col = group_colors.get(g, palette[i % len(palette)])
+                ax_in_raster.text(
+                    -0.015,
+                    group_mids[g],
+                    g,
+                    color=col,
+                    ha="right",
+                    va="center",
+                    transform=txt_trans,
+                    clip_on=False,
+                )
 
     # Vm panel
     ax_vm = axes[panel_idx]
@@ -717,7 +759,13 @@ def plot_paper_panel_from_results(
                 if style == "line":
                     ax_out_r.vlines(tr, y - 0.40, y + 0.40, color=out_col, lw=0.7)
                 else:
-                    ax_out_r.scatter(tr, np.full_like(tr, y), color=out_col, s=5, marker=".")
+                    ax_out_r.scatter(
+                        tr,
+                        np.full_like(tr, y),
+                        color=out_col,
+                        s=output_raster_dot_size_f,
+                        marker=".",
+                    )
             ax_out_r.set_ylim(0.5, len(trials) + 0.5)
         if show_y_axes and show_y_axis_titles:
             ax_out_r.set_ylabel("Trial")

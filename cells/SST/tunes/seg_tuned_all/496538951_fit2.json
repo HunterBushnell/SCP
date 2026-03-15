@@ -62,7 +62,7 @@
     {
       "section": "soma",
       "name": "cm",
-      "value": 1,
+      "value": 2,
       "mechanism": ""
     },
     {
@@ -86,19 +86,19 @@
     {
       "section": "soma",
       "name": "gbar_SK",
-      "value": 0.00002,
+      "value": 0.0000,
       "mechanism": "SK"
     },
     {
       "section": "soma",
       "name": "gbar_Kv3_1",
-      "value": 0.010067,
+      "value": 0.02,
       "mechanism": "Kv3_1"
     },
     {
       "section": "soma",
       "name": "gbar_Ca_HVA",
-      "value": 0.00015,
+      "value": 0.0,
       "mechanism": "Ca_HVA"
     },
     {
@@ -140,7 +140,7 @@
     {
       "section": "axon",
       "name": "cm",
-      "value": 1.0,
+      "value": 2.0,
       "mechanism": ""
     },
     {
@@ -165,31 +165,31 @@
     {
       "section": "axon",
       "name": "gbar_Kv2like",
-      "value": 0.912945,
+      "value": 0.0,
       "mechanism": "Kv2like"
     },
     {
       "section": "axon",
       "name": "gbar_Kv3_1",
-      "value": 0.0318455,
+      "value": 0.06,
       "mechanism": "Kv3_1"
     },
     {
       "section": "axon",
       "name": "gbar_SK",
-      "value": 0.00000016182,
+      "value": 0.000000,
       "mechanism": "SK"
     },
     {
       "section": "axon",
       "name": "gbar_Ca_HVA",
-      "value": 2.88844e-05,
+      "value": 0.0,
       "mechanism": "Ca_HVA"
     },
     {
       "section": "axon",
       "name": "gbar_Ca_LVA",
-      "value": 0.00351146,
+      "value": 0.0,
       "mechanism": "Ca_LVA"
     },
     {
@@ -219,7 +219,7 @@
     {
       "section": "apic",
       "name": "cm",
-      "value": 1,
+      "value": 2,
       "mechanism": ""
     },
     {
@@ -238,7 +238,7 @@
     {
       "section": "apic",
       "name": "gbar_Im_v2",
-      "value": 0.00815197,
+      "value": 0.0,
       "mechanism": "Im_v2"
     },
     {
@@ -262,7 +262,7 @@
     {
       "section": "dend",
       "name": "cm",
-      "value": 1,
+      "value": 2,
       "mechanism": ""
     },
     {
@@ -281,7 +281,7 @@
     {
       "section": "dend",
       "name": "gbar_Im_v2",
-      "value": 0.00998071,
+      "value": 0.005,
       "mechanism": "Im_v2"
     },
     {

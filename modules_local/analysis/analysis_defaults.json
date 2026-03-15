@@ -66,10 +66,10 @@
     {"path": "external_data/SSTFiringRateAvg.csv@500;color=k;linestyle=--;label=SST_bio", "enabled": false},
     {"path": "external_data/PVFiringRateAvg.csv@300;color=royalblue;linestyle=--;label=PV_bio", "enabled": false},
 
-    {"path": "cells/SST/tunes/seg_tuned_all/output_data/_final_base_SST@color=m;linestyle=-;label=SST_base", "enabled": true},
+    {"path": "cells/SST/tunes/seg_tuned_all/output_data/_final_base_SST@color=m;linestyle=-;label=SST_base", "enabled": false},
     {"path": "cells/SST/tunes/seg_tuned_all/output_data/_final_tuned_SST@;color=darkmagenta;label=SST_tuned;linestyle=-", "enabled": false},
-    {"path": "cells/PV/tunes/seg_tuned/output_data/_final_base_PV@200;color=royalblue;label=PV_base;linestyle=-", "enabled": true},
-    {"path": "cells/PV/tunes/seg_tuned/output_data/_final_tunedSST_PV@200;color=navy;label=PV_tuned;linestyle=-", "enabled": true}
+    {"path": "cells/PV/tunes/seg_tuned/output_data/_final_base_PV@200;color=royalblue;label=PV_base;linestyle=-", "enabled": false},
+    {"path": "cells/PV/tunes/seg_tuned/output_data/_final_tunedSST_PV@200;color=navy;label=PV_tuned;linestyle=-", "enabled": false}
   ],
   "compare_list_dir_paths": [
   "external_data"

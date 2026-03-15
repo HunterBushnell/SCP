@@ -1,0 +1,48 @@
+Running: python /home/hrbncv/SCP/run_pipeline.py --tune-dir /home/hrbncv/SCP/cells/PV/tunes/seg_tuned --output-dir /home/hrbncv/SCP/cells/PV/tunes/seg_tuned/output_data/slurm_32387/parts --n-trials 20 --output-stem slurm_32387_27 --trial-offset 540 --force-save
+Mechanisms already loaded; skipping duplicate load.
+Loaded Allen cell for 'PV' from /home/hrbncv/SCP/cells/PV/tunes/seg_tuned/manifest.json, soma_diam_multiplier=6.0, Vinit=-71.0, loader=allensdk_default
+Geometry defined for 'PV': 1 soma segs, 46 proximal dend segs, 41 distal dend segs, 97 total dend segs.
+[trial 1/20] input_spikes: pn_exc=2792 bg_exc=809 bg_inh=184
+[trial 1/20] spikes=13  rate=13.00 Hz  time=29.16s
+[trial 2/20] input_spikes: pn_exc=2776 bg_exc=845 bg_inh=204
+[trial 2/20] spikes=13  rate=13.00 Hz  time=28.98s
+[trial 3/20] input_spikes: pn_exc=2790 bg_exc=862 bg_inh=200
+[trial 3/20] spikes=13  rate=13.00 Hz  time=28.02s
+[trial 4/20] input_spikes: pn_exc=2680 bg_exc=814 bg_inh=209
+[trial 4/20] spikes=12  rate=12.00 Hz  time=28.86s
+[trial 5/20] input_spikes: pn_exc=2644 bg_exc=749 bg_inh=166
+[trial 5/20] spikes=13  rate=13.00 Hz  time=28.68s
+[trial 6/20] input_spikes: pn_exc=2843 bg_exc=864 bg_inh=214
+[trial 6/20] spikes=13  rate=13.00 Hz  time=28.14s
+[trial 7/20] input_spikes: pn_exc=2658 bg_exc=805 bg_inh=227
+[trial 7/20] spikes=11  rate=11.00 Hz  time=28.83s
+[trial 8/20] input_spikes: pn_exc=2808 bg_exc=895 bg_inh=203
+[trial 8/20] spikes=14  rate=14.00 Hz  time=28.87s
+[trial 9/20] input_spikes: pn_exc=2870 bg_exc=810 bg_inh=194
+[trial 9/20] spikes=13  rate=13.00 Hz  time=28.20s
+[trial 10/20] input_spikes: pn_exc=2749 bg_exc=837 bg_inh=193
+[trial 10/20] spikes=12  rate=12.00 Hz  time=28.74s
+[trial 11/20] input_spikes: pn_exc=2828 bg_exc=775 bg_inh=204
+[trial 11/20] spikes=12  rate=12.00 Hz  time=28.70s
+[trial 12/20] input_spikes: pn_exc=2789 bg_exc=828 bg_inh=214
+[trial 12/20] spikes=13  rate=13.00 Hz  time=28.17s
+[trial 13/20] input_spikes: pn_exc=2706 bg_exc=827 bg_inh=178
+[trial 13/20] spikes=11  rate=11.00 Hz  time=28.85s
+[trial 14/20] input_spikes: pn_exc=2386 bg_exc=647 bg_inh=126
+[trial 14/20] spikes=13  rate=13.00 Hz  time=28.75s
+[trial 15/20] input_spikes: pn_exc=2815 bg_exc=872 bg_inh=203
+[trial 15/20] spikes=11  rate=11.00 Hz  time=28.05s
+[trial 16/20] input_spikes: pn_exc=2897 bg_exc=862 bg_inh=193
+[trial 16/20] spikes=12  rate=12.00 Hz  time=28.63s
+[trial 17/20] input_spikes: pn_exc=2896 bg_exc=851 bg_inh=238
+[trial 17/20] spikes=11  rate=11.00 Hz  time=28.21s
+[trial 18/20] input_spikes: pn_exc=2767 bg_exc=917 bg_inh=209
+[trial 18/20] spikes=13  rate=13.00 Hz  time=27.73s
+[trial 19/20] input_spikes: pn_exc=2639 bg_exc=820 bg_inh=208
+[trial 19/20] spikes=11  rate=11.00 Hz  time=28.44s
+[trial 20/20] input_spikes: pn_exc=2830 bg_exc=883 bg_inh=210
+[trial 20/20] spikes=13  rate=13.00 Hz  time=28.08s
+save_plots single_plot warning: Top input panel: group list empty, auto-using all groups (3).
+save_plots single_plot warning: Input raster panel: group list empty, auto-using all groups (3).
+Results saved to /home/hrbncv/SCP/cells/PV/tunes/seg_tuned/output_data/slurm_32387/parts/slurm_32387_27/run_manifest.json
+Total runtime: 686.08s

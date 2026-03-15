@@ -4,7 +4,7 @@
     "mode": "homogeneous_poisson",
     "color": "#2ca02c",
     "source": {
-      "freq": 0.75,
+      "freq": 0.5,
       "baseline": null,
       "path": null,
       "bin_ms": null
@@ -38,7 +38,7 @@
         "Use": 0.4,
         "Dep": 0,
         "Fac": 70,
-        "NMDA_ratio": 0.0
+        "NMDA_ratio": 1.5
       }
     }
   }

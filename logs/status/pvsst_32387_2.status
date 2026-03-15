@@ -1,0 +1,12 @@
+state=MERGE_PENDING
+time=2026-03-14T22:11:59-05:00
+run_tag=32387
+job_name=pvsst
+job_id=32390
+array_job_id=32387
+array_task_id=2
+tune_dir=/home/hrbncv/SCP/cells/PV/tunes/seg_tuned
+output_dir=/home/hrbncv/SCP/cells/PV/tunes/seg_tuned/output_data/slurm_32387/parts
+run_root=/home/hrbncv/SCP/cells/PV/tunes/seg_tuned/output_data/slurm_32387
+output_stem=slurm_32387_2
+message=waiting_for_merge
