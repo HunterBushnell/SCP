@@ -16,8 +16,8 @@
   "raster_style": "dot",
 
   "y_window": [null, null],
-  "plot_window": [400, 1100],
-  "input_plot_window": [400, 1100],
+  "plot_window": [200, 1100],
+  "input_plot_window": [200, 1100],
   "auto_plot_window_from_stim": true,
   "plot_window_adjustment_ms": 100.0,
   "output_stim_start_ms": null,
@@ -60,13 +60,13 @@
   "compare_preset_path": null,
   "compare_list_paths_enabled": true,
   "compare_list_paths": [
-    {"path": "external_data/pyrFiringRateAvg.csv@500;color=k;linestyle=--", "enabled": false},
+    {"path": "external_data/pyrFiringRateAvg.csv@300;color=k;linestyle=--", "enabled": true},
     {"path": "external_data/bio_cell_output/pyrFiringRateAvg_gabab_tau200ms_delay50ms.csv@500;color=k;linestyle=-.", "enabled": false},
     {"path": "external_data/SSTFiringRateAvg.csv@525;color=k;linestyle=--;label=SST_bio_shifted", "enabled": false},
     {"path": "external_data/SSTFiringRateAvg.csv@500;color=k;linestyle=--;label=SST_bio", "enabled": false},
     {"path": "external_data/PVFiringRateAvg.csv@300;color=royalblue;linestyle=--;label=PV_bio", "enabled": false},
 
-    {"path": "cells/SST/tunes/seg_tuned_all/output_data/_final_base_SST@color=m;linestyle=-;label=SST_base", "enabled": false},
+    {"path": "cells/SST/tunes/seg_tuned_all/output_data/SST2_base@-200;color=m;linestyle=--;label=SST_base", "enabled": false},
     {"path": "cells/SST/tunes/seg_tuned_all/output_data/_final_tuned_SST@;color=darkmagenta;label=SST_tuned;linestyle=-", "enabled": false},
     {"path": "cells/PV/tunes/seg_tuned/output_data/_final_base_PV@200;color=royalblue;label=PV_base;linestyle=-", "enabled": false},
     {"path": "cells/PV/tunes/seg_tuned/output_data/_final_tunedSST_PV@200;color=navy;label=PV_tuned;linestyle=-", "enabled": false}
@@ -143,6 +143,8 @@
   "extra_compare_cell_tables": false,
   "extra_compare_geometry_tables": false,
   "extra_compare_synapse_tables": true,
+  "extra_compare_apply": ["sim_config", "cell_config", "geometry", "syn_config", "syn_groups", "fit_json"],
+  "extra_compare_syn_groups_selector": "all",
   "extra_compare_recording_tables": true,
   "extra_compare_diff_only": true,
   "extra_snapshot_tables": false,

@@ -11,7 +11,7 @@
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 550,
+      "stim_tstart_ms": 50,
       "duration_ms": null,
       "input_stim_tstart_ms": 300,
       "input_duration_ms": null
@@ -27,7 +27,7 @@
         }
       },
       "params": {
-        "wt_mean": 0.25,
+        "wt_mean": 1.0,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,

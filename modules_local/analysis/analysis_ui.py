@@ -73,7 +73,7 @@ HELP_EXTRA = textwrap.dedent(
     - Trial points and point jitter can be toggled for cleaner panels.
     - Matrix shape is controlled by columns + panel size; legend can be toggled/relocated.
     - Table metrics can reuse the same metric selection as the distribution plot.
-    - Compare configs: diff cell/geom/syn configs across runs.
+    - Compare configs: restore-style config compare across selected runs (sim/cell/geom/syn/syn_groups/fit).
     - Compare outputs/inputs: reuse plot logic with the current selection.
     - Input sampling: synthesize input curves from synapse configs.
     - Snapshot compare: compare notebook vs slurm outputs.
@@ -1923,6 +1923,65 @@ def _compare_list_run_paths(selection: Dict[str, Any]) -> list[Path]:
         seen.add(path)
         out.append(path)
     return out
+
+
+def _selected_config_compare_runs(
+    selection: Dict[str, Any],
+) -> tuple[list[Path], list[Optional[str]], list[str]]:
+    base_dir = selection.get("base")
+    if base_dir is None:
+        return [], [], ["Selection base directory is unavailable."]
+
+    warnings: list[str] = []
+    runs: list[Path] = []
+    labels: list[Optional[str]] = []
+    seen: set[Path] = set()
+
+    def _add_candidate(path: Optional[Path], label: Optional[str] = None) -> None:
+        if path is None:
+            return
+        if not path.exists():
+            warnings.append(f"Skipping missing path: {path}")
+            return
+        if _is_curve_path(path):
+            warnings.append(f"Skipping curve path in compare-configs mode: {path}")
+            return
+        resolved = analysis.resolve_run_dir(path)
+        if resolved in seen:
+            return
+        seen.add(resolved)
+        runs.append(resolved)
+        labels.append(label)
+
+    preset_entries = _load_compare_preset(selection.get("compare_preset_path"), base_dir)
+    list_entries = _compare_list_entries(selection) if not preset_entries else []
+    if preset_entries:
+        for entry in preset_entries:
+            path = entry.get("path")
+            if not isinstance(path, Path):
+                continue
+            _add_candidate(path, entry.get("label"))
+        return runs, labels, warnings
+
+    if list_entries:
+        for item in list_entries:
+            spec = _parse_compare_list_item(item)
+            path_raw = spec.get("path")
+            path = _coerce_run_path(path_raw, base_dir)
+            _add_candidate(path, spec.get("label"))
+        return runs, labels, warnings
+
+    run_a_path = _coerce_run_path(selection.get("run_a_path"), base_dir)
+    run_b_path = _coerce_run_path(selection.get("run_b_path"), base_dir)
+    run_a = run_a_path if run_a_path is not None else _coerce_run_path(selection.get("run_a"), base_dir)
+    run_b = run_b_path if run_b_path is not None else _coerce_run_path(selection.get("run_b"), base_dir)
+    run_single = _coerce_run_path(selection.get("run_single"), base_dir)
+
+    _add_candidate(run_a)
+    _add_candidate(run_b)
+    if not runs:
+        _add_candidate(run_single)
+    return runs, labels, warnings
 
 
 def run_output_plots(
@@ -5105,7 +5164,7 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
     mode_dd = widgets.Dropdown(
         options=[
             ("Output metrics (table)", "output_metrics"),
-            ("Compare configs (cell/geom/syn)", "compare_configs"),
+            ("Compare configs (restore-style)", "compare_configs"),
             ("Compare outputs (plots)", "compare_outputs"),
             ("Compare inputs (plots)", "compare_inputs"),
             ("Input sampling (preview)", "input_sampling"),
@@ -5118,57 +5177,44 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         description="Extra mode",
     )
 
+    apply_choices = list(analysis.RESTORE_CONFIG_APPLY_CHOICES)
+    apply_defaults = [str(v) for v in (g.get("extra_compare_apply") or apply_choices)]
+    apply_defaults = [v for v in apply_defaults if v in apply_choices]
+    if not apply_defaults:
+        apply_defaults = apply_choices
+
+    cfg_sim_cb = widgets.Checkbox(
+        value=bool("sim_config" in apply_defaults),
+        description="sim_config",
+    )
     cfg_cell_cb = widgets.Checkbox(
-        value=bool(g.get("extra_compare_cell_tables", False)),
-        description="Cell tables",
+        value=bool("cell_config" in apply_defaults),
+        description="cell_config",
     )
     cfg_geom_cb = widgets.Checkbox(
-        value=bool(g.get("extra_compare_geometry_tables", False)),
-        description="Geometry tables",
+        value=bool("geometry" in apply_defaults),
+        description="geometry",
     )
     cfg_syn_cb = widgets.Checkbox(
-        value=bool(g.get("extra_compare_synapse_tables", True)),
-        description="Synapse tables",
+        value=bool("syn_config" in apply_defaults),
+        description="syn_config",
     )
-    cfg_rec_cb = widgets.Checkbox(
-        value=bool(g.get("extra_recording_tables", True)),
-        description="Recording tables",
+    cfg_syn_groups_cb = widgets.Checkbox(
+        value=bool("syn_groups" in apply_defaults),
+        description="syn_groups",
     )
-    cfg_rec_cmp_cb = widgets.Checkbox(
-        value=bool(g.get("extra_compare_recording_tables", True)),
-        description="Recording compare",
+    cfg_fit_cb = widgets.Checkbox(
+        value=bool("fit_json" in apply_defaults),
+        description="fit_json",
     )
     cfg_diff_cb = widgets.Checkbox(
         value=bool(g.get("extra_compare_diff_only", True)),
         description="Diff only",
     )
-
-    syn_weight_cb = widgets.Checkbox(
-        value=bool(g.get("extra_synapse_weight_plot", False)),
-        description="Synapse weight hist",
-    )
-    syn_dist_cb = widgets.Checkbox(
-        value=bool(g.get("extra_synapse_distance_plot", False)),
-        description="Synapse distance hist",
-    )
-    syn_groups_txt = widgets.Text(
-        value=",".join(g.get("extra_synapse_groups") or []),
+    cfg_syn_groups_txt = widgets.Text(
+        value=str(g.get("extra_compare_syn_groups_selector", "all") or "all"),
         description="Syn groups",
-        layout=widgets.Layout(width="60%"),
-    )
-    syn_weight_bin_txt = widgets.Text(
-        value=str(g.get("extra_synapse_weight_bin", 0.1)),
-        description="Weight bin",
-        layout=widgets.Layout(width="200px"),
-    )
-    syn_dist_bin_txt = widgets.Text(
-        value=str(g.get("extra_synapse_distance_bin", 25.0)),
-        description="Dist bin",
-        layout=widgets.Layout(width="200px"),
-    )
-    syn_density_cb = widgets.Checkbox(
-        value=bool(g.get("extra_synapse_density", True)),
-        description="Density",
+        layout=widgets.Layout(width="280px"),
     )
 
     snap_diff_cb = widgets.Checkbox(
@@ -5207,9 +5253,8 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
     out_extra = widgets.Output()
 
     cfg_box = widgets.VBox([
-        widgets.HBox([cfg_cell_cb, cfg_geom_cb, cfg_syn_cb, cfg_rec_cb, cfg_diff_cb]),
-        widgets.HBox([cfg_rec_cmp_cb, syn_weight_cb, syn_dist_cb, syn_density_cb]),
-        widgets.HBox([syn_groups_txt, syn_weight_bin_txt, syn_dist_bin_txt]),
+        widgets.HBox([cfg_sim_cb, cfg_cell_cb, cfg_geom_cb, cfg_syn_cb]),
+        widgets.HBox([cfg_syn_groups_cb, cfg_fit_cb, cfg_diff_cb, cfg_syn_groups_txt]),
     ])
     def _initial_metrics_ref_options() -> list[str]:
         sel = get_selection_from_globals(g)
@@ -5564,24 +5609,29 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
 
     def _apply_extra_opts():
         g["extra_mode"] = mode_dd.value
+        compare_apply: list[str] = []
+        if cfg_sim_cb.value:
+            compare_apply.append("sim_config")
+        if cfg_cell_cb.value:
+            compare_apply.append("cell_config")
+        if cfg_geom_cb.value:
+            compare_apply.append("geometry")
+        if cfg_syn_cb.value:
+            compare_apply.append("syn_config")
+        if cfg_syn_groups_cb.value:
+            compare_apply.append("syn_groups")
+        if cfg_fit_cb.value:
+            compare_apply.append("fit_json")
+        if not compare_apply:
+            compare_apply = list(analysis.RESTORE_CONFIG_APPLY_CHOICES)
+        g["extra_compare_apply"] = compare_apply
+        g["extra_compare_syn_groups_selector"] = str(cfg_syn_groups_txt.value or "all").strip() or "all"
+        g["extra_compare_diff_only"] = cfg_diff_cb.value
+
+        # Legacy keys kept in sync for existing defaults files.
         g["extra_compare_cell_tables"] = cfg_cell_cb.value
         g["extra_compare_geometry_tables"] = cfg_geom_cb.value
         g["extra_compare_synapse_tables"] = cfg_syn_cb.value
-        g["extra_recording_tables"] = cfg_rec_cb.value
-        g["extra_compare_recording_tables"] = cfg_rec_cmp_cb.value
-        g["extra_compare_diff_only"] = cfg_diff_cb.value
-
-        g["extra_synapse_weight_plot"] = syn_weight_cb.value
-        g["extra_synapse_distance_plot"] = syn_dist_cb.value
-        g["extra_synapse_density"] = syn_density_cb.value
-
-        g["extra_synapse_groups"] = analysis.parse_groups(syn_groups_txt.value)
-        weight_bin = analysis.parse_optional_float(syn_weight_bin_txt.value)
-        dist_bin = analysis.parse_optional_float(syn_dist_bin_txt.value)
-        if weight_bin is not None:
-            g["extra_synapse_weight_bin"] = weight_bin
-        if dist_bin is not None:
-            g["extra_synapse_distance_bin"] = dist_bin
 
         g["extra_snapshot_diff_only"] = snap_diff_cb.value
         g["save_snapshot_compare_table"] = snap_save_cb.value
@@ -5921,151 +5971,65 @@ def run_extra_tables_from_globals(g: Dict[str, Any]) -> None:
 
 
 def run_extra_compare_from_globals(g: Dict[str, Any]) -> None:
-    sel, run_a, run_b, res_a, res_b = resolve_compare_from_globals(g)
-    if run_b is None:
-        print("Comparison disabled (set Compare B to a run name).")
+    sel = get_selection_from_globals(g)
+    tune_dir = (g.get("CELLS_DIR") / sel["cell"] / sel["tunes"] / sel["model"]).resolve()
+    if not tune_dir.is_dir():
+        print(f"Compare configs failed: target tune directory not found: {tune_dir}")
         return
 
-    label_a = analysis.run_label(run_a)
-    label_b = analysis.run_label(run_b)
-    tune_dir = (g.get("CELLS_DIR") / sel["cell"] / sel["tunes"] / sel["model"]).resolve()
+    run_paths, run_labels, selection_warnings = _selected_config_compare_runs(sel)
+    if not run_paths:
+        print("Compare configs skipped: no valid run folders selected.")
+        if selection_warnings:
+            show_md(analysis.format_diff_list_table(selection_warnings, title="Selection warnings", max_items=20))
+        return
 
-    cell = None
-    geom = None
-    geom_cfg = None
-    if g.get("load_cell_for_analysis") and (
-        g.get("extra_compare_cell_tables")
-        or g.get("extra_compare_geometry_tables")
-        or g.get("extra_compare_synapse_tables")
-    ):
-        try:
-            cell, geom, geom_cfg = analysis.load_cell_and_geometry(tune_dir)
-        except Exception as exc:
-            print("Cell/geometry load failed:", exc)
+    apply_raw = g.get("extra_compare_apply") or list(analysis.RESTORE_CONFIG_APPLY_CHOICES)
+    apply = [str(tok).strip() for tok in apply_raw if str(tok).strip() in analysis.RESTORE_CONFIG_APPLY_CHOICES]
+    if not apply:
+        apply = list(analysis.RESTORE_CONFIG_APPLY_CHOICES)
+    syn_groups = str(g.get("extra_compare_syn_groups_selector", "all") or "all").strip() or "all"
 
-    if g.get("extra_compare_cell_tables") and cell is not None:
-        cell_sections = analysis.summarize_cell_sections(cell)
-        mech_summary = analysis.summarize_mechanisms(cell)
-        show_md(
-            analysis.format_section_summary_compare(
-                cell_sections,
-                cell_sections,
-                labels=(label_a, label_b),
-                diff_only=g.get("extra_compare_diff_only"),
-                title="Cell sections",
-            )
-        )
-        show_md(
-            analysis.format_mechanism_summary_compare(
-                mech_summary,
-                mech_summary,
-                labels=(label_a, label_b),
-                diff_only=g.get("extra_compare_diff_only"),
-                title="Mechanisms",
-            )
-        )
+    diff_only = bool(g.get("extra_compare_diff_only", True))
+    if diff_only and len(run_paths) < 2:
+        diff_only = False
+        print("Only one run selected; disabling diff-only filter to show all checked parameters.")
 
-    if g.get("extra_compare_geometry_tables") and geom is not None:
-        geom_summary = analysis.summarize_geometry(geom, geom_config=geom_cfg)
-        show_md(
-            analysis.format_geometry_summary_compare(
-                geom_summary,
-                geom_summary,
-                labels=(label_a, label_b),
-                diff_only=g.get("extra_compare_diff_only"),
-                title="Geometry distances",
-            )
-        )
-
-    syn_summary_a = analysis.summarize_synapse_records(
-        res_a.get("syn_records") or {},
-        geom=geom,
-        duration_ms=analysis._get_duration_ms(res_a),
-    )
-    syn_summary_b = analysis.summarize_synapse_records(
-        res_b.get("syn_records") or {},
-        geom=geom,
-        duration_ms=analysis._get_duration_ms(res_b),
+    report = analysis.compare_config_runs(
+        run_paths,
+        target_tune=tune_dir,
+        labels=run_labels,
+        apply=apply,
+        syn_groups=syn_groups,
+        diff_only=diff_only,
+        allow_source_fallback=True,
     )
 
-    if g.get("extra_compare_synapse_tables") and (syn_summary_a.get("groups") or syn_summary_b.get("groups")):
-        show_md(
-            analysis.format_synapse_summary_compare(
-                syn_summary_a,
-                syn_summary_b,
-                labels=(label_a, label_b),
-                diff_only=g.get("extra_compare_diff_only"),
-                title="Synapse summary",
-            )
+    print(f"Target tune: {report.get('target_tune')}")
+    print(f"Runs compared: {len(report.get('runs') or [])}")
+    print(f"Apply: {', '.join(report.get('apply') or [])}; syn_groups={report.get('syn_groups')}")
+    print(f"Rows shown: {len(report.get('rows') or [])}")
+
+    if selection_warnings:
+        show_md(analysis.format_diff_list_table(selection_warnings, title="Selection warnings", max_items=20))
+    if report.get("skipped"):
+        show_md(analysis.format_diff_list_table(report.get("skipped", []), title="Skipped runs", max_items=20))
+    if report.get("warnings"):
+        show_md(analysis.format_diff_list_table(report.get("warnings", []), title="Config compare warnings", max_items=40))
+
+    show_md(
+        analysis.format_config_compare_table(
+            report,
+            title="Config compare (restore-style)",
         )
+    )
 
-    if g.get("extra_compare_recording_tables", True):
-        cell_rec_a = analysis.summarize_cell_recordings(res_a)
-        cell_rec_b = analysis.summarize_cell_recordings(res_b)
-        if cell_rec_a.get("available") or cell_rec_b.get("available"):
-            show_md(
-                analysis.format_cell_recording_summary_compare(
-                    cell_rec_a,
-                    cell_rec_b,
-                    labels=(label_a, label_b),
-                    diff_only=g.get("extra_compare_diff_only"),
-                    title="Cell recording summary",
-                )
-            )
-
-        syn_trace_a = analysis.summarize_total_synaptic_traces(res_a)
-        syn_trace_b = analysis.summarize_total_synaptic_traces(res_b)
-        if syn_trace_a.get("available") or syn_trace_b.get("available"):
-            show_md(
-                analysis.format_total_synaptic_trace_compare(
-                    syn_trace_a,
-                    syn_trace_b,
-                    labels=(label_a, label_b),
-                    diff_only=g.get("extra_compare_diff_only"),
-                    title="Total synaptic traces (I/G)",
-                )
-            )
-
-    if g.get("extra_synapse_weight_plot") or g.get("extra_synapse_distance_plot"):
-        syn_groups = g.get("extra_synapse_groups")
-        vals_w_a = analysis.extract_synapse_values(res_a.get("syn_records") or {}, "weight", syn_groups)
-        vals_w_b = analysis.extract_synapse_values(res_b.get("syn_records") or {}, "weight", syn_groups)
-        vals_d_a = analysis.extract_synapse_values(res_a.get("syn_records") or {}, "distance", syn_groups)
-        vals_d_b = analysis.extract_synapse_values(res_b.get("syn_records") or {}, "distance", syn_groups)
-
-        if g.get("extra_synapse_weight_plot"):
-            fig_w = plotting.plot_synapse_compare_hist(
-                vals_w_a,
-                vals_w_b,
-                labels=(label_a, label_b),
-                bin_width=g.get("extra_synapse_weight_bin"),
-                xlabel="Synaptic weight",
-                title="Synapse weight distribution",
-                density=g.get("extra_synapse_density"),
-            )
-            if fig_w is not None:
-                analysis.save_figure(
-                    fig_w,
-                    analysis.plot_dir_for_compare(sel["base"], run_a, run_b) / "syn_weight_compare.png",
-                    enabled=bool(g.get("save_plots", False)),
-                )
-
-        if g.get("extra_synapse_distance_plot"):
-            fig_d = plotting.plot_synapse_compare_hist(
-                vals_d_a,
-                vals_d_b,
-                labels=(label_a, label_b),
-                bin_width=g.get("extra_synapse_distance_bin"),
-                xlabel="Distance from soma (um)",
-                title="Synapse distance distribution",
-                density=g.get("extra_synapse_density"),
-            )
-            if fig_d is not None:
-                analysis.save_figure(
-                    fig_d,
-                    analysis.plot_dir_for_compare(sel["base"], run_a, run_b) / "syn_distance_compare.png",
-                    enabled=bool(g.get("save_plots", False)),
-                )
+    if bool(g.get("save_analysis", False)):
+        if len(report.get("runs", [])) == 1:
+            out_dir = analysis.analysis_dir_for_run(Path(report["runs"][0]["run_dir"]))
+        else:
+            out_dir = sel["base"] / "_comparisons" / "config_compare_list" / "analysis"
+        analysis.save_json(report, out_dir / "config_compare_report.json", enabled=True)
 
 
 def run_snapshot_compare_from_globals(g: Dict[str, Any]) -> None:

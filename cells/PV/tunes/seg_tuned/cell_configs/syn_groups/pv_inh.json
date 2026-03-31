@@ -1,6 +1,6 @@
 {
   "pv_inh": {
-    "state": false,
+    "state": true,
     "mode": "precomputed",
     "color": "#8c564b",
     "source": {
@@ -12,7 +12,7 @@
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 300.0,
+      "stim_tstart_ms": 270.0,
       "duration_ms": null,
       "input_stim_tstart_ms": 300.0,
       "input_duration_ms": null
@@ -30,7 +30,7 @@
         }
       },
       "params": {
-        "wt_mean": 0.015,
+        "wt_mean": 0.05,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,

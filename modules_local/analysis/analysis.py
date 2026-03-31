@@ -5,10 +5,11 @@ Simple analysis helpers for single-cell simulation results.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional, Union
+from typing import Any, Dict, Iterable, Optional, Sequence, Union
 
 from collections import Counter
 import csv
+import copy
 import json
 import math
 import os
@@ -2901,6 +2902,432 @@ def save_compare_table(
         outputs["xlsx"] = xlsx_path
 
     return outputs
+
+
+RESTORE_CONFIG_APPLY_CHOICES: tuple[str, ...] = (
+    "sim_config",
+    "cell_config",
+    "geometry",
+    "syn_config",
+    "syn_groups",
+    "fit_json",
+)
+
+
+def _normalize_restore_apply(apply: Optional[Sequence[str]]) -> list[str]:
+    if not apply:
+        return list(RESTORE_CONFIG_APPLY_CHOICES)
+    out: list[str] = []
+    for raw in apply:
+        for token in str(raw).split(","):
+            tok = token.strip()
+            if not tok:
+                continue
+            if tok not in RESTORE_CONFIG_APPLY_CHOICES:
+                raise ValueError(
+                    f"Unknown config-compare target '{tok}'. "
+                    f"Valid: {', '.join(RESTORE_CONFIG_APPLY_CHOICES)}"
+                )
+            if tok not in out:
+                out.append(tok)
+    return out or list(RESTORE_CONFIG_APPLY_CHOICES)
+
+
+def _flatten_json_leaf_values(
+    payload: Any,
+    *,
+    json_path_fn: Any,
+    path_parts: tuple[Any, ...] = (),
+    out: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    if out is None:
+        out = {}
+    if isinstance(payload, dict):
+        if not payload:
+            out[json_path_fn(path_parts)] = {}
+            return out
+        for key, val in payload.items():
+            _flatten_json_leaf_values(
+                val,
+                json_path_fn=json_path_fn,
+                path_parts=path_parts + (key,),
+                out=out,
+            )
+        return out
+    if isinstance(payload, list):
+        if not payload:
+            out[json_path_fn(path_parts)] = []
+            return out
+        for idx, val in enumerate(payload):
+            _flatten_json_leaf_values(
+                val,
+                json_path_fn=json_path_fn,
+                path_parts=path_parts + (idx,),
+                out=out,
+            )
+        return out
+    out[json_path_fn(path_parts)] = payload
+    return out
+
+
+def _project_restore_like_values_for_run(
+    run_path: Union[str, Path],
+    *,
+    target_tune: Path,
+    apply: Sequence[str],
+    syn_groups: str = "all",
+    allow_source_fallback: bool = True,
+) -> Dict[str, Any]:
+    from scripts import restore_run_state as restore
+
+    manifest_path = restore._resolve_manifest_path(Path(run_path))
+    run_dir, _, source_payloads, source_warnings = restore._collect_source_payloads(
+        manifest_path,
+        source_tune_override=None,
+        allow_source_fallback=allow_source_fallback,
+    )
+    warnings: list[str] = list(source_warnings or [])
+    apply_set = set(apply)
+    config_root = target_tune / "cell_configs"
+
+    source_tune_path = source_payloads.get("source_tune")
+    if source_tune_path is not None:
+        source_tune_path = Path(source_tune_path).expanduser().resolve()
+        if source_tune_path != target_tune:
+            warnings.append(
+                f"{run_label(run_dir)}: source tune '{source_tune_path}' differs from target '{target_tune}'."
+            )
+
+    values: Dict[tuple[str, str], Any] = {}
+
+    def _project_file_value(
+        *,
+        kind: str,
+        target_path: Optional[Path],
+        source_payload: Any,
+        adapt_sim: bool = False,
+    ) -> None:
+        if kind not in apply_set:
+            return
+        if target_path is None or not target_path.is_file():
+            warnings.append(f"{run_label(run_dir)}: target file missing for {kind}: {target_path}")
+            return
+        if source_payload is None:
+            warnings.append(f"{run_label(run_dir)}: source payload missing for {kind}.")
+            return
+
+        target_payload = restore._read_json(target_path)
+        src_payload = copy.deepcopy(source_payload)
+        if adapt_sim and isinstance(target_payload, dict) and isinstance(src_payload, dict):
+            src_payload = restore._adapt_sim_source_for_target(target_payload, src_payload)
+        projected_payload, _ = restore._overlay_values_keep_structure(target_payload, src_payload, ())
+        flat = _flatten_json_leaf_values(projected_payload, json_path_fn=restore._json_path)
+        for json_path, val in flat.items():
+            values[(kind, json_path)] = val
+
+    _project_file_value(
+        kind="sim_config",
+        target_path=config_root / "sim_config.json",
+        source_payload=source_payloads.get("sim_config"),
+        adapt_sim=True,
+    )
+    _project_file_value(
+        kind="cell_config",
+        target_path=config_root / "cell_config.json",
+        source_payload=source_payloads.get("cell_config"),
+    )
+    _project_file_value(
+        kind="geometry",
+        target_path=config_root / "geometry.json",
+        source_payload=source_payloads.get("geometry"),
+    )
+    _project_file_value(
+        kind="syn_config",
+        target_path=config_root / "syn_config.json",
+        source_payload=source_payloads.get("syn_config"),
+    )
+
+    if "fit_json" in apply_set:
+        source_fit = source_payloads.get("fit_json")
+        source_fit_path = source_payloads.get("fit_json_path")
+        preferred_name = Path(source_fit_path).name if isinstance(source_fit_path, Path) else None
+        target_fit_path = restore._find_fit_json_in_tune(target_tune, preferred_name=preferred_name)
+        _project_file_value(
+            kind="fit_json",
+            target_path=target_fit_path,
+            source_payload=source_fit,
+        )
+
+    if "syn_groups" in apply_set:
+        source_syn_payload = source_payloads.get("syn_config")
+        syn_cfg_path = config_root / "syn_config.json"
+        if source_syn_payload is None:
+            warnings.append(f"{run_label(run_dir)}: source payload missing for syn_groups.")
+        elif not syn_cfg_path.is_file():
+            warnings.append(f"{run_label(run_dir)}: target syn_config missing for syn_groups: {syn_cfg_path}")
+        else:
+            source_groups: Any = source_syn_payload
+            needs_expand = isinstance(source_syn_payload, list) or (
+                isinstance(source_syn_payload, dict) and "__includes__" in source_syn_payload
+            )
+            if needs_expand:
+                source_config_root = (
+                    (source_tune_path / "cell_configs")
+                    if isinstance(source_tune_path, Path)
+                    else None
+                )
+                if source_config_root is None:
+                    warnings.append(
+                        f"{run_label(run_dir)}: cannot expand source syn_config __includes__ without source tune."
+                    )
+                    source_groups = None
+                else:
+                    try:
+                        source_groups = restore._expand_syn_config(source_syn_payload, source_config_root)
+                    except Exception as exc:
+                        warnings.append(
+                            f"{run_label(run_dir)}: failed to expand source syn_config __includes__: {exc}"
+                        )
+                        source_groups = None
+
+            if isinstance(source_groups, dict):
+                try:
+                    target_syn_cfg = restore._read_json(syn_cfg_path)
+                    group_to_file, file_payloads, target_warns = restore._collect_target_group_files(
+                        target_syn_cfg,
+                        config_root,
+                        syn_cfg_path,
+                    )
+                    warnings.extend(
+                        [f"{run_label(run_dir)}: {line}" for line in (target_warns or [])]
+                    )
+                except Exception as exc:
+                    warnings.append(f"{run_label(run_dir)}: failed to load target syn groups: {exc}")
+                    group_to_file = {}
+                    file_payloads = {}
+
+                selected = restore._parse_syn_groups(syn_groups)
+                if selected is None:
+                    candidate_groups = sorted(set(source_groups.keys()) & set(group_to_file.keys()))
+                else:
+                    candidate_groups = sorted(selected)
+
+                for group_name in candidate_groups:
+                    if group_name not in source_groups:
+                        warnings.append(
+                            f"{run_label(run_dir)}: requested syn group '{group_name}' missing in source."
+                        )
+                        continue
+                    if group_name not in group_to_file:
+                        warnings.append(
+                            f"{run_label(run_dir)}: requested syn group '{group_name}' missing in target."
+                        )
+                        continue
+                    file_path = group_to_file[group_name]
+                    target_payload = file_payloads.get(file_path)
+                    if target_payload is None and file_path.is_file():
+                        target_payload = restore._read_json(file_path)
+                        file_payloads[file_path] = target_payload
+                    if not isinstance(target_payload, dict):
+                        warnings.append(
+                            f"{run_label(run_dir)}: invalid target syn group payload in {file_path}."
+                        )
+                        continue
+                    target_group = target_payload.get(group_name)
+                    source_group = source_groups.get(group_name)
+                    if not isinstance(target_group, dict) or not isinstance(source_group, dict):
+                        warnings.append(
+                            f"{run_label(run_dir)}: syn group '{group_name}' is non-dict in source/target."
+                        )
+                        continue
+                    projected_group, _ = restore._overlay_values_keep_structure(
+                        target_group,
+                        source_group,
+                        (),
+                    )
+                    flat = _flatten_json_leaf_values(
+                        projected_group,
+                        json_path_fn=restore._json_path,
+                        path_parts=(group_name,),
+                    )
+                    for json_path, val in flat.items():
+                        values[("syn_groups", json_path)] = val
+
+    return {
+        "run_dir": run_dir,
+        "values": values,
+        "warnings": warnings,
+    }
+
+
+def compare_config_runs(
+    runs: Sequence[Union[str, Path]],
+    *,
+    target_tune: Union[str, Path],
+    labels: Optional[Sequence[Optional[str]]] = None,
+    apply: Optional[Sequence[str]] = None,
+    syn_groups: str = "all",
+    diff_only: bool = True,
+    allow_source_fallback: bool = True,
+) -> Dict[str, Any]:
+    apply_list = _normalize_restore_apply(apply)
+    target_tune_path = Path(target_tune).expanduser().resolve()
+    warnings: list[str] = []
+    skipped: list[str] = []
+    rows_values_by_label: Dict[str, Dict[tuple[str, str], Any]] = {}
+    runs_meta: list[Dict[str, str]] = []
+    used_labels: Dict[str, int] = {}
+
+    for idx, run in enumerate(list(runs or [])):
+        try:
+            projected = _project_restore_like_values_for_run(
+                run,
+                target_tune=target_tune_path,
+                apply=apply_list,
+                syn_groups=syn_groups,
+                allow_source_fallback=allow_source_fallback,
+            )
+        except Exception as exc:
+            skipped.append(f"{run}: {exc}")
+            continue
+
+        run_dir = Path(projected["run_dir"]).resolve()
+        label_raw = None
+        if labels is not None and idx < len(labels):
+            label_raw = labels[idx]
+        base_label = str(label_raw).strip() if label_raw not in (None, "") else run_label(run_dir)
+        suffix_idx = used_labels.get(base_label, 0)
+        label = base_label if suffix_idx == 0 else f"{base_label}_{suffix_idx + 1}"
+        used_labels[base_label] = suffix_idx + 1
+
+        rows_values_by_label[label] = projected.get("values", {}) or {}
+        runs_meta.append({"label": label, "run_dir": str(run_dir)})
+        warnings.extend(projected.get("warnings", []) or [])
+
+    if not runs_meta:
+        return {
+            "target_tune": str(target_tune_path),
+            "apply": apply_list,
+            "syn_groups": syn_groups,
+            "runs": [],
+            "rows": [],
+            "warnings": warnings,
+            "skipped": skipped,
+            "diff_only": diff_only,
+        }
+
+    labels_order = [item["label"] for item in runs_meta]
+    all_row_keys: set[tuple[str, str]] = set()
+    for val_map in rows_values_by_label.values():
+        all_row_keys.update(val_map.keys())
+
+    kind_rank = {kind: i for i, kind in enumerate(apply_list)}
+    sorted_keys = sorted(all_row_keys, key=lambda item: (kind_rank.get(item[0], 999), item[0], item[1]))
+
+    rows: list[Dict[str, Any]] = []
+    for kind, json_path in sorted_keys:
+        present_values: list[Any] = []
+        values_by_label: Dict[str, Any] = {}
+        missing_any = False
+        for label in labels_order:
+            val_map = rows_values_by_label.get(label, {})
+            if (kind, json_path) not in val_map:
+                missing_any = True
+                continue
+            val = val_map[(kind, json_path)]
+            values_by_label[label] = val
+            present_values.append(val)
+
+        include_row = True
+        if diff_only:
+            if missing_any:
+                include_row = True
+            elif not present_values:
+                include_row = False
+            else:
+                first = present_values[0]
+                include_row = not all(_values_equal(first, other) for other in present_values[1:])
+        if not include_row:
+            continue
+
+        rows.append(
+            {
+                "kind": kind,
+                "json_path": json_path,
+                "values": values_by_label,
+            }
+        )
+
+    return {
+        "target_tune": str(target_tune_path),
+        "apply": apply_list,
+        "syn_groups": syn_groups,
+        "runs": runs_meta,
+        "rows": rows,
+        "warnings": warnings,
+        "skipped": skipped,
+        "diff_only": bool(diff_only),
+    }
+
+
+def _fmt_config_compare_value(value: Any, *, max_len: int = 140) -> str:
+    try:
+        text = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    except Exception:
+        text = str(value)
+    if len(text) > max_len:
+        text = text[: max_len - 3] + "..."
+    return text
+
+
+def _escape_md_cell(text: Any) -> str:
+    s = str(text)
+    return s.replace("\\", "\\\\").replace("|", "\\|").replace("\n", "<br>")
+
+
+def format_config_compare_table(
+    report: Dict[str, Any],
+    *,
+    title: str = "Config compare",
+    max_rows: Optional[int] = None,
+) -> str:
+    runs = report.get("runs") or []
+    rows = report.get("rows") or []
+    labels = [str(item.get("label")) for item in runs]
+
+    lines = [f"**{title}**"]
+    header = "| Config | Param | " + " | ".join([_escape_md_cell(lb) for lb in labels]) + " |"
+    sep = "| --- | --- | " + " | ".join(["---"] * len(labels)) + " |"
+    lines.extend([header, sep])
+
+    if not rows:
+        lines.append("| (no rows) | — | " + " | ".join(["—"] * len(labels)) + " |")
+        return "\n".join(lines)
+
+    rows_to_show = rows
+    if max_rows is not None and max_rows > 0:
+        rows_to_show = rows[: int(max_rows)]
+
+    for row in rows_to_show:
+        kind = _escape_md_cell(row.get("kind", ""))
+        json_path = _escape_md_cell(row.get("json_path", ""))
+        values = row.get("values") or {}
+        row_cells: list[str] = []
+        for label in labels:
+            if label not in values:
+                row_cells.append("—")
+            else:
+                row_cells.append(_escape_md_cell(_fmt_config_compare_value(values[label])))
+        lines.append(f"| {kind} | {json_path} | " + " | ".join(row_cells) + " |")
+
+    if max_rows is not None and max_rows > 0 and len(rows) > len(rows_to_show):
+        lines.append(
+            f"| (truncated) | showing first {len(rows_to_show)} of {len(rows)} rows | "
+            + " | ".join(["—"] * len(labels))
+            + " |"
+        )
+
+    return "\n".join(lines)
 
 
 def format_snapshot_table(

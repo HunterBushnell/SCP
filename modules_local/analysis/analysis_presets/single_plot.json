@@ -5,7 +5,7 @@
     "top_input_groups": [],
     "top_input_mode": "average",
     "top_layout": "overlay",
-    "top_fill_under": true,
+    "top_fill_under": false,
     "top_fill_alpha": 0.28,
 
     "include_input_raster": false,

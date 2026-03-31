@@ -1,0 +1,87 @@
+Running: python /home/hrbncv/SCP/run_pipeline.py --tune-dir /home/hrbncv/SCP/cells/PV/tunes/seg_tuned --output-dir /home/hrbncv/SCP/cells/PV/tunes/seg_tuned/output_data/slurm_34963/parts --n-trials 40 --output-stem slurm_34963_22 --trial-offset 880 --force-save
+Mechanisms already loaded; skipping duplicate load.
+Loaded Allen cell for 'PV' from /home/hrbncv/SCP/cells/PV/tunes/seg_tuned/manifest.json, soma_diam_multiplier=6.0, Vinit=-71.0, loader=allensdk_default
+Geometry defined for 'PV': 1 soma segs, 46 proximal dend segs, 41 distal dend segs, 97 total dend segs.
+[trial 1/40] input_spikes: pn_exc=2817 bg_exc=830 bg_inh=219 sst_inh=380 pv_inh=1211
+[trial 1/40] spikes=8  rate=8.00 Hz  time=28.09s
+[trial 2/40] input_spikes: pn_exc=2950 bg_exc=869 bg_inh=234 sst_inh=359 pv_inh=1207
+[trial 2/40] spikes=8  rate=8.00 Hz  time=27.76s
+[trial 3/40] input_spikes: pn_exc=2794 bg_exc=888 bg_inh=184 sst_inh=375 pv_inh=1185
+[trial 3/40] spikes=6  rate=6.00 Hz  time=27.84s
+[trial 4/40] input_spikes: pn_exc=2689 bg_exc=802 bg_inh=201 sst_inh=373 pv_inh=1208
+[trial 4/40] spikes=7  rate=7.00 Hz  time=27.57s
+[trial 5/40] input_spikes: pn_exc=2877 bg_exc=929 bg_inh=203 sst_inh=360 pv_inh=1198
+[trial 5/40] spikes=8  rate=8.00 Hz  time=27.51s
+[trial 6/40] input_spikes: pn_exc=2842 bg_exc=865 bg_inh=206 sst_inh=378 pv_inh=1185
+[trial 6/40] spikes=6  rate=6.00 Hz  time=27.53s
+[trial 7/40] input_spikes: pn_exc=2751 bg_exc=841 bg_inh=214 sst_inh=357 pv_inh=1193
+[trial 7/40] spikes=5  rate=5.00 Hz  time=27.61s
+[trial 8/40] input_spikes: pn_exc=2857 bg_exc=879 bg_inh=219 sst_inh=371 pv_inh=1222
+[trial 8/40] spikes=7  rate=7.00 Hz  time=27.71s
+[trial 9/40] input_spikes: pn_exc=2730 bg_exc=850 bg_inh=206 sst_inh=384 pv_inh=1198
+[trial 9/40] spikes=6  rate=6.00 Hz  time=27.29s
+[trial 10/40] input_spikes: pn_exc=2652 bg_exc=806 bg_inh=173 sst_inh=381 pv_inh=1200
+[trial 10/40] spikes=8  rate=8.00 Hz  time=27.11s
+[trial 11/40] input_spikes: pn_exc=2733 bg_exc=809 bg_inh=213 sst_inh=406 pv_inh=1171
+[trial 11/40] spikes=5  rate=5.00 Hz  time=27.01s
+[trial 12/40] input_spikes: pn_exc=2688 bg_exc=825 bg_inh=227 sst_inh=392 pv_inh=1214
+[trial 12/40] spikes=4  rate=4.00 Hz  time=27.01s
+[trial 13/40] input_spikes: pn_exc=2856 bg_exc=858 bg_inh=242 sst_inh=350 pv_inh=1203
+[trial 13/40] spikes=8  rate=8.00 Hz  time=33.02s
+[trial 14/40] input_spikes: pn_exc=2362 bg_exc=553 bg_inh=165 sst_inh=361 pv_inh=1198
+[trial 14/40] spikes=6  rate=6.00 Hz  time=35.57s
+[trial 15/40] input_spikes: pn_exc=2843 bg_exc=848 bg_inh=203 sst_inh=382 pv_inh=1195
+[trial 15/40] spikes=8  rate=8.00 Hz  time=34.93s
+[trial 16/40] input_spikes: pn_exc=2734 bg_exc=826 bg_inh=207 sst_inh=378 pv_inh=1193
+[trial 16/40] spikes=7  rate=7.00 Hz  time=34.43s
+[trial 17/40] input_spikes: pn_exc=2764 bg_exc=880 bg_inh=199 sst_inh=391 pv_inh=1185
+[trial 17/40] spikes=6  rate=6.00 Hz  time=34.34s
+[trial 18/40] input_spikes: pn_exc=2824 bg_exc=791 bg_inh=176 sst_inh=378 pv_inh=1213
+[trial 18/40] spikes=6  rate=6.00 Hz  time=34.86s
+[trial 19/40] input_spikes: pn_exc=2620 bg_exc=754 bg_inh=206 sst_inh=377 pv_inh=1189
+[trial 19/40] spikes=7  rate=7.00 Hz  time=34.36s
+[trial 20/40] input_spikes: pn_exc=2669 bg_exc=845 bg_inh=198 sst_inh=371 pv_inh=1169
+[trial 20/40] spikes=5  rate=5.00 Hz  time=34.66s
+[trial 21/40] input_spikes: pn_exc=2794 bg_exc=819 bg_inh=179 sst_inh=392 pv_inh=1212
+[trial 21/40] spikes=7  rate=7.00 Hz  time=35.27s
+[trial 22/40] input_spikes: pn_exc=2813 bg_exc=909 bg_inh=203 sst_inh=373 pv_inh=1191
+[trial 22/40] spikes=6  rate=6.00 Hz  time=34.11s
+[trial 23/40] input_spikes: pn_exc=2849 bg_exc=867 bg_inh=217 sst_inh=378 pv_inh=1215
+[trial 23/40] spikes=5  rate=5.00 Hz  time=29.95s
+[trial 24/40] input_spikes: pn_exc=2800 bg_exc=890 bg_inh=215 sst_inh=375 pv_inh=1206
+[trial 24/40] spikes=8  rate=8.00 Hz  time=27.49s
+[trial 25/40] input_spikes: pn_exc=2764 bg_exc=837 bg_inh=201 sst_inh=362 pv_inh=1187
+[trial 25/40] spikes=6  rate=6.00 Hz  time=27.57s
+[trial 26/40] input_spikes: pn_exc=2746 bg_exc=839 bg_inh=214 sst_inh=374 pv_inh=1187
+[trial 26/40] spikes=5  rate=5.00 Hz  time=27.52s
+[trial 27/40] input_spikes: pn_exc=2823 bg_exc=826 bg_inh=203 sst_inh=342 pv_inh=1181
+[trial 27/40] spikes=7  rate=7.00 Hz  time=27.51s
+[trial 28/40] input_spikes: pn_exc=2847 bg_exc=798 bg_inh=210 sst_inh=371 pv_inh=1192
+[trial 28/40] spikes=6  rate=6.00 Hz  time=27.75s
+[trial 29/40] input_spikes: pn_exc=2562 bg_exc=708 bg_inh=171 sst_inh=378 pv_inh=1185
+[trial 29/40] spikes=7  rate=7.00 Hz  time=27.49s
+[trial 30/40] input_spikes: pn_exc=2850 bg_exc=809 bg_inh=213 sst_inh=368 pv_inh=1212
+[trial 30/40] spikes=8  rate=8.00 Hz  time=27.48s
+[trial 31/40] input_spikes: pn_exc=2607 bg_exc=770 bg_inh=193 sst_inh=360 pv_inh=1192
+[trial 31/40] spikes=7  rate=7.00 Hz  time=27.47s
+[trial 32/40] input_spikes: pn_exc=2750 bg_exc=884 bg_inh=211 sst_inh=375 pv_inh=1213
+[trial 32/40] spikes=7  rate=7.00 Hz  time=27.54s
+[trial 33/40] input_spikes: pn_exc=2745 bg_exc=789 bg_inh=205 sst_inh=366 pv_inh=1194
+[trial 33/40] spikes=6  rate=6.00 Hz  time=27.54s
+[trial 34/40] input_spikes: pn_exc=2758 bg_exc=740 bg_inh=203 sst_inh=376 pv_inh=1198
+[trial 34/40] spikes=6  rate=6.00 Hz  time=27.74s
+[trial 35/40] input_spikes: pn_exc=2832 bg_exc=905 bg_inh=186 sst_inh=373 pv_inh=1191
+[trial 35/40] spikes=5  rate=5.00 Hz  time=27.60s
+[trial 36/40] input_spikes: pn_exc=2910 bg_exc=828 bg_inh=186 sst_inh=364 pv_inh=1188
+[trial 36/40] spikes=7  rate=7.00 Hz  time=27.41s
+[trial 37/40] input_spikes: pn_exc=2722 bg_exc=808 bg_inh=163 sst_inh=391 pv_inh=1197
+[trial 37/40] spikes=6  rate=6.00 Hz  time=27.59s
+[trial 38/40] input_spikes: pn_exc=2769 bg_exc=811 bg_inh=210 sst_inh=385 pv_inh=1187
+[trial 38/40] spikes=5  rate=5.00 Hz  time=27.51s
+[trial 39/40] input_spikes: pn_exc=2687 bg_exc=765 bg_inh=197 sst_inh=381 pv_inh=1198
+[trial 39/40] spikes=6  rate=6.00 Hz  time=27.37s
+[trial 40/40] input_spikes: pn_exc=2514 bg_exc=714 bg_inh=160 sst_inh=393 pv_inh=1202
+[trial 40/40] spikes=8  rate=8.00 Hz  time=26.75s
+save_plots single_plot warning: Top input panel: group list empty, auto-using all groups (5).
+Results saved to /home/hrbncv/SCP/cells/PV/tunes/seg_tuned/output_data/slurm_34963/parts/slurm_34963_22/run_manifest.json
+Total runtime: 1174.41s

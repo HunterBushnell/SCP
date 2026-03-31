@@ -1,6 +1,6 @@
 {
   "sst_inh": {
-    "state": false,
+    "state": true,
     "mode": "precomputed",
     "color": "#ff7f0e",
     "source": {
@@ -30,7 +30,7 @@
         }
       },
       "params": {
-        "wt_mean": 1.5,
+        "wt_mean": 1.0,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,

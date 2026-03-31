@@ -1,0 +1,41 @@
+{
+  "vip_inh_bio": {
+    "state": false,
+    "mode": "inhomogeneous_poisson",
+    "color": "#9467bd",
+    "source": {
+      "freq": null,
+      "baseline": 2.3,
+      "path": "external_data/pyrFiringRateAvg.csv",
+      "bin_ms": null,
+      "time_col": "Time",
+      "rate_col": "AvgFiringRate"
+    },
+    "timing": {
+      "onset_ms": null,
+      "stim_tstart_ms": 330.0,
+      "duration_ms": null,
+      "input_stim_tstart_ms": 0.0,
+      "input_duration_ms": null
+    },
+    "syns": {
+      "type": "GABA_A",
+      "N_syn": 17,
+      "segs": "proximal",
+      "dist_func": {
+        "kind": "uniform",
+        "params": {
+          "c": 2.0
+        }
+      },
+      "params": {
+        "wt_mean": 30.0,
+        "wt_std": 0.33,
+        "initW": 1.0,
+        "gmax": 0.001,
+        "tau_r_GABAA": 0.5,
+        "tau_d_GABAA": 5.5
+      }
+    }
+  }
+}
