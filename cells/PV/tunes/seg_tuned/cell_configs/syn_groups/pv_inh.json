@@ -6,13 +6,13 @@
     "source": {
       "freq": null,
       "baseline": 3.0,
-      "path": "cells/PV/tunes/seg_tuned/output_data/_passive_SSTinh_PV/results/spikes.npz",
+      "path": "cells/PV/tunes/seg_tuned/output_data/_PV1_base/results/spikes.npz",
       "bin_ms": null,
       "key": "base tune"
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 270.0,
+      "stim_tstart_ms": 300.0,
       "duration_ms": null,
       "input_stim_tstart_ms": 300.0,
       "input_duration_ms": null
