@@ -1,0 +1,46 @@
+Running: python /home/hrbncv/SCP/run_pipeline.py --tune-dir /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all --output-dir /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/output_data/slurm_35973/parts --n-trials 20 --output-stem slurm_35973_21 --trial-offset 420 --force-save
+Loaded mechanisms from /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/modfiles/x86_64/.libs/libnrnmech.so
+Loaded Allen cell for 'SST' from /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/manifest.json, soma_diam_multiplier=10.0, Vinit=-65.0, loader=genome_fallback
+Geometry defined for 'SST': 1 soma segs, 54 proximal dend segs, 52 distal dend segs, 115 total dend segs.
+[trial 1/20] input_spikes: pn_exc=1651 bg_exc=2135 bg_inh=657
+[trial 1/20] spikes=5  rate=5.00 Hz  time=21.75s
+[trial 2/20] input_spikes: pn_exc=1747 bg_exc=2459 bg_inh=721
+[trial 2/20] spikes=3  rate=3.00 Hz  time=22.14s
+[trial 3/20] input_spikes: pn_exc=1630 bg_exc=2276 bg_inh=700
+[trial 3/20] spikes=9  rate=9.00 Hz  time=21.98s
+[trial 4/20] input_spikes: pn_exc=1739 bg_exc=2328 bg_inh=763
+[trial 4/20] spikes=4  rate=4.00 Hz  time=22.00s
+[trial 5/20] input_spikes: pn_exc=1737 bg_exc=2523 bg_inh=751
+[trial 5/20] spikes=3  rate=3.00 Hz  time=22.22s
+[trial 6/20] input_spikes: pn_exc=1533 bg_exc=2079 bg_inh=628
+[trial 6/20] spikes=6  rate=6.00 Hz  time=21.65s
+[trial 7/20] input_spikes: pn_exc=1675 bg_exc=2546 bg_inh=732
+[trial 7/20] spikes=5  rate=5.00 Hz  time=22.22s
+[trial 8/20] input_spikes: pn_exc=1625 bg_exc=2168 bg_inh=658
+[trial 8/20] spikes=3  rate=3.00 Hz  time=21.68s
+[trial 9/20] input_spikes: pn_exc=1789 bg_exc=2397 bg_inh=714
+[trial 9/20] spikes=2  rate=2.00 Hz  time=22.03s
+[trial 10/20] input_spikes: pn_exc=1703 bg_exc=2334 bg_inh=754
+[trial 10/20] spikes=4  rate=4.00 Hz  time=21.99s
+[trial 11/20] input_spikes: pn_exc=1716 bg_exc=2460 bg_inh=767
+[trial 11/20] spikes=3  rate=3.00 Hz  time=22.17s
+[trial 12/20] input_spikes: pn_exc=1739 bg_exc=2479 bg_inh=747
+[trial 12/20] spikes=5  rate=5.00 Hz  time=22.16s
+[trial 13/20] input_spikes: pn_exc=1718 bg_exc=2247 bg_inh=719
+[trial 13/20] spikes=1  rate=1.00 Hz  time=22.05s
+[trial 14/20] input_spikes: pn_exc=1628 bg_exc=2105 bg_inh=641
+[trial 14/20] spikes=2  rate=2.00 Hz  time=21.96s
+[trial 15/20] input_spikes: pn_exc=1702 bg_exc=2385 bg_inh=713
+[trial 15/20] spikes=2  rate=2.00 Hz  time=22.20s
+[trial 16/20] input_spikes: pn_exc=1709 bg_exc=2276 bg_inh=721
+[trial 16/20] spikes=3  rate=3.00 Hz  time=22.11s
+[trial 17/20] input_spikes: pn_exc=1622 bg_exc=2055 bg_inh=618
+[trial 17/20] spikes=3  rate=3.00 Hz  time=21.90s
+[trial 18/20] input_spikes: pn_exc=1570 bg_exc=1968 bg_inh=644
+[trial 18/20] spikes=5  rate=5.00 Hz  time=21.86s
+[trial 19/20] input_spikes: pn_exc=1685 bg_exc=2255 bg_inh=693
+[trial 19/20] spikes=8  rate=8.00 Hz  time=22.22s
+[trial 20/20] input_spikes: pn_exc=1688 bg_exc=2368 bg_inh=716
+[trial 20/20] spikes=6  rate=6.00 Hz  time=21.98s
+Results saved to /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/output_data/slurm_35973/parts/slurm_35973_21/run_manifest.json
+Total runtime: 440.55s

@@ -1,0 +1,14 @@
+/home/hrbncv/miniconda3/envs/BMTK-py311/lib/python3.11/site-packages/allensdk/model/biophys_sim/config.py:38: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import resource_filename  # @UnresolvedImport
+Warning: no DISPLAY environment variable.
+--No graphics will be displayed.
+na_ion mechanism not inserted in section axon[0]
+NEURON: 
+ near line 1
+ forsec "axon" { ena = 53 }
+                           ^
+na_ion mechanism not inserted in section dend[0]
+NEURON: 
+ near line 1
+ forsec "dend" { ena = 53 }
+                           ^

@@ -62,7 +62,7 @@
     {
       "section": "soma",
       "name": "cm",
-      "value": 1,
+      "value": 1.0,
       "mechanism": ""
     },
     {
@@ -219,7 +219,7 @@
     {
       "section": "apic",
       "name": "cm",
-      "value": 1,
+      "value": 1.0,
       "mechanism": ""
     },
     {
@@ -262,7 +262,7 @@
     {
       "section": "dend",
       "name": "cm",
-      "value": 1,
+      "value": 1.0,
       "mechanism": ""
     },
     {

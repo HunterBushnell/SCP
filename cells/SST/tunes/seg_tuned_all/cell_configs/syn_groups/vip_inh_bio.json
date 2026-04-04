@@ -1,6 +1,6 @@
 {
   "vip_inh_bio": {
-    "state": true,
+    "state": false,
     "mode": "inhomogeneous_poisson",
     "color": "#9467bd",
     "source": {

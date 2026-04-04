@@ -44,7 +44,12 @@ def _draw_syn_weight(rng: np.random.Generator, syn_params: Dict[str, Any]) -> fl
 
     if wt_std > 0:
         mu, sig = _lognormal_mu_sigma(wt_mean, wt_std)
-        return float(rng.lognormal(mu, sig))
+        syn_wt = float(rng.lognormal(mu, sig))
+        # Cap high-tail draws to < mean + 3*std for this synapse group.
+        wt_cap = float(wt_mean + 3.0 * wt_std)
+        if syn_wt >= wt_cap:
+            syn_wt = float(np.nextafter(wt_cap, -np.inf))
+        return syn_wt
     else:
         return float(wt_mean)
 

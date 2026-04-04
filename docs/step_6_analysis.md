@@ -46,6 +46,23 @@ Spikes CSV export (row-per-trial)
 - You can also pass a run directory:
   - `python scripts/export_spikes_csv.py --input cells/PV/tunes/seg_tuned/output_data/<run_name>`
 
+Vm trace swap utility
+- Use `scripts/swap_vm_trace.py` to replace saved exemplar data in an existing run output without rerunning a full batch.
+- Default behavior is dry-run; add `--write` to apply changes.
+- `--update` controls what is replaced: `vm`, `inputs`, or `both` (default: `vm`).
+- Optional: `--source-input-trial-idx` / `--target-input-trial-idx` choose which saved input payload index to copy/replace.
+- `--rerun` mode executes `run_pipeline.py` from the tune directory currently on disk.
+- Typical use:
+  - Copy from another run:
+    - Vm only:
+      - `python scripts/swap_vm_trace.py --target-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35973 --source-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35922 --update vm`
+    - Input raster payload only:
+      - `python scripts/swap_vm_trace.py --target-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35973 --source-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35922 --update inputs`
+    - Vm + input payload together:
+      - `python scripts/swap_vm_trace.py --target-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35973 --source-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35922 --update both`
+  - Generate one fresh trial and use that Vm trace:
+    - `python scripts/swap_vm_trace.py --target-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35973 --rerun --update both --write`
+
 Notebook helper cell (5_local or 6_analysis)
 ```python
 from modules_local.analysis import analysis

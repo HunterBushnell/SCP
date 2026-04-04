@@ -2,6 +2,9 @@
 #  Moving-average helper
 # ────────────────────────────────────────────────────────────────────────────
 import pickle
+from pathlib import Path
+import csv
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
@@ -78,6 +81,165 @@ def _legend_safe_label(label):
     if txt.startswith("_"):
         return f" {txt}"
     return txt
+
+
+def resolve_export_paths(export_path, export_formats=None):
+    """
+    Resolve a base export path plus formats into concrete figure file paths.
+
+    Examples
+    --------
+    - export_path='plots/vm_traces', export_formats=('svg','png')
+      -> ['plots/vm_traces.svg', 'plots/vm_traces.png']
+    - export_path='plots/vm_traces.png'
+      -> ['plots/vm_traces.png']
+    """
+    if export_path in (None, ""):
+        return []
+
+    out = Path(str(export_path)).expanduser()
+    if out.suffix:
+        return [out]
+
+    fmts = [str(f).strip(".").lower() for f in (export_formats or ["svg"])]
+    fmts = [f for f in fmts if f]
+    if not fmts:
+        fmts = ["svg"]
+    return [out.with_suffix(f".{fmt}") for fmt in fmts]
+
+
+def save_figure_exports(
+    fig,
+    *,
+    export_path=None,
+    export_formats=("svg",),
+    export_overwrite=False,
+    dpi=300,
+    verbose=True,
+):
+    """
+    Save a matplotlib figure to one or more paths/formats with overwrite guard.
+
+    Returns
+    -------
+    dict with keys:
+      - requested_export_paths: list[str]
+      - exported_paths: list[str]
+      - warnings: list[str]
+    """
+    if fig is None or not hasattr(fig, "savefig"):
+        raise TypeError("save_figure_exports requires a matplotlib figure (obj with savefig).")
+
+    requested = [p.resolve() for p in resolve_export_paths(export_path, export_formats)]
+    exported = []
+    warnings = []
+
+    for out_path in requested:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        if out_path.exists() and not bool(export_overwrite):
+            msg = f"Warning: Export skipped (exists, overwrite disabled): {out_path}"
+            warnings.append(msg)
+            if verbose:
+                print(msg)
+            continue
+        fig.savefig(out_path, dpi=int(dpi), bbox_inches="tight")
+        exported.append(out_path)
+
+    if verbose and exported:
+        print("Saved:")
+        for p in exported:
+            print("  " + str(p))
+
+    return {
+        "requested_export_paths": [str(p) for p in requested],
+        "exported_paths": [str(p) for p in exported],
+        "warnings": warnings,
+    }
+
+
+def collect_trace_rows(fig):
+    """
+    Collect plotted line traces from a matplotlib figure.
+
+    Returns a list of dict rows, one row per trace.
+    """
+    if fig is None or not hasattr(fig, "axes"):
+        raise TypeError("collect_trace_rows requires a matplotlib figure.")
+
+    rows = []
+    for ax_idx, ax in enumerate(fig.axes):
+        ax_title = str(ax.get_title() or "")
+        x_label = str(ax.get_xlabel() or "")
+        y_label = str(ax.get_ylabel() or "")
+
+        for line_idx, line in enumerate(ax.get_lines()):
+            label = str(line.get_label() or "")
+            if label.startswith("_"):
+                label = ""
+            x = np.asarray(line.get_xdata(), dtype=float).tolist()
+            y = np.asarray(line.get_ydata(), dtype=float).tolist()
+            rows.append(
+                {
+                    "axis_index": ax_idx,
+                    "trace_index": line_idx,
+                    "label": label,
+                    "axis_title": ax_title,
+                    "x_label": x_label,
+                    "y_label": y_label,
+                    "n_points": len(y),
+                    "x_json": json.dumps(x),
+                    "y_json": json.dumps(y),
+                }
+            )
+    return rows
+
+
+def save_trace_rows_csv(
+    fig,
+    csv_path,
+    *,
+    overwrite=False,
+    verbose=True,
+):
+    """
+    Save plotted traces from a figure to CSV with one row per trace.
+    """
+    if fig is None or not hasattr(fig, "axes"):
+        raise TypeError("save_trace_rows_csv requires a matplotlib figure.")
+
+    out_path = Path(str(csv_path)).expanduser()
+    if not out_path.suffix:
+        out_path = out_path.with_suffix(".csv")
+    out_path = out_path.resolve()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if out_path.exists() and not bool(overwrite):
+        msg = f"Warning: CSV export skipped (exists, overwrite disabled): {out_path}"
+        if verbose:
+            print(msg)
+        return {"path": str(out_path), "saved": False, "warnings": [msg], "rows": 0}
+
+    rows = collect_trace_rows(fig)
+    fieldnames = [
+        "axis_index",
+        "trace_index",
+        "label",
+        "axis_title",
+        "x_label",
+        "y_label",
+        "n_points",
+        "x_json",
+        "y_json",
+    ]
+    with out_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    if verbose:
+        print(f"Saved CSV: {out_path}")
+
+    return {"path": str(out_path), "saved": True, "warnings": [], "rows": len(rows)}
 
 # ────────────────────────────────────────────────────────────────────────────
 #  Normalization helper
