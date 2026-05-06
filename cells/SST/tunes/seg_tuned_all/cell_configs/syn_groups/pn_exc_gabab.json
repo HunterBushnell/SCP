@@ -1,26 +1,35 @@
 {
-  "pn_exc_gabab": {
+  "pn_exc_gabab_auto": {
     "state": false,
     "mode": "inhomogeneous_poisson",
     "color": "#1f77b4",
     "source": {
       "freq": null,
       "baseline": "start",
-      "path": "external_data/bio_cell_output/pyrFiringRateAvg_gabab_tau100ms_delay50ms.csv",
+      "path": "external_data/bio_cell_output/pyrFiringRateAvg.csv",
       "bin_ms": 5,
+      "gabab": {
+        "enabled": false,
+        "tau_s": 0.01,
+        "delay_ms": 50.0,
+        "alpha": 1.0,
+        "history": "full"
+      },
       "freq_shift": 0,
-      "freq_scale": 1.25
+      "freq_scale": 1.0
+      
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 500.0,
+      "stim_tstart_ms": 300.0,
+      "stim_jitter": null,
       "duration_ms": null,
       "input_stim_tstart_ms": 0.0,
       "input_duration_ms": null
     },
     "syns": {
       "type": "AMPA_NMDA_STP",
-      "N_syn": 50,
+      "N_syn": 435,
       "segs": "all",
       "dist_func": {
         "kind": "uniform",
@@ -29,8 +38,8 @@
         }
       },
       "params": {
-        "wt_mean": 0.5,
-        "wt_std": 0.34,
+        "wt_mean": 0.25,
+        "wt_std": 0.33,
         "initW": 1.0,
         "gmax_AMPA": 0.001,
         "gmax_NMDA": 0.001,

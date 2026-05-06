@@ -44,7 +44,8 @@ PARAMETER {
     tau_r_AMPA = 0.2   (ms)  : Dual-exponential conductance profile
     tau_d_AMPA = 1.7   (ms)  : IMPORTANT: tau_r < tau_d
     tau_r_NMDA = 0.29  (ms)  : Dual-exponential conductance profile
-    tau_d_NMDA = 43    (ms)  : IMPORTANT: tau_r < tau_d
+    tau_d_NMDA = 43    (ms)  : IM
+    PORTANT: tau_r < tau_d
     Use = 1.0          (1)   : Utilization of synaptic efficacy
     Dep = 100          (ms)  : Relaxation time constant from depression
     Fac = 10           (ms)  : Relaxation time constant from facilitation

@@ -194,3 +194,85 @@ def build_cell_for_notebook(cell_config: Dict[str, Any]):
         loaded.axon = list(loaded.h.axon) if hasattr(loaded.h, "axon") else []
 
     return loaded
+
+
+def _ensure_synapse_test_state(cell: Any) -> None:
+    """
+    Ensure notebook-level synapse state containers exist on the cell.
+
+    These lists keep NEURON objects alive and mirror the state shape expected by
+    notebook experiments and run_sim helpers.
+    """
+    for attr in ("synapses", "netcons", "stims", "vecs", "syn_locs"):
+        if not hasattr(cell, attr):
+            setattr(cell, attr, [])
+
+
+def build_synapse_test_cell(cell_config: Dict[str, Any]):
+    """
+    Build a notebook-compatible cell for manual synapse tests/tuning.
+
+    This wraps `build_cell_for_notebook` and guarantees:
+      - `cell.all` is present for bmtool section lookup,
+      - synapse state containers exist (`synapses/netcons/stims/vecs/syn_locs`).
+    """
+    loaded = build_cell_for_notebook(cell_config)
+
+    if not hasattr(loaded, "all"):
+        loaded.all = loaded.h.SectionList()
+        for sec in loaded.h.allsec():
+            loaded.all.append(sec)
+
+    _ensure_synapse_test_state(loaded)
+    return loaded
+
+
+def add_single_synapse_for_notebook(
+    cell: Any,
+    syn_loc: Any,
+    syn_params: Dict[str, Any],
+    spike_train: Sequence[float],
+    *,
+    netcon_weight: float = 1.0,
+) -> Dict[str, Any]:
+    """
+    Attach one synapse + VecStim/NetCon pair to a built cell.
+
+    Expected `syn_params` shape matches Step 4 notebook entries:
+      {
+        "spec_settings": {"level_of_detail": "<mechanism_name>", ...},
+        "spec_syn_param": {... mechanism attributes ...},
+      }
+    """
+    from neuron import h
+
+    spec_settings = syn_params.get("spec_settings", {})
+    syn_cfg = syn_params.get("spec_syn_param", {})
+    mech_name = spec_settings.get("level_of_detail")
+    if not mech_name:
+        raise KeyError("syn_params['spec_settings']['level_of_detail'] is required")
+
+    syn = getattr(h, mech_name)(syn_loc)
+    for param, val in syn_cfg.items():
+        if hasattr(syn, param):
+            setattr(syn, param, val)
+
+    spike_times = [float(t) for t in spike_train]
+    vec = h.Vector(spike_times)
+    stim = h.VecStim()
+    stim.play(vec)
+    nc = h.NetCon(stim, syn)
+    nc.weight[0] = float(netcon_weight)
+
+    _ensure_synapse_test_state(cell)
+    cell.synapses.append(syn)
+    cell.vecs.append(vec)
+    cell.stims.append(stim)
+    cell.netcons.append(nc)
+
+    return {
+        "syn": syn,
+        "vec": vec,
+        "stim": stim,
+        "netcon": nc,
+    }

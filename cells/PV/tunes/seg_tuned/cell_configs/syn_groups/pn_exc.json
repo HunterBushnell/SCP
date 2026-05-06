@@ -27,13 +27,13 @@
         }
       },
       "params": {
-        "wt_mean": 0.1,
+        "wt_mean": 0.4,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax_AMPA": 0.001,
         "gmax_NMDA": 0.001,
-        "tau_r_AMPA": 3.5,
-        "tau_d_AMPA": 4,
+        "tau_r_AMPA": 0.2,
+        "tau_d_AMPA": 1.7,
         "Use": 0.8,
         "Dep": 100.0,
         "Fac": 0.0,

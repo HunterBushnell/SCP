@@ -1,6 +1,6 @@
 {
   "sst_inh": {
-    "state": false,
+    "state": true,
     "mode": "precomputed",
     "color": "#ff7f0e",
     "source": {
@@ -12,7 +12,7 @@
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 280.0,
+      "stim_tstart_ms": 300.0,
       "duration_ms": null,
       "input_stim_tstart_ms": 500.0,
       "input_duration_ms": null
