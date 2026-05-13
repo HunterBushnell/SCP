@@ -20,7 +20,7 @@
     },
     "syns": {
       "type": "GABA_A",
-      "N_syn": 17,
+      "N_syn": 95,
       "segs": "proximal",
       "dist_func": {
         "kind": "uniform",
@@ -29,7 +29,7 @@
         }
       },
       "params": {
-        "wt_mean": 30.0,
+        "wt_mean": 7.0,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,

@@ -1,0 +1,12 @@
+state=MERGE_PENDING
+time=2026-05-12T22:14:35-05:00
+run_tag=42203
+job_name=pvsst
+job_id=42251
+array_job_id=42203
+array_task_id=47
+tune_dir=/home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all
+output_dir=/home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/output_data/slurm_42203/parts
+run_root=/home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/output_data/slurm_42203
+output_stem=slurm_42203_47
+message=waiting_for_merge

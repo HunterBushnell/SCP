@@ -19,6 +19,21 @@
 
 set -euo pipefail
 
+# Resolve Python interpreter once for all downstream calls.
+# Override with PYTHON_BIN=/path/to/python if needed.
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [[ -z "${PYTHON_BIN}" ]]; then
+    if command -v python >/dev/null 2>&1; then
+        PYTHON_BIN="$(command -v python)"
+    elif command -v python3 >/dev/null 2>&1; then
+        PYTHON_BIN="$(command -v python3)"
+    else
+        echo "No Python interpreter found on PATH (tried 'python' and 'python3')." >&2
+        echo "Load a Python module, activate your env, or set PYTHON_BIN explicitly." >&2
+        exit 127
+    fi
+fi
+
 # Capture submit dir before changing cwd (SLURM writes logs relative to submit dir).
 SUBMIT_DIR="${SLURM_SUBMIT_DIR:-$(pwd)}"
 LOG_SRC_DIR="${SUBMIT_DIR}/logs"
@@ -255,7 +270,7 @@ if [[ ! -f "${SIM_CFG_PATH}" ]]; then
     SIM_CFG_PATH="${TUNE_DIR}/sim_config.json"
 fi
 if [[ -f "${SIM_CFG_PATH}" ]]; then
-    read -r SAVE_ENABLED SAVE_STEM < <(SIM_CFG_PATH="$SIM_CFG_PATH" python - <<'PY'
+    read -r SAVE_ENABLED SAVE_STEM < <(SIM_CFG_PATH="$SIM_CFG_PATH" "${PYTHON_BIN}" - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -384,7 +399,7 @@ fi
 
 export STATUS_FILE STATUS_LATEST_FILE STATUS_PRIMARY_FILE STATUS_IS_PRIMARY RUN_TAG
 
-CMD=(python "${REPO_ROOT}/run_pipeline.py"
+CMD=("${PYTHON_BIN}" "${REPO_ROOT}/run_pipeline.py"
     --tune-dir "$TUNE_DIR"
     --output-dir "$RESULTS_DIR")
 

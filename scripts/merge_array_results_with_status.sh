@@ -3,6 +3,19 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Resolve interpreter similarly to run_slurm.sh for merge jobs.
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [[ -z "${PYTHON_BIN}" ]]; then
+    if command -v python >/dev/null 2>&1; then
+        PYTHON_BIN="$(command -v python)"
+    elif command -v python3 >/dev/null 2>&1; then
+        PYTHON_BIN="$(command -v python3)"
+    else
+        echo "No Python interpreter found on PATH (tried 'python' and 'python3')." >&2
+        exit 127
+    fi
+fi
+
 STATUS_FILE="${STATUS_FILE:-}"
 STATUS_LATEST_FILE="${STATUS_LATEST_FILE:-}"
 STATUS_PRIMARY_FILE="${STATUS_PRIMARY_FILE:-}"
@@ -70,7 +83,7 @@ write_status() {
 
 write_status "MERGING" "merge_start"
 
-if python "${SCRIPT_DIR}/merge_array_results.py" "$@"; then
+if "${PYTHON_BIN}" "${SCRIPT_DIR}/merge_array_results.py" "$@"; then
     write_status "SUCCESS" "merged"
     if [[ -n "${PARTS_DIR}" && -d "${PARTS_DIR}" ]]; then
         rm -rf "${PARTS_DIR}"

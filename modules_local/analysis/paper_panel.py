@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence, Union
 
@@ -400,6 +401,92 @@ def _resolve_export_paths(
     if not fmts:
         fmts = ["svg"]
     return [out.with_suffix(f".{fmt}") for fmt in fmts]
+
+
+def resolve_export_paths(
+    export_path: Optional[Union[str, Path]],
+    *,
+    run_dir: Optional[Union[str, Path]],
+    export_formats: Optional[Sequence[str]],
+) -> list[Path]:
+    """
+    Public wrapper for resolving requested paper-panel export paths.
+    """
+    return _resolve_export_paths(
+        export_path,
+        run_dir=run_dir,
+        export_formats=export_formats,
+    )
+
+
+def choose_preview_export_path(paths: Sequence[Union[str, Path]]) -> Optional[Path]:
+    """
+    Choose a preferred preview file from exported/saved paths.
+    """
+    path_list = [Path(p) for p in (paths or [])]
+    if not path_list:
+        return None
+    for suffix in (".png", ".svg", ".jpg", ".jpeg", ".webp", ".gif"):
+        for p in path_list:
+            if p.suffix.lower() == suffix:
+                return p
+    return path_list[0]
+
+
+def load_single_plot_preset(
+    *,
+    repo_root: Optional[Union[str, Path]] = None,
+    preset_path: Optional[Union[str, Path]] = None,
+) -> Dict[str, Any]:
+    """
+    Load single-plot preset defaults from JSON.
+
+    Returns:
+      {
+        "config": dict,
+        "preset_path": str,
+        "repo_root": str,
+        "warnings": list[str],
+      }
+    """
+    warnings: list[str] = []
+
+    if repo_root is None:
+        try:
+            root = analysis.find_scp_root(Path.cwd())
+        except Exception:
+            root = Path.cwd()
+    else:
+        root = Path(repo_root).expanduser().resolve()
+
+    path = (
+        root / "modules_local" / "analysis" / "analysis_presets" / "single_plot.json"
+        if preset_path in (None, "", False)
+        else Path(str(preset_path)).expanduser()
+    )
+    if not path.is_absolute():
+        path = (root / path).resolve()
+
+    cfg: Dict[str, Any] = {}
+    try:
+        payload = json.loads(path.read_text())
+        if isinstance(payload, dict):
+            defaults = payload.get("defaults", payload)
+            if isinstance(defaults, dict):
+                cfg = dict(defaults)
+            else:
+                warnings.append(f"Single-plot preset defaults missing/invalid in {path}")
+        else:
+            warnings.append(f"Single-plot preset JSON root must be object (got {type(payload).__name__})")
+    except Exception as exc:
+        warnings.append(f"Single-plot preset load failed ({path}): {exc}")
+
+    return {
+        "config": cfg,
+        "preset_path": str(path),
+        "repo_root": str(root),
+        "warnings": warnings,
+    }
 
 
 def plot_paper_panel_from_results(
@@ -872,3 +959,141 @@ def resolve_single_run_for_paper_panel(selection: Dict[str, Any]) -> tuple[Path,
 
     run_single = selection.get("run_single", "latest")
     return analysis.resolve_run(base_path, run_single), warnings
+
+
+def run_single_plot_from_selection(
+    selection: Dict[str, Any],
+    *,
+    repo_root: Optional[Union[str, Path]] = None,
+    preset_path: Optional[Union[str, Path]] = None,
+    prefer_saved_export: bool = True,
+) -> Dict[str, Any]:
+    """
+    Resolve one run from analysis selection and produce a single paper panel.
+
+    When prefer_saved_export=True and export_overwrite=False, if all requested export
+    files already exist, figure regeneration is skipped and saved files are reused.
+    """
+    warnings: list[str] = []
+    run_dir, run_warnings = resolve_single_run_for_paper_panel(selection)
+    warnings.extend(run_warnings)
+
+    preset_info = load_single_plot_preset(
+        repo_root=repo_root,
+        preset_path=preset_path,
+    )
+    warnings.extend(list(preset_info.get("warnings") or []))
+    panel_cfg = dict(preset_info.get("config") or {})
+
+    requested = resolve_export_paths(
+        panel_cfg.get("export_path"),
+        run_dir=run_dir,
+        export_formats=panel_cfg.get("export_formats", ("svg",)),
+    )
+    requested_paths = [Path(p) for p in requested]
+    existing_paths = [p for p in requested_paths if p.exists()]
+    export_overwrite = bool(panel_cfg.get("export_overwrite", False))
+    use_saved = (
+        bool(prefer_saved_export)
+        and (not export_overwrite)
+        and bool(requested_paths)
+        and (len(existing_paths) == len(requested_paths))
+    )
+
+    if use_saved:
+        preview = choose_preview_export_path(existing_paths)
+        return {
+            "fig": None,
+            "axes": [],
+            "warnings": warnings,
+            "run_dir": Path(run_dir).resolve(),
+            "preset_path": str(preset_info.get("preset_path") or ""),
+            "panel_cfg": panel_cfg,
+            "used_existing_exports": True,
+            "requested_export_paths": [str(p) for p in requested_paths],
+            "existing_export_paths": [str(p) for p in existing_paths],
+            "exported_paths": [],
+            "preview_path": (str(preview) if preview is not None else None),
+        }
+
+    from modules_local import run_sim  # local import to keep module dependencies light
+
+    results = run_sim.load_results(run_dir)
+    panel_result = plot_paper_panel_from_results(
+        results,
+        run_dir=run_dir,
+        **panel_cfg,
+    )
+
+    exported_paths = [Path(p) for p in (panel_result.get("exported_paths") or [])]
+    if requested_paths:
+        existing_after = [p for p in requested_paths if p.exists()]
+    else:
+        existing_after = [Path(p) for p in (panel_result.get("requested_export_paths") or []) if Path(p).exists()]
+
+    preview = choose_preview_export_path(exported_paths or existing_after)
+    merged_warnings = warnings + list(panel_result.get("warnings") or [])
+
+    out = dict(panel_result)
+    out["warnings"] = merged_warnings
+    out["preset_path"] = str(preset_info.get("preset_path") or "")
+    out["panel_cfg"] = panel_cfg
+    out["used_existing_exports"] = False
+    out["existing_export_paths"] = [str(p) for p in existing_after]
+    out["preview_path"] = (str(preview) if preview is not None else None)
+    return out
+
+
+def display_single_plot_result(
+    result: Dict[str, Any],
+    *,
+    show_warnings: bool = True,
+    show_paths: bool = True,
+) -> Optional[Union[Path, Any]]:
+    """
+    Notebook-friendly display helper for run_single_plot_from_selection results.
+
+    Returns the displayed preview path, displayed fig, or None.
+    """
+    if show_warnings:
+        for w in (result.get("warnings") or []):
+            print(f"Warning: {w}")
+
+    used_existing = bool(result.get("used_existing_exports", False))
+    exported = [Path(p) for p in (result.get("exported_paths") or [])]
+    existing = [Path(p) for p in (result.get("existing_export_paths") or [])]
+
+    if show_paths:
+        if used_existing:
+            if existing:
+                print("Using saved single plot (no regeneration):")
+                for p in existing:
+                    print("  " + str(p))
+        elif exported:
+            print("Saved:")
+            for p in exported:
+                print("  " + str(p))
+
+    preview_raw = result.get("preview_path", None)
+    preview = Path(preview_raw) if preview_raw not in (None, "") else choose_preview_export_path(exported or existing)
+    if preview is None:
+        return None
+
+    try:
+        from IPython.display import Image, SVG, display  # type: ignore
+    except Exception:
+        return preview
+
+    suffix = preview.suffix.lower()
+    if suffix == ".svg":
+        display(SVG(filename=str(preview)))
+        return preview
+    if suffix in {".png", ".jpg", ".jpeg", ".gif", ".webp"}:
+        display(Image(filename=str(preview)))
+        return preview
+
+    fig = result.get("fig", None)
+    if fig is not None:
+        display(fig)
+        return fig
+    return preview

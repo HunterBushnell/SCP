@@ -1,0 +1,207 @@
+Running: /home/hrbncv/miniconda3/envs/BMTK-py311/bin/python /home/hrbncv/SCP/run_pipeline.py --tune-dir /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all --output-dir /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/output_data/slurm_42203/parts --n-trials 100 --output-stem slurm_42203_32 --trial-offset 3200 --force-save
+Loaded mechanisms from /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/modfiles/x86_64/.libs/libnrnmech.so
+Loaded Allen cell for 'SST' from /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/manifest.json, soma_diam_multiplier=10.0, Vinit=-65.0, loader=genome_fallback
+Geometry defined for 'SST': 1 soma segs, 54 proximal dend segs, 52 distal dend segs, 115 total dend segs.
+[trial 1/100] input_spikes: pn_exc=1739 vip_inh_bio=383 bg_exc=2304 bg_inh=685
+[trial 1/100] spikes=5  rate=5.00 Hz  time=22.89s
+[trial 2/100] input_spikes: pn_exc=1681 vip_inh_bio=332 bg_exc=2159 bg_inh=692
+[trial 2/100] spikes=5  rate=5.00 Hz  time=22.98s
+[trial 3/100] input_spikes: pn_exc=1538 vip_inh_bio=331 bg_exc=2047 bg_inh=665
+[trial 3/100] spikes=6  rate=6.00 Hz  time=22.73s
+[trial 4/100] input_spikes: pn_exc=1724 vip_inh_bio=369 bg_exc=2504 bg_inh=803
+[trial 4/100] spikes=5  rate=5.00 Hz  time=23.12s
+[trial 5/100] input_spikes: pn_exc=1720 vip_inh_bio=397 bg_exc=2492 bg_inh=760
+[trial 5/100] spikes=3  rate=3.00 Hz  time=23.22s
+[trial 6/100] input_spikes: pn_exc=1677 vip_inh_bio=359 bg_exc=2546 bg_inh=750
+[trial 6/100] spikes=4  rate=4.00 Hz  time=23.25s
+[trial 7/100] input_spikes: pn_exc=1725 vip_inh_bio=386 bg_exc=2352 bg_inh=751
+[trial 7/100] spikes=2  rate=2.00 Hz  time=22.97s
+[trial 8/100] input_spikes: pn_exc=1597 vip_inh_bio=365 bg_exc=2176 bg_inh=691
+[trial 8/100] spikes=7  rate=7.00 Hz  time=22.77s
+[trial 9/100] input_spikes: pn_exc=1656 vip_inh_bio=399 bg_exc=2451 bg_inh=773
+[trial 9/100] spikes=2  rate=2.00 Hz  time=23.33s
+[trial 10/100] input_spikes: pn_exc=1488 vip_inh_bio=324 bg_exc=1791 bg_inh=535
+[trial 10/100] spikes=2  rate=2.00 Hz  time=22.38s
+[trial 11/100] input_spikes: pn_exc=1709 vip_inh_bio=329 bg_exc=2402 bg_inh=710
+[trial 11/100] spikes=5  rate=5.00 Hz  time=23.13s
+[trial 12/100] input_spikes: pn_exc=1738 vip_inh_bio=404 bg_exc=2509 bg_inh=800
+[trial 12/100] spikes=2  rate=2.00 Hz  time=23.00s
+[trial 13/100] input_spikes: pn_exc=1645 vip_inh_bio=360 bg_exc=2383 bg_inh=766
+[trial 13/100] spikes=7  rate=7.00 Hz  time=23.27s
+[trial 14/100] input_spikes: pn_exc=1787 vip_inh_bio=357 bg_exc=2466 bg_inh=814
+[trial 14/100] spikes=1  rate=1.00 Hz  time=23.03s
+[trial 15/100] input_spikes: pn_exc=1454 vip_inh_bio=301 bg_exc=1696 bg_inh=524
+[trial 15/100] spikes=3  rate=3.00 Hz  time=22.32s
+[trial 16/100] input_spikes: pn_exc=1657 vip_inh_bio=383 bg_exc=2427 bg_inh=731
+[trial 16/100] spikes=8  rate=8.00 Hz  time=23.18s
+[trial 17/100] input_spikes: pn_exc=1721 vip_inh_bio=383 bg_exc=2480 bg_inh=775
+[trial 17/100] spikes=8  rate=8.00 Hz  time=23.19s
+[trial 18/100] input_spikes: pn_exc=1745 vip_inh_bio=397 bg_exc=2388 bg_inh=784
+[trial 18/100] spikes=7  rate=7.00 Hz  time=22.87s
+[trial 19/100] input_spikes: pn_exc=1731 vip_inh_bio=396 bg_exc=2365 bg_inh=751
+[trial 19/100] spikes=5  rate=5.00 Hz  time=22.96s
+[trial 20/100] input_spikes: pn_exc=1662 vip_inh_bio=344 bg_exc=2200 bg_inh=698
+[trial 20/100] spikes=4  rate=4.00 Hz  time=23.05s
+[trial 21/100] input_spikes: pn_exc=1741 vip_inh_bio=356 bg_exc=2531 bg_inh=799
+[trial 21/100] spikes=3  rate=3.00 Hz  time=23.36s
+[trial 22/100] input_spikes: pn_exc=1542 vip_inh_bio=331 bg_exc=1916 bg_inh=632
+[trial 22/100] spikes=6  rate=6.00 Hz  time=22.62s
+[trial 23/100] input_spikes: pn_exc=1722 vip_inh_bio=389 bg_exc=2372 bg_inh=733
+[trial 23/100] spikes=5  rate=5.00 Hz  time=23.06s
+[trial 24/100] input_spikes: pn_exc=1675 vip_inh_bio=368 bg_exc=2290 bg_inh=729
+[trial 24/100] spikes=3  rate=3.00 Hz  time=23.01s
+[trial 25/100] input_spikes: pn_exc=1743 vip_inh_bio=381 bg_exc=2426 bg_inh=739
+[trial 25/100] spikes=3  rate=3.00 Hz  time=23.19s
+[trial 26/100] input_spikes: pn_exc=1654 vip_inh_bio=332 bg_exc=2342 bg_inh=782
+[trial 26/100] spikes=3  rate=3.00 Hz  time=23.13s
+[trial 27/100] input_spikes: pn_exc=1726 vip_inh_bio=366 bg_exc=2337 bg_inh=693
+[trial 27/100] spikes=4  rate=4.00 Hz  time=22.92s
+[trial 28/100] input_spikes: pn_exc=1576 vip_inh_bio=352 bg_exc=2132 bg_inh=651
+[trial 28/100] spikes=0  rate=0.00 Hz  time=23.01s
+[trial 29/100] input_spikes: pn_exc=1717 vip_inh_bio=378 bg_exc=2386 bg_inh=751
+[trial 29/100] spikes=5  rate=5.00 Hz  time=23.21s
+[trial 30/100] input_spikes: pn_exc=1557 vip_inh_bio=350 bg_exc=1923 bg_inh=589
+[trial 30/100] spikes=3  rate=3.00 Hz  time=22.65s
+[trial 31/100] input_spikes: pn_exc=1504 vip_inh_bio=325 bg_exc=1751 bg_inh=547
+[trial 31/100] spikes=2  rate=2.00 Hz  time=22.38s
+[trial 32/100] input_spikes: pn_exc=1738 vip_inh_bio=338 bg_exc=2358 bg_inh=702
+[trial 32/100] spikes=5  rate=5.00 Hz  time=23.03s
+[trial 33/100] input_spikes: pn_exc=1657 vip_inh_bio=356 bg_exc=2303 bg_inh=778
+[trial 33/100] spikes=3  rate=3.00 Hz  time=23.40s
+[trial 34/100] input_spikes: pn_exc=1743 vip_inh_bio=375 bg_exc=2441 bg_inh=758
+[trial 34/100] spikes=6  rate=6.00 Hz  time=23.59s
+[trial 35/100] input_spikes: pn_exc=1521 vip_inh_bio=320 bg_exc=1843 bg_inh=566
+[trial 35/100] spikes=4  rate=4.00 Hz  time=23.09s
+[trial 36/100] input_spikes: pn_exc=1472 vip_inh_bio=334 bg_exc=641 bg_inh=193
+[trial 36/100] spikes=0  rate=0.00 Hz  time=22.34s
+[trial 37/100] input_spikes: pn_exc=1640 vip_inh_bio=412 bg_exc=2511 bg_inh=760
+[trial 37/100] spikes=4  rate=4.00 Hz  time=23.61s
+[trial 38/100] input_spikes: pn_exc=1679 vip_inh_bio=354 bg_exc=2437 bg_inh=731
+[trial 38/100] spikes=2  rate=2.00 Hz  time=23.41s
+[trial 39/100] input_spikes: pn_exc=1714 vip_inh_bio=388 bg_exc=2453 bg_inh=772
+[trial 39/100] spikes=5  rate=5.00 Hz  time=23.64s
+[trial 40/100] input_spikes: pn_exc=1687 vip_inh_bio=359 bg_exc=2420 bg_inh=755
+[trial 40/100] spikes=2  rate=2.00 Hz  time=23.28s
+[trial 41/100] input_spikes: pn_exc=1592 vip_inh_bio=353 bg_exc=2048 bg_inh=690
+[trial 41/100] spikes=4  rate=4.00 Hz  time=23.05s
+[trial 42/100] input_spikes: pn_exc=1712 vip_inh_bio=369 bg_exc=2261 bg_inh=715
+[trial 42/100] spikes=3  rate=3.00 Hz  time=23.32s
+[trial 43/100] input_spikes: pn_exc=1754 vip_inh_bio=410 bg_exc=2536 bg_inh=782
+[trial 43/100] spikes=5  rate=5.00 Hz  time=23.66s
+[trial 44/100] input_spikes: pn_exc=1707 vip_inh_bio=371 bg_exc=2499 bg_inh=737
+[trial 44/100] spikes=7  rate=7.00 Hz  time=23.39s
+[trial 45/100] input_spikes: pn_exc=1668 vip_inh_bio=397 bg_exc=2277 bg_inh=693
+[trial 45/100] spikes=3  rate=3.00 Hz  time=23.32s
+[trial 46/100] input_spikes: pn_exc=1775 vip_inh_bio=365 bg_exc=2454 bg_inh=782
+[trial 46/100] spikes=7  rate=7.00 Hz  time=23.36s
+[trial 47/100] input_spikes: pn_exc=1710 vip_inh_bio=366 bg_exc=2379 bg_inh=786
+[trial 47/100] spikes=6  rate=6.00 Hz  time=23.50s
+[trial 48/100] input_spikes: pn_exc=1781 vip_inh_bio=378 bg_exc=2468 bg_inh=762
+[trial 48/100] spikes=3  rate=3.00 Hz  time=23.34s
+[trial 49/100] input_spikes: pn_exc=1624 vip_inh_bio=360 bg_exc=2036 bg_inh=631
+[trial 49/100] spikes=7  rate=7.00 Hz  time=22.97s
+[trial 50/100] input_spikes: pn_exc=1602 vip_inh_bio=366 bg_exc=2395 bg_inh=773
+[trial 50/100] spikes=1  rate=1.00 Hz  time=23.33s
+[trial 51/100] input_spikes: pn_exc=1721 vip_inh_bio=345 bg_exc=2320 bg_inh=783
+[trial 51/100] spikes=8  rate=8.00 Hz  time=23.42s
+[trial 52/100] input_spikes: pn_exc=1746 vip_inh_bio=392 bg_exc=2371 bg_inh=800
+[trial 52/100] spikes=3  rate=3.00 Hz  time=23.58s
+[trial 53/100] input_spikes: pn_exc=1698 vip_inh_bio=362 bg_exc=2424 bg_inh=722
+[trial 53/100] spikes=3  rate=3.00 Hz  time=23.50s
+[trial 54/100] input_spikes: pn_exc=1719 vip_inh_bio=367 bg_exc=2525 bg_inh=762
+[trial 54/100] spikes=2  rate=2.00 Hz  time=23.38s
+[trial 55/100] input_spikes: pn_exc=1692 vip_inh_bio=402 bg_exc=2572 bg_inh=803
+[trial 55/100] spikes=5  rate=5.00 Hz  time=23.62s
+[trial 56/100] input_spikes: pn_exc=1795 vip_inh_bio=372 bg_exc=2461 bg_inh=773
+[trial 56/100] spikes=4  rate=4.00 Hz  time=23.47s
+[trial 57/100] input_spikes: pn_exc=1583 vip_inh_bio=361 bg_exc=2003 bg_inh=626
+[trial 57/100] spikes=2  rate=2.00 Hz  time=22.84s
+[trial 58/100] input_spikes: pn_exc=1652 vip_inh_bio=362 bg_exc=2393 bg_inh=748
+[trial 58/100] spikes=4  rate=4.00 Hz  time=23.33s
+[trial 59/100] input_spikes: pn_exc=1755 vip_inh_bio=368 bg_exc=2420 bg_inh=739
+[trial 59/100] spikes=6  rate=6.00 Hz  time=23.40s
+[trial 60/100] input_spikes: pn_exc=1713 vip_inh_bio=352 bg_exc=2485 bg_inh=747
+[trial 60/100] spikes=2  rate=2.00 Hz  time=23.58s
+[trial 61/100] input_spikes: pn_exc=1747 vip_inh_bio=366 bg_exc=2441 bg_inh=743
+[trial 61/100] spikes=6  rate=6.00 Hz  time=23.68s
+[trial 62/100] input_spikes: pn_exc=1619 vip_inh_bio=355 bg_exc=2195 bg_inh=721
+[trial 62/100] spikes=5  rate=5.00 Hz  time=23.49s
+[trial 63/100] input_spikes: pn_exc=1675 vip_inh_bio=384 bg_exc=2407 bg_inh=718
+[trial 63/100] spikes=2  rate=2.00 Hz  time=23.62s
+[trial 64/100] input_spikes: pn_exc=1637 vip_inh_bio=379 bg_exc=2346 bg_inh=705
+[trial 64/100] spikes=6  rate=6.00 Hz  time=23.38s
+[trial 65/100] input_spikes: pn_exc=1655 vip_inh_bio=343 bg_exc=2166 bg_inh=673
+[trial 65/100] spikes=3  rate=3.00 Hz  time=23.20s
+[trial 66/100] input_spikes: pn_exc=1626 vip_inh_bio=329 bg_exc=2278 bg_inh=722
+[trial 66/100] spikes=5  rate=5.00 Hz  time=23.37s
+[trial 67/100] input_spikes: pn_exc=1661 vip_inh_bio=354 bg_exc=2390 bg_inh=787
+[trial 67/100] spikes=5  rate=5.00 Hz  time=23.65s
+[trial 68/100] input_spikes: pn_exc=1774 vip_inh_bio=407 bg_exc=2520 bg_inh=703
+[trial 68/100] spikes=2  rate=2.00 Hz  time=23.61s
+[trial 69/100] input_spikes: pn_exc=1599 vip_inh_bio=340 bg_exc=2102 bg_inh=692
+[trial 69/100] spikes=7  rate=7.00 Hz  time=23.03s
+[trial 70/100] input_spikes: pn_exc=1733 vip_inh_bio=366 bg_exc=2403 bg_inh=771
+[trial 70/100] spikes=2  rate=2.00 Hz  time=23.50s
+[trial 71/100] input_spikes: pn_exc=1713 vip_inh_bio=399 bg_exc=2403 bg_inh=765
+[trial 71/100] spikes=5  rate=5.00 Hz  time=23.38s
+[trial 72/100] input_spikes: pn_exc=1663 vip_inh_bio=400 bg_exc=2333 bg_inh=745
+[trial 72/100] spikes=9  rate=9.00 Hz  time=23.32s
+[trial 73/100] input_spikes: pn_exc=1731 vip_inh_bio=386 bg_exc=2474 bg_inh=855
+[trial 73/100] spikes=5  rate=5.00 Hz  time=23.64s
+[trial 74/100] input_spikes: pn_exc=1734 vip_inh_bio=359 bg_exc=2506 bg_inh=799
+[trial 74/100] spikes=6  rate=6.00 Hz  time=23.53s
+[trial 75/100] input_spikes: pn_exc=1679 vip_inh_bio=346 bg_exc=2189 bg_inh=657
+[trial 75/100] spikes=5  rate=5.00 Hz  time=23.16s
+[trial 76/100] input_spikes: pn_exc=1666 vip_inh_bio=350 bg_exc=2302 bg_inh=760
+[trial 76/100] spikes=5  rate=5.00 Hz  time=23.32s
+[trial 77/100] input_spikes: pn_exc=1625 vip_inh_bio=360 bg_exc=2232 bg_inh=697
+[trial 77/100] spikes=3  rate=3.00 Hz  time=23.22s
+[trial 78/100] input_spikes: pn_exc=1758 vip_inh_bio=373 bg_exc=2579 bg_inh=807
+[trial 78/100] spikes=3  rate=3.00 Hz  time=23.94s
+[trial 79/100] input_spikes: pn_exc=1757 vip_inh_bio=400 bg_exc=2423 bg_inh=734
+[trial 79/100] spikes=3  rate=3.00 Hz  time=23.43s
+[trial 80/100] input_spikes: pn_exc=1707 vip_inh_bio=334 bg_exc=2373 bg_inh=718
+[trial 80/100] spikes=3  rate=3.00 Hz  time=23.28s
+[trial 81/100] input_spikes: pn_exc=1655 vip_inh_bio=379 bg_exc=2496 bg_inh=760
+[trial 81/100] spikes=3  rate=3.00 Hz  time=23.52s
+[trial 82/100] input_spikes: pn_exc=1627 vip_inh_bio=354 bg_exc=2215 bg_inh=723
+[trial 82/100] spikes=5  rate=5.00 Hz  time=23.03s
+[trial 83/100] input_spikes: pn_exc=1730 vip_inh_bio=352 bg_exc=2307 bg_inh=762
+[trial 83/100] spikes=6  rate=6.00 Hz  time=23.44s
+[trial 84/100] input_spikes: pn_exc=1766 vip_inh_bio=378 bg_exc=2326 bg_inh=780
+[trial 84/100] spikes=3  rate=3.00 Hz  time=23.44s
+[trial 85/100] input_spikes: pn_exc=1446 vip_inh_bio=314 bg_exc=1748 bg_inh=554
+[trial 85/100] spikes=5  rate=5.00 Hz  time=22.61s
+[trial 86/100] input_spikes: pn_exc=1804 vip_inh_bio=376 bg_exc=2502 bg_inh=713
+[trial 86/100] spikes=4  rate=4.00 Hz  time=23.52s
+[trial 87/100] input_spikes: pn_exc=1695 vip_inh_bio=366 bg_exc=2314 bg_inh=788
+[trial 87/100] spikes=4  rate=4.00 Hz  time=23.40s
+[trial 88/100] input_spikes: pn_exc=1686 vip_inh_bio=337 bg_exc=2245 bg_inh=739
+[trial 88/100] spikes=3  rate=3.00 Hz  time=23.33s
+[trial 89/100] input_spikes: pn_exc=1476 vip_inh_bio=313 bg_exc=1883 bg_inh=592
+[trial 89/100] spikes=4  rate=4.00 Hz  time=22.73s
+[trial 90/100] input_spikes: pn_exc=1520 vip_inh_bio=313 bg_exc=1796 bg_inh=583
+[trial 90/100] spikes=5  rate=5.00 Hz  time=22.86s
+[trial 91/100] input_spikes: pn_exc=1636 vip_inh_bio=379 bg_exc=2384 bg_inh=787
+[trial 91/100] spikes=4  rate=4.00 Hz  time=23.32s
+[trial 92/100] input_spikes: pn_exc=1538 vip_inh_bio=329 bg_exc=2097 bg_inh=704
+[trial 92/100] spikes=3  rate=3.00 Hz  time=23.08s
+[trial 93/100] input_spikes: pn_exc=1708 vip_inh_bio=368 bg_exc=2567 bg_inh=770
+[trial 93/100] spikes=6  rate=6.00 Hz  time=23.41s
+[trial 94/100] input_spikes: pn_exc=1714 vip_inh_bio=371 bg_exc=2341 bg_inh=738
+[trial 94/100] spikes=2  rate=2.00 Hz  time=22.87s
+[trial 95/100] input_spikes: pn_exc=1557 vip_inh_bio=316 bg_exc=1971 bg_inh=623
+[trial 95/100] spikes=9  rate=9.00 Hz  time=20.49s
+[trial 96/100] input_spikes: pn_exc=1762 vip_inh_bio=359 bg_exc=2459 bg_inh=743
+[trial 96/100] spikes=0  rate=0.00 Hz  time=20.84s
+[trial 97/100] input_spikes: pn_exc=1688 vip_inh_bio=347 bg_exc=2201 bg_inh=703
+[trial 97/100] spikes=3  rate=3.00 Hz  time=20.47s
+[trial 98/100] input_spikes: pn_exc=1680 vip_inh_bio=379 bg_exc=2385 bg_inh=711
+[trial 98/100] spikes=6  rate=6.00 Hz  time=20.40s
+[trial 99/100] input_spikes: pn_exc=1666 vip_inh_bio=372 bg_exc=2422 bg_inh=695
+[trial 99/100] spikes=6  rate=6.00 Hz  time=20.67s
+[trial 100/100] input_spikes: pn_exc=1609 vip_inh_bio=333 bg_exc=2196 bg_inh=697
+[trial 100/100] spikes=5  rate=5.00 Hz  time=19.77s
+save_plots single_plot warning: Top input panel: group list empty, auto-using all groups (4).
+Results saved to /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/output_data/slurm_42203/parts/slurm_42203_32/run_manifest.json
+Total runtime: 2307.16s
