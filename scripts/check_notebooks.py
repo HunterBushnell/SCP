@@ -25,13 +25,13 @@ from typing import Iterable, Optional
 DEFAULT_NOTEBOOKS = [
     "0_download.ipynb",
     "1_segment.ipynb",
-    "2_colab.ipynb",
+    "colab_notebooks/2_colab.ipynb",
     "2_passive.ipynb",
-    "3_colab.ipynb",
+    "colab_notebooks/3_colab.ipynb",
     "3_active.ipynb",
     "4_synapses.ipynb",
     "5_local.ipynb",
-    "5_colab.ipynb",
+    "colab_notebooks/5_colab.ipynb",
     "6_analysis.ipynb",
 ]
 

@@ -47,4 +47,4 @@ Notes
 - Inhomogeneous input sources can use `source.gabab` and
   `source.freq_scale`/`source.freq_shift` (see `configs_reference.md`).
 - `5_old_PV.ipynb` and `5_old_SST.ipynb` are legacy notebooks kept for reference.
-- `5_colab.ipynb` bootstraps a clean environment when needed.
+- `colab_notebooks/5_colab.ipynb` bootstraps a clean environment when needed.

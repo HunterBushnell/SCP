@@ -22,8 +22,8 @@
     {
       "path": "external_data/pyrFiringRateAvg.csv",
       "label": "PN bio",
-      "enabled": false,
-      "shift_ms": 1000,
+      "enabled": true,
+      "shift_ms": 290,
       "scale": 1,
       "color": "r",
       "linestyle": "--"
@@ -41,16 +41,16 @@
       "linestyle": "--"
     },
     {
-      "path": "cells/PV/tunes/seg_tuned/output_data/_PV1_base",
+      "path": "cells/PV/tunes/seg_tuned/output_data/PV4.0_base",
       "label": "PV base",
-      "enabled": true,
+      "enabled": false,
       "shift_ms": 0,
       "scale": 1,
       "color": "royalblue",
       "linestyle": "-"
     },
     {
-      "path": "cells/PV/tunes/seg_tuned/output_data/_PV1.1_tunedSST",
+      "path": "cells/PV/tunes/seg_tuned/output_data/PV4.0_tuned",
       "label": "PV tuned",
       "enabled": true,
       "shift_ms": 0,
@@ -71,15 +71,15 @@
       "linestyle": "--"
     },
     {
-      "path": "cells/SST/tunes/seg_tuned_all/output_data/SST2.2_base",
+      "path": "cells/SST/tunes/seg_tuned_all/output_data/SST4.0_base",
       "label": "SST base",
-      "enabled": true,
+      "enabled": false,
       "scale": 1,
       "color": "m",
       "linestyle": "-"
     },
     {
-      "path": "cells/SST/tunes/seg_tuned_all/output_data/SST2.2_VIP330",
+      "path": "cells/SST/tunes/seg_tuned_all/output_data/SST4.0_tuned",
       "label": "SST tuned",
       "enabled": true,
       "scale": 1,

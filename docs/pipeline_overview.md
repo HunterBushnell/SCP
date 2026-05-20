@@ -9,7 +9,7 @@ Execution model
   assume the tune bundle is already prepared and mechanisms are already compiled
   (typically by Step 0). They validate and load existing files; they do not
   download/compile mechanisms.
-- Colab notebooks (`2_colab.ipynb`, `3_colab.ipynb`, `5_colab.ipynb`) are
+- Colab notebooks (`colab_notebooks/2_colab.ipynb`, `colab_notebooks/3_colab.ipynb`, `colab_notebooks/5_colab.ipynb`) are
   bootstrapped and can run standalone (auto-clone/install/compile as needed).
 
 Before running any step on a new machine, complete `installation.md` and run:
@@ -20,12 +20,12 @@ Steps (notebooks)
 - scripts/step0_prepare.py: CLI equivalent of Step 0.
 - 1_segment.ipynb: Segment and prepare morphology.
 - 2_passive.ipynb: Passive parameter tuning.
-- 2_colab.ipynb: Colab-friendly Step 2 (auto-bootstrap + passive tuning).
+- colab_notebooks/2_colab.ipynb: Colab-friendly Step 2 (auto-bootstrap + passive tuning).
 - 3_active.ipynb: Active parameter tuning.
-- 3_colab.ipynb: Colab-friendly Step 3 (auto-bootstrap + active tuning).
+- colab_notebooks/3_colab.ipynb: Colab-friendly Step 3 (auto-bootstrap + active tuning).
 - 4_synapses.ipynb: Synaptic tuning.
 - 5_local.ipynb: Stable local pipeline (inputs -> synapses -> simulation -> outputs).
-- 5_colab.ipynb: Colab/Linux pipeline (bootstrapped).
+- colab_notebooks/5_colab.ipynb: Colab/Linux pipeline (bootstrapped).
 - 6_analysis.ipynb: End-of-pipeline analysis and comparisons.
 
 Step 5 sub-steps (documentation labels)

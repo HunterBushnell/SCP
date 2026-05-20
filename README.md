@@ -40,22 +40,23 @@ Pipeline map
 - scripts/step0_prepare.py: CLI for Step-0 bootstrap
 - 1_segment.ipynb: Segment cell and build geometry outputs
 - 2_passive.ipynb: Passive parameter tuning workflow
-- 2_colab.ipynb: Passive tuning (Colab classroom version, bootstrapped)
+- colab_notebooks/2_colab.ipynb: Passive tuning (Colab classroom version, bootstrapped)
 - 3_active.ipynb: Active parameter tuning workflow
-- 3_colab.ipynb: Active tuning (Colab classroom version, bootstrapped)
+- colab_notebooks/3_colab.ipynb: Active tuning (Colab classroom version, bootstrapped)
 - 4_synapses.ipynb: Synaptic tuning workflow (including bmtool path)
 - 5_local.ipynb: Local pipeline (stable)
-- 5_colab.ipynb: Colab/Linux full pipeline (classroom + bootstrapped)
+- colab_notebooks/5_colab.ipynb: Colab/Linux full pipeline (classroom + bootstrapped)
 - 5_old_PV.ipynb, 5_old_SST.ipynb: Legacy notebooks
 - 6_analysis.ipynb: End-of-pipeline analysis and comparisons
 
 Colab classroom usage (notebook-only)
-- `2_colab.ipynb`, `3_colab.ipynb`, and `5_colab.ipynb` are designed for first-time users.
+- `colab_notebooks/2_colab.ipynb`, `colab_notebooks/3_colab.ipynb`, and `colab_notebooks/5_colab.ipynb` are designed for first-time users.
 - They can auto-clone SCP and required external repos (ACT) when run in a fresh Colab.
 - For private repos, set one of: `SCP_GIT_TOKEN`, `SCP_GITHUB_TOKEN`, or `GITHUB_TOKEN`.
 - Optional repo controls:
   - `SCP_REPO_URL`, `SCP_REPO_BRANCH`, `SCP_REPO_DIR`
   - `SCP_ACT_REPO_URL`, `SCP_ACT_REPO_BRANCH`, `SCP_ACT_DIR`
+- Quick Colab setup guide: `colab_notebooks/README.md`.
 - Recommended class flow: run top-to-bottom once with defaults, then vary one parameter block at a time.
 
 Step 5 sub-steps (for docs)
@@ -97,4 +98,4 @@ Contracts
 Status notes
 - Step 0 now uses `modules_local` and writes/validates `cell_configs/` scaffolds.
 - Steps 1-4 run with repo-relative paths and use current notebook helpers.
-- `5_colab.ipynb` bootstraps a clean environment and can compile modfiles as needed.
+- `colab_notebooks/5_colab.ipynb` bootstraps a clean environment and can compile modfiles as needed.

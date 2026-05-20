@@ -11,7 +11,7 @@
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 300.0,
+      "stim_tstart_ms": 290.0,
       "stim_jitter": null,
       "duration_ms": null,
       "input_stim_tstart_ms": 0.0,
@@ -28,7 +28,7 @@
         }
       },
       "params": {
-        "wt_mean": 0.3,
+        "wt_mean": 0.35,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax_AMPA": 0.001,

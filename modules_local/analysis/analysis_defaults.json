@@ -60,7 +60,8 @@
   "compare_preset_path": null,
   "compare_list_paths_enabled": true,
   "compare_list_paths": [
-    {"path": "external_data/pyrFiringRateAvg.csv@300;color=k;linestyle=--", "enabled": true},
+        {"path": "external_data/pyrFiringRateAvg.csv@300;color=k;linestyle=--;label=original_PN", "enabled": false},
+    {"path": "external_data/pyrFiringRateAvg.csv@290;color=k;linestyle=--;label=shifted_PN", "enabled": true},
     {"path": "external_data/bio_cell_output/pyrFiringRateAvg_gabab_tau200ms_delay50ms.csv@500;color=k;linestyle=-.", "enabled": false},
     {"path": "external_data/SSTFiringRateAvg.csv@525;color=k;linestyle=--;label=SST_bio_shifted", "enabled": false},
     {"path": "external_data/SSTFiringRateAvg.csv@500;color=k;linestyle=--;label=SST_bio", "enabled": false},

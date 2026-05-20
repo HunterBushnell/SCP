@@ -1,6 +1,6 @@
 {
   "vip_inh_bio": {
-    "state": true,
+    "state": false,
     "mode": "inhomogeneous_poisson",
     "color": "#9467bd",
     "source": {
@@ -13,7 +13,7 @@
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 330.0,
+      "stim_tstart_ms": 320.0,
       "duration_ms": null,
       "input_stim_tstart_ms": 0.0,
       "input_duration_ms": null
