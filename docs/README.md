@@ -6,6 +6,7 @@
 - `pipeline_overview.md`: notebook and CLI map for steps 0-6.
 
 ## Core Usage
+- `analysis.md`: practical guide to `6_analysis.ipynb` workflows and metrics.
 - `step_5_local_pipeline.md`: stable Step 5 pipeline details.
 - `step_6_analysis.md`: analysis notebook usage and expected outputs.
 - `cli_slurm.md`: CLI and SLURM execution.

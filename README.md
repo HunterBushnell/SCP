@@ -79,6 +79,7 @@ Docs index
 - `docs/pipeline_overview.md`
 - `docs/step_0_4_stub.md` (Step 0-4 reference and prerequisites)
 - `docs/step_5_local_pipeline.md`
+- `docs/analysis.md` (practical guide for `6_analysis.ipynb`)
 - `docs/step_6_analysis.md`
 - `docs/configs_reference.md`
 - `docs/cli_slurm.md`

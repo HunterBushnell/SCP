@@ -1,0 +1,46 @@
+{
+  "title": "output_metrics",
+  "defaults": {
+    "output_baseline_center_ms": 0.0,
+    "output_metric_mode": "window",
+    "output_metric_window_ms": 50.0,
+    "output_metric_window_markers": false,
+    "output_peak_window_ms": 175.0,
+    "output_drop_window_ms": 50.0,
+    "output_rebound_window_ms": 200.0,
+    "output_auc_window": "stim",
+    "output_t50_mode": "relative",
+    "output_show_metric_points": true,
+    "output_metric_label_points": false,
+    "output_metric_marker_size": 36.0,
+
+    "output_metrics_show_params": false,
+    "output_metrics_std_mode": "sem",
+    "output_metrics_ref_label": null,
+    "output_metrics_show_delta": false,
+    "output_metrics_highlight_best": true,
+    "output_metrics_use_plot_keys_for_tables": true,
+    "output_metrics_plot_keys": [
+      "baseline_mean",
+      "peak_rate_hz_raw",
+      "peak_latency_ms",
+      "tpeak10_ms",
+      "drop_pct",
+      "t50_ms",
+      "rebound_pct",
+      "auc"
+    ],
+    "output_metrics_plot_style": "bar",
+    "output_metrics_plot_show_points": false,
+    "output_metrics_plot_jitter": true,
+    "output_metrics_plot_show_error": false,
+    "output_metrics_plot_ncols": 0,
+    "output_metrics_plot_panel_size": [4.8, 3.6],
+    "output_metrics_plot_bar_alpha": 0.25,
+    "output_metrics_plot_show_legend": true,
+    "output_metrics_plot_legend_loc": "best",
+    "output_metrics_plot_save_plot": false,
+    "output_metrics_plot_save_data": false,
+    "output_metrics_plot_data_path": ""
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "title": "input_plotting",
+  "defaults": {
+    "plot_inputs_mean": true,
+    "plot_input_raster": false,
+    "show_input_std": false,
+    "input_source": "stats",
+    "input_std_mode": "std",
+    "input_groups": null,
+    "input_linewidth": 2.0,
+    "input_shade_alpha": 0.2,
+    "input_output_linewidth": 1.5,
+    "input_raster_linewidth": 0.8,
+    "input_stim_linewidth": 1.0,
+    "input_bin_ms": 5.0,
+    "input_smooth_ms": 25.0,
+    "input_raster_trial_idx": 0,
+    "input_raster_max_trains": 200,
+    "input_raster_win_size": 25.0,
+    "input_raster_style": "dot",
+    "input_plot_window": [200, 1100],
+    "input_legend_loc": "upper left",
+    "compare_input_layout": "side-by-side",
+    "compare_show_input_std": false,
+    "input_plot_data_path": "",
+    "input_plot_data_format": "trace_rows",
+    "input_plot_data_auto_save": false
+  }
+}

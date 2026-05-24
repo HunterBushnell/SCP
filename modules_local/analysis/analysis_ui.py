@@ -43,8 +43,8 @@ HELP_OUTPUTS = textwrap.dedent(
     - Compare layout: overlay/stacked/side-by-side; Shade adds std/sem band.
     - Window origin 0: display x-axis relative to plot-window start (data/metrics unchanged).
     - Paper compare toggles presets from analysis_presets/paper_compare.json.
-    - CSV export saves plotted data (including raster/shaded artists when shown).
-    - Format toggle: Trace rows (one row per trace) or Long rows (one row per point).
+    - Save type controls export mode: CSV data, PNG image, or SVG image.
+    - CSV format toggle: Trace rows (one row per trace) or Long rows (one row per point).
     """
 ).strip()
 
@@ -251,16 +251,27 @@ def _selection_name_tokens(selection: Dict[str, Any]) -> list[str]:
     return [_slug_token(Path(str(run_single)).name)]
 
 
+def _default_plot_export_filename(
+    selection: Dict[str, Any],
+    *,
+    figure_type: str,
+    mode: str,
+    suffix: str,
+) -> str:
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    tokens = _selection_name_tokens(selection)[:4]
+    token_text = "_".join(tokens) if tokens else "plot"
+    suffix_clean = str(suffix or "").strip().lstrip(".") or "csv"
+    return f"{_slug_token(figure_type)}_{_slug_token(mode)}_{token_text}_{stamp}.{suffix_clean}"
+
+
 def _default_plot_data_filename(
     selection: Dict[str, Any],
     *,
     figure_type: str,
     mode: str,
 ) -> str:
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    tokens = _selection_name_tokens(selection)[:4]
-    token_text = "_".join(tokens) if tokens else "plot"
-    return f"{_slug_token(figure_type)}_{_slug_token(mode)}_{token_text}_{stamp}.csv"
+    return _default_plot_export_filename(selection, figure_type=figure_type, mode=mode, suffix="csv")
 
 
 def _resolve_plot_data_target_path(
@@ -282,6 +293,42 @@ def _resolve_plot_data_target_path(
     p = Path(requested).expanduser()
     if not p.suffix:
         p = p.with_suffix(".csv")
+    if p.is_absolute():
+        return p
+    if p.parent == Path("."):
+        return default_dir / p.name
+    return p.resolve()
+
+
+def _resolve_plot_figure_target_path(
+    selection: Dict[str, Any],
+    requested_path: Any,
+    *,
+    figure_type: str,
+    mode: str,
+    image_format: str,
+) -> Path:
+    base_dir = selection.get("base")
+    if base_dir is None:
+        base_dir = Path.cwd()
+    base_dir = Path(base_dir)
+    default_dir = base_dir / "plot_data"
+    fmt = str(image_format or "png").strip().lower()
+    if fmt not in {"png", "svg"}:
+        fmt = "png"
+    requested = str(requested_path or "").strip()
+    if not requested:
+        return default_dir / _default_plot_export_filename(
+            selection,
+            figure_type=figure_type,
+            mode=mode,
+            suffix=fmt,
+        )
+
+    p = Path(requested).expanduser()
+    suffix = f".{fmt}"
+    if p.suffix.lower() != suffix:
+        p = p.with_suffix(suffix)
     if p.is_absolute():
         return p
     if p.parent == Path("."):
@@ -336,6 +383,13 @@ def _normalize_plot_data_format(value: Any) -> str:
     if token in {"long", "long_rows", "tidy", "point_rows", "points"}:
         return "long_rows"
     return "trace_rows"
+
+
+def _normalize_output_plot_export_type(value: Any) -> str:
+    token = str(value or "").strip().lower()
+    if token in {"png", "svg"}:
+        return token
+    return "csv"
 
 
 def _rows_to_trace_rows(rows: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
@@ -922,7 +976,9 @@ def _plot_metric_points(
         return
     entries = [
         ("peak_time_ms", "peak_value", "o", "Peak"),
+        ("tpeak10_time_ms", "tpeak10_value", "s", "Tpeak10"),
         ("drop_time_ms", "drop_value", "v", "+100ms"),
+        ("t50_time_ms", "t50_value", "D", "T50"),
         ("rebound_time_ms", "rebound_value", "^", "+300ms"),
     ]
     any_label = False
@@ -1055,7 +1111,9 @@ def _scale_metrics_for_plot(metrics: Optional[Dict[str, Any]], scale: Any) -> Op
     for key in (
         "peak_value",
         "peak_rate_hz",
+        "tpeak10_value",
         "drop_value",
+        "t50_value",
         "rebound_value",
         "peak_value_raw",
         "peak_rate_hz_raw",
@@ -1125,6 +1183,7 @@ def _compute_output_metrics(
         drop_window_ms=_pick("drop_window_ms", "output_drop_window_ms", 100.0),
         rebound_window_ms=_pick("rebound_window_ms", "output_rebound_window_ms", 300.0),
         auc_window=_pick("auc_window", "output_auc_window", "stim"),
+        t50_mode=_pick("t50_mode", "output_t50_mode", "absolute"),
         pdp_mode=_pick("pdp_mode", "output_metric_mode", "point"),
         pdp_window_ms=_pick("pdp_window_ms", "output_metric_window_ms", 0.0),
         baseline_ms=_pick("baseline_ms", "output_metric_window_ms", 100.0),
@@ -1146,6 +1205,7 @@ def _output_metric_overrides(opts: Dict[str, Any]) -> Dict[str, Any]:
         "drop_window_ms": opts.get("output_drop_window_ms", 100.0),
         "rebound_window_ms": opts.get("output_rebound_window_ms", 300.0),
         "auc_window": opts.get("output_auc_window", "stim"),
+        "t50_mode": opts.get("output_t50_mode", "absolute"),
     }
 
 
@@ -2019,7 +2079,19 @@ def run_output_plots(
             mode=export_mode,
             run_label=export_run_label,
         )
-        return {"rows": rows, "mode": export_mode, "run_label": export_run_label}
+        figures = [
+            {
+                "figure": analysis.resolve_figure(fig_obj),
+                "plot_name": str(plot_name),
+            }
+            for fig_obj, plot_name in export_figures
+        ]
+        return {
+            "rows": rows,
+            "mode": export_mode,
+            "run_label": export_run_label,
+            "figures": figures,
+        }
 
     output_scale = 1.0
     external_scale = 1.0
@@ -4074,7 +4146,9 @@ def show_md(text: str) -> None:
 
 _HIGHLIGHT_METRICS = {
     "peak_latency_ms",
+    "tpeak10_ms",
     "drop_pct",
+    "t50_ms",
     "rebound_pct",
     "auc",
     "baseline_mean",
@@ -4084,9 +4158,15 @@ _HIGHLIGHT_METRICS = {
 
 
 def _format_metric_key(key: str) -> str:
+    if key == "t50_ms":
+        label = "T50"
+    elif key == "tpeak10_ms":
+        label = "Tpeak10"
+    else:
+        label = key
     if key in _HIGHLIGHT_METRICS:
-        return f"**{key}**"
-    return key
+        return f"**{label}**"
+    return label
 
 
 def _format_metric_value(val: Any) -> str:
@@ -4137,8 +4217,10 @@ _OUTPUT_METRIC_VALUE_ORDER = [
     "peak_rate_hz",
     "peak_value",
     "peak_latency_ms",
+    "tpeak10_ms",
     "drop_value",
     "drop_pct",
+    "t50_ms",
     "rebound_value",
     "rebound_pct",
     "auc",
@@ -4148,7 +4230,9 @@ _OUTPUT_METRIC_PLOT_DEFAULT_KEYS = [
     "baseline_mean",
     "peak_rate_hz_raw",
     "peak_latency_ms",
+    "tpeak10_ms",
     "drop_pct",
+    "t50_ms",
     "rebound_pct",
     "auc",
 ]
@@ -4308,9 +4392,12 @@ _OUTPUT_PARAM_KEYS = {
     "drop_window_ms",
     "rebound_window_ms",
     "auc_window",
+    "auc_window_start_ms",
+    "auc_window_stop_ms",
     "auc_units",
     "pdp_mode",
     "pdp_window_ms",
+    "t50_mode",
     "stim_start_ms",
     "stim_stop_ms",
     "baseline_ms",
@@ -4320,8 +4407,12 @@ _OUTPUT_PARAM_KEYS = {
     "baseline_window_start_ms",
     "baseline_window_stop_ms",
     "peak_time_ms",
+    "tpeak10_time_ms",
     "drop_time_ms",
+    "t50_time_ms",
     "rebound_time_ms",
+    "tpeak10_value",
+    "t50_value",
     "drop_center_ms",
     "drop_window_start_ms",
     "drop_window_stop_ms",
@@ -4512,6 +4603,7 @@ def output_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "output_drop_window_ms": g.get("output_drop_window_ms"),
         "output_rebound_window_ms": g.get("output_rebound_window_ms"),
         "output_auc_window": g.get("output_auc_window"),
+        "output_t50_mode": g.get("output_t50_mode", "absolute"),
         "output_show_metric_points": g.get("output_show_metric_points"),
         "output_metric_label_points": g.get("output_metric_label_points"),
         "output_metric_marker_size": g.get("output_metric_marker_size"),
@@ -4595,6 +4687,100 @@ def save_output_plot_data_from_globals(g: Dict[str, Any]) -> Optional[Path]:
         mode=str(payload.get("mode") or "single"),
         export_format=g.get("output_plot_data_format", "trace_rows"),
     )
+
+
+def _collect_output_plot_figures(payload: Dict[str, Any]) -> list[Dict[str, Any]]:
+    figures_raw = payload.get("figures") or []
+    figures: list[Dict[str, Any]] = []
+    for item in figures_raw:
+        fig_obj = None
+        plot_name = "output_plot"
+        if isinstance(item, dict):
+            fig_obj = item.get("figure")
+            plot_name = str(item.get("plot_name") or plot_name)
+        elif isinstance(item, (list, tuple)) and len(item) >= 2:
+            fig_obj = item[0]
+            plot_name = str(item[1] or plot_name)
+        elif item is not None:
+            fig_obj = item
+        if fig_obj is None:
+            continue
+        figures.append({"figure": analysis.resolve_figure(fig_obj), "plot_name": plot_name})
+    return figures
+
+
+def save_output_plot_figure_from_globals(
+    g: Dict[str, Any],
+    *,
+    image_format: Any = "png",
+) -> list[Path]:
+    fmt = _normalize_output_plot_export_type(image_format)
+    if fmt not in {"png", "svg"}:
+        fmt = "png"
+    payload = g.get("_last_output_plot_export") or {"rows": [], "mode": "single", "figures": []}
+    figures = _collect_output_plot_figures(payload)
+    if not figures:
+        print("Output plot image not saved: no output plot figures are available. Run output plots first.")
+        return []
+
+    selection = g.get("_last_output_plot_selection") or get_selection_from_globals(g)
+    out_path = _resolve_plot_figure_target_path(
+        selection,
+        g.get("output_plot_data_path", ""),
+        figure_type="output",
+        mode=str(payload.get("mode") or "single"),
+        image_format=fmt,
+    )
+    overwrite = bool(g.get("save_overwrite", False))
+    dpi = int(g.get("plots_dpi", 150))
+
+    saved_paths: list[Path] = []
+    if len(figures) == 1:
+        only_fig = figures[0]
+        saved_path = analysis.save_figure(
+            only_fig["figure"],
+            out_path,
+            enabled=True,
+            dpi=dpi,
+            overwrite=overwrite,
+        )
+        if saved_path is not None:
+            saved_paths.append(saved_path)
+    else:
+        stem = out_path.stem
+        suffix = out_path.suffix
+        parent = out_path.parent
+        name_counts: Dict[str, int] = {}
+        for idx, entry in enumerate(figures, start=1):
+            token = _slug_token(str(entry.get("plot_name") or "plot"))
+            count = name_counts.get(token, 0) + 1
+            name_counts[token] = count
+            token_suffix = token if count == 1 else f"{token}_{count}"
+            item_path = parent / f"{stem}_{idx:02d}_{token_suffix}{suffix}"
+            saved_path = analysis.save_figure(
+                entry["figure"],
+                item_path,
+                enabled=True,
+                dpi=dpi,
+                overwrite=overwrite,
+            )
+            if saved_path is not None:
+                saved_paths.append(saved_path)
+
+    if not saved_paths:
+        print(f"Output plot {fmt.upper()} export skipped.")
+    elif len(saved_paths) == 1:
+        print(f"Saved output plot {fmt.upper()}: {saved_paths[0]}")
+    else:
+        print(f"Saved {len(saved_paths)} output plot {fmt.upper()} files under {saved_paths[0].parent}")
+    return saved_paths
+
+
+def save_output_plot_export_from_globals(g: Dict[str, Any]) -> Any:
+    export_type = _normalize_output_plot_export_type(g.get("output_plot_export_type", "csv"))
+    if export_type == "csv":
+        return save_output_plot_data_from_globals(g)
+    return save_output_plot_figure_from_globals(g, image_format=export_type)
 
 
 def save_input_plot_data_from_globals(g: Dict[str, Any]) -> Optional[Path]:
@@ -4904,8 +5090,17 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
     outputs_help_btn.layout = widgets.Layout(width="80px", flex="0 0 auto")
     output_csv_path_txt = widgets.Text(
         value=str(g.get("output_plot_data_path", "") or ""),
-        description="CSV path",
+        description="Save path",
         layout=widgets.Layout(width="60%"),
+    )
+    output_save_type_dd = widgets.Dropdown(
+        options=[
+            ("CSV data", "csv"),
+            ("PNG image", "png"),
+            ("SVG image", "svg"),
+        ],
+        value=_normalize_output_plot_export_type(g.get("output_plot_export_type", "csv")),
+        description="Save type",
     )
     output_csv_format_dd = widgets.Dropdown(
         options=[
@@ -4913,14 +5108,32 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
             ("Long rows", "long_rows"),
         ],
         value=_normalize_plot_data_format(g.get("output_plot_data_format", "trace_rows")),
-        description="Format",
+        description="CSV format",
     )
     output_csv_auto_cb = widgets.Checkbox(
         value=bool(g.get("output_plot_data_auto_save", False)),
-        description="Auto-save CSV",
+        description="Auto-save",
     )
-    output_csv_btn = widgets.Button(description="Save plotted CSV")
+    output_csv_btn = widgets.Button(description="Save plotted")
     output_csv_btn.layout = widgets.Layout(width="150px", flex="0 0 auto")
+
+    def _sync_output_export_ui(*_):
+        export_type = _normalize_output_plot_export_type(output_save_type_dd.value)
+        is_csv = export_type == "csv"
+        output_csv_format_dd.disabled = not is_csv
+        output_csv_format_dd.layout.display = "" if is_csv else "none"
+        if is_csv:
+            output_csv_path_txt.description = "CSV path"
+            output_csv_auto_cb.description = "Auto-save CSV"
+            output_csv_btn.description = "Save plotted CSV"
+        else:
+            tag = export_type.upper()
+            output_csv_path_txt.description = f"{tag} path"
+            output_csv_auto_cb.description = f"Auto-save {tag}"
+            output_csv_btn.description = f"Save plotted {tag}"
+
+    output_save_type_dd.observe(_sync_output_export_ui, names="value")
+    _sync_output_export_ui()
 
     def _on_outputs(_):
         sync_common_from_globals(g)
@@ -4954,19 +5167,21 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
         g["compare_output_layout"] = outputs_compare_layout_dd.value
         g["output_plot_data_path"] = str(output_csv_path_txt.value or "").strip()
         g["output_plot_data_format"] = output_csv_format_dd.value
+        g["output_plot_export_type"] = output_save_type_dd.value
         g["output_plot_data_auto_save"] = bool(output_csv_auto_cb.value)
 
         with out_outputs:
             out_outputs.clear_output()
             run_output_plots_from_globals(g)
             if g.get("output_plot_data_auto_save", False):
-                save_output_plot_data_from_globals(g)
+                save_output_plot_export_from_globals(g)
 
     def _on_save_output_csv(_):
         g["output_plot_data_path"] = str(output_csv_path_txt.value or "").strip()
         g["output_plot_data_format"] = output_csv_format_dd.value
+        g["output_plot_export_type"] = output_save_type_dd.value
         with out_outputs:
-            save_output_plot_data_from_globals(g)
+            save_output_plot_export_from_globals(g)
 
     outputs_btn.on_click(_on_outputs)
     output_csv_btn.on_click(_on_save_output_csv)
@@ -4981,7 +5196,7 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
             widgets.HBox([output_bin_txt, output_smooth_mode_dd, outputs_shade_dd, outputs_compare_layout_dd]),
             widgets.HBox([window_start_txt, window_end_txt, window_y_start_txt, window_y_end_txt, auto_window_cb, window_adjust_txt, output_stim_start_txt, output_stim_stop_txt]),
             widgets.HBox([output_curve_mode_dd, output_curve_plot_mode_dd, output_norm_mode_dd, outputs_norm_txt]),
-            widgets.HBox([output_csv_path_txt, output_csv_format_dd, output_csv_auto_cb, output_csv_btn]),
+            widgets.HBox([output_csv_path_txt, output_save_type_dd, output_csv_format_dd, output_csv_auto_cb, output_csv_btn]),
             out_outputs,
         ])
     )

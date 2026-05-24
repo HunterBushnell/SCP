@@ -806,7 +806,8 @@ def compute_output_metrics(
     peak_window_ms: float = 100.0,
     drop_window_ms: float = 100.0,
     rebound_window_ms: Optional[float] = 300.0,
-    auc_window: str = "stim",
+    auc_window: Any = "stim",
+    t50_mode: Optional[str] = None,
     pdp_mode: Optional[str] = None,
     pdp_window_ms: Optional[float] = None,
     baseline_ms: Optional[float] = None,
@@ -815,7 +816,43 @@ def compute_output_metrics(
     stim_start_ms: Optional[float] = None,
     stim_stop_ms: Optional[float] = None,
 ) -> Dict[str, Any]:
-    auc_window = (auc_window or "stim").lower()
+    auc_window_mode = "stim"
+    auc_window_start: Optional[float] = None
+    auc_window_stop: Optional[float] = None
+    if isinstance(auc_window, str):
+        auc_raw = auc_window.strip()
+        auc_norm = auc_raw.lower()
+        if auc_norm == "full":
+            auc_window_mode = "full"
+        elif auc_norm == "stim" or not auc_raw:
+            auc_window_mode = "stim"
+        else:
+            # Support custom bounds syntax in a single field:
+            # - "start,stop"
+            # - "start:stop"
+            # - "[start, stop]" or "(start, stop)"
+            bounds_txt = auc_raw
+            if (
+                len(bounds_txt) >= 2
+                and ((bounds_txt[0] == "[" and bounds_txt[-1] == "]") or (bounds_txt[0] == "(" and bounds_txt[-1] == ")"))
+            ):
+                bounds_txt = bounds_txt[1:-1].strip()
+            sep = "," if "," in bounds_txt else (":" if ":" in bounds_txt else None)
+            if sep is not None:
+                left_txt, right_txt = bounds_txt.split(sep, 1)
+                start_val = parse_optional_float(left_txt)
+                stop_val = parse_optional_float(right_txt)
+                if start_val is not None or stop_val is not None:
+                    auc_window_mode = "bounds"
+                    auc_window_start = start_val
+                    auc_window_stop = stop_val
+    elif isinstance(auc_window, (list, tuple, np.ndarray)) and len(auc_window) >= 2:
+        start_val = parse_optional_float(auc_window[0])
+        stop_val = parse_optional_float(auc_window[1])
+        if start_val is not None or stop_val is not None:
+            auc_window_mode = "bounds"
+            auc_window_start = start_val
+            auc_window_stop = stop_val
     t_ms = np.asarray(curve.get("t_ms", []) or [], dtype=float)
     rate = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
     stim_start, stim_stop = _resolve_stim_window(sim_cfg)
@@ -827,7 +864,9 @@ def compute_output_metrics(
     metrics = {
         "peak_window_ms": float(peak_window_ms),
         "drop_window_ms": float(drop_window_ms),
-        "auc_window": auc_window,
+        "auc_window": auc_window_mode,
+        "auc_window_start_ms": None,
+        "auc_window_stop_ms": None,
         "pdp_mode": None,
         "pdp_window_ms": None,
         "stim_start_ms": stim_start,
@@ -836,9 +875,16 @@ def compute_output_metrics(
         "peak_value": None,
         "peak_rate_hz": None,
         "peak_latency_ms": None,
+        "tpeak10_ms": None,
+        "tpeak10_time_ms": None,
+        "tpeak10_value": None,
         "drop_time_ms": None,
         "drop_value": None,
         "drop_pct": None,
+        "t50_ms": None,
+        "t50_time_ms": None,
+        "t50_value": None,
+        "t50_mode": None,
         "rebound_window_ms": float(rebound_window_ms) if rebound_window_ms is not None else None,
         "rebound_time_ms": None,
         "rebound_value": None,
@@ -873,6 +919,9 @@ def compute_output_metrics(
         baseline_ms_val = 100.0
     baseline_mode_val = (baseline_mode or curve.get("baseline_mode") or "window").lower()
     pdp_mode_val = (pdp_mode or curve.get("pdp_mode") or "point").lower()
+    t50_mode_val = str(t50_mode or curve.get("t50_mode") or "absolute").strip().lower()
+    if t50_mode_val not in ("absolute", "relative"):
+        t50_mode_val = "absolute"
     pdp_window_val = pdp_window_ms if pdp_window_ms is not None else curve.get("pdp_window_ms")
     try:
         pdp_window_val = float(pdp_window_val) if pdp_window_val is not None else 0.0
@@ -913,6 +962,7 @@ def compute_output_metrics(
     metrics["baseline_mean"] = baseline_mean
     metrics["pdp_mode"] = pdp_mode_val
     metrics["pdp_window_ms"] = pdp_window_val
+    metrics["t50_mode"] = t50_mode_val
 
     peak_start = float(stim_start)
     peak_stop = peak_start + float(peak_window_ms)
@@ -936,6 +986,29 @@ def compute_output_metrics(
     metrics["peak_value"] = peak_val
     metrics["peak_rate_hz"] = peak_val
     metrics["peak_latency_ms"] = peak_time - float(stim_start)
+
+    if peak_val > 0:
+        # Rising-phase latency: first sampled point between stim start and peak
+        # that reaches 10% of the detected peak amplitude.
+        tpeak10_target = 0.1 * peak_val
+        rise_mask = _select_window_mask(t_ms, float(stim_start), peak_time)
+        if rise_mask.any():
+            rise_indices = np.flatnonzero(rise_mask)
+            rise_vals = rate[rise_indices]
+            reached_idx = np.flatnonzero(rise_vals >= tpeak10_target)
+            if reached_idx.size:
+                tpeak10_pos = None
+                for rel_idx in reached_idx:
+                    cand_pos = int(rise_indices[int(rel_idx)])
+                    if cand_pos <= 0 or float(rate[cand_pos]) >= float(rate[cand_pos - 1]):
+                        tpeak10_pos = cand_pos
+                        break
+                if tpeak10_pos is None:
+                    tpeak10_pos = int(rise_indices[int(reached_idx[0])])
+                tpeak10_time_abs = float(t_ms[tpeak10_pos])
+                metrics["tpeak10_time_ms"] = tpeak10_time_abs
+                metrics["tpeak10_value"] = float(rate[tpeak10_pos])
+                metrics["tpeak10_ms"] = float(tpeak10_time_abs - float(stim_start))
 
     rate_bs = np.asarray(curve.get("rate_hz_baseline_sub") or [], dtype=float)
     raw_rate = None
@@ -976,6 +1049,23 @@ def compute_output_metrics(
     if peak_val != 0:
         metrics["drop_pct"] = 100.0 * (peak_val - drop_val) / peak_val
 
+    if peak_val > 0 and (peak_pos + 1) < rate.size:
+        # Time from peak to the first sampled point AFTER peak at (or below) 50% of peak.
+        t50_target = 0.5 * peak_val
+        post_rate = rate[peak_pos + 1 :]
+        below_idx = np.flatnonzero(post_rate <= t50_target)
+        if below_idx.size:
+            first_after_peak = peak_pos + 1 + int(below_idx[0])
+            t50_time_abs = float(t_ms[first_after_peak])
+            t50_val = float(rate[first_after_peak])
+            metrics["t50_time_ms"] = t50_time_abs
+            metrics["t50_value"] = t50_val
+            if t50_mode_val == "relative":
+                metrics["t50_ms"] = float(t50_time_abs - peak_time)
+            else:
+                # "absolute" is defined as latency from stimulation start.
+                metrics["t50_ms"] = float(t50_time_abs - float(stim_start))
+
     if rebound_window_ms is not None:
         rebound_target = peak_time + float(rebound_window_ms)
         if pdp_mode_val == "window" and pdp_window_val > 0:
@@ -1001,12 +1091,20 @@ def compute_output_metrics(
         if peak_val != 0:
             metrics["rebound_pct"] = 100.0 * (peak_val - rebound_val) / peak_val
 
-    tstart = sim_cfg.get("tstart")
-    tstop = sim_cfg.get("tstop")
-    if auc_window == "full":
-        auc_mask = _select_window_mask(t_ms, tstart, tstop)
+    tstart = parse_optional_float(sim_cfg.get("tstart"))
+    tstop = parse_optional_float(sim_cfg.get("tstop"))
+    if auc_window_mode == "full":
+        auc_start = tstart
+        auc_stop = tstop
+    elif auc_window_mode == "bounds":
+        auc_start = auc_window_start
+        auc_stop = auc_window_stop
     else:
-        auc_mask = _select_window_mask(t_ms, stim_start, stim_stop)
+        auc_start = stim_start
+        auc_stop = stim_stop
+    metrics["auc_window_start_ms"] = auc_start
+    metrics["auc_window_stop_ms"] = auc_stop
+    auc_mask = _select_window_mask(t_ms, auc_start, auc_stop)
     if auc_mask.any():
         metrics["auc"] = float(np.trapz(rate[auc_mask], t_ms[auc_mask] / 1000.0))
 

@@ -8,7 +8,7 @@ This folder holds the analysis helpers used by `6_analysis.ipynb`.
 - `analysis_ui.py`: Jupyter UI builders and glue code
 - `bio_curve.py`: CSV loading helper for bio curves
 - `analysis_defaults.json`: default UI/options (used by `6_analysis.ipynb`)
-- `analysis_presets/`: optional presets (ex: `paper_compare.json`)
+- `analysis_presets/`: optional presets (ex: `paper_compare.json`, `output_plotting.json`, `input_plotting.json`, `output_metrics.json`, `extra_analysis.json`)
 
 ## Recording summaries
 - `analysis.summarize_cell_recordings(results, ...)`: per-site/per-variable summary for `cell_recordings`.
@@ -21,6 +21,14 @@ This folder holds the analysis helpers used by `6_analysis.ipynb`.
 
 ## Defaults + presets
 - Defaults are loaded in `6_analysis.ipynb` from `modules_local/analysis/analysis_defaults.json`.
+- Output plotting defaults are loaded from `modules_local/analysis/analysis_presets/output_plotting.json`
+  using `output_plot_preset_path` in `analysis_defaults.json`.
+- Input plotting defaults are loaded from `modules_local/analysis/analysis_presets/input_plotting.json`
+  using `input_plot_preset_path` in `analysis_defaults.json`.
+- Output metrics defaults are loaded from `modules_local/analysis/analysis_presets/output_metrics.json`
+  using `output_metrics_preset_path` in `analysis_defaults.json`.
+- Extra analysis defaults are loaded from `modules_local/analysis/analysis_presets/extra_analysis.json`
+  using `extra_preset_path` in `analysis_defaults.json`.
 - Presets can be toggled via the Outputs UI (Paper compare) or set in the JSON.
 
 ## Compare paths syntax

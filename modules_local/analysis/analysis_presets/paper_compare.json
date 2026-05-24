@@ -43,7 +43,7 @@
     {
       "path": "cells/PV/tunes/seg_tuned/output_data/PV4.0_base",
       "label": "PV base",
-      "enabled": false,
+      "enabled": true,
       "shift_ms": 0,
       "scale": 1,
       "color": "royalblue",
@@ -73,7 +73,7 @@
     {
       "path": "cells/SST/tunes/seg_tuned_all/output_data/SST4.0_base",
       "label": "SST base",
-      "enabled": false,
+      "enabled": true,
       "scale": 1,
       "color": "m",
       "linestyle": "-"

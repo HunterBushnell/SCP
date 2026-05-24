@@ -7,6 +7,14 @@ Inputs
 - One or more run folders under `output_data/`.
 - Optional comparison data under `_comparisons/`.
 - Defaults are loaded from `modules_local/analysis/analysis_defaults.json`.
+- Output plotting defaults are loaded from `modules_local/analysis/analysis_presets/output_plotting.json`
+  (via `output_plot_preset_path` in `analysis_defaults.json`).
+- Input plotting defaults are loaded from `modules_local/analysis/analysis_presets/input_plotting.json`
+  (via `input_plot_preset_path` in `analysis_defaults.json`).
+- Output metrics defaults are loaded from `modules_local/analysis/analysis_presets/output_metrics.json`
+  (via `output_metrics_preset_path` in `analysis_defaults.json`).
+- Extra analysis defaults are loaded from `modules_local/analysis/analysis_presets/extra_analysis.json`
+  (via `extra_preset_path` in `analysis_defaults.json`).
 - Optional presets live under `modules_local/analysis/analysis_presets/`.
 
 Common tasks

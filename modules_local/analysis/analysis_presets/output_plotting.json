@@ -1,0 +1,40 @@
+{
+  "title": "output_plotting",
+  "defaults": {
+    "plot_outputs": true,
+    "plot_output_curve": true,
+    "plot_spike_stats": false,
+    "plot_raster": false,
+    "output_plot_window_zero_origin": false,
+    "raster_style": "dot",
+
+    "y_window": [null, null],
+    "plot_window": [200, 1100],
+    "output_stim_start_ms": null,
+    "output_stim_stop_ms": null,
+    "win_size": 25,
+
+    "multi_plot_type": "line",
+    "multi_shade_mode": null,
+    "multi_norm_fr": null,
+    "compare_output_layout": "overlay",
+    "output_compare_figsize": [10.0, 4.0],
+    "output_compare_panel_size": [4.2, 3.2],
+    "output_linewidth": 2.0,
+    "output_stim_linewidth": 2.0,
+    "output_metric_linewidth": 1.0,
+    "output_metric_window_alpha": 0.15,
+    "output_shade_alpha": 0.25,
+    "output_plot_data_path": "",
+    "output_plot_export_type": "csv",
+    "output_plot_data_format": "trace_rows",
+    "output_plot_data_auto_save": false,
+
+    "output_curve_mode": "normalized",
+    "output_curve_plot_mode": "rate",
+    "output_norm_mode": "peak",
+    "output_norm_window": "stim",
+    "output_bin_ms": 5.0,
+    "output_smooth_mode": "center"
+  }
+}
