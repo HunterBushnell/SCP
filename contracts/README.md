@@ -22,6 +22,6 @@ They are descriptive references; public inputs/outputs remain authoritative.
 ## Notes
 - Some historical 2.3 drafts reflect pre-refactor config layouts.
 - For current runtime behavior, cross-check:
-  - `modules_local/inputs.py`
+  - `modules/inputs.py`
   - `docs/configs_reference.md`
   - `docs/step_5_local_pipeline.md`

@@ -6,16 +6,16 @@ It is used for comparing runs, plotting aggregates, and generating figures.
 Inputs
 - One or more run folders under `output_data/`.
 - Optional comparison data under `_comparisons/`.
-- Defaults are loaded from `modules_local/analysis/analysis_defaults.json`.
-- Output plotting defaults are loaded from `modules_local/analysis/analysis_presets/output_plotting.json`
+- Defaults are loaded from `modules/analysis/analysis_defaults.json`.
+- Output plotting defaults are loaded from `modules/analysis/analysis_presets/output_plotting.json`
   (via `output_plot_preset_path` in `analysis_defaults.json`).
-- Input plotting defaults are loaded from `modules_local/analysis/analysis_presets/input_plotting.json`
+- Input plotting defaults are loaded from `modules/analysis/analysis_presets/input_plotting.json`
   (via `input_plot_preset_path` in `analysis_defaults.json`).
-- Output metrics defaults are loaded from `modules_local/analysis/analysis_presets/output_metrics.json`
+- Output metrics defaults are loaded from `modules/analysis/analysis_presets/output_metrics.json`
   (via `output_metrics_preset_path` in `analysis_defaults.json`).
-- Extra analysis defaults are loaded from `modules_local/analysis/analysis_presets/extra_analysis.json`
+- Extra analysis defaults are loaded from `modules/analysis/analysis_presets/extra_analysis.json`
   (via `extra_preset_path` in `analysis_defaults.json`).
-- Optional presets live under `modules_local/analysis/analysis_presets/`.
+- Optional presets live under `modules/analysis/analysis_presets/`.
 
 Common tasks
 - Multi-trial averages with optional shaded error bands.
@@ -63,17 +63,17 @@ Vm trace swap utility
 - Typical use:
   - Copy from another run:
     - Vm only:
-      - `python scripts/swap_vm_trace.py --target-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35973 --source-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35922 --update vm`
+      - `python scripts/swap_vm_trace.py --target-run cells/SST/tunes/seg_tuned/output_data/slurm_35973 --source-run cells/SST/tunes/seg_tuned/output_data/slurm_35922 --update vm`
     - Input raster payload only:
-      - `python scripts/swap_vm_trace.py --target-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35973 --source-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35922 --update inputs`
+      - `python scripts/swap_vm_trace.py --target-run cells/SST/tunes/seg_tuned/output_data/slurm_35973 --source-run cells/SST/tunes/seg_tuned/output_data/slurm_35922 --update inputs`
     - Vm + input payload together:
-      - `python scripts/swap_vm_trace.py --target-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35973 --source-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35922 --update both`
+      - `python scripts/swap_vm_trace.py --target-run cells/SST/tunes/seg_tuned/output_data/slurm_35973 --source-run cells/SST/tunes/seg_tuned/output_data/slurm_35922 --update both`
   - Generate one fresh trial and use that Vm trace:
-    - `python scripts/swap_vm_trace.py --target-run cells/SST/tunes/seg_tuned_all/output_data/slurm_35973 --rerun --update both --write`
+    - `python scripts/swap_vm_trace.py --target-run cells/SST/tunes/seg_tuned/output_data/slurm_35973 --rerun --update both --write`
 
 Notebook helper cell (5_local or 6_analysis)
 ```python
-from modules_local.analysis import analysis
+from modules.analysis import analysis
 
 out_csv = analysis.export_spikes_trials_csv(
     "cells/PV/tunes/seg_tuned/output_data/<run_name>/results/spikes.npz",
@@ -100,8 +100,8 @@ Notes
 
 Recording summary helpers
 ```python
-from modules_local.analysis import analysis
-from modules_local import run_sim
+from modules.analysis import analysis
+from modules import run_sim
 
 res = run_sim.load_results("cells/SST/tunes/seg_tuned/output_data/<run_name>")
 

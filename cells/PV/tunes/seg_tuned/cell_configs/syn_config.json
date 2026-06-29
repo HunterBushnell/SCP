@@ -3,10 +3,7 @@
     "syn_groups/pn_exc.json",
     "syn_groups/bg_exc.json",
     "syn_groups/bg_inh.json",
-    "syn_groups/bg_exc_del.json",
     "syn_groups/sst_inh.json",
-    "syn_groups/sst_inh_bio.json",
-    "syn_groups/pv_inh.json",
-    "syn_groups/pv_inh_bio.json"
+    "syn_groups/pv_inh.json"
   ]
 }

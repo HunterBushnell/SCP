@@ -23,13 +23,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Ensure repo root is on sys.path so modules_local can be imported when run as a script
+# Ensure repo root is on sys.path so modules can be imported when run as a script
 REPO_ROOT = Path(__file__).resolve().parents[1]
 for p in (REPO_ROOT,):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from modules_local import input_sampling
+from modules import input_sampling
 
 
 def main():

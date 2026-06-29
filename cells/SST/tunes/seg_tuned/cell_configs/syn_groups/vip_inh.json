@@ -1,24 +1,26 @@
 {
   "vip_inh": {
-    "state": false,
-    "mode": "precomputed",
+    "state": true,
+    "mode": "inhomogeneous_poisson",
     "color": "#9467bd",
     "source": {
       "freq": null,
-      "baseline": 4.0,
-      "path": "external_data/PV_1000tr.pkl",
-      "bin_ms": null
+      "baseline": 2.3,
+      "path": "external_data/pyrFiringRateAvg.csv",
+      "bin_ms": null,
+      "time_col": "Time",
+      "rate_col": "AvgFiringRate"
     },
     "timing": {
       "onset_ms": null,
-      "stim_tstart_ms": 530,
+      "stim_tstart_ms": 320.0,
       "duration_ms": null,
-      "input_stim_tstart_ms": 300,
+      "input_stim_tstart_ms": 0.0,
       "input_duration_ms": null
     },
     "syns": {
       "type": "GABA_A",
-      "N_syn": 12,
+      "N_syn": 95,
       "segs": "proximal",
       "dist_func": {
         "kind": "uniform",
@@ -27,7 +29,7 @@
         }
       },
       "params": {
-        "wt_mean": 2.0,
+        "wt_mean": 7.0,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,

@@ -2,7 +2,7 @@
 # Step 2.3 – Input Generation Module Contract (PV–SST, v2)
 
 > Historical draft: kept for design history. For current behavior, prefer
-> `modules_local/inputs.py` and `docs/configs_reference.md`.
+> `modules/inputs.py` and `docs/configs_reference.md`.
 
 This document specifies the design and behavior of **Step 2.3 – Input Generation** in the PV–SST single-cell pipeline.
 
@@ -138,7 +138,7 @@ Each normalized `group_cfg["syns"]` has:
 
 ### 2.1 `GroupInputs` dataclass
 
-Defined in `modules_local/inputs.py`:
+Defined in `modules/inputs.py`:
 
 ```python
 from dataclasses import dataclass
@@ -461,7 +461,7 @@ Notebook sets tune directory and config path:
 
 ```python
 from pathlib import Path
-from modules_local import inputs as stim_inputs
+from modules import inputs as stim_inputs
 
 REPO_ROOT = Path("<repo_root>")
 TUNE_DIR = REPO_ROOT / "cells" / "SST" / "tunes" / "seg_tuned"

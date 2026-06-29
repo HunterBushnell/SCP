@@ -43,7 +43,7 @@ FORBIDDEN_SOURCE_PATTERNS = [
 
 
 def _is_repo_root(path: Path) -> bool:
-    return (path / "run_pipeline.py").is_file() and (path / "modules_local").is_dir()
+    return (path / "run_pipeline.py").is_file() and (path / "modules").is_dir()
 
 
 def _find_repo_root(start: Path) -> Path:
@@ -54,7 +54,7 @@ def _find_repo_root(start: Path) -> Path:
             return cand
         raise FileNotFoundError(
             f"SCP_ROOT is set but is not an SCP repo root: {cand} "
-            "(expected run_pipeline.py and modules_local/)"
+            "(expected run_pipeline.py and modules/)"
         )
 
     start = start.resolve()

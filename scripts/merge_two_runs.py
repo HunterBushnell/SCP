@@ -28,8 +28,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from modules_local import randomness as randomness_mod
-from modules_local import run_sim
+from modules import randomness as randomness_mod
+from modules import run_sim
 
 
 SIM_CFG_IGNORE_KEYS = {

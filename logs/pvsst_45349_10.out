@@ -1,6 +1,6 @@
-Running: /home/hrbncv/miniconda3/envs/BMTK-py311/bin/python /home/hrbncv/SCP/run_pipeline.py --tune-dir /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all --output-dir /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/output_data/slurm_45349/parts --n-trials 20 --output-stem slurm_45349_10 --trial-offset 200 --force-save
-Loaded mechanisms from /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/modfiles/x86_64/.libs/libnrnmech.so
-Loaded Allen cell for 'SST' from /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/manifest.json, soma_diam_multiplier=10.0, Vinit=-65.0, loader=genome_fallback
+Running: /home/hrbncv/miniconda3/envs/BMTK-py311/bin/python /home/hrbncv/SCP/run_pipeline.py --tune-dir /home/hrbncv/SCP/cells/SST/tunes/seg_tuned --output-dir /home/hrbncv/SCP/cells/SST/tunes/seg_tuned/output_data/slurm_45349/parts --n-trials 20 --output-stem slurm_45349_10 --trial-offset 200 --force-save
+Loaded mechanisms from /home/hrbncv/SCP/cells/SST/tunes/seg_tuned/modfiles/x86_64/.libs/libnrnmech.so
+Loaded Allen cell for 'SST' from /home/hrbncv/SCP/cells/SST/tunes/seg_tuned/manifest.json, soma_diam_multiplier=10.0, Vinit=-65.0, loader=genome_fallback
 Geometry defined for 'SST': 1 soma segs, 54 proximal dend segs, 52 distal dend segs, 115 total dend segs.
 [trial 1/20] input_spikes: pn_exc=1707 bg_exc=2437 bg_inh=732
 [trial 1/20] spikes=16  rate=16.00 Hz  time=22.39s
@@ -43,5 +43,5 @@ Geometry defined for 'SST': 1 soma segs, 54 proximal dend segs, 52 distal dend s
 [trial 20/20] input_spikes: pn_exc=1661 bg_exc=2282 bg_inh=718
 [trial 20/20] spikes=11  rate=11.00 Hz  time=21.49s
 save_plots single_plot warning: Top input panel: group list empty, auto-using all groups (3).
-Results saved to /home/hrbncv/SCP/cells/SST/tunes/seg_tuned_all/output_data/slurm_45349/parts/slurm_45349_10/run_manifest.json
+Results saved to /home/hrbncv/SCP/cells/SST/tunes/seg_tuned/output_data/slurm_45349/parts/slurm_45349_10/run_manifest.json
 Total runtime: 433.51s

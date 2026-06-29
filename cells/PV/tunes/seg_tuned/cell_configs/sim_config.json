@@ -9,7 +9,24 @@
   "n_trials": 1,
   "n_traces_to_save": 1,
   "n_inputs_to_save": 1,
-  "load": [
+
+  "save_input_stats": true,
+  "input_stats_bin_ms": 5.0,
+  "avg_rate_curve_smooth_ms": 25.0,
+  "avg_rate_curve_smooth_mode": "center",
+  "plots_win_size": 25.0,
+  "plots_input_smooth_ms": 25.0,
+  "plots_profile": "off",
+  "save_plots": true,
+  "save_plots_mode": "single_plot",
+  "save_plots_single_plot_preset": "modules/analysis/analysis_presets/single_plot.json",
+  "save_plots_overwrite": false,
+  "randomness_mode": "random",
+  "random_seed": null,
+
+
+
+    "load": [
     false,
     null
   ],
@@ -23,25 +40,14 @@
     false,
     null
   ],
-  "save_input_stats": true,
-  "input_stats_bin_ms": 5.0,
-  "avg_rate_curve_smooth_ms": 25.0,
-  "avg_rate_curve_smooth_mode": "center",
-  "plots_win_size": 25.0,
-  "plots_input_smooth_ms": 25.0,
-  "plots_profile": "off",
-  "save_plots": true,
-  "save_plots_mode": "single_plot",
-  "save_plots_single_plot_preset": "modules_local/analysis/analysis_presets/single_plot.json",
-  "save_plots_overwrite": false,
-  "randomness_mode": "random",
-  "random_seed": null,
+
   "param_study": {
     "input_type": null,
     "param_type": null,
     "param_vals": [],
     "n_trials": null
   },
+
   "iclamp": {
     "enabled": false,
     "amp_nA": 0.2,
@@ -51,6 +57,7 @@
     "dt_ms": null,
     "record_currents": false
   },
+
   "cell_recording": {
     "enabled": false,
     "n_trials": 1,
@@ -82,6 +89,7 @@
       "mech_states": false
     }
   },
+
   "syn_recording": {
     "enabled": false,
     "default_mode": "group",
@@ -98,6 +106,7 @@
     },
     "groups": {}
   },
+  
   "snapshot": {
     "enabled": false,
     "n_trials": 1,

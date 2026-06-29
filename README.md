@@ -97,6 +97,6 @@ Contracts
 - Contracts are descriptive; only inputs and outputs should be treated as authoritative.
 
 Status notes
-- Step 0 now uses `modules_local` and writes/validates `cell_configs/` scaffolds.
+- Step 0 now uses `modules` and writes/validates `cell_configs/` scaffolds.
 - Steps 1-4 run with repo-relative paths and use current notebook helpers.
 - `colab_notebooks/5_colab.ipynb` bootstraps a clean environment and can compile modfiles as needed.

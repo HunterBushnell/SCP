@@ -1,7 +1,7 @@
 Pipeline Overview
 
 SCP is a notebook-first pipeline for single-cell simulations.
-Step 0 uses `modules_local`; Steps 1-4 run with updated notebook helpers and
+Step 0 uses `modules`; Steps 1-4 run with updated notebook helpers and
 external ACT/bmtool dependencies; Step 5 is the stable run pipeline; Step 6 is analysis.
 
 Execution model

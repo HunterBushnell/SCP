@@ -18,16 +18,16 @@ It is used to:
 
 - Run folders under `cells/<cell>/tunes/<tune>/output_data/<run_name>/`
 - Optional external curves (CSV paths) from compare-path entries
-- Defaults from `modules_local/analysis/analysis_defaults.json`
-- Output-plot defaults from `modules_local/analysis/analysis_presets/output_plotting.json`
+- Defaults from `modules/analysis/analysis_defaults.json`
+- Output-plot defaults from `modules/analysis/analysis_presets/output_plotting.json`
   (loaded via `output_plot_preset_path` in `analysis_defaults.json`)
-- Input-plot defaults from `modules_local/analysis/analysis_presets/input_plotting.json`
+- Input-plot defaults from `modules/analysis/analysis_presets/input_plotting.json`
   (loaded via `input_plot_preset_path` in `analysis_defaults.json`)
-- Output-metrics defaults from `modules_local/analysis/analysis_presets/output_metrics.json`
+- Output-metrics defaults from `modules/analysis/analysis_presets/output_metrics.json`
   (loaded via `output_metrics_preset_path` in `analysis_defaults.json`)
-- Extra-analysis defaults from `modules_local/analysis/analysis_presets/extra_analysis.json`
+- Extra-analysis defaults from `modules/analysis/analysis_presets/extra_analysis.json`
   (loaded via `extra_preset_path` in `analysis_defaults.json`)
-- Optional presets from `modules_local/analysis/analysis_presets/`
+- Optional presets from `modules/analysis/analysis_presets/`
 
 ## Typical Workflow
 
@@ -181,4 +181,4 @@ When save toggles are enabled, `6_analysis` can write:
 - `docs/pipeline_overview.md`
 - `docs/outputs_layout.md`
 - `docs/configs_reference.md`
-- `modules_local/analysis/README.md`
+- `modules/analysis/README.md`

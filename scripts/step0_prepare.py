@@ -22,8 +22,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from modules_local import download_cell
-from modules_local.step0_prepare import (
+from modules import download_cell
+from modules.step0_prepare import (
     guess_cell_color,
     guess_soma_multiplier,
     guess_specimen_from_cell,
@@ -57,7 +57,7 @@ def parse_args() -> argparse.Namespace:
         help="Tune directory path (e.g., cells/PV/tunes/seg_tuned)",
     )
 
-    ap.add_argument("--cell", type=str, default=None, help="Cell label (PV, SST, SST_0, PN)")
+    ap.add_argument("--cell", type=str, default=None, help="Cell label (PV or SST)")
     ap.add_argument("--tune", type=str, default="seg_tuned", help="Tune name under cells/<cell>/tunes/")
     ap.add_argument("--tunes-dir", type=str, default="tunes", help="Parent directory for tune names")
 

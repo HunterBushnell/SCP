@@ -1,12 +1,8 @@
 {
   "__includes__": [
     "syn_groups/pn_exc.json",
-    "syn_groups/pn_exc_gabab.json",
-    "syn_groups/pn_exc_gabab_auto.json",
     "syn_groups/vip_inh.json",
-    "syn_groups/vip_inh_bio.json",
     "syn_groups/bg_exc.json",
-    "syn_groups/bg_inh.json",
-    "syn_groups/bg_exc_del.json"
+    "syn_groups/bg_inh.json"
   ]
 }

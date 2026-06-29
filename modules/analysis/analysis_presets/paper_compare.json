@@ -1,0 +1,90 @@
+{
+  "title": "paper_compare",
+  "defaults": {
+    "save_overwrite": false,
+    "plot_window": [200, 900],
+    "y_window": [-0.2, 1.1],
+    "compare_output_layout": "overlay",
+    "multi_plot_type": "line",
+    "multi_shade_mode": null,
+    "output_curve_mode": "normalized",
+    "output_norm_mode": "peak",
+    "output_norm_window": "stim",
+    "output_baseline_center_ms": 100.0,
+    "output_metric_mode": "window",
+    "output_metric_window_ms": 0.0,
+    "output_bin_ms": 1.0,
+    "output_smooth_mode": "center",
+    "output_stim_start_ms": 300.0,
+    "output_stim_stop_ms": 800.0
+  },
+  "entries": [
+    {
+      "path": "external_data/pyrFiringRateAvg.csv",
+      "label": "PN bio",
+      "enabled": true,
+      "shift_ms": 290,
+      "scale": 1,
+      "color": "r",
+      "linestyle": "--"
+    },
+
+
+
+    {
+      "path": "external_data/PVFiringRateAvg.csv",
+      "label": "PV bio",
+      "enabled": false,
+      "shift_ms": 500,
+      "scale": 1,
+      "color": "b",
+      "linestyle": "--"
+    },
+    {
+      "path": "cells/PV/tunes/seg_tuned/output_data/PV4.0_base",
+      "label": "PV base",
+      "enabled": true,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "royalblue",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/PV/tunes/seg_tuned/output_data/PV4.0_tuned",
+      "label": "PV tuned",
+      "enabled": true,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "navy",
+      "linestyle": "-"
+    },
+
+
+
+    {
+      "path": "external_data/SSTFiringRateAvg.csv",
+      "label": "SST bio",
+      "enabled": false,
+      "shift_ms": 500,
+      "scale": 1,
+      "color": "m",
+      "linestyle": "--"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/SST4.0_base",
+      "label": "SST base",
+      "enabled": true,
+      "scale": 1,
+      "color": "m",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/seg_tuned/output_data/SST4.0_tuned",
+      "label": "SST tuned",
+      "enabled": true,
+      "scale": 1,
+      "color": "darkmagenta",
+      "linestyle": "-"
+    }
+  ]
+}

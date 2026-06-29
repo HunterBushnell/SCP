@@ -1,6 +1,6 @@
 Steps 0-4 (Reference)
 
-Step 0 is implemented with `modules_local` and prepares tune directories for
+Step 0 is implemented with `modules` and prepares tune directories for
 later steps. Steps 1-4 use updated notebooks with repo-relative path handling,
 while still depending on ACT (Steps 1-3) and bmtool (Step 4).
 
@@ -18,7 +18,7 @@ Prerequisites for Steps 1-4
 
 0_download.ipynb / scripts/step0_prepare.py
 - Purpose: bootstrap a tune directory so it is ready for Steps 1-6.
-- Core implementation: `modules_local/step0_prepare.py`.
+- Core implementation: `modules/step0_prepare.py`.
 - Inputs:
   - Cell/tune target (`cells/<CELL>/tunes/<TUNE>` or explicit `--tune-dir`)
   - Allen model identity (`specimen_id`, `model_type`)

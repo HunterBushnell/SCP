@@ -158,10 +158,10 @@ SCP results and outputs contract (v1)
 * **Quick load + plot snippet**
   * Minimal Python example for saved results (single or multi):
 ```python
-from modules_local import run_sim
-from modules_local.analysis import plotting
+from modules import run_sim
+from modules.analysis import plotting
 
-results = run_sim.load_results("cells/SST/tunes/seg_tuned/output_data/slurm_20251218_231500")
+results = run_sim.load_results("cells/SST/tunes/seg_tuned/output_data/SST4.0_tuned")
 plotting.plot_results(results)
 ```
   * Notebook alternative: `<repo_root>/6_analysis.ipynb`

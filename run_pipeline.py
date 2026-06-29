@@ -28,7 +28,7 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-from modules_local import load_cell, geometry, inputs, run_sim, randomness  # noqa: E402
+from modules import load_cell, geometry, inputs, run_sim, randomness  # noqa: E402
 
 
 def _timestamp_stem() -> str:
