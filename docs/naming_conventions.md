@@ -5,8 +5,8 @@ can be adjusted later.
 
 Notebooks
 - Use numeric prefixes for pipeline order: `0_`, `1_`, ..., `6_`.
-- Keep the stable pipeline as `5_local.ipynb` and analysis as `6_analysis.ipynb`.
-- Legacy notebooks: `5_old_<cell>.ipynb` (e.g., `5_old_SST.ipynb`).
+- Keep the stable pipeline as `5_simulate.ipynb`.
+- Keep optional analysis and utility notebooks as `6_analysis.ipynb` and `7_tools.ipynb`.
 
 Scripts
 - Entry points can keep short names:

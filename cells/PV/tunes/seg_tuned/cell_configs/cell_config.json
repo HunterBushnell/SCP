@@ -2,6 +2,7 @@
   "cell_name": "PV",
   "tune": "seg_tuned",
   "color": "royalblue",
+  "cell_loader": "allen_manifest",
   "paths": {
     "manifest": "manifest.json"
   },

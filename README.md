@@ -31,7 +31,7 @@ Notes
 - If you prefer `venv` + pip instead of Conda, see `docs/installation.md`.
 
 Quickstart (existing tune)
-- Notebook route: open `5_local.ipynb` and run all.
+- Notebook route: open `5_simulate.ipynb` and run all.
 - CLI route (from repo root):
   `python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 1`
 
@@ -44,10 +44,9 @@ Pipeline map
 - 3_active.ipynb: Active parameter tuning workflow
 - colab_notebooks/3_colab.ipynb: Active tuning (Colab classroom version, bootstrapped)
 - 4_synapses.ipynb: Synaptic tuning workflow (including bmtool path)
-- 5_local.ipynb: Local pipeline (stable)
+- 5_simulate.ipynb: Simulation pipeline (stable)
 - colab_notebooks/5_colab.ipynb: Colab/Linux full pipeline (classroom + bootstrapped)
-- 5_old_PV.ipynb, 5_old_SST.ipynb: Legacy notebooks
-- 6_analysis.ipynb: End-of-pipeline analysis and comparisons
+- 6_analysis.ipynb: Optional end-of-pipeline analysis and comparisons
 
 Colab classroom usage (notebook-only)
 - `colab_notebooks/2_colab.ipynb`, `colab_notebooks/3_colab.ipynb`, and `colab_notebooks/5_colab.ipynb` are designed for first-time users.
@@ -78,7 +77,7 @@ Docs index
 - `docs/installation.md`
 - `docs/pipeline_overview.md`
 - `docs/step_0_4_stub.md` (Step 0-4 reference and prerequisites)
-- `docs/step_5_local_pipeline.md`
+- `docs/step_5_simulate.md`
 - `docs/analysis.md` (practical guide for `6_analysis.ipynb`)
 - `docs/step_6_analysis.md`
 - `docs/configs_reference.md`

@@ -2,6 +2,7 @@
   "cell_name": "PV",
   "tune": "adb_peri",
   "color": "blue",
+  "cell_loader": "allen_manifest",
   "paths": {
     "manifest": "manifest.json"
   },

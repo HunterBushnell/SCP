@@ -145,6 +145,7 @@ def default_cell_config(
         "cell_name": cell_name,
         "tune": tune_name,
         "color": color if color is not None else guess_cell_color(cell_name),
+        "cell_loader": "allen_manifest",
         "paths": {
             "manifest": "manifest.json",
         },
@@ -625,6 +626,7 @@ def scaffold_common_configs(
         cell_cfg_data.setdefault("paths", {})
         cell_cfg_data["cell_name"] = cell_name
         cell_cfg_data["tune"] = tune_name
+        cell_cfg_data.setdefault("cell_loader", "allen_manifest")
         # Canonical model identity is the tune directory itself.
         cell_cfg_data.pop("specimen_id", None)
         cell_cfg_data.pop("model_type", None)
@@ -724,6 +726,7 @@ def validate_tune(
             cell = load_cell(
                 {
                     "cell_name": cell_name,
+                    "cell_loader": "allen_manifest",
                     "paths": {"manifest": "manifest.json"},
                     "tuning": {"soma_diam_multiplier": float(soma_diam_multiplier)},
                 }

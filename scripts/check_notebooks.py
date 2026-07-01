@@ -30,7 +30,7 @@ DEFAULT_NOTEBOOKS = [
     "colab_notebooks/3_colab.ipynb",
     "3_active.ipynb",
     "4_synapses.ipynb",
-    "5_local.ipynb",
+    "5_simulate.ipynb",
     "colab_notebooks/5_colab.ipynb",
     "6_analysis.ipynb",
 ]

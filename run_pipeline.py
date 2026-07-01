@@ -29,6 +29,7 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
 from modules import load_cell, geometry, inputs, run_sim, randomness  # noqa: E402
+from modules.loaders import get_cell_loader_name, loader_requires_manifest  # noqa: E402
 
 
 def _timestamp_stem() -> str:
@@ -338,7 +339,6 @@ def main() -> None:
     config_root = inputs._resolve_config_root(tune_dir)
     sim_path = config_root / "sim_config.json"
     syn_path = config_root / "syn_config.json"
-    manifest_path = tune_dir / "manifest.json"
 
     if not sim_path.is_file():
         raise FileNotFoundError(
@@ -347,15 +347,49 @@ def main() -> None:
         )
     if not syn_path.is_file():
         raise FileNotFoundError(f"Missing syn_config.json in {config_root}")
-    if not manifest_path.is_file():
-        raise FileNotFoundError(f"Missing manifest.json in {tune_dir}")
-
-    # Load compiled mechanisms (nrnivmodl output) before building the cell
-    _load_mechanisms(tune_dir)
 
     # ---------------------- Load cell (2.1) ----------------------
     with sim_path.open("r") as f:
         sim_cfg_preview = json.load(f)
+
+    # Align with notebook: load cell_configs/cell_config.json when present
+    cell_config_path = tune_dir / "cell_configs" / "cell_config.json"
+    if cell_config_path.is_file():
+        try:
+            cell_cfg = json.loads(cell_config_path.read_text())
+        except Exception:
+            cell_cfg = {}
+    else:
+        cell_cfg = {}
+
+    cell_cfg.setdefault("cell_name", tune_dir.parent.name)  # e.g., SST or PV
+    paths = cell_cfg.setdefault("paths", {})
+    paths.setdefault("manifest", "manifest.json")
+    paths.setdefault("tune_dir", str(tune_dir))
+
+    loader_name = get_cell_loader_name(cell_cfg)
+    if loader_requires_manifest(loader_name):
+        raw_manifest = Path(str(paths.get("manifest", "manifest.json")))
+        if raw_manifest.is_absolute():
+            resolved_manifest = raw_manifest
+        else:
+            manifest_candidates = [
+                Path.cwd() / raw_manifest,
+                cell_config_path.parent / raw_manifest,
+                tune_dir / raw_manifest,
+            ]
+            resolved_manifest = next(
+                (p for p in manifest_candidates if p.is_file()),
+                manifest_candidates[1],
+            )
+        if not resolved_manifest.is_file():
+            raise FileNotFoundError(
+                f"Missing manifest.json for cell_loader={loader_name!r}: {resolved_manifest}"
+            )
+        paths["manifest"] = str(resolved_manifest)
+
+    # Load compiled mechanisms (nrnivmodl output) before building the cell
+    _load_mechanisms(tune_dir)
 
     append_target = _resolve_append_target(sim_cfg_preview, tune_dir / "output_data")
     sim_cfg_override = None
@@ -399,34 +433,6 @@ def main() -> None:
         snapshot_enabled = True
         if sim_cfg_override is None:
             sim_cfg_override = sim_cfg_for_cell
-    # Align with notebook: load cell_configs/cell_config.json when present
-    cell_config_path = tune_dir / "cell_configs" / "cell_config.json"
-    if cell_config_path.is_file():
-        try:
-            cell_cfg = json.loads(cell_config_path.read_text())
-        except Exception:
-            cell_cfg = {}
-    else:
-        cell_cfg = {}
-
-    cell_cfg.setdefault("cell_name", tune_dir.parent.name)  # e.g., SST or PV
-    paths = cell_cfg.setdefault("paths", {})
-    paths.setdefault("manifest", "manifest.json")
-
-    # Resolve relative manifest paths to the tune directory instead of CWD.
-    # This keeps CLI behavior consistent regardless of where run_pipeline is launched.
-    raw_manifest = Path(str(paths.get("manifest", "manifest.json")))
-    if raw_manifest.is_absolute():
-        resolved_manifest = raw_manifest
-    else:
-        manifest_candidates = [
-            Path.cwd() / raw_manifest,
-            cell_config_path.parent / raw_manifest,
-            tune_dir / raw_manifest,
-        ]
-        resolved_manifest = next((p for p in manifest_candidates if p.is_file()), manifest_candidates[1])
-    paths["manifest"] = str(resolved_manifest)
-
     tuning = cell_cfg.setdefault("tuning", {})
     if "soma_diam_multiplier" not in tuning:
         tuning["soma_diam_multiplier"] = sim_cfg_for_cell.get("soma_diam_multiplier", 1.0)

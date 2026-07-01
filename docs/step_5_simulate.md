@@ -1,7 +1,7 @@
-Step 5: Local Pipeline
+Step 5: Simulate
 
 Step 5 is the stable, current pipeline for running tuned single-cell simulations.
-The notebook `5_local.ipynb` is the reference implementation.
+The notebook `5_simulate.ipynb` is the reference implementation.
 
 Sub-steps (documentation labels)
 - 5.2.1 Load cell: build NEURON cell from `cell_config.json` and `manifest.json`.
@@ -12,7 +12,7 @@ Sub-steps (documentation labels)
 - 5.4 Analyze: summarize and compare outputs.
 
 Entry points
-- Notebook: `5_local.ipynb`
+- Notebook: `5_simulate.ipynb`
 - CLI: `run_pipeline.py`
 - SLURM: `run_slurm.sh`
 
@@ -46,5 +46,4 @@ Notes
   to 5.2.3 and 5.2.4 to keep Step 5 as the stable pipeline.
 - Inhomogeneous input sources can use `source.gabab` and
   `source.freq_scale`/`source.freq_shift` (see `configs_reference.md`).
-- `5_old_PV.ipynb` and `5_old_SST.ipynb` are legacy notebooks kept for reference.
 - `colab_notebooks/5_colab.ipynb` bootstraps a clean environment when needed.

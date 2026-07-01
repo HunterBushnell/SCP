@@ -11,7 +11,7 @@ They are descriptive references; public inputs/outputs remain authoritative.
 - `pvsst_results_outputs.contract.v1.md`: output/run artifact schema.
 - `pvsst_step2.3_inputs_modes.contract.v1.md`: mode handler interface expectations.
 - `mode_contract.md`: compact mode contract summary.
-- `5_local_randomness.md`: randomness design notes.
+- `5_simulate_randomness.md`: randomness design notes.
 
 ## Historical Drafts (Context)
 - `step2.3_input_generation.contract.v1.md`
@@ -24,4 +24,4 @@ They are descriptive references; public inputs/outputs remain authoritative.
 - For current runtime behavior, cross-check:
   - `modules/inputs.py`
   - `docs/configs_reference.md`
-  - `docs/step_5_local_pipeline.md`
+  - `docs/step_5_simulate.md`

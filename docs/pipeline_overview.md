@@ -5,7 +5,7 @@ Step 0 uses `modules`; Steps 1-4 run with updated notebook helpers and
 external ACT/bmtool dependencies; Step 5 is the stable run pipeline; Step 6 is analysis.
 
 Execution model
-- Local notebooks (`2_passive.ipynb`, `3_active.ipynb`, `4_synapses.ipynb`, `5_local.ipynb`)
+- Local notebooks (`2_passive.ipynb`, `3_active.ipynb`, `4_synapses.ipynb`, `5_simulate.ipynb`)
   assume the tune bundle is already prepared and mechanisms are already compiled
   (typically by Step 0). They validate and load existing files; they do not
   download/compile mechanisms.
@@ -24,7 +24,7 @@ Steps (notebooks)
 - 3_active.ipynb: Active parameter tuning.
 - colab_notebooks/3_colab.ipynb: Colab-friendly Step 3 (auto-bootstrap + active tuning).
 - 4_synapses.ipynb: Synaptic tuning.
-- 5_local.ipynb: Stable local pipeline (inputs -> synapses -> simulation -> outputs).
+- 5_simulate.ipynb: Stable simulation pipeline (inputs -> synapses -> simulation -> outputs).
 - colab_notebooks/5_colab.ipynb: Colab/Linux pipeline (bootstrapped).
 - 6_analysis.ipynb: End-of-pipeline analysis and comparisons.
 
@@ -37,7 +37,7 @@ Step 5 sub-steps (documentation labels)
 - 5.4: Analyze results
 
 Entry points
-- Notebook: `5_local.ipynb`
+- Notebook: `5_simulate.ipynb`
 - CLI: `run_pipeline.py`
 - SLURM: `run_slurm.sh`
 
@@ -46,5 +46,5 @@ Data flow (high level)
 - Outputs: `output_data/<run>/` with `run_manifest.json` and sidecars
 
 See also
-- `step_5_local_pipeline.md` for pipeline details.
+- `step_5_simulate.md` for simulation details.
 - `step_6_analysis.md` for analysis usage.

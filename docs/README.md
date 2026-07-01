@@ -7,7 +7,7 @@
 
 ## Core Usage
 - `analysis.md`: practical guide to `6_analysis.ipynb` workflows and metrics.
-- `step_5_local_pipeline.md`: stable Step 5 pipeline details.
+- `step_5_simulate.md`: stable Step 5 simulation details.
 - `step_6_analysis.md`: analysis notebook usage and expected outputs.
 - `cli_slurm.md`: CLI and SLURM execution.
 - `configs_reference.md`: config layout and field reference.

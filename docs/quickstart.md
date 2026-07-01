@@ -8,7 +8,7 @@ This is the shortest path to run an existing tuned cell.
 - Optional safety check: `python scripts/check_notebooks.py`.
 
 ## Option A: Notebook
-1. Open `5_local.ipynb`.
+1. Open `5_simulate.ipynb`.
 2. Set the cell/tune at the top.
 3. Run all cells.
 4. Open `6_analysis.ipynb` for analysis/comparisons.

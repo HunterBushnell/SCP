@@ -71,7 +71,7 @@ Vm trace swap utility
   - Generate one fresh trial and use that Vm trace:
     - `python scripts/swap_vm_trace.py --target-run cells/SST/tunes/seg_tuned/output_data/slurm_35973 --rerun --update both --write`
 
-Notebook helper cell (5_local or 6_analysis)
+Notebook helper cell (5_simulate or 6_analysis)
 ```python
 from modules.analysis import analysis
 

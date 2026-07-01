@@ -158,6 +158,7 @@ def resolve_cell_config_for_notebook(cell_name: str, tune_dir: Path | None = Non
         cell_config = {}
 
     cell_config.setdefault("cell_name", cell_name)
+    cell_config.setdefault("cell_loader", "allen_manifest")
     paths = cell_config.setdefault("paths", {})
     if not isinstance(paths, dict):
         paths = {}

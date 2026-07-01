@@ -13,7 +13,7 @@ Formula options:
 
 Usage:
   python scripts/scale_bio_trace_csv.py \
-    --input plot_data/PV/raw/_final_PV.csv \
+    --input path/to/biotrace.csv \
     --scalar 1.2 \
     --offset -0.3 \
     --order scale-then-offset
