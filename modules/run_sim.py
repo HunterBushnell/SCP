@@ -1,499 +1,44 @@
+"""
+Core Step 5 simulation routines.
+
+This module keeps the historical `modules.run_sim` public API while delegating
+current-injection helpers and result I/O to focused `modules.simulation` modules.
+"""
+
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, Mapping, Tuple
-import json, copy, os, pickle, math, random, time, sys, hashlib
-import shutil
-import re
-import numpy as np
-import matplotlib.pyplot as plt
-from neuron import h
-############################################################
-
-
-
-
-######## Simple Current Injection simulation #########
-
-def get_rec_vars_for_i_in_sec(sec,seg):#create recording variables for every current in a section
-    current_recording_vars = {}
-
-    for mech in sec.psection()['density_mechs']:
-        for param in sec.psection()['density_mechs'][mech]:
-            if param[0] == 'i':#assumes only current names start with i
-                attr = getattr(sec(seg),mech)
-                ref = getattr(attr, f"_ref_{param}")
-                current_recording_vars[f"{mech}.{param}"] = h.Vector().record(ref)
-    # print(current_recording_vars)
-    # ivecs = {}
-    # for name,vec in current_recording_vars.items():
-    #     # print(name)
-    #     ivecs[name] = vec.as_numpy().copy
-
-    return current_recording_vars #ivecs
-
-
-#function to calculate the frequency of a voltage trace
-def get_frequency(v,sim_params):
-
-    start_idx = int(sim_params['stim_delay']/sim_params['h_dt'])
-    end_idx = int((sim_params['stim_delay']+sim_params['stim_dur'])/sim_params['h_dt'])
-    
-    v_range = v.as_numpy()[start_idx:end_idx]
-    # Calculate the slope of the voltage
-    slope = np.diff(v_range)
-    above_threshold_indices = np.where(v_range[:-1] > -20)[0]
-    positive_to_negative_indices = np.where((slope[:-1] > 0) & (slope[1:] < 0))[0]
-    event_indices = np.intersect1d(above_threshold_indices, positive_to_negative_indices)
-    spikes = len(event_indices)
-
-    if spikes> 0:
-        duration_sec = sim_params['stim_dur'] / 1000.0
-        freq = spikes / duration_sec
-        return freq
-    else:
-        return 0
-    
-
-def _get_hoc(cell):
-    return getattr(cell, "h", cell)
-
-
-def run_current_injection(cell,sim_params,):
-    
-    # from neuron import h
-    # h.load_file("stdrun.hoc")
-
-    hoc = _get_hoc(cell)
-    stim = h.IClamp(hoc.soma[0](0.5))
-    stim.amp = sim_params['stim_amp']
-    stim.delay = sim_params['stim_delay']
-    stim.dur = sim_params['stim_dur']
-    h.tstop = sim_params['h_tstop']
-    h.dt = sim_params['h_dt']
-    # h.steps_per_ms = 1 / h.dt
-    # return h, stim
-
-    recorded_data = {}
-
-    # Attach recorders
-    vvec = h.Vector().record(hoc.soma[0](0.5)._ref_v)
-    tvec = h.Vector().record(h._ref_t)
-
-    # Attach *all* the current recorders in that section
-    current_recording_vars = get_rec_vars_for_i_in_sec(hoc.soma[0], 0.5)
-
-    # Run
-    h.finitialize()
-    h.run()
-
-    # Stash numpy arrays
-    recorded_data['T'] = np.array(tvec)                # Time (same for all sims)
-    recorded_data['V'] = np.array(vvec)                   # Voltage
-    recorded_data['F'] = get_frequency(vvec, sim_params)
-    recorded_data['I'] = {name: vec.as_numpy().copy() for name, vec in current_recording_vars.items()} #ivecs
-
-    return recorded_data
-
-
-def run_iclamp_test(cell, sim_cfg, iclamp_cfg=None):
-    """
-    Run a simple somatic current injection (IClamp) test.
-
-    Uses sim_cfg plus optional iclamp_cfg overrides to build parameters.
-    Returns a results dict compatible with save_results (traces + meta).
-    """
-    sim_cfg = dict(sim_cfg or {})
-    iclamp = dict(sim_cfg.get("iclamp", {}) or {})
-    if iclamp_cfg:
-        iclamp.update(iclamp_cfg)
-
-    def _get_float(key, fallback):
-        val = iclamp.get(key, None)
-        if val in (None, "", False):
-            val = fallback
-        return float(val)
-
-    amp_nA = _get_float("amp_nA", 0.2)
-    delay_ms = _get_float("delay_ms", sim_cfg.get("tstart", 0.0))
-    dur_ms = _get_float("dur_ms", sim_cfg.get("stim_duration_ms", 500.0))
-    dt_ms = _get_float("dt_ms", sim_cfg.get("dt", 0.025))
-
-    tstop_raw = iclamp.get("tstop_ms", None)
-    if tstop_raw in (None, "", False):
-        tstop_raw = sim_cfg.get("tstop", delay_ms + dur_ms)
-    tstop_ms = float(tstop_raw)
-
-    sim_params = {
-        "stim_amp": amp_nA,
-        "stim_delay": delay_ms,
-        "stim_dur": dur_ms,
-        "h_tstop": tstop_ms,
-        "h_dt": dt_ms,
-    }
-
-    record_currents = bool(iclamp.get("record_currents", False))
-    recorded = run_current_injection(cell, sim_params)
-    if not record_currents:
-        recorded.pop("I", None)
-
-    meta = {
-        "experiment": "iclamp",
-        "amp_nA": amp_nA,
-        "delay_ms": delay_ms,
-        "dur_ms": dur_ms,
-        "tstop_ms": tstop_ms,
-        "dt_ms": dt_ms,
-        "record_currents": record_currents,
-        "frequency_hz": recorded.get("F"),
-    }
-
-    results = {
-        "mode": "iclamp",
-        "sim_cfg": sim_cfg,
-        "meta": meta,
-        "traces": {"T": recorded.get("T"), "V": recorded.get("V")},
-        "iclamp": recorded,
-    }
-    return results
-
-def looped_current_injection(cell,sim_params,sim_amps,):
-
-    looped_records = { # Could automate from items in recorded_data later?
-        'T': {},
-        'V': {},
-        'F': {},
-        'I': {},
-    }
-
-    for idx, amp_val in enumerate(sim_amps):
-        # 1) set the new amp
-        sim_params['stim_amp'] = amp_val / 1000.0   # convert to nA
-
-        # 3) run_sim
-        recorded_data = run_current_injection(cell,sim_params)
-        T,V,F,I = recorded_data['T'],recorded_data['V'],recorded_data['F'],recorded_data['I']
-        for rec_var in recorded_data:
-            looped_records[rec_var][amp_val] = recorded_data[rec_var]
-    
-    return looped_records
-
-def plot_looped_currents(cell_name,trial_amp,currents,looped_records,window):
-
-    plt.figure(figsize = (6,4))
-    if currents:
-        for cur in currents:
-            plt.plot(looped_records['T'][trial_amp], looped_records['I'][trial_amp][cur], label=cur)
-    else:
-        for cur_name, cur_trace in looped_records['I'][trial_amp].items():
-            plt.plot(looped_records['T'][trial_amp], cur_trace, label=cur_name) 
-
-    plt.xlabel("Time (ms)")
-    plt.xlim(window[0],window[1])
-    plt.ylabel("Current (A/cm²)")
-    # plt.ylim(-0.01,0.01)
-    plt.title(f"{cell_name} currents @ {trial_amp} pA")
-    plt.legend(loc='upper left')
-    plt.grid()
-    plt.show()
-
-        
-def run_FI(cell,sim_params,amps,):
-
-    looped_records = looped_current_injection(cell,sim_params,amps)
-    freq_records = looped_records['F']
-    freq_list = [freq_records[amp] for amp in freq_records]
-
-    plt.plot(amps, freq_list, marker='o')
-    plt.title(f"FI CURVE")
-    plt.xlabel("Stimulus Amplitude (nA)")
-    plt.ylabel("Frequency (Hz)")
-    plt.grid(),plt.show()
-    
-    return freq_records
-
-
-#############################################
-#############################################
-
-import numpy as np
-from neuron import h
-
-
-def _get_soma_segment(cell):
-    """
-    Return a NEURON soma(0.5) segment for both the new LoadedCell
-    (which exposes `cell.h.soma`) and older cell wrappers that have
-    `cell.soma` directly.
-    """
-    # Prefer the NEURON hoc object inside LoadedCell.
-    h_obj = getattr(cell, "h", None)
-    if h_obj is not None and hasattr(h_obj, "soma") and len(h_obj.soma) > 0:
-        return h_obj.soma[0](0.5)
-
-    # Fallback to older pattern where the cell itself had `soma`.
-    if hasattr(cell, "soma") and len(cell.soma) > 0:
-        return cell.soma[0](0.5)
-
-    raise AttributeError("run_sim: could not find soma on cell or cell.h")
-
-
-_SITE_SPEC_RE = re.compile(
-    r"^(?P<sec>[A-Za-z_]\w*)(?:\[(?P<idx>\d+)\])?(?:\((?P<x>[-+]?(?:\d+(?:\.\d*)?|\.\d+))\))?$"
-)
-
-
-def _parse_bool_like(value: Any, *, default: bool = False) -> bool:
-    if value is None:
-        return default
-    if isinstance(value, str):
-        v = value.strip().lower()
-        if v in {"true", "1", "yes", "on"}:
-            return True
-        if v in {"false", "0", "no", "off", ""}:
-            return False
-    return bool(value)
-
-
-def _normalize_runtime_recording_site(site_raw: Any) -> Dict[str, Any]:
-    if isinstance(site_raw, str):
-        m = _SITE_SPEC_RE.match(site_raw.strip())
-        if not m:
-            raise ValueError(
-                f"run_cell: invalid site spec {site_raw!r}; expected 'sec', 'sec[idx]' or 'sec[idx](x)'"
-            )
-        return {
-            "sec": m.group("sec"),
-            "idx": int(m.group("idx") or 0),
-            "x": float(m.group("x") or 0.5),
-        }
-    if isinstance(site_raw, (list, tuple)):
-        if not site_raw:
-            raise ValueError("run_cell: empty site list/tuple is invalid")
-        site_raw = {
-            "sec": site_raw[0],
-            "idx": site_raw[1] if len(site_raw) > 1 else 0,
-            "x": site_raw[2] if len(site_raw) > 2 else 0.5,
-        }
-    if not isinstance(site_raw, dict):
-        raise TypeError(
-            f"run_cell: site must be string/dict/[sec,idx,x] (got {type(site_raw)!r})"
-        )
-
-    sec = site_raw.get("sec", site_raw.get("section", site_raw.get("name")))
-    if sec in (None, ""):
-        raise ValueError("run_cell: site is missing 'sec' (or 'section'/'name')")
-    idx_raw = site_raw.get("idx", site_raw.get("index", 0))
-    x_raw = site_raw.get("x", 0.5)
-    label = site_raw.get("label")
-
-    idx = int(idx_raw)
-    x = float(x_raw)
-    if idx < 0:
-        raise ValueError(f"run_cell: site idx must be >= 0 (got {idx})")
-    if x < 0.0 or x > 1.0:
-        raise ValueError(f"run_cell: site x must be in [0, 1] (got {x})")
-
-    out = {"sec": str(sec), "idx": idx, "x": x}
-    if label not in (None, ""):
-        out["label"] = str(label)
-    return out
-
-
-def _get_cell_recording_cfg(sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
-    default_vars = {
-        "v": True,
-        "i_cap": False,
-        "ion_currents": False,
-        "mech_currents": False,
-        "ion_concentrations": False,
-        "ion_reversals": False,
-        "mech_conductances": False,
-        "mech_states": False,
-    }
-    cfg_raw = sim_cfg.get("cell_recording", {})
-    if cfg_raw is None:
-        cfg_raw = {}
-    if isinstance(cfg_raw, (bool, str)):
-        cfg_raw = {"enabled": cfg_raw}
-    if not isinstance(cfg_raw, dict):
-        raise TypeError("run_cell: sim_cfg['cell_recording'] must be a dict/bool/string")
-
-    enabled = _parse_bool_like(cfg_raw.get("enabled", False), default=False)
-    vars_raw = cfg_raw.get("vars", {}) or {}
-    if not isinstance(vars_raw, dict):
-        raise TypeError("run_cell: sim_cfg['cell_recording']['vars'] must be a dict")
-
-    vars_cfg = dict(default_vars)
-    for key, val in vars_raw.items():
-        if key not in vars_cfg:
-            allowed = ", ".join(sorted(vars_cfg.keys()))
-            raise ValueError(
-                f"run_cell: unknown cell_recording vars key {key!r}; allowed: {allowed}"
-            )
-        vars_cfg[key] = _parse_bool_like(val, default=vars_cfg[key])
-
-    sites_raw = cfg_raw.get("sites", [{"sec": "soma", "idx": 0, "x": 0.5}])
-    if isinstance(sites_raw, (str, dict, tuple)):
-        sites_raw = [sites_raw]
-    if not isinstance(sites_raw, list):
-        raise TypeError("run_cell: sim_cfg['cell_recording']['sites'] must be a list")
-    if not sites_raw:
-        sites_raw = [{"sec": "soma", "idx": 0, "x": 0.5}]
-
-    sites = [_normalize_runtime_recording_site(site) for site in sites_raw]
-    n_trials_raw = cfg_raw.get("n_trials", cfg_raw.get("n_traces_to_save", None))
-    if n_trials_raw is None:
-        n_trials_raw = sim_cfg.get("n_traces_to_save", 1)
-    try:
-        n_trials = int(n_trials_raw)
-    except Exception:
-        n_trials = int(sim_cfg.get("n_traces_to_save", 1))
-    if n_trials < 0:
-        n_trials = 0
-    return {"enabled": bool(enabled), "n_trials": int(n_trials), "vars": vars_cfg, "sites": sites}
-
-
-def _resolve_recording_site(cell: Any, site: Dict[str, Any]) -> Tuple[Any, str]:
-    hoc = _get_hoc(cell)
-    sec_name = str(site["sec"])
-    if not hasattr(hoc, sec_name):
-        raise ValueError(f"run_cell: section list '{sec_name}' not found on cell")
-    sec_list = getattr(hoc, sec_name)
-    idx = int(site["idx"])
-    if idx < 0 or idx >= len(sec_list):
-        raise ValueError(
-            f"run_cell: section index out of range for '{sec_name}' (idx={idx}, n={len(sec_list)})"
-        )
-    x = float(site["x"])
-    seg = sec_list[idx](x)
-    default_label = f"{sec_name}[{idx}]({x:.3f})"
-    return seg, str(site.get("label", default_label))
-
-
-def _build_cell_recorders_for_site(seg: Any, vars_cfg: Dict[str, bool]) -> Dict[str, Any]:
-    recorders: Dict[str, Any] = {}
-
-    if vars_cfg.get("v", True) and hasattr(seg, "_ref_v"):
-        recorders["v"] = h.Vector().record(seg._ref_v)
-    if vars_cfg.get("i_cap", False) and hasattr(seg, "_ref_i_cap"):
-        recorders["i_cap"] = h.Vector().record(seg._ref_i_cap)
-
-    if vars_cfg.get("ion_currents", False):
-        for name in ("ina", "ik", "ica", "ih"):
-            ref_name = f"_ref_{name}"
-            if hasattr(seg, ref_name):
-                recorders[name] = h.Vector().record(getattr(seg, ref_name))
-
-    if vars_cfg.get("ion_concentrations", False):
-        for name in ("nai", "ki", "cai", "nao", "ko", "cao"):
-            ref_name = f"_ref_{name}"
-            if hasattr(seg, ref_name):
-                recorders[name] = h.Vector().record(getattr(seg, ref_name))
-
-    if vars_cfg.get("ion_reversals", False):
-        for name in ("ena", "ek", "eca"):
-            ref_name = f"_ref_{name}"
-            if hasattr(seg, ref_name):
-                recorders[name] = h.Vector().record(getattr(seg, ref_name))
-
-    if vars_cfg.get("mech_currents", False) or vars_cfg.get("mech_conductances", False) or vars_cfg.get("mech_states", False):
-        density_mechs = seg.sec.psection().get("density_mechs", {})
-        for mech in sorted(density_mechs.keys()):
-            attr = getattr(seg, mech, None)
-            if attr is None:
-                continue
-            for param in sorted(density_mechs[mech].keys()):
-                want = False
-                if vars_cfg.get("mech_currents", False) and param.startswith("i"):
-                    want = True
-                elif vars_cfg.get("mech_conductances", False) and param.startswith("g"):
-                    want = True
-                elif vars_cfg.get("mech_states", False) and not param.startswith("i") and not param.startswith("g"):
-                    want = True
-                if not want:
-                    continue
-                ref_name = f"_ref_{param}"
-                if hasattr(attr, ref_name):
-                    recorders[f"{mech}.{param}"] = h.Vector().record(getattr(attr, ref_name))
-
-    return recorders
-
-
-def run_cell(cell, sim_cfg):
-    sim_traces = {}
-
-    # Recorders
-    tvec = h.Vector().record(h._ref_t)
-    vseg = _get_soma_segment(cell)
-    vvec = h.Vector().record(vseg._ref_v)  # somatic Vm
-
-    isynvec = None
-    gsynvec = None
-    if hasattr(cell, "synapses") and len(cell.synapses) > 0:
-        isynvec = h.Vector().record(cell.synapses[0]._ref_i)
-        gsynvec = h.Vector().record(cell.synapses[0]._ref_g)
-
-    cell_recording_cfg = _get_cell_recording_cfg(sim_cfg)
-    cell_recorders: Dict[str, Dict[str, Any]] = {}
-    if cell_recording_cfg.get("enabled", False):
-        for site in cell_recording_cfg.get("sites", []):
-            seg, label = _resolve_recording_site(cell, site)
-            label_base = label
-            dupe_idx = 2
-            while label in cell_recorders:
-                label = f"{label_base}#{dupe_idx}"
-                dupe_idx += 1
-            site_recorders = _build_cell_recorders_for_site(seg, cell_recording_cfg.get("vars", {}))
-            if site_recorders:
-                cell_recorders[label] = site_recorders
-
-    # Simulation parameters (ms)
-    dt     = float(sim_cfg.get("dt", 0.025))
-    tstart = float(sim_cfg.get("tstart", 0.0))
-    tstop  = float(sim_cfg["tstop"])
-
-    h.t = tstart
-    v_init = float(getattr(cell, "Vinit", -65.0))
-    h.finitialize(v_init)
-    h.dt = dt
-    h.tstop = tstop
-
-    h.run()
-
-    sim_traces["T"] = np.array(tvec)
-    sim_traces["V"] = np.array(vvec)
-    if isynvec is not None:
-        sim_traces["I"] = np.array(isynvec)
-        sim_traces["G"] = np.array(gsynvec)
-    if cell_recorders:
-        sim_traces["cell_recordings"] = {
-            site: {name: np.array(vec) for name, vec in recs.items()}
-            for site, recs in cell_recorders.items()
-        }
-
-    return sim_traces
-
-#############################################
-#############################################
-
-"""
-run_sim.py
-
-Core simulation entrypoints for single / multi / parametric runs,
-built on top of:
-  - inputs.generate_inputs(...)
-  - synapses.add_synapses(...)
-  - run_cell(cell, sim_cfg)
-"""
+from typing import Any, Dict, List, Optional, Tuple
 
 import copy
-from typing import Any, Dict, List, Optional
+import hashlib
+import os
+import random
+import sys
+import time
 
 import numpy as np
+from neuron import h
 
-from . import synapses  # assumes run_sim.py lives next to synapses.py
-from . import randomness
 from . import inputs as inputs_mod
-
+from . import randomness, synapses
+from .simulation.cell_runtime import (
+    _build_cell_recorders_for_site,
+    _get_cell_recording_cfg,
+    _get_soma_segment,
+    _normalize_runtime_recording_site,
+    _parse_bool_like,
+    _resolve_recording_site,
+    run_cell,
+)
+from .simulation.current_injection import (
+    _get_hoc,
+    get_frequency,
+    get_rec_vars_for_i_in_sec,
+    looped_current_injection,
+    plot_looped_currents,
+    run_FI,
+    run_current_injection,
+    run_iclamp_test,
+)
 from .simulation.result_helpers import (
     _aggregate_input_stats,
     _resolve_inputs_to_save,
@@ -724,14 +269,6 @@ def _collect_neuron_state() -> Dict[str, Any]:
     return state
 
 
-
-
-
-
-
-
-
-
 def _collect_mechanism_info(sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
     info: Dict[str, Any] = {}
     tune_path = _resolve_tune_path(sim_cfg)
@@ -825,8 +362,6 @@ def _snapshot_synapse_params(
     return snapshot
 
 
-
-
 def _set_trace_trials_to_save(sim_cfg: Dict[str, Any], n_traces: int) -> None:
     n = max(0, int(n_traces))
     sim_cfg["n_traces_to_save"] = n
@@ -837,8 +372,6 @@ def _set_trace_trials_to_save(sim_cfg: Dict[str, Any], n_traces: int) -> None:
         sim_cfg["cell_recording"] = cell_rec
 
 
-
-
 def _coerce_bin_width(val: Any, default: float) -> float:
     try:
         bw = float(val)
@@ -847,8 +380,6 @@ def _coerce_bin_width(val: Any, default: float) -> float:
     if bw <= 0:
         bw = float(default)
     return bw
-
-
 
 
 def _prepare_input_stats_bins(
@@ -909,8 +440,6 @@ def _compute_input_stats_for_trial(
         }
 
     return groups
-
-
 
 
 # ---------------------------------------------------------------------
@@ -1436,4 +965,3 @@ def summarize_results(results):
         print(f"  multi: n_trials={len(spikes)}, spike_counts={[len(s) for s in spikes]}")
         if results["traces"]:
             print(f"  multi: traces V stored for {len(results['traces']['V'])} trial(s)")
-
