@@ -7,9 +7,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from modules import geometry, inputs, randomness, run_sim, synapses
+from modules import geometry, inputs, randomness, synapses
 from modules.load_cell import load_cell
 from modules.loaders import get_cell_loader_name, loader_requires_manifest
+
+from .current_injection import run_iclamp_test
+from .result_loading import load_results
+from .result_saving import save_results
+from .runner import run_multi, run_single
 
 
 def _timestamp_stem() -> str:
@@ -257,7 +262,7 @@ class SimulationSession:
             print(f"append_to target not found yet: {append_target} (using local sim_config.json)")
             return
 
-        base_results = run_sim.load_results(append_target)
+        base_results = load_results(append_target)
         base_sim_cfg = base_results.get("sim_cfg", {}) or {}
         base_cell = base_sim_cfg.get("cell")
         base_tune = base_sim_cfg.get("tune")
@@ -392,7 +397,7 @@ class SimulationSession:
             raise RuntimeError("SimulationSession.run called before simulation config was prepared.")
 
         if self.iclamp_enabled:
-            self.result = run_sim.run_iclamp_test(
+            self.result = run_iclamp_test(
                 self.cell,
                 self.sim_cfg,
                 iclamp_cfg=self.iclamp_cfg,
@@ -409,7 +414,7 @@ class SimulationSession:
             mode = "multi" if n_trials_eff > 1 else "single"
 
         if mode == "single":
-            self.result = run_sim.run_single(
+            self.result = run_single(
                 cell=self.cell,
                 geom=self.geom,
                 sim_cfg=self.sim_cfg,
@@ -418,7 +423,7 @@ class SimulationSession:
                 rm=self.randomness_manager,
             )
         elif mode == "multi":
-            self.result = run_sim.run_multi(
+            self.result = run_multi(
                 cell=self.cell,
                 geom=self.geom,
                 sim_cfg=self.sim_cfg,
@@ -441,7 +446,7 @@ class SimulationSession:
     def save(self) -> Optional[Path]:
         if self.result is None:
             raise RuntimeError("SimulationSession.save called before run().")
-        self.saved_path = run_sim.save_results(self.result, base_dir=self.output_dir)
+        self.saved_path = save_results(self.result, base_dir=self.output_dir)
         return self.saved_path
 
     def run_and_save(self, *, trial_callback: Optional[Any] = None) -> Dict[str, Any]:

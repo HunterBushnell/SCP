@@ -24,7 +24,8 @@ from .result_helpers import (
     _resolve_trace_trials_to_save,
     _smooth_rate_curve,
 )
-from .results import load_results, save_results
+from .result_loading import load_results
+from .result_saving import save_results
 from .snapshots import (
     _apply_snapshot_deterministic,
     _collect_env_snapshot,
