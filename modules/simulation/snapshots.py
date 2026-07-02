@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from neuron import h
 
-from .results import _resolve_tune_path, _sha256_file
+from .result_paths import _resolve_tune_path, _sha256_file
 
 
 def _snapshot_cfg(sim_cfg: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:

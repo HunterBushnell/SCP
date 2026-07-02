@@ -31,18 +31,20 @@ from .simulation.result_helpers import (
     _resolve_trace_trials_to_save,
     _smooth_rate_curve,
 )
-from .simulation.results import (
-    _append_results_to_path,
+from .simulation.result_paths import (
     _build_output_path,
     _copy_fit_json_sidecar,
-    _ensure_multi_results,
     _find_fit_json_path,
     _json_default,
-    _load_from_manifest,
     _resolve_tune_path,
-    _save_sidecars,
     _sha256_file,
     _write_json,
+)
+from .simulation.results import (
+    _append_results_to_path,
+    _ensure_multi_results,
+    _load_from_manifest,
+    _save_sidecars,
     _write_results_file,
     _write_results_to_run_dir,
     append_multi_results,
