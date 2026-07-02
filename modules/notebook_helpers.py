@@ -169,7 +169,7 @@ def resolve_cell_config_for_notebook(cell_name: str, tune_dir: Path | None = Non
     if not isinstance(tuning, dict) or "soma_diam_multiplier" not in tuning:
         raise KeyError(
             "cell_configs/cell_config.json must define tuning.soma_diam_multiplier. "
-            "Run Step 0 scaffold or set it manually before Steps 2-5."
+            "Run Step 1 scaffold or set it manually before Steps 2-5."
         )
     tuning["soma_diam_multiplier"] = float(tuning["soma_diam_multiplier"])
 

@@ -2,7 +2,7 @@
 """SCP environment + workspace readiness checker.
 
 Usage examples:
-  python scripts/check_setup.py --steps 0 1 2 3 4 5 --cell PV --tune seg_tuned
+  python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune seg_tuned
   python scripts/check_setup.py --steps 5 --cell SST --tune seg_tuned --compile-modfiles
 """
 
@@ -196,7 +196,7 @@ def _check_python_packages(r: Reporter) -> None:
 
 
 def _check_external_dependencies(r: Reporter, repo_root: Path, steps: set[str]) -> None:
-    if steps.intersection({"1", "2", "3"}):
+    if steps.intersection({"2", "3"}):
         act_marker = Path("act") / "segregation.py"
         act_path, act_candidates = _resolve_external_repo(
             repo_name="ACT",
@@ -206,7 +206,7 @@ def _check_external_dependencies(r: Reporter, repo_root: Path, steps: set[str]) 
         )
         if act_path is None:
             r.fail(
-                "ACT repo not found for steps 1-3. "
+                "ACT repo not found for steps 2-3. "
                 "Set SCP_ACT_PATH or clone ACT to ../mods/ACT. "
                 f"Example: git clone {ACT_REPO_URL} {repo_root.parent / 'mods' / 'ACT'}"
             )
@@ -319,7 +319,7 @@ def _check_tune_bundle(
 
 
 def _parse_steps(raw_steps: Iterable[str]) -> set[str]:
-    valid = {"0", "1", "2", "3", "4", "5", "6"}
+    valid = {"1", "2", "3", "4", "5", "6"}
     steps: set[str] = set()
     for token in raw_steps:
         tok = token.strip()
@@ -341,7 +341,7 @@ def _parse_steps(raw_steps: Iterable[str]) -> set[str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Check SCP environment + local workspace readiness")
     ap.add_argument("--repo-root", default=None, help="Path to SCP repo root (auto-detected by default)")
-    ap.add_argument("--steps", nargs="*", default=["0", "1", "2", "3", "4", "5"], help="Pipeline steps to validate, e.g. --steps 0 1 2 3 4 5")
+    ap.add_argument("--steps", nargs="*", default=["1", "2", "3", "4", "5"], help="Pipeline steps to validate, e.g. --steps 1 2 3 4 5")
     ap.add_argument("--cell", default="PV", help="Cell name for tune checks (default: PV)")
     ap.add_argument("--tune", default="seg_tuned", help="Tune directory name (default: seg_tuned)")
     ap.add_argument("--skip-tune-check", action="store_true", help="Skip tune/config/modfile checks")
@@ -385,7 +385,7 @@ def main() -> int:
     _check_python_packages(r)
     _check_external_dependencies(r, repo_root=repo_root, steps=steps)
 
-    if not args.skip_tune_check and steps.intersection({"0", "2", "3", "4", "5", "6"}):
+    if not args.skip_tune_check and steps.intersection({"1", "2", "3", "4", "5", "6"}):
         _check_tune_bundle(
             r,
             repo_root=repo_root,

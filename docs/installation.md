@@ -18,7 +18,7 @@ Alternative local setup (venv + pip)
 3. Register a Jupyter kernel:
    `python -m ipykernel install --user --name scp-venv --display-name "Python (SCP venv)"`
 
-External repos for steps 1-4
+External repos for steps 2-4
 1. Clone ACT and bmtool next to SCP (default discovery path):
    `mkdir -p ../mods`
    `git clone https://github.com/V-Marco/ACT.git ../mods/ACT`
@@ -29,7 +29,7 @@ External repos for steps 1-4
 
 Validate environment + workspace
 1. Run the setup checker:
-   `python scripts/check_setup.py --steps 0 1 2 3 4 5 --cell PV --tune seg_tuned`
+   `python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune seg_tuned`
 2. If mechanisms are missing, build during check:
    `python scripts/check_setup.py --steps 5 --cell PV --tune seg_tuned --compile-modfiles`
 3. Lint notebooks for portability and duplicate-key config issues:

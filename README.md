@@ -6,7 +6,7 @@ It is being prepared for extraction into its own repo.
 Goals
 - Provide a repeatable, notebook-first pipeline for single-cell sims and analysis.
 - Keep configs and outputs consistent across notebook and CLI/SLURM runs.
-- Keep Steps 0-6 portable across local and Colab workflows.
+- Keep Steps 1-6 portable across local and Colab workflows.
 
 Setup (new machine)
 1. Clone SCP and enter the repo:
@@ -16,12 +16,12 @@ Setup (new machine)
    `conda activate scp-py311`
 3. Register the notebook kernel (optional but recommended):
    `python -m ipykernel install --user --name scp-py311 --display-name "Python (SCP)"`
-4. Clone external repos used by steps 1-4:
+4. Clone external repos used by steps 2-4:
    `mkdir -p ../mods`
    `git clone https://github.com/V-Marco/ACT.git ../mods/ACT`
    `git clone https://github.com/cyneuro/bmtool.git ../mods/bmtool`
 5. Verify setup end-to-end:
-   `python scripts/check_setup.py --steps 0 1 2 3 4 5 --cell PV --tune seg_tuned`
+   `python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune seg_tuned`
 6. Lint notebooks for portability/config issues:
    `python scripts/check_notebooks.py`
 
@@ -36,9 +36,9 @@ Quickstart (existing tune)
   `python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 1`
 
 Pipeline map
-- 0_download.ipynb: Step-0 bootstrap (download + compile + scaffold + validate)
-- scripts/step0_prepare.py: CLI for Step-0 bootstrap
-- 1_segment.ipynb: Segment cell and build geometry outputs
+- 1_download.ipynb: Step-1 bootstrap (download + compile + scaffold + validate)
+- scripts/step1_prepare.py: CLI for Step-1 bootstrap
+- archive/1_segment.ipynb: Optional ACT-derived segmentation reference
 - 2_passive.ipynb: Passive parameter tuning workflow
 - colab_notebooks/2_colab.ipynb: Passive tuning (Colab classroom version, bootstrapped)
 - 3_active.ipynb: Active parameter tuning workflow
@@ -76,7 +76,7 @@ Docs index
 - `docs/quickstart.md`
 - `docs/installation.md`
 - `docs/pipeline_overview.md`
-- `docs/step_0_4_stub.md` (Step 0-4 reference and prerequisites)
+- `docs/step_1_4_stub.md` (Step 1-4 reference and prerequisites)
 - `docs/step_5_simulate.md`
 - `docs/analysis.md` (practical guide for `6_analysis.ipynb`)
 - `docs/step_6_analysis.md`
@@ -96,6 +96,6 @@ Contracts
 - Contracts are descriptive; only inputs and outputs should be treated as authoritative.
 
 Status notes
-- Step 0 now uses `modules` and writes/validates `cell_configs/` scaffolds.
+- Step 1 now uses `modules` and writes/validates `cell_configs/` scaffolds.
 - Steps 1-4 run with repo-relative paths and use current notebook helpers.
 - `colab_notebooks/5_colab.ipynb` bootstraps a clean environment and can compile modfiles as needed.

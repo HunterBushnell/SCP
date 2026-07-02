@@ -1,7 +1,7 @@
 """
 Helpers for downloading Allen Cell Types biophysical bundles.
 
-This module provides the Step 0 download interface used by the current
+This module provides the Step 1 download interface used by the current
 `modules` pipeline.
 """
 

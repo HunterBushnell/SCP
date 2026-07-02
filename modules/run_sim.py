@@ -5,7 +5,7 @@ import shutil
 import re
 import numpy as np
 import matplotlib.pyplot as plt
-from neuron import h, gui  # gui not needed in headless scripts
+from neuron import h
 ############################################################
 
 
@@ -215,7 +215,7 @@ def run_FI(cell,sim_params,amps,):
 #############################################
 
 import numpy as np
-from neuron import h, gui  # gui not needed in headless scripts
+from neuron import h
 
 
 def _get_soma_segment(cell):

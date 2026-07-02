@@ -3,7 +3,7 @@
 ## Start Here
 - `installation.md`: environment setup and readiness checks.
 - `quickstart.md`: shortest path to run an existing tune.
-- `pipeline_overview.md`: notebook and CLI map for steps 0-6.
+- `pipeline_overview.md`: notebook and CLI map for steps 1-6.
 
 ## Core Usage
 - `analysis.md`: practical guide to `6_analysis.ipynb` workflows and metrics.
@@ -18,7 +18,7 @@
 - `reproducibility.md`: seeds, snapshots, and append behavior.
 - `troubleshooting.md`: common setup and runtime issues.
 - `glossary.md`: SCP terms and definitions.
-- `step_0_4_stub.md`: Steps 0-4 prerequisites and outputs.
+- `step_1_4_stub.md`: Steps 1-4 prerequisites and outputs.
 - `naming_conventions.md`: recommended naming patterns.
 - `roadmap.md`: short future plan.
 - `example_run.md`: minimal end-to-end run.

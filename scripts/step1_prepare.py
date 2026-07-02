@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """
-Step 0 CLI: prepare a tune directory for SCP Steps 1-6.
+Step 1 CLI: prepare a tune directory for later SCP steps.
 
 Examples:
-  python scripts/step0_prepare.py \
+  python scripts/step1_prepare.py \
     --cell PV --tune seg_tuned --specimen-id 484635029 --model-type perisomatic
 
-  python scripts/step0_prepare.py \
+  python scripts/step1_prepare.py \
     --tune-dir cells/SST/tunes/seg_tuned --specimen-id 485466109 \
     --no-download --no-compile --config-mode fill
 """
@@ -23,7 +23,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from modules import download_cell
-from modules.step0_prepare import (
+from modules.step1_prepare import (
     guess_cell_color,
     guess_soma_multiplier,
     guess_specimen_from_cell,
@@ -47,7 +47,7 @@ def _infer_cell_tune_from_path(tune_dir: Path) -> tuple[str, str]:
 
 
 def parse_args() -> argparse.Namespace:
-    ap = argparse.ArgumentParser(description="Prepare SCP Step-0 tune directory")
+    ap = argparse.ArgumentParser(description="Prepare SCP Step-1 tune directory")
 
     loc = ap.add_mutually_exclusive_group(required=False)
     loc.add_argument(

@@ -6,6 +6,7 @@ Step 5.2 (build + inputs) components:
 - geometry:    Step 5.2.2 — define geometry groups for synapse placement.
 - inputs:      Step 5.2.3 — generate spike trains for each synapse group.
 - synapses:    Step 5.2.4 — attach synapses and connect spike trains to the cell.
+- simulation:  Step 5 backend session used by notebooks, CLI, and SLURM.
 - notebook_helpers: shared setup/build helpers used by teaching notebooks.
 """
 

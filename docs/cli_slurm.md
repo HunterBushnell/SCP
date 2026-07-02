@@ -4,11 +4,11 @@ Prerequisite
 - Complete `installation.md`.
 - Run `python scripts/check_setup.py --steps 5 --cell PV --tune seg_tuned`.
 
-Step 0 Prep CLI (scripts/step0_prepare.py)
+Step 1 Prep CLI (scripts/step1_prepare.py)
 - Minimal:
-  `python scripts/step0_prepare.py --cell PV --tune seg_tuned --specimen-id 484635029`
+  `python scripts/step1_prepare.py --cell PV --tune seg_tuned --specimen-id 484635029`
 - Example (scaffold-only refresh):
-  `python scripts/step0_prepare.py --tune-dir cells/PV/tunes/seg_tuned --no-download --no-compile --config-mode fill`
+  `python scripts/step1_prepare.py --tune-dir cells/PV/tunes/seg_tuned --no-download --no-compile --config-mode fill`
 
 CLI (run_pipeline.py)
 - Minimal:

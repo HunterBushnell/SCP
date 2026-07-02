@@ -1,8 +1,8 @@
 """
-Step 0 preparation helpers.
+Step 1 preparation helpers.
 
 This module bootstraps a tune directory so it is ready for the refactored
-modules pipeline (Steps 1-6):
+modules pipeline:
 - download Allen bundle files (manifest, morphology, fit json, modfiles),
 - optionally compile/load NEURON mechanisms,
 - scaffold common config files under cell_configs/,
@@ -35,7 +35,7 @@ def _pushd(path: Path):
     """
     Temporarily change the process working directory.
 
-    AllenSDK manifest loading resolves some resources relative to cwd, so Step-0
+    AllenSDK manifest loading resolves some resources relative to cwd, so Step-1
     validation uses this context for load_cell smoke tests.
     """
     old = Path.cwd()
@@ -172,7 +172,7 @@ def default_sim_config(*, cell_name: str, specimen_id: int, model_type: str) -> 
         "n_traces_to_save": 1,
         "n_inputs_to_save": 1,
         "load": [False, None],
-        "save": [False, "step0_bootstrap", "pkl", False],
+        "save": [False, "step1_bootstrap", "pkl", False],
         "append": [False, None],
         "save_input_stats": True,
         "input_stats_bin_ms": 5.0,
@@ -298,7 +298,7 @@ def default_syn_config(*, include_path: str = "syn_groups/placeholder_off.json")
 
 
 @dataclass
-class Step0Paths:
+class Step1Paths:
     tune_dir: Path
     config_dir: Path
     syn_groups_dir: Path
@@ -306,9 +306,9 @@ class Step0Paths:
     modfiles_dir: Path
 
 
-def resolve_step0_paths(tune_dir: Path) -> Step0Paths:
+def resolve_step1_paths(tune_dir: Path) -> Step1Paths:
     tune_dir = Path(tune_dir).expanduser().resolve()
-    return Step0Paths(
+    return Step1Paths(
         tune_dir=tune_dir,
         config_dir=tune_dir / "cell_configs",
         syn_groups_dir=tune_dir / "cell_configs" / "syn_groups",
@@ -557,7 +557,7 @@ def compile_modfiles(
             h.nrn_load_dll(str(dll))
             loaded = True
         except RuntimeError as exc:
-            # Common when rerunning Step-0 in a live kernel/session. NEURON can
+            # Common when rerunning Step-1 in a live kernel/session. NEURON can
             # emit only a generic hocobj_call RuntimeError; verify required
             # mechanisms are already present before deciding to continue.
             required_mechs = mechanisms_declared_in_fit_json(tune_dir)
@@ -604,7 +604,7 @@ def scaffold_common_configs(
       - overwrite: replace existing files with defaults
       - skip: do not modify existing files
     """
-    paths = resolve_step0_paths(tune_dir)
+    paths = resolve_step1_paths(tune_dir)
     paths.config_dir.mkdir(parents=True, exist_ok=True)
     paths.syn_groups_dir.mkdir(parents=True, exist_ok=True)
 
@@ -703,9 +703,9 @@ def validate_tune(
     validate_load_cell: bool = True,
     validate_inputs: bool = True,
 ) -> Dict[str, Any]:
-    """Run lightweight validation checks for Step-0 output layout."""
+    """Run lightweight validation checks for Step-1 output layout."""
     tune_dir = Path(tune_dir).expanduser().resolve()
-    paths = resolve_step0_paths(tune_dir)
+    paths = resolve_step1_paths(tune_dir)
 
     checks: Dict[str, Any] = {
         "manifest_exists": paths.manifest.is_file(),
@@ -780,7 +780,7 @@ def prepare_tune(
     validate_inputs_cfg: bool = True,
 ) -> Dict[str, Any]:
     """
-    End-to-end Step-0 preparation entrypoint.
+    End-to-end Step-1 preparation entrypoint.
 
     Returns a summary dictionary with actions and key paths.
     """

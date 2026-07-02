@@ -2239,10 +2239,7 @@ def save_default_plots(
     if mode in {"single_plot", "single-panel", "paper_panel", "paper-panel"}:
         from . import paper_panel  # local import to avoid circular deps
 
-        try:
-            repo_root = find_scp_root(run_dir.resolve())
-        except Exception:
-            repo_root = Path.cwd()
+        repo_root = resolve_scp_root_for_results(results, run_dir)
         preset_path = (
             repo_root / "modules" / "analysis" / "analysis_presets" / "single_plot.json"
             if single_plot_preset in (None, "", False)
@@ -3834,6 +3831,52 @@ def find_scp_root(start: Path) -> Path:
         pass
 
     return start
+
+
+def is_scp_root(path: Path) -> bool:
+    return (path / "cells").is_dir() and (path / "run_pipeline.py").is_file()
+
+
+def resolve_scp_root_for_results(results: Dict[str, Any], run_dir: Union[str, Path]) -> Path:
+    """
+    Resolve the SCP repo root for saved-run helpers.
+
+    Output directories may be outside the repo, so do not rely only on
+    `run_dir`. Prefer explicit environment/config paths before falling back to
+    the module location.
+    """
+    sim_cfg = results.get("sim_cfg", {}) or {}
+    candidates: list[Path] = []
+
+    env_root = os.environ.get("SCP_ROOT")
+    if env_root:
+        candidates.append(Path(env_root).expanduser())
+
+    tune_dir = sim_cfg.get("tune_dir")
+    if tune_dir:
+        candidates.append(Path(str(tune_dir)).expanduser())
+
+    candidates.extend(
+        [
+            Path(run_dir).expanduser(),
+            Path.cwd(),
+            Path(__file__).resolve().parents[2],
+        ]
+    )
+
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+        except Exception:
+            continue
+        try:
+            root = find_scp_root(resolved)
+        except Exception:
+            continue
+        if is_scp_root(root):
+            return root
+
+    return Path(__file__).resolve().parents[2]
 
 
 def list_cells(base_dir: Path) -> list[str]:

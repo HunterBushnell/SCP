@@ -1,11 +1,11 @@
-Steps 0-4 (Reference)
+Steps 1-4 (Reference)
 
-Step 0 is implemented with `modules` and prepares tune directories for
-later steps. Steps 1-4 use updated notebooks with repo-relative path handling,
-while still depending on ACT (Steps 1-3) and bmtool (Step 4).
+Step 1 is implemented with `modules` and prepares tune directories for
+later steps. Steps 2-4 use updated notebooks with repo-relative path handling,
+while still depending on ACT (Steps 2-3) and bmtool (Step 4).
 
 Local vs Colab behavior
-- Local Steps 2-4 assume Step 0 already prepared the tune directory and
+- Local Steps 2-4 assume Step 1 already prepared the tune directory and
   compiled mechanisms. They validate bundle contents and load existing DLLs.
 - If you need notebook-only bootstrapping, use `colab_notebooks/2_colab.ipynb` / `colab_notebooks/3_colab.ipynb`
   (and `colab_notebooks/5_colab.ipynb` for Step 5).
@@ -16,9 +16,9 @@ Prerequisites for Steps 1-4
   - ACT (`../mods/ACT` or `SCP_ACT_PATH`)
   - bmtool for Step 4 (`../mods/bmtool` or `SCP_BMTOOL_PATH`)
 
-0_download.ipynb / scripts/step0_prepare.py
-- Purpose: bootstrap a tune directory so it is ready for Steps 1-6.
-- Core implementation: `modules/step0_prepare.py`.
+1_download.ipynb / scripts/step1_prepare.py
+- Purpose: bootstrap a tune directory so it is ready for later SCP steps.
+- Core implementation: `modules/step1_prepare.py`.
 - Inputs:
   - Cell/tune target (`cells/<CELL>/tunes/<TUNE>` or explicit `--tune-dir`)
   - Allen model identity (`specimen_id`, `model_type`)
@@ -37,8 +37,8 @@ Prerequisites for Steps 1-4
   - `cell_configs/syn_config.json`
   - `cell_configs/syn_groups/placeholder_off.json`
 
-1_segment.ipynb
-- Purpose: segment the morphology and build a geometry description.
+- archive/1_segment.ipynb (optional)
+- Purpose: archived ACT-derived segmentation reference for building geometry descriptions.
 - Outputs: `cell_configs/geometry.json`.
 
 2_passive.ipynb
