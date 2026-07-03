@@ -29,7 +29,7 @@ for p in (REPO_ROOT,):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from modules import input_sampling
+from modules.input_generation import sampling as input_sampling
 
 
 def main():

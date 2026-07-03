@@ -6,8 +6,8 @@ from typing import Any, Dict, List
 import math
 import numpy as np
 
-from modules.inputs import _compile_density_from_spec
-from modules import randomness
+from modules.core import randomness
+from modules.input_generation.inputs import _compile_density_from_spec
 
 
 @dataclass

@@ -13,15 +13,15 @@ import numpy as np
 import pandas as pd
 
 from . import inputs as inputs_mod
-from . import input_modes_core
+from . import modes_core
 
 
 def _build_mode_registry():
-    reg = input_modes_core.get_default_mode_registry()
+    reg = modes_core.get_default_mode_registry()
     try:
-        from . import input_modes_user  # type: ignore
+        from . import modes_user  # type: ignore
 
-        user_reg = input_modes_user.get_user_mode_registry()
+        user_reg = modes_user.get_user_mode_registry()
         reg = {**reg, **user_reg}
     except Exception:
         pass

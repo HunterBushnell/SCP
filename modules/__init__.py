@@ -1,13 +1,17 @@
 """
 Local modules for the SCP single-cell pipeline.
 
-Step 5.2 (build + inputs) components:
-- load_cell:   Step 5.2.1 — construct the NEURON cell from tuned model files.
-- geometry:    Step 5.2.2 — define geometry groups for synapse placement.
-- inputs:      Step 5.2.3 — generate spike trains for each synapse group.
-- synapses:    Step 5.2.4 — attach synapses and connect spike trains to the cell.
-- simulation:  Step 5 backend session used by notebooks, CLI, and SLURM.
-- notebook_helpers: shared setup/build helpers used by teaching notebooks.
+Primary packages:
+- setup: input cell download and tune-directory preparation.
+- model: cell loading, geometry grouping, and synapse attachment.
+- input_generation: Step 5.2.3 input config normalization and spike-train generation.
+- simulation: Step 5 simulation backend for notebooks, CLI, and SLURM.
+- analysis: plotting and analysis utilities.
+- notebooks: shared notebook setup/build helpers.
+- core: shared utilities such as reproducible randomness.
+
+The legacy `modules.run_sim` facade remains for compatibility with analysis and
+notebook code that loads/saves Step 5 results.
 """
 
-from .load_cell import load_cell  # re-export for convenience
+from .model.load_cell import load_cell  # re-export for convenience

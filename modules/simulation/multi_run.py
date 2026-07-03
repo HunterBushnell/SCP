@@ -6,8 +6,9 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from .. import inputs as inputs_mod
-from .. import randomness, synapses
+from ..core import randomness
+from ..input_generation import inputs as inputs_mod
+from ..model import synapses
 from .cell_runtime import run_cell
 from .result_helpers import (
     _aggregate_input_stats,
@@ -86,7 +87,7 @@ def run_multi(
     if mode_registry is None:
         mode_registry = inputs_mod._build_default_mode_registry()
         try:
-            from modules import input_modes_user
+            from modules.input_generation import modes_user as input_modes_user
 
             user_reg = input_modes_user.get_user_mode_registry()
             # user registry wins on name collisions
@@ -314,4 +315,3 @@ def run_multi(
     if input_stats is not None:
         result["meta"]["input_stats"] = input_stats
     return result
-

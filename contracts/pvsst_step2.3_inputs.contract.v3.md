@@ -1,7 +1,7 @@
 # Step 2.3 – Input Generation Module Contract (PV–SST, v3)
 
 > Historical draft: kept for design history. For current behavior, prefer
-> `modules/inputs.py` and `docs/configs_reference.md`.
+> `modules/input_generation/inputs.py` and `docs/configs_reference.md`.
 
 This document specifies the design and behavior of **Step 2.3 – Input Generation** in the PV–SST single‑cell pipeline.
 
@@ -149,7 +149,7 @@ Resolution rules (implemented in `_resolve_n_syn`):
 
 ### 2.1 `GroupInputs` dataclass
 
-Defined in `modules/inputs.py`:
+Defined in `modules/input_generation/inputs.py`:
 
 ```python
 from dataclasses import dataclass, field
@@ -606,8 +606,8 @@ Each user mode must **fully** satisfy the global handler contract (§7):
 Notebook code merges registries, for example:
 
 ```python
-from modules import inputs as stim_inputs
-from modules import input_modes_user
+from modules.input_generation import inputs as stim_inputs
+from modules.input_generation import modes_user as input_modes_user
 
 default_modes = stim_inputs._build_default_mode_registry()
 user_modes = input_modes_user.get_user_mode_registry()
@@ -636,7 +636,7 @@ Notebook sets tune directory and config path:
 
 ```python
 from pathlib import Path
-from modules import inputs as stim_inputs
+from modules.input_generation import inputs as stim_inputs
 
 REPO_ROOT = Path("<repo_root>")
 TUNE_DIR = REPO_ROOT / "cells" / "SST" / "tunes" / "seg_tuned"

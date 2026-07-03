@@ -12,8 +12,8 @@ import re
 
 from dataclasses import dataclass, field
 
-from modules import input_modes_core  # or: from . import input_modes_core
-from modules import randomness
+from . import modes_core as input_modes_core
+from modules.core import randomness
 
 
 # ===================================================================

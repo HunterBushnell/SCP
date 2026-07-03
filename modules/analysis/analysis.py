@@ -4175,7 +4175,8 @@ def load_cell_and_geometry(
             )
     cell_cfg.setdefault("paths", {})["manifest"] = str(manifest_path)
 
-    from modules import load_cell, geometry as geom_mod
+    from modules.model import geometry as geom_mod
+    from modules.model import load_cell
 
     cwd = Path.cwd()
     try:

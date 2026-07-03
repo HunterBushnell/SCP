@@ -22,8 +22,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from modules import download_cell
-from modules.step1_prepare import (
+from modules.setup import download_cell
+from modules.setup.step1_prepare import (
     guess_cell_color,
     guess_soma_multiplier,
     guess_specimen_from_cell,

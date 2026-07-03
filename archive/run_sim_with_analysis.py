@@ -1029,7 +1029,7 @@ def run_multi(
     if mode_registry is None:
         mode_registry = inputs_mod._build_default_mode_registry()
         try:
-            from modules import input_modes_user
+            from modules.input_generation import modes_user as input_modes_user
 
             user_reg = input_modes_user.get_user_mode_registry()
             # user registry wins on name collisions

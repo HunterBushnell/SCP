@@ -18,7 +18,7 @@ Prerequisites for Steps 1-4
 
 1_download.ipynb / scripts/step1_prepare.py
 - Purpose: bootstrap a tune directory so it is ready for later SCP steps.
-- Core implementation: `modules/step1_prepare.py`.
+- Core implementation: `modules/setup/step1_prepare.py`.
 - Inputs:
   - Cell/tune target (`cells/<CELL>/tunes/<TUNE>` or explicit `--tune-dir`)
   - Allen model identity (`specimen_id`, `model_type`)

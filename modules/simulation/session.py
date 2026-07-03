@@ -5,8 +5,10 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from modules import geometry, inputs, randomness, synapses
-from modules.load_cell import load_cell
+from modules.core import randomness
+from modules.input_generation import inputs
+from modules.model import geometry, synapses
+from modules.model.load_cell import load_cell
 
 from .current_injection import run_iclamp_test
 from .multi_run import run_multi

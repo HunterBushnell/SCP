@@ -1,4 +1,4 @@
-# modules/randomness.py
+# modules/core/randomness.py
 """
 Randomness utilities for the SCP pipeline.
 

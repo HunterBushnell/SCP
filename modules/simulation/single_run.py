@@ -5,7 +5,8 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from .. import randomness, synapses
+from ..core import randomness
+from ..model import synapses
 from .cell_runtime import run_cell
 from .result_helpers import (
     _aggregate_input_stats,
@@ -158,4 +159,3 @@ def run_single(
     if input_stats is not None:
         result["meta"]["input_stats"] = input_stats
     return result
-

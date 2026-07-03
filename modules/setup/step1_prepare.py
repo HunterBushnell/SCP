@@ -22,8 +22,9 @@ import shutil
 import subprocess
 from contextlib import contextmanager
 
-from modules import download_cell, inputs
-from modules.load_cell import load_cell
+from modules.input_generation import inputs
+from modules.model.load_cell import load_cell
+from modules.setup import download_cell
 
 
 CONFIG_MODE_VALUES = ("fill", "overwrite", "skip")

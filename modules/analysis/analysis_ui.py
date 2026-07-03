@@ -13,7 +13,9 @@ from matplotlib.collections import LineCollection, PathCollection, PolyCollectio
 from pathlib import Path
 import textwrap
 
-from modules import input_sampling, inputs, run_sim
+from modules import run_sim
+from modules.input_generation import inputs
+from modules.input_generation import sampling as input_sampling
 from . import analysis, plotting
 
 HELP_SELECTION = textwrap.dedent(

@@ -2,7 +2,7 @@
 # Step 2.3 – Input Generation Module Contract (v1)
 
 > Historical draft: kept for design history. For current behavior, prefer
-> `modules/inputs.py` and `docs/configs_reference.md`.
+> `modules/input_generation/inputs.py` and `docs/configs_reference.md`.
 
 ## 0. Scope
 
@@ -101,7 +101,7 @@ Normalized in `_normalize_group_configs` into:
 
 ### 2.1 `GroupInputs` dataclass
 
-Defined in `modules/inputs.py`:
+Defined in `modules/input_generation/inputs.py`:
 
 ```python
 @dataclass
@@ -306,7 +306,7 @@ Notebook sets tune directory and config path:
 
 ```python
 from pathlib import Path
-from modules import inputs as stim_inputs
+from modules.input_generation import inputs as stim_inputs
 
 REPO_ROOT = Path("<repo_root>")
 TUNE_DIR = REPO_ROOT / "cells" / "SST" / "tunes" / "seg_tuned"

@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Sequence
 
-from modules.load_cell import load_cell
+from modules.model.load_cell import load_cell
 
 
 def is_scp_repo_root(path: Path) -> bool:
@@ -178,7 +178,7 @@ def resolve_cell_config_for_notebook(cell_name: str, tune_dir: Path | None = Non
 
 def build_cell_for_notebook(cell_config: Dict[str, Any]):
     """
-    Build a cell via `modules.load_cell` and expose common section attrs.
+    Build a cell via `modules.model.load_cell` and expose common section attrs.
 
     The returned object is compatible with existing notebook calls that access
     `cell.soma`, `cell.dend`, `cell.apic`, and `cell.axon`.
