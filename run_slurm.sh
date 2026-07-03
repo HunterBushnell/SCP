@@ -197,6 +197,46 @@ on_exit() {
 trap on_exit EXIT
 write_status "RUNNING" "starting"
 
+add_cmd_option() {
+    local flag="$1"
+    local value="${2:-}"
+    if [[ -n "${value}" ]]; then
+        CMD+=("${flag}" "${value}")
+    fi
+}
+
+add_cmd_flag_if_enabled() {
+    local flag="$1"
+    local value="${2:-}"
+    if [[ -n "${value}" && "${value}" != "0" ]]; then
+        CMD+=("${flag}")
+    fi
+}
+
+copy_current_task_logs() {
+    if [[ -z "${RUN_OUTPUT_STEM}" || -z "${SLURM_JOB_ID:-}" ]]; then
+        return 0
+    fi
+
+    local log_dir
+    local log_base
+    local ext
+    if [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then
+        log_dir="${RUN_ROOT}/logs"
+        log_base="pvsst_${ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
+    else
+        log_dir="${RESULTS_DIR}/${RUN_OUTPUT_STEM}/logs"
+        log_base="pvsst_${SLURM_JOB_ID}_0"
+    fi
+
+    mkdir -p "${log_dir}"
+    for ext in out err; do
+        if [[ -f "${LOG_SRC_DIR}/${log_base}.${ext}" ]]; then
+            cp -f "${LOG_SRC_DIR}/${log_base}.${ext}" "${log_dir}/"
+        fi
+    done
+}
+
 # Rotate old logs so the latest run is easy to find (keep current job logs in logs/)
 # For job arrays, rotate only on task 0 to avoid races.
 # Set ROTATE_LOGS=0 to disable moving old logs to logs/old.
@@ -405,27 +445,13 @@ CMD=("${PYTHON_BIN}" "${REPO_ROOT}/run_pipeline.py"
 
 write_status "RUNNING" "run_pipeline"
 
-if [[ -n "${MODE}" ]]; then
-    CMD+=(--mode "$MODE")
-fi
-if [[ -n "${N_TRIALS}" ]]; then
-    CMD+=(--n-trials "$N_TRIALS")
-fi
-if [[ -n "${RUN_OUTPUT_STEM}" ]]; then
-    CMD+=(--output-stem "$RUN_OUTPUT_STEM")
-fi
-if [[ -n "${SEED}" ]]; then
-    CMD+=(--seed "$SEED")
-fi
-if [[ -n "${TRIAL_OFFSET:-}" ]]; then
-    CMD+=(--trial-offset "$TRIAL_OFFSET")
-fi
-if [[ -n "${ICLAMP}" && "${ICLAMP}" != "0" ]]; then
-    CMD+=(--iclamp)
-fi
-if [[ -n "${SNAPSHOT}" && "${SNAPSHOT}" != "0" ]]; then
-    CMD+=(--snapshot)
-fi
+add_cmd_option --mode "${MODE}"
+add_cmd_option --n-trials "${N_TRIALS}"
+add_cmd_option --output-stem "${RUN_OUTPUT_STEM}"
+add_cmd_option --seed "${SEED}"
+add_cmd_option --trial-offset "${TRIAL_OFFSET:-}"
+add_cmd_flag_if_enabled --iclamp "${ICLAMP}"
+add_cmd_flag_if_enabled --snapshot "${SNAPSHOT}"
 if [[ "${FORCE_SAVE}" == "1" ]]; then
     CMD+=(--force-save)
 fi
@@ -434,24 +460,7 @@ echo "Running: ${CMD[@]}"
 "${CMD[@]}"
 
 # Move this task's logs into the run folder
-if [[ -n "${RUN_OUTPUT_STEM}" && -n "${SLURM_JOB_ID:-}" ]]; then
-    if [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then
-        log_dir="${RUN_ROOT}/logs"
-    else
-        log_dir="${RESULTS_DIR}/${RUN_OUTPUT_STEM}/logs"
-    fi
-    mkdir -p "${log_dir}"
-    if [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then
-        log_base="pvsst_${ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
-    else
-        log_base="pvsst_${SLURM_JOB_ID}_0"
-    fi
-    for ext in out err; do
-        if [[ -f "${LOG_SRC_DIR}/${log_base}.${ext}" ]]; then
-            cp -f "${LOG_SRC_DIR}/${log_base}.${ext}" "${log_dir}/"
-        fi
-    done
-fi
+copy_current_task_logs
 
 # Auto-merge array outputs into a single multi result (default on)
 if [[ -n "${SLURM_ARRAY_TASK_ID:-}" && "${SLURM_ARRAY_TASK_ID}" == "0" && "${MERGE_ARRAY}" == "1" ]]; then

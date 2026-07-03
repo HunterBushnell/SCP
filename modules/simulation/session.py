@@ -9,9 +9,10 @@ from modules import geometry, inputs, randomness, synapses
 from modules.load_cell import load_cell
 
 from .current_injection import run_iclamp_test
+from .multi_run import run_multi
 from .result_loading import load_results
 from .result_saving import save_results
-from .runner import run_multi, run_single
+from .single_run import run_single
 from .session_setup import (
     _load_json_dict,
     _resolve_append_target,
