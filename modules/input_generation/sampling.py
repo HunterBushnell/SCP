@@ -12,8 +12,16 @@ from typing import Dict, Tuple, Optional, Any, List
 import numpy as np
 import pandas as pd
 
-from . import inputs as inputs_mod
 from . import modes_core
+from .config import (
+    _expand_group_includes,
+    _inject_path_metadata,
+    _normalize_group_configs,
+    _normalize_sim_config,
+    _resolve_config_root,
+)
+from .processing import _process_all_groups
+from .timing import _calculate_timing
 
 
 def _build_mode_registry():
@@ -73,7 +81,7 @@ def _load_reference_curve(groups_cfg, sim_cfg, group_name, bin_ms):
 
     # Timing
     try:
-        time_cfg = inputs_mod._calculate_timing(sim_cfg, gcfg)
+        time_cfg = _calculate_timing(sim_cfg, gcfg)
     except Exception:
         return None
     blocks = time_cfg.get("blocks", []) or []
@@ -134,7 +142,7 @@ def _sample_group_rates_from_configs(
     *,
     config_root: Optional[Path] = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, Any], Dict[str, Any], Optional[Tuple[np.ndarray, np.ndarray]]]:
-    groups_raw = inputs_mod._expand_group_includes(groups_raw, config_root or Path.cwd())
+    groups_raw = _expand_group_includes(groups_raw, config_root or Path.cwd())
     if group not in groups_raw:
         raise KeyError(f"Group {group!r} not found in syn_config.json")
 
@@ -142,9 +150,9 @@ def _sample_group_rates_from_configs(
     for gname, gcfg in groups_raw.items():
         gcfg["state"] = (gname == group)
 
-    sim_cfg = inputs_mod._normalize_sim_config(sim_raw)
-    inputs_mod._inject_path_metadata(sim_cfg, config_root)
-    groups_cfg = inputs_mod._normalize_group_configs(groups_raw)
+    sim_cfg = _normalize_sim_config(sim_raw)
+    _inject_path_metadata(sim_cfg, config_root)
+    groups_cfg = _normalize_group_configs(groups_raw)
 
     mode_registry = _build_mode_registry()
     geometry = None
@@ -164,7 +172,7 @@ def _sample_group_rates_from_configs(
     bin_ms = float(bin_ms) if bin_ms else 5.0
 
     def _gen_inputs_with_rng(rng):
-        return inputs_mod._process_all_groups(
+        return _process_all_groups(
             sim_cfg=sim_cfg,
             groups_cfg=groups_cfg.copy(),
             geometry=geometry,
@@ -243,7 +251,7 @@ def sample_group_rates_from_path(
             if group is None and len(groups_override) == 1:
                 group = next(iter(groups_override))
 
-    config_root = inputs_mod._resolve_config_root(p)
+    config_root = _resolve_config_root(p)
     # If pointing at a run dir, prefer results/ configs
     results_root = None
     if p.is_dir() and (p / "results").is_dir():
@@ -301,7 +309,7 @@ def sample_group_rates(
         where ref_curve is (t_ms, rate_hz) or None.
     """
     tune_dir = Path(tune_dir).expanduser().resolve()
-    config_root = inputs_mod._resolve_config_root(tune_dir)
+    config_root = _resolve_config_root(tune_dir)
     sim_path = config_root / "sim_config.json"
     syn_path = config_root / "syn_config.json"
     if not sim_path.is_file() or not syn_path.is_file():

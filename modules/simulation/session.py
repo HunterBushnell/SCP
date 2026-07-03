@@ -7,6 +7,11 @@ from typing import Any, Dict, Optional, Union
 
 from modules.core import randomness
 from modules.input_generation import inputs
+from modules.input_generation.config import (
+    _inject_path_metadata,
+    _normalize_sim_config,
+    _resolve_config_root,
+)
 from modules.model import geometry, synapses
 from modules.model.load_cell import load_cell
 
@@ -97,7 +102,7 @@ class SimulationSession:
         return self.tune_dir / "output_data"
 
     def load_configs(self) -> "SimulationSession":
-        self.config_root = inputs._resolve_config_root(self.tune_dir)
+        self.config_root = _resolve_config_root(self.tune_dir)
         self.sim_path = self.config_root / "sim_config.json"
         self.syn_path = self.config_root / "syn_config.json"
         self.cell_config_path = self.tune_dir / "cell_configs" / "cell_config.json"
@@ -255,8 +260,8 @@ class SimulationSession:
 
         if self.iclamp_enabled:
             sim_cfg_raw = self.sim_cfg_override or self.sim_cfg_preview
-            self.sim_cfg = inputs._normalize_sim_config(sim_cfg_raw)
-            inputs._inject_path_metadata(self.sim_cfg, self.config_root)
+            self.sim_cfg = _normalize_sim_config(sim_cfg_raw)
+            _inject_path_metadata(self.sim_cfg, self.config_root)
             self.sim_cfg = self._apply_options_to_sim_cfg(self.sim_cfg)
             self.groups_cfg = {}
             self.inputs_by_group = {}

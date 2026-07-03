@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from ..core import randomness
-from ..input_generation import inputs as inputs_mod
+from ..input_generation.processing import _build_default_mode_registry, _process_all_groups
 from ..model import synapses
 from .cell_runtime import run_cell
 from .result_helpers import (
@@ -85,7 +85,7 @@ def run_multi(
 
     # Prebuild mode registry once for per-trial input regeneration
     if mode_registry is None:
-        mode_registry = inputs_mod._build_default_mode_registry()
+        mode_registry = _build_default_mode_registry()
         try:
             from modules.input_generation import modes_user as input_modes_user
 
@@ -127,7 +127,7 @@ def run_multi(
         # Optionally regenerate inputs per trial (fresh randomness)
         if regen_inputs:
             gcfg_trial = copy.deepcopy(groups_cfg)
-            inputs_trial = inputs_mod._process_all_groups(
+            inputs_trial = _process_all_groups(
                 sim_cfg=sim_cfg_local,
                 groups_cfg=gcfg_trial,
                 geometry=geom,

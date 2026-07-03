@@ -1,0 +1,394 @@
+"""Simulation-level config normalization for Step 5 input generation."""
+
+from __future__ import annotations
+
+from typing import Any, Dict
+
+from modules.core import randomness
+
+from .recording_config import (
+    _normalize_cell_recording_config,
+    _sync_trace_limit_with_cell_recording,
+)
+
+
+def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize/validate simulation-level config.
+
+    Ensures keys:
+      - cell (string, optional)
+      - tune (string, optional)
+      - dt, tstart, tstop (floats)
+      - jitter (float or None)
+      - seed (int or None)
+      - n_trials (int >= 1)
+      - save_profile (optional: 'lean'|'standard'|'full')
+        - fills n_traces_to_save / n_inputs_to_save if those keys are absent
+      - n_traces_to_save (int >= 0), merged with `cell_recording.n_trials`
+      - n_inputs_to_save (int >= 0 or 'all')
+      - trial_randomness (one of 'inputs', 'synapses', 'both', 'none')
+      - load (string path or [enabled, path])
+      - save/output (string stem or [enabled, stem, format, full_results])
+      - append/append_to (string path or [enabled, path])
+      - output_format ('npz' or 'pkl')
+      - plots_profile ('off'|'basic'|'inputs'|'full')
+      - save_plots_mode (optional: 'default'|'single_plot')
+      - save_plots_single_plot_preset (optional path to paper single-plot preset JSON)
+      - save_plots_overwrite (optional: overwrite existing plot files when true)
+      - param_study (dict with standard keys)
+      - snapshot (optional dict): enables full debug capture
+    """
+    sim_cfg = dict(sim_cfg_raw)
+
+    # Required numeric fields
+    for key in ("dt", "tstart", "tstop"):
+        if key not in sim_cfg:
+            raise ValueError(f"sim config missing required key {key!r}")
+        try:
+            sim_cfg[key] = float(sim_cfg[key])
+        except Exception as exc:
+            raise ValueError(
+                f"sim[{key!r}] must be convertible to float (got {sim_cfg[key]!r})"
+            ) from exc
+
+    # jitter is optional
+    jitter = sim_cfg.get("jitter", None)
+    if jitter is None:
+        sim_cfg["jitter"] = None
+    else:
+        sim_cfg["jitter"] = float(jitter)
+
+    # optional stimulation markers (used for plotting or bookkeeping)
+    for key in ("stim_start_ms", "stim_stop_ms", "stim_duration_ms"):
+        if key in sim_cfg and sim_cfg[key] is not None:
+            try:
+                sim_cfg[key] = float(sim_cfg[key])
+            except Exception as exc:
+                raise ValueError(f"sim['{key}'] must be numeric or null (got {sim_cfg[key]!r})") from exc
+        else:
+            sim_cfg[key] = None
+
+    # Cell and tune labels are just passed through if present
+    for key in ("cell", "tune"):
+        if key in sim_cfg and sim_cfg[key] is not None:
+            sim_cfg[key] = str(sim_cfg[key])
+
+    # seed is optional
+    seed_raw = sim_cfg.get("seed", None)
+    if seed_raw is None:
+        sim_cfg["seed"] = None
+    else:
+        try:
+            sim_cfg["seed"] = int(seed_raw)
+        except Exception as exc:
+            raise ValueError(
+                f"sim['seed'] must be integer-like or null (got {seed_raw!r})"
+            ) from exc
+    random_seed_raw = sim_cfg.get("random_seed", None)
+    if sim_cfg["seed"] is None and random_seed_raw not in (None, "", False):
+        try:
+            sim_cfg["seed"] = int(random_seed_raw)
+        except Exception as exc:
+            raise ValueError(
+                f"sim['random_seed'] must be integer-like or null (got {random_seed_raw!r})"
+            ) from exc
+
+    # n_trials: optional, default 1
+    n_trials_raw = sim_cfg.get("n_trials", 1)
+    try:
+        n_trials = int(n_trials_raw)
+    except Exception as exc:
+        raise ValueError(
+            f"sim['n_trials'] must be integer-like (got {n_trials_raw!r})"
+        ) from exc
+    if n_trials < 1:
+        raise ValueError("sim['n_trials'] must be >= 1")
+    sim_cfg["n_trials"] = n_trials
+
+    # save_profile: optional, defaults to None
+    save_profile = sim_cfg.get("save_profile", None)
+    raw_has_traces = "n_traces_to_save" in sim_cfg_raw
+    raw_has_inputs = "n_inputs_to_save" in sim_cfg_raw
+    if save_profile not in (None, "", False):
+        prof = str(save_profile).strip().lower()
+        defaults = {
+            "lean": {"n_traces_to_save": 1, "n_inputs_to_save": 1},
+            "standard": {"n_traces_to_save": 1, "n_inputs_to_save": 10},
+            "full": {"n_traces_to_save": 1, "n_inputs_to_save": "all"},
+        }
+        if prof not in defaults:
+            raise ValueError(
+                f"sim['save_profile'] must be one of {sorted(defaults)} (got {save_profile!r})"
+            )
+        if not raw_has_traces:
+            sim_cfg["n_traces_to_save"] = defaults[prof]["n_traces_to_save"]
+        if not raw_has_inputs:
+            sim_cfg["n_inputs_to_save"] = defaults[prof]["n_inputs_to_save"]
+        sim_cfg["save_profile"] = prof
+
+    # trial_randomness: optional, default 'synapses'
+    tr = sim_cfg.get("trial_randomness", "synapses")
+    if tr is None:
+        tr = "synapses"
+    tr = str(tr)
+    allowed_tr = {"inputs", "synapses", "both", "none"}
+    if tr not in allowed_tr:
+        raise ValueError(
+            f"sim['trial_randomness'] must be one of {sorted(allowed_tr)} (got {tr!r})"
+        )
+    sim_cfg["trial_randomness"] = tr
+
+    # Optional cell-level recording config (sites + variable toggles)
+    _normalize_cell_recording_config(sim_cfg_raw, sim_cfg)
+
+    # n_traces_to_save: optional, default 1
+    n_traces_raw = sim_cfg.get("n_traces_to_save", 1)
+    try:
+        n_traces = int(n_traces_raw)
+    except Exception as exc:
+        raise ValueError(
+            f"sim['n_traces_to_save'] must be integer-like (got {n_traces_raw!r})"
+        ) from exc
+    if n_traces < 0:
+        raise ValueError("sim['n_traces_to_save'] must be >= 0")
+    sim_cfg["n_traces_to_save"] = n_traces
+    _sync_trace_limit_with_cell_recording(sim_cfg, prefer_cell=True)
+    n_traces = int(sim_cfg["n_traces_to_save"])
+
+    # n_inputs_to_save: optional, default n_traces_to_save
+    n_inputs_raw = sim_cfg.get("n_inputs_to_save", n_traces)
+    if isinstance(n_inputs_raw, str):
+        if n_inputs_raw.strip().lower() in ("all",):
+            sim_cfg["n_inputs_to_save"] = "all"
+        else:
+            try:
+                sim_cfg["n_inputs_to_save"] = int(n_inputs_raw)
+            except Exception as exc:
+                raise ValueError(
+                    f"sim['n_inputs_to_save'] must be integer-like or 'all' (got {n_inputs_raw!r})"
+                ) from exc
+    else:
+        try:
+            sim_cfg["n_inputs_to_save"] = int(n_inputs_raw)
+        except Exception as exc:
+            raise ValueError(
+                f"sim['n_inputs_to_save'] must be integer-like or 'all' (got {n_inputs_raw!r})"
+            ) from exc
+
+    # load: allow [enabled, path] or {"enabled":..., "path":...}
+    load_raw = sim_cfg.get("load", None)
+    load_enabled = None
+    load_path = None
+    if isinstance(load_raw, (list, tuple)):
+        if len(load_raw) >= 1:
+            load_enabled = bool(load_raw[0])
+        if len(load_raw) >= 2:
+            load_path = load_raw[1]
+    elif isinstance(load_raw, dict):
+        load_enabled = bool(load_raw.get("enabled", False))
+        load_path = load_raw.get("path")
+    else:
+        if load_raw in (None, "", False):
+            load_enabled = False
+            load_path = None
+        else:
+            load_enabled = True
+            load_path = load_raw
+    sim_cfg["load_enabled"] = bool(load_enabled)
+    sim_cfg["load"] = None if load_path in (None, "", False) else str(load_path)
+
+    # save/output + output_format (allow [enabled, stem, format, full_results] or dict form)
+    if "save" in sim_cfg_raw:
+        output_raw = sim_cfg_raw.get("save")
+    else:
+        output_raw = sim_cfg.get("output")
+    output_enabled = None
+    output_stem = None
+    output_fmt = None
+    output_full = None
+    if isinstance(output_raw, (list, tuple)):
+        if len(output_raw) >= 1:
+            output_enabled = bool(output_raw[0])
+        if len(output_raw) >= 2:
+            output_stem = output_raw[1]
+        if len(output_raw) >= 3:
+            output_fmt = output_raw[2]
+        if len(output_raw) >= 4:
+            output_full = output_raw[3]
+    elif isinstance(output_raw, dict):
+        output_enabled = output_raw.get("enabled")
+        output_stem = output_raw.get("path") or output_raw.get("stem") or output_raw.get("name")
+        output_fmt = output_raw.get("format")
+        output_full = output_raw.get("full_results")
+        if output_full is None:
+            output_full = output_raw.get("save_full_results")
+    else:
+        if output_raw not in (None, "", False):
+            output_stem = output_raw
+            output_enabled = True
+        else:
+            output_stem = None
+            output_enabled = False
+
+    # save_output: optional, default True (unless output tuple/dict provided)
+    if not isinstance(output_raw, (list, tuple, dict)):
+        if "save_output" in sim_cfg:
+            output_enabled = bool(sim_cfg.get("save_output"))
+    if output_enabled is None:
+        output_enabled = True
+    sim_cfg["save_output"] = bool(output_enabled)
+    sim_cfg["output"] = None if output_stem in (None, "", False) else str(output_stem)
+    sim_cfg["save"] = sim_cfg["output"]
+
+    if output_fmt is not None:
+        sim_cfg["output_format"] = str(output_fmt)
+
+    ofmt = sim_cfg.get("output_format", "pkl")
+    if ofmt is None:
+        ofmt = "pkl"
+    ofmt = str(ofmt)
+    if ofmt not in {"npz", "pkl"}:
+        raise ValueError(
+            f"sim['output_format'] must be 'npz' or 'pkl' (got {ofmt!r})"
+        )
+    sim_cfg["output_format"] = ofmt
+
+    if output_full is not None:
+        sim_cfg["save_full_results"] = bool(output_full)
+        if bool(output_full) and "save_sidecars" not in sim_cfg_raw:
+            sim_cfg["save_sidecars"] = False
+
+    # plots_profile: optional presets for save_plots flags
+    plots_profile = sim_cfg.get("plots_profile", None)
+    if plots_profile not in (None, "", False):
+        prof = str(plots_profile).strip().lower()
+        defaults = {
+            "off": {"save_plots": False, "save_plots_inputs": False, "save_plots_synapses": False},
+            "basic": {"save_plots": True, "save_plots_inputs": False, "save_plots_synapses": False},
+            "inputs": {"save_plots": True, "save_plots_inputs": True, "save_plots_synapses": False},
+            "full": {"save_plots": True, "save_plots_inputs": True, "save_plots_synapses": True},
+        }
+        if prof not in defaults:
+            raise ValueError(
+                f"sim['plots_profile'] must be one of {sorted(defaults)} (got {plots_profile!r})"
+            )
+        if "save_plots" not in sim_cfg_raw:
+            sim_cfg["save_plots"] = defaults[prof]["save_plots"]
+        if "save_plots_inputs" not in sim_cfg_raw:
+            sim_cfg["save_plots_inputs"] = defaults[prof]["save_plots_inputs"]
+        if "save_plots_synapses" not in sim_cfg_raw:
+            sim_cfg["save_plots_synapses"] = defaults[prof]["save_plots_synapses"]
+        sim_cfg["plots_profile"] = prof
+
+    # param_study: optional
+    param_raw = sim_cfg.get("param_study", None)
+    if param_raw is None:
+        sim_cfg["param_study"] = {
+            "input_type": None,
+            "param_type": None,
+            "param_vals": [],
+            "n_trials": None,
+        }
+    else:
+        if not isinstance(param_raw, dict):
+            raise TypeError("sim['param_study'] must be a dict or null")
+        param = dict(param_raw)
+        param.setdefault("input_type", None)
+        param.setdefault("param_type", None)
+        vals = param.get("param_vals", [])
+        if vals is None:
+            vals = []
+        if not isinstance(vals, list):
+            vals = list(vals)
+        param["param_vals"] = vals
+        if "n_trials" in param and param["n_trials"] is not None:
+            try:
+                param["n_trials"] = int(param["n_trials"])
+            except Exception as exc:
+                raise ValueError(
+                    "param_study['n_trials'] must be integer-like or null"
+                ) from exc
+        sim_cfg["param_study"] = param
+
+    # append/append_to: allow [enabled, path] or {"enabled":..., "path":...}
+    if "append" in sim_cfg_raw:
+        append_raw = sim_cfg_raw.get("append")
+    else:
+        append_raw = sim_cfg.get("append_to", None)
+    append_enabled = None
+    append_path = None
+    if isinstance(append_raw, (list, tuple)):
+        if len(append_raw) >= 1:
+            append_enabled = bool(append_raw[0])
+        if len(append_raw) >= 2:
+            append_path = append_raw[1]
+    elif isinstance(append_raw, dict):
+        append_enabled = bool(append_raw.get("enabled", False))
+        append_path = append_raw.get("path")
+    else:
+        if append_raw in (None, "", False):
+            append_enabled = False
+            append_path = None
+        else:
+            append_enabled = True
+            append_path = append_raw
+    sim_cfg["append_enabled"] = bool(append_enabled)
+    sim_cfg["append_to"] = None if append_path in (None, "", False) else str(append_path)
+    sim_cfg["append"] = sim_cfg["append_to"]
+
+    # Snapshot mode: force full capture for debugging comparisons
+    snapshot_raw = sim_cfg_raw.get("snapshot", sim_cfg.get("snapshot"))
+    snapshot_cfg = None
+    snapshot_enabled = False
+    if isinstance(snapshot_raw, dict):
+        snapshot_cfg = dict(snapshot_raw)
+        snapshot_enabled = bool(snapshot_cfg.get("enabled", False))
+    elif isinstance(snapshot_raw, str):
+        snapshot_enabled = snapshot_raw.strip().lower() in ("true", "1", "yes", "on")
+        snapshot_cfg = {}
+    elif snapshot_raw is True:
+        snapshot_enabled = True
+        snapshot_cfg = {}
+
+    if snapshot_enabled:
+        snapshot_cfg = snapshot_cfg or {}
+        snapshot_cfg["enabled"] = True
+
+        snap_trials = snapshot_cfg.get("n_trials", None)
+        if snap_trials is None:
+            snap_trials = 1
+        try:
+            snap_trials = int(snap_trials)
+        except Exception:
+            snap_trials = 1
+        if snap_trials < 1:
+            snap_trials = 1
+        sim_cfg["n_trials"] = snap_trials
+
+        if snapshot_cfg.get("save_all_inputs", True):
+            sim_cfg["n_inputs_to_save"] = "all"
+        if snapshot_cfg.get("save_all_traces", True):
+            sim_cfg["n_traces_to_save"] = snap_trials
+
+        sim_cfg["save_full_results"] = True
+        sim_cfg["save_sidecars"] = True
+        sim_cfg["save_syn_records_sidecar"] = True
+        sim_cfg["save_syn_records_by_trial"] = True
+        sim_cfg["save_input_stats"] = True
+        sim_cfg["log_input_summary"] = True
+        sim_cfg["save_output"] = True
+
+        snap_output = snapshot_cfg.get("output") or snapshot_cfg.get("output_stem")
+        if snap_output not in (None, "", False):
+            sim_cfg["output"] = str(snap_output)
+
+        sim_cfg["snapshot"] = snapshot_cfg
+
+    # Snapshot may override trace count; keep merged key in sync.
+    _sync_trace_limit_with_cell_recording(sim_cfg, prefer_cell=False)
+
+    # Optional simplified randomness mode
+    sim_cfg = randomness.apply_randomness_mode(sim_cfg)
+
+    return sim_cfg

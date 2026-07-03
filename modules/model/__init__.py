@@ -2,7 +2,8 @@
 
 from .geometry import SegmentRef, define_geometry
 from .load_cell import load_cell
-from .synapses import SynapseRecord, add_synapses, preview_synapses
+from .synapse_records import SynapseRecord
+from .synapses import add_synapses, preview_synapses
 
 __all__ = [
     "SegmentRef",
