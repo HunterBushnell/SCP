@@ -3,7 +3,7 @@ Colab Notebooks Quickstart
 Notebooks in this folder
 - `2_colab.ipynb`: Step 2 passive tuning (bootstrapped).
 - `3_colab.ipynb`: Step 3 active tuning (bootstrapped).
-- `5_colab.ipynb`: Step 5 full pipeline (bootstrapped).
+- `5_colab.ipynb`: Placeholder. Use `../5_simulate.ipynb` for Step 5 local or Colab runs.
 
 What "bootstrapped" means
 - The notebook can clone SCP in-session.
@@ -12,7 +12,7 @@ What "bootstrapped" means
 
 Run in Colab (public repo)
 1. Open a Colab runtime.
-2. Upload/open one notebook from this folder.
+2. Upload/open one notebook from this folder for Steps 2-3, or open `5_simulate.ipynb` from the repo root for Step 5.
 3. Run cells from top to bottom.
 
 Run in Colab (private repo)

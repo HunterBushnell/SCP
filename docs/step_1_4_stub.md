@@ -8,7 +8,7 @@ Local vs Colab behavior
 - Local Steps 2-4 assume Step 1 already prepared the tune directory and
   compiled mechanisms. They validate bundle contents and load existing DLLs.
 - If you need notebook-only bootstrapping, use `colab_notebooks/2_colab.ipynb` / `colab_notebooks/3_colab.ipynb`
-  (and `colab_notebooks/5_colab.ipynb` for Step 5).
+  for Steps 2-3. Step 5 uses the unified `5_simulate.ipynb`.
 
 Prerequisites for Steps 1-4
 - Run `python scripts/check_setup.py --steps 1 2 3 4 --cell PV --tune seg_tuned`.

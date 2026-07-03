@@ -46,4 +46,4 @@ Notes
   to 5.2.3 and 5.2.4 to keep Step 5 as the stable pipeline.
 - Inhomogeneous input sources can use `source.gabab` and
   `source.freq_scale`/`source.freq_shift` (see `configs_reference.md`).
-- `colab_notebooks/5_colab.ipynb` bootstraps a clean environment when needed.
+- `5_simulate.ipynb` bootstraps a clean Colab environment when needed.

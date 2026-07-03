@@ -44,12 +44,12 @@ Pipeline map
 - 3_active.ipynb: Active parameter tuning workflow
 - colab_notebooks/3_colab.ipynb: Active tuning (Colab classroom version, bootstrapped)
 - 4_synapses.ipynb: Synaptic tuning workflow (including bmtool path)
-- 5_simulate.ipynb: Simulation pipeline (stable)
-- colab_notebooks/5_colab.ipynb: Colab/Linux full pipeline (classroom + bootstrapped)
+- 5_simulate.ipynb: Simulation pipeline (stable; local + Colab)
+- colab_notebooks/5_colab.ipynb: Placeholder pointing to the unified Step 5 notebook
 - 6_analysis.ipynb: Optional end-of-pipeline analysis and comparisons
 
 Colab classroom usage (notebook-only)
-- `colab_notebooks/2_colab.ipynb`, `colab_notebooks/3_colab.ipynb`, and `colab_notebooks/5_colab.ipynb` are designed for first-time users.
+- `colab_notebooks/2_colab.ipynb` and `colab_notebooks/3_colab.ipynb` are designed for first-time users; Step 5 uses `5_simulate.ipynb` for both local and Colab runs.
 - They can auto-clone SCP and required external repos (ACT) when run in a fresh Colab.
 - For private repos, set one of: `SCP_GIT_TOKEN`, `SCP_GITHUB_TOKEN`, or `GITHUB_TOKEN`.
 - Optional repo controls:
@@ -98,4 +98,4 @@ Contracts
 Status notes
 - Step 1 now uses `modules` and writes/validates `cell_configs/` scaffolds.
 - Steps 1-4 run with repo-relative paths and use current notebook helpers.
-- `colab_notebooks/5_colab.ipynb` bootstraps a clean environment and can compile modfiles as needed.
+- `5_simulate.ipynb` bootstraps Colab when needed and can compile modfiles as needed.

@@ -39,7 +39,8 @@ Manual modfile build (per tune)
 - `cd <tune_dir>/modfiles && nrnivmodl`
 
 Colab/Linux bootstrapped notebooks
-- `colab_notebooks/2_colab.ipynb`, `colab_notebooks/3_colab.ipynb`, and `colab_notebooks/5_colab.ipynb` install dependencies and clone required repos in a fresh Colab session.
+- `colab_notebooks/2_colab.ipynb` and `colab_notebooks/3_colab.ipynb` install dependencies and clone required repos in a fresh Colab session.
+- `5_simulate.ipynb` is the unified Step 5 notebook for both local and Colab runs.
 - Optional Colab environment overrides:
   - SCP repo: `SCP_REPO_URL`, `SCP_REPO_BRANCH`, `SCP_REPO_DIR`, `SCP_GIT_TOKEN`.
   - ACT repo (Steps 2/3): `SCP_ACT_REPO_URL`, `SCP_ACT_REPO_BRANCH`, `SCP_ACT_DIR`, `SCP_ACT_PATH`.
