@@ -104,7 +104,10 @@ def run_iclamp_test(cell, sim_cfg, iclamp_cfg=None):
         return float(val)
 
     amp_nA = _get_float("amp_nA", 0.2)
-    delay_ms = _get_float("delay_ms", sim_cfg.get("tstart", 0.0))
+    delay_ms = _get_float(
+        "delay_ms",
+        sim_cfg.get("stim_start_ms", sim_cfg.get("tstart", 0.0)),
+    )
     dur_ms = _get_float("dur_ms", sim_cfg.get("stim_duration_ms", 500.0))
     dt_ms = _get_float("dt_ms", sim_cfg.get("dt", 0.025))
 
@@ -201,4 +204,3 @@ def run_FI(cell,sim_params,amps,):
     plt.grid(),plt.show()
     
     return freq_records
-

@@ -45,7 +45,7 @@ Pipeline map
 - colab_notebooks/3_colab.ipynb: Active tuning (Colab classroom version, bootstrapped)
 - 4_synapses.ipynb: Synaptic tuning workflow (including bmtool path)
 - 5_simulate.ipynb: Simulation pipeline (stable; local + Colab)
-- colab_notebooks/5_colab.ipynb: Placeholder pointing to the unified Step 5 notebook
+- archive/5_colab.ipynb: Archived Step 5 Colab notebook; use `5_simulate.ipynb`
 - 6_analysis.ipynb: Optional end-of-pipeline analysis and comparisons
 
 Colab classroom usage (notebook-only)

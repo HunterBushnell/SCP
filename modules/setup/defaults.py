@@ -98,8 +98,8 @@ def default_sim_config(*, cell_name: str, specimen_id: int, model_type: str) -> 
         "iclamp": {
             "enabled": False,
             "amp_nA": 0.2,
-            "delay_ms": 200.0,
-            "dur_ms": 800.0,
+            "delay_ms": None,
+            "dur_ms": None,
             "tstop_ms": None,
             "dt_ms": None,
             "record_currents": False,

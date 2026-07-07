@@ -1,18 +1,37 @@
-"""Analysis subpackage (metrics, plotting, and UI helpers)."""
+"""Analysis subpackage (metrics, plotting, and UI helpers).
 
-from .analysis import *  # re-export core analysis helpers
-from . import analysis as analysis
-from . import plotting as plotting
-from . import analysis_ui as analysis_ui
-from . import bio_curve as bio_curve
-from . import paper_panel as paper_panel
-from . import sst_self_inh as sst_self_inh
+Submodules are loaded lazily so Step 5 auto-plot saving does not import the
+interactive analysis UI unless a notebook explicitly requests it.
+"""
 
-__all__ = [
+from __future__ import annotations
+
+from importlib import import_module
+from typing import Any
+
+_SUBMODULES = {
     "analysis",
     "plotting",
     "analysis_ui",
+    "auto_plots",
     "bio_curve",
     "paper_panel",
     "sst_self_inh",
-]
+}
+
+__all__ = sorted(_SUBMODULES)
+
+
+def __getattr__(name: str) -> Any:
+    if name in _SUBMODULES:
+        module = import_module(f"{__name__}.{name}")
+        globals()[name] = module
+        return module
+
+    analysis_module = import_module(f"{__name__}.analysis")
+    if hasattr(analysis_module, name):
+        value = getattr(analysis_module, name)
+        globals()[name] = value
+        return value
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

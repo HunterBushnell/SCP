@@ -26,7 +26,7 @@ Steps (notebooks)
 - colab_notebooks/3_colab.ipynb: Colab-friendly Step 3 (auto-bootstrap + active tuning).
 - 4_synapses.ipynb: Synaptic tuning.
 - 5_simulate.ipynb: Stable simulation pipeline (inputs -> synapses -> simulation -> outputs; local + Colab).
-- colab_notebooks/5_colab.ipynb: Placeholder pointing to the unified Step 5 notebook.
+- archive/5_colab.ipynb: Archived Step 5 Colab notebook; use `5_simulate.ipynb`.
 - 6_analysis.ipynb: End-of-pipeline analysis and comparisons.
 
 Step 5 sub-steps (documentation labels)

@@ -207,14 +207,12 @@ def save_results(
             pickle.dump(results, f)
         manifest["files"]["results_pkl"] = out_path.name
 
-    _write_json(run_dir / "run_manifest.json", manifest)
-
     # Optional: auto-save plots into run_dir/plots
     if sim_cfg.get("save_plots", False):
         try:
-            from modules.analysis import analysis as analysis_mod
+            from modules.analysis import auto_plots
 
-            analysis_mod.save_default_plots(
+            saved_plots = auto_plots.save_default_plots(
                 results,
                 run_dir,
                 save_inputs=bool(sim_cfg.get("save_plots_inputs", True)),
@@ -227,8 +225,19 @@ def save_results(
                 single_plot_preset=sim_cfg.get("save_plots_single_plot_preset", None),
                 overwrite=bool(sim_cfg.get("save_plots_overwrite", False)),
             )
+            plot_files = {}
+            for name, path in saved_plots.items():
+                path = Path(path)
+                try:
+                    plot_files[name] = str(path.relative_to(run_dir))
+                except ValueError:
+                    plot_files[name] = str(path)
+            if plot_files:
+                manifest["files"]["plots"] = plot_files
         except Exception as exc:
             print(f"save_plots failed: {exc}")
+
+    _write_json(run_dir / "run_manifest.json", manifest)
 
     append_to = sim_cfg.get("append_to")
     if sim_cfg.get("append_enabled", True) and append_to:

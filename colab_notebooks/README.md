@@ -3,7 +3,7 @@ Colab Notebooks Quickstart
 Notebooks in this folder
 - `2_colab.ipynb`: Step 2 passive tuning (bootstrapped).
 - `3_colab.ipynb`: Step 3 active tuning (bootstrapped).
-- `5_colab.ipynb`: Placeholder. Use `../5_simulate.ipynb` for Step 5 local or Colab runs.
+- Step 5 no longer has a separate Colab notebook. Use `../5_simulate.ipynb` for local or Colab runs.
 
 What "bootstrapped" means
 - The notebook can clone SCP in-session.

@@ -31,12 +31,30 @@ from .session_setup import (
 )
 
 
+def _merge_overrides(base: Dict[str, Any], overrides: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Recursively merge non-None notebook/CLI overrides into a config dict."""
+    if not overrides:
+        return base
+    for key, value in overrides.items():
+        if value is None:
+            continue
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            nested = dict(base.get(key, {}) or {})
+            base[key] = _merge_overrides(nested, value)
+        elif isinstance(value, dict):
+            base[key] = _merge_overrides({}, value)
+        else:
+            base[key] = value
+    return base
+
+
 @dataclass
 class SimulationOptions:
     mode: Optional[str] = None
     n_trials: Optional[int] = None
     seed: Optional[int] = None
     trial_offset: Optional[int] = None
+    sim_overrides: Optional[Dict[str, Any]] = None
     iclamp: bool = False
     snapshot: bool = False
     force_save: bool = False
@@ -198,7 +216,10 @@ class SimulationSession:
         if sim_cfg_for_cell.get("soma_diam_multiplier") is not None:
             tuning["soma_diam_multiplier"] = sim_cfg_for_cell.get("soma_diam_multiplier", 1.0)
 
-    def _apply_options_to_sim_cfg(self, sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    def _apply_run_overrides(self, sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply options that affect input generation and simulation behavior."""
+        _merge_overrides(sim_cfg, self.options.sim_overrides)
+
         if self.options.n_trials is not None:
             sim_cfg["n_trials"] = int(self.options.n_trials)
         if self.options.trial_offset is not None:
@@ -215,6 +236,11 @@ class SimulationSession:
             global_cfg["seed"] = int(self.options.seed)
             rand_cfg["global"] = global_cfg
             sim_cfg["randomness"] = rand_cfg
+
+        return sim_cfg
+
+    def _apply_options_to_sim_cfg(self, sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
+        self._apply_run_overrides(sim_cfg)
 
         save_output = sim_cfg.get("save_output", True)
         if save_output is None:
@@ -249,7 +275,10 @@ class SimulationSession:
         self.cell = load_cell(self.cell_config)
         self.geom = geometry.define_geometry(self.cell, self.geom_config)
 
-        self.iclamp_cfg = (self.sim_cfg_override or self.sim_cfg_preview).get("iclamp", {}) or {}
+        sim_cfg_for_mode = self._apply_run_overrides(
+            copy.deepcopy(self.sim_cfg_override or self.sim_cfg_preview)
+        )
+        self.iclamp_cfg = sim_cfg_for_mode.get("iclamp", {}) or {}
         self.iclamp_enabled = bool(self.iclamp_cfg.get("enabled", False)) or bool(self.options.iclamp)
         if self.snapshot_enabled and self.iclamp_enabled:
             print("Snapshot mode ignored because IClamp is enabled.")
@@ -259,18 +288,22 @@ class SimulationSession:
                 sim_cfg_for_cell["snapshot"]["enabled"] = False
 
         if self.iclamp_enabled:
-            sim_cfg_raw = self.sim_cfg_override or self.sim_cfg_preview
+            sim_cfg_raw = copy.deepcopy(self.sim_cfg_override or self.sim_cfg_preview)
+            self._apply_run_overrides(sim_cfg_raw)
             self.sim_cfg = _normalize_sim_config(sim_cfg_raw)
             _inject_path_metadata(self.sim_cfg, self.config_root)
             self.sim_cfg = self._apply_options_to_sim_cfg(self.sim_cfg)
             self.groups_cfg = {}
             self.inputs_by_group = {}
         elif generate_inputs:
+            sim_cfg_for_inputs = self._apply_run_overrides(
+                copy.deepcopy(self.sim_cfg_override or self.sim_cfg_preview)
+            )
             self.sim_cfg, self.groups_cfg, self.inputs_by_group = inputs.generate_inputs(
                 path=self.tune_dir,
                 geometry=self.geom,
                 seed_override=self.options.seed,
-                sim_cfg_override=self.sim_cfg_override,
+                sim_cfg_override=sim_cfg_for_inputs,
             )
             self.sim_cfg = self._apply_options_to_sim_cfg(self.sim_cfg)
 

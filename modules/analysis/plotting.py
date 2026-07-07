@@ -1508,9 +1508,11 @@ def plot_single(
     # -------------------------- A) Vm trace --------------------------------
     peaks, _ = find_peaks(V, height=-20, distance=2)
     spike_times  = T[peaks]
+    tstart_ms = float(sim_cfg.get("tstart", 0.0))
+    duration_s = max((sim_duration_ms - tstart_ms) / 1000.0, 1e-9)
     print(
         f"Detected {len(spike_times)} spikes "
-        f"(total avg: {(len(spike_times)/((sim_duration_ms-100)/1000))}) "
+        f"(total avg: {len(spike_times) / duration_s}) "
         f"at times (ms):", spike_times
     )
 

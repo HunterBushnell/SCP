@@ -9,6 +9,8 @@
   "n_trials": 1,
   "n_traces_to_save": 1,
   "n_inputs_to_save": 1,
+  "randomness_mode": "random",
+  "random_seed": null,
   
   "save_input_stats": true,
   "input_stats_bin_ms": 5.0,
@@ -16,13 +18,11 @@
   "avg_rate_curve_smooth_mode": "center",
   "plots_win_size": 25.0,
   "plots_input_smooth_ms": 25.0,
-  "plots_profile": "off",
-  "save_plots": true,
+  "plots_profile": "basic",
   "save_plots_mode": "single_plot",
   "save_plots_single_plot_preset": "modules/analysis/analysis_presets/single_plot.json",
   "save_plots_overwrite": false,
-  "randomness_mode": "random",
-  "random_seed": null,
+
 
 
 
@@ -101,8 +101,8 @@
   "iclamp": {
     "enabled": false,
     "amp_nA": 0.2,
-    "delay_ms": 200.0,
-    "dur_ms": 800.0,
+    "delay_ms": null,
+    "dur_ms": null,
     "tstop_ms": null,
     "dt_ms": null,
     "record_currents": false
