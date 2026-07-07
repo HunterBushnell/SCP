@@ -17,7 +17,7 @@ Before running any step on a new machine, complete `installation.md` and run:
 - `python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune seg_tuned`
 
 Steps (notebooks)
-- 1_download.ipynb: Bootstrap tune directory (download/compile/scaffold/validate).
+- 1_setup.ipynb: Set up tune directory (ADB download/compile/scaffold/validate).
 - scripts/step1_prepare.py: CLI equivalent of Step 1.
 - archive/1_segment.ipynb: Optional ACT-derived segmentation reference.
 - 2_passive.ipynb: Passive parameter tuning.

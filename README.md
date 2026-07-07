@@ -36,7 +36,7 @@ Quickstart (existing tune)
   `python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 1`
 
 Pipeline map
-- 1_download.ipynb: Step-1 bootstrap (download + compile + scaffold + validate)
+- 1_setup.ipynb: Step-1 setup (ADB download + compile + scaffold + validate)
 - scripts/step1_prepare.py: CLI for Step-1 bootstrap
 - archive/1_segment.ipynb: Optional ACT-derived segmentation reference
 - 2_passive.ipynb: Passive parameter tuning workflow

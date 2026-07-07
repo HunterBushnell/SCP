@@ -1,9 +1,4 @@
-"""
-Helpers for downloading Allen Cell Types biophysical bundles.
-
-This module provides the Step 1 download interface used by the current
-`modules` pipeline.
-"""
+"""Download and inspect Allen Cell Types biophysical model bundles."""
 
 from __future__ import annotations
 

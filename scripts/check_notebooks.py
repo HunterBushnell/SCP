@@ -23,7 +23,7 @@ from typing import Iterable, Optional
 
 
 DEFAULT_NOTEBOOKS = [
-    "1_download.ipynb",
+    "1_setup.ipynb",
     "colab_notebooks/2_colab.ipynb",
     "2_passive.ipynb",
     "colab_notebooks/3_colab.ipynb",

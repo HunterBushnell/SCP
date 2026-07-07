@@ -5,7 +5,7 @@ First check
 
 Missing modfiles or NEURON errors
 - Local notebooks (Steps 2-5) expect precompiled mechanisms from Step 1.
-- Prepare/refresh with Step 1 (`1_download.ipynb` or `scripts/step1_prepare.py`)
+- Prepare/refresh with Step 1 (`1_setup.ipynb` or `scripts/step1_prepare.py`)
   if the tune bundle is incomplete.
 - Build modfiles: `cd <tune_dir>/modfiles && nrnivmodl`.
 - In Colab notebooks, rerun the bootstrap cell first (it installs deps and

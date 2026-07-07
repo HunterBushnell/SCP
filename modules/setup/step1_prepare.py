@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from modules.setup import download_cell
+from modules.setup.adb import download_ADB_cell
 
 from .defaults import (
     default_cell_config,
@@ -83,7 +83,7 @@ def prepare_tune(
     }
 
     if do_download:
-        dl_info = download_cell.download_ADB_cell(
+        dl_info = download_ADB_cell(
             specimen_id=int(specimen_id),
             model_type=model_type,
             tunes_dir=str(tune_dir),

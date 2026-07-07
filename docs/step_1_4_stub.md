@@ -16,7 +16,7 @@ Prerequisites for Steps 1-4
   - ACT (`../mods/ACT` or `SCP_ACT_PATH`)
   - bmtool for Step 4 (`../mods/bmtool` or `SCP_BMTOOL_PATH`)
 
-1_download.ipynb / scripts/step1_prepare.py
+1_setup.ipynb / scripts/step1_prepare.py
 - Purpose: bootstrap a tune directory so it is ready for later SCP steps.
 - Core implementation: `modules/setup/step1_prepare.py`.
 - Inputs:

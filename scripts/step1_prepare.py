@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Step 1 CLI: prepare a tune directory for later SCP steps.
+Step 1 CLI: set up a tune directory for later SCP steps.
 
 Examples:
   python scripts/step1_prepare.py \
@@ -22,7 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from modules.setup import download_cell
+from modules.setup.adb import list_ADB_models
 from modules.setup.step1_prepare import (
     guess_cell_color,
     guess_soma_multiplier,
@@ -47,7 +47,7 @@ def _infer_cell_tune_from_path(tune_dir: Path) -> tuple[str, str]:
 
 
 def parse_args() -> argparse.Namespace:
-    ap = argparse.ArgumentParser(description="Prepare SCP Step-1 tune directory")
+    ap = argparse.ArgumentParser(description="Set up an SCP Step-1 tune directory")
 
     loc = ap.add_mutually_exclusive_group(required=False)
     loc.add_argument(
@@ -66,10 +66,10 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--soma-diam-multiplier", type=float, default=None, help="Soma diameter multiplier")
     ap.add_argument("--color", type=str, default=None, help="cell_config color field")
 
-    ap.add_argument("--list-models", action="store_true", help="Print available Allen models before prepare")
+    ap.add_argument("--list-models", action="store_true", help="Print available ADB models before setup")
     ap.add_argument("--list-models-only", action="store_true", help="Only list available models and exit")
 
-    ap.add_argument("--no-download", dest="do_download", action="store_false", help="Skip Allen download")
+    ap.add_argument("--no-download", dest="do_download", action="store_false", help="Skip ADB bundle download")
     ap.add_argument("--force-download", action="store_true", help="Force cache_data even if target has files")
     ap.add_argument("--cache-stimulus", action="store_true", help="Allow large NWB stimulus cache")
 
@@ -141,7 +141,7 @@ def main() -> None:
         )
 
     if args.list_models or args.list_models_only:
-        download_cell.list_ADB_models(specimen_id, filter_type=args.model_type)
+        list_ADB_models(specimen_id, filter_type=args.model_type)
         if args.list_models_only:
             return
 
