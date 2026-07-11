@@ -1,7 +1,7 @@
 {
   "cell_name": "SST",
   "tune": "seg_tuned",
-  "color": "m",
+  "color": "mediumorchid",
   "cell_loader": "allen_manifest",
   "paths": {
     "manifest": "manifest.json"

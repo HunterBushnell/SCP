@@ -205,16 +205,14 @@ class SimulationSession:
             if self.sim_cfg_override is None:
                 self.sim_cfg_override = sim_cfg_for_cell
 
-    def _apply_cell_tuning_fallback(self) -> None:
-        sim_cfg_for_cell = self.sim_cfg_override or self.sim_cfg_preview
-        tuning = self.cell_config.setdefault("tuning", {})
-        if not isinstance(tuning, dict):
-            tuning = {}
-            self.cell_config["tuning"] = tuning
-        if "soma_diam_multiplier" not in tuning:
-            tuning["soma_diam_multiplier"] = sim_cfg_for_cell.get("soma_diam_multiplier", 1.0)
-        if sim_cfg_for_cell.get("soma_diam_multiplier") is not None:
-            tuning["soma_diam_multiplier"] = sim_cfg_for_cell.get("soma_diam_multiplier", 1.0)
+    def _validate_cell_tuning(self) -> None:
+        tuning = self.cell_config.get("tuning")
+        if not isinstance(tuning, dict) or "soma_diam_multiplier" not in tuning:
+            raise KeyError(
+                "cell_configs/cell_config.json must define tuning.soma_diam_multiplier. "
+                "Run Step 1 setup or set it manually before simulation."
+            )
+        tuning["soma_diam_multiplier"] = float(tuning["soma_diam_multiplier"])
 
     def _apply_run_overrides(self, sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
         """Apply options that affect input generation and simulation behavior."""
@@ -270,7 +268,7 @@ class SimulationSession:
 
         self._resolve_append_override()
         self._apply_snapshot_option()
-        self._apply_cell_tuning_fallback()
+        self._validate_cell_tuning()
 
         self.cell = load_cell(self.cell_config)
         self.geom = geometry.define_geometry(self.cell, self.geom_config)

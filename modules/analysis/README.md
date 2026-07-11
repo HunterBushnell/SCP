@@ -1,69 +1,88 @@
 # Analysis Module (SCP)
 
-This folder holds the analysis helpers used by `6_analysis.ipynb`.
+This folder holds the analysis helpers and defaults used by `6_analysis.ipynb`.
 
-## What lives here
-- `analysis.py`: core curve/metrics logic and helpers
-- `plotting.py`: plotting routines for outputs/inputs/synapses
-- `analysis_ui.py`: Jupyter UI builders and glue code
-- `bio_curve.py`: CSV loading helper for bio curves
-- `analysis_defaults.json`: default UI/options (used by `6_analysis.ipynb`)
-- `analysis_presets/`: optional presets (ex: `paper_compare.json`, `output_plotting.json`, `input_plotting.json`, `output_metrics.json`, `extra_analysis.json`)
+## Files
 
-## Recording summaries
-- `analysis.summarize_cell_recordings(results, ...)`: per-site/per-variable summary for `cell_recordings`.
-- `analysis.summarize_total_synaptic_traces(results, ...)`: summary for total synaptic `I`/`G` traces (if saved).
-- Formatting helpers:
-  - `analysis.format_cell_recording_summary_table(...)`
-  - `analysis.format_cell_recording_summary_compare(...)`
-  - `analysis.format_total_synaptic_trace_table(...)`
-  - `analysis.format_total_synaptic_trace_compare(...)`
+- `analysis.py`: core curve, metric, table, snapshot, and export helpers.
+- `plotting.py`: plotting routines for outputs, inputs, and synapse records.
+- `analysis_ui.py`: compatibility facade for Jupyter widget builders.
+- `ui/`: section-organized Step 6 UI package.
+- `single_plot_panel.py`: compact single-plot wrapper used by Step 6.
+- `bio_curve.py`: external CSV curve loading helper.
+- `analysis_defaults.json`: global Step 6 defaults and preset paths.
+- `analysis_presets/`: JSON preset files for specific UI sections.
 
-## Defaults + presets
-- Defaults are loaded in `6_analysis.ipynb` from `modules/analysis/analysis_defaults.json`.
-- Output plotting defaults are loaded from `modules/analysis/analysis_presets/output_plotting.json`
-  using `output_plot_preset_path` in `analysis_defaults.json`.
-- Input plotting defaults are loaded from `modules/analysis/analysis_presets/input_plotting.json`
-  using `input_plot_preset_path` in `analysis_defaults.json`.
-- Output metrics defaults are loaded from `modules/analysis/analysis_presets/output_metrics.json`
-  using `output_metrics_preset_path` in `analysis_defaults.json`.
-- Extra analysis defaults are loaded from `modules/analysis/analysis_presets/extra_analysis.json`
-  using `extra_preset_path` in `analysis_defaults.json`.
-- Presets can be toggled via the Outputs UI (Paper compare) or set in the JSON.
+## Presets
 
-## Compare paths syntax
-When using Compare paths (comma-separated list), each entry can include shift/scale
-and optional style metadata:
+`6_analysis.ipynb` loads `analysis_defaults.json`, then loads preset files
+referenced by these fields:
 
-```
+- `output_plot_preset_path` -> `analysis_presets/output_plotting.json`
+- `input_plot_preset_path` -> `analysis_presets/input_plotting.json`
+- `output_metrics_preset_path` -> `analysis_presets/output_metrics.json`
+- `extra_preset_path` -> `analysis_presets/extra_analysis.json`
+
+Other presets, such as `analysis_presets/single_plot.json`, are used by specific
+notebook sections or when explicitly selected.
+
+## Main UI Builders
+
+- `analysis_ui.build_selection_ui(...)`
+- `analysis_ui.build_outputs_ui(...)`
+- `analysis_ui.build_inputs_ui(...)`
+- `analysis_ui.build_extra_ui(...)`
+
+Each UI section has a Help button that prints a concise guide into the notebook
+output.
+
+For backend development, import narrower section modules from
+`modules.analysis.ui`:
+
+- `modules.analysis.ui.selection`
+- `modules.analysis.ui.outputs`
+- `modules.analysis.ui.inputs`
+- `modules.analysis.ui.metrics`
+- `modules.analysis.ui.extra`
+
+## Recording and Synapse Summaries
+
+- `analysis.summarize_cell_recordings(results, ...)`
+- `analysis.summarize_total_synaptic_traces(results, ...)`
+- `analysis.summarize_synapse_records(results, ...)`
+- `analysis.format_cell_recording_summary_table(...)`
+- `analysis.format_total_synaptic_trace_table(...)`
+- `analysis.format_synapse_summary_table(...)`
+
+These helpers are data-dependent. They only report records saved by Step 5.
+
+## Compare Path Syntax
+
+Compare paths can include shift/scale and optional style metadata:
+
+```text
 path/to/file.csv@shift:scale;color=red;label=Bio;linestyle=--
 ```
 
 Notes:
-- `shift` is in ms, `scale` is multiplicative.
-- `@shift` alone is allowed; `@shift:scale` or `@shift,scale` both work.
-- Keys are `color`, `label`, `linestyle`, `shift`, `scale`.
 
-Per-item enable/disable
-You can also use object entries in `compare_list_paths` to toggle paths on/off:
+- `shift` is in ms.
+- `scale` is multiplicative.
+- `@shift`, `@shift:scale`, and `@shift,scale` are accepted.
+- Keys include `color`, `label`, `linestyle`, `shift`, and `scale`.
 
-```
+Object entries are also supported in `compare_list_paths`:
+
+```json
 {
-  "path": "/abs/path/file.csv@500",
-  "enabled": false,
-  "color": "0.4"
+  "path": "external_data/pyrFiringRateAvg.csv@290",
+  "enabled": true,
+  "color": "k",
+  "label": "PN bio"
 }
 ```
 
-## UI help
-Each UI section (Selection, Outputs, Inputs, Extra) includes a **Help** button
-that prints a short guide into the cell output.
+## User Docs
 
-## JSON-only knobs (examples)
-Some options are only in the defaults JSON:
-- `output_compare_figsize`, `output_compare_panel_size`
-- `output_metric_window_markers`, `output_metric_label_points`
-- `compare_preset_path`
-- `extra_snapshot_*` settings
-
-Keep this file lightweight; the JSON is the source of truth for defaults.
+- Main guide: `docs/guides/analysis.md`
+- Detailed Step 6 reference: `docs/guides/step_6_analysis.md`

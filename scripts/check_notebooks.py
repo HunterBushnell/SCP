@@ -24,13 +24,13 @@ from typing import Iterable, Optional
 
 DEFAULT_NOTEBOOKS = [
     "1_setup.ipynb",
-    "colab_notebooks/2_colab.ipynb",
     "2_passive.ipynb",
-    "colab_notebooks/3_colab.ipynb",
     "3_active.ipynb",
     "4_synapses.ipynb",
     "5_simulate.ipynb",
     "6_analysis.ipynb",
+    "7_tools.ipynb",
+    "extra_notebooks/act_segmentation.ipynb",
 ]
 
 FORBIDDEN_SOURCE_PATTERNS = [

@@ -1,14 +1,36 @@
 logs/old/
 # logs/status/
+archive/
 cells/**/output_data/
+cells/**/notebook_exports/
+cells/**/tuning_exports/
+cells/**/*.nwb
+cells/**/act_workspace/module_*/
+cells/**/act_workspace/output/
+cells/**/act_workspace/x86_64/
+cells/**/act_workspace/*.npy
+cells/**/act_workspace/*.pickle
+external_data/*.pkl
+external_data/*.pickle
+external_data/*.npy
+external_data/*.npz
+external_data/*.xlsx
+external_data/*.xls
 
 # Python cache/build artifacts
 __pycache__/
 *.py[cod]
 *.pyo
 
+# OS/editor artifacts
+.DS_Store
+
 # Jupyter
 .ipynb_checkpoints/
 
 # NEURON compiled artifacts (build as needed per tune)
+cells/**/x86_64/
 cells/**/modfiles/x86_64/
+
+# Local release checklist
+PUBLIC_RELEASE_TODO.local.md

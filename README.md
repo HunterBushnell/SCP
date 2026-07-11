@@ -1,101 +1,99 @@
 # Single Cell Pipeline (SCP)
 
-This folder is the working version of the Single Cell Pipeline (SCP) for PV/SST models.
-It is being prepared for extraction into its own repo.
+SCP is a notebook-first workflow for preparing, tuning, simulating, and analyzing
+single-cell NEURON models. The current examples focus on PV and SST cells, but
+the repo is organized around reusable tune directories and JSON configs so other
+cell models can be adapted without changing the main pipeline code.
 
-Goals
-- Provide a repeatable, notebook-first pipeline for single-cell sims and analysis.
-- Keep configs and outputs consistent across notebook and CLI/SLURM runs.
-- Keep Steps 1-6 portable across local and Colab workflows.
+## Quick Start
 
-Setup (new machine)
-1. Clone SCP and enter the repo:
-   `git clone <SCP_REPO_URL> && cd SCP`
-2. Create the recommended Conda environment:
-   `conda env create -f environment.yml`
-   `conda activate scp-py311`
-3. Register the notebook kernel (optional but recommended):
-   `python -m ipykernel install --user --name scp-py311 --display-name "Python (SCP)"`
-4. Clone external repos used by steps 2-4:
-   `mkdir -p ../mods`
-   `git clone https://github.com/V-Marco/ACT.git ../mods/ACT`
-   `git clone https://github.com/cyneuro/bmtool.git ../mods/bmtool`
-5. Verify setup end-to-end:
-   `python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune seg_tuned`
-6. Lint notebooks for portability/config issues:
-   `python scripts/check_notebooks.py`
+1. Install the environment:
+   - `conda env create -f environment.yml`
+   - `conda activate scp-py311`
+2. Optional setup check:
+   - `python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune seg_tuned --compile-modfiles`
+3. Run an example:
+   - Notebook: open `5_simulate.ipynb`, set `force_save = True` if you want a saved run.
+   - CLI: `python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 1 --force-save`
+4. Analyze saved runs:
+   - open `6_analysis.ipynb` after a run has been saved under `output_data/`.
 
-Notes
-- You can override paths with env vars:
-  `SCP_ROOT`, `SCP_ACT_PATH`, `SCP_BMTOOL_PATH`.
-- If you prefer `venv` + pip instead of Conda, see `docs/installation.md`.
+See `docs/quickstart.md` for the shortest runnable path and
+`docs/installation.md` for local/Colab setup.
 
-Quickstart (existing tune)
-- Notebook route: open `5_simulate.ipynb` and run all.
-- CLI route (from repo root):
-  `python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 1`
+## Pipeline
 
-Pipeline map
-- 1_setup.ipynb: Step-1 setup (ADB download + compile + scaffold + validate)
-- scripts/step1_prepare.py: CLI for Step-1 bootstrap
-- archive/1_segment.ipynb: Optional ACT-derived segmentation reference
-- 2_passive.ipynb: Passive parameter tuning workflow
-- colab_notebooks/2_colab.ipynb: Passive tuning (Colab classroom version, bootstrapped)
-- 3_active.ipynb: Active parameter tuning workflow
-- colab_notebooks/3_colab.ipynb: Active tuning (Colab classroom version, bootstrapped)
-- 4_synapses.ipynb: Synaptic tuning workflow (including bmtool path)
-- 5_simulate.ipynb: Simulation pipeline (stable; local + Colab)
-- archive/5_colab.ipynb: Archived Step 5 Colab notebook; use `5_simulate.ipynb`
-- 6_analysis.ipynb: Optional end-of-pipeline analysis and comparisons
+- `1_setup.ipynb`: set up a tune directory with model files, compiled mechanisms,
+  config templates, and validation.
+- `2_passive.ipynb`: passive-parameter tuning workflow.
+- `3_active.ipynb`: active-parameter tuning workflow, including optional ACT
+  active-tuning workspace support.
+- `4_synapses.ipynb`: BMTool-based synapse setup/tuning workflow.
+- `5_simulate.ipynb`: primary simulation entry point for local or Colab use.
+- `6_analysis.ipynb`: saved-output analysis and comparison workflow.
+- `7_tools.ipynb`: optional notebook wrappers for small utility scripts.
 
-Colab classroom usage (notebook-only)
-- `colab_notebooks/2_colab.ipynb` and `colab_notebooks/3_colab.ipynb` are designed for first-time users; Step 5 uses `5_simulate.ipynb` for both local and Colab runs.
-- They can auto-clone SCP and required external repos (ACT) when run in a fresh Colab.
-- For private repos, set one of: `SCP_GIT_TOKEN`, `SCP_GITHUB_TOKEN`, or `GITHUB_TOKEN`.
-- Optional repo controls:
-  - `SCP_REPO_URL`, `SCP_REPO_BRANCH`, `SCP_REPO_DIR`
-  - `SCP_ACT_REPO_URL`, `SCP_ACT_REPO_BRANCH`, `SCP_ACT_DIR`
-- Quick Colab setup guide: `colab_notebooks/README.md`.
-- Recommended class flow: run top-to-bottom once with defaults, then vary one parameter block at a time.
+Step 5 is the main destination of the pipeline. Earlier steps prepare a cell/tune
+for simulation; Step 6 is optional post-processing.
 
-Step 5 sub-steps (for docs)
-- 5.2.1: Load cell
-- 5.2.2: Define geometry
-- 5.2.3: Generate inputs
-- 5.2.4: Preview/attach synapses
-- 5.3: Run sims and save outputs
-- 5.4: Analyze results
+## Optional Notebooks
 
-Config layout
-- `cell_configs/cell_config.json`: cell identity (cell_name, tune, color, specimen_id, model_type, tuning)
-- `cell_configs/sim_config.json`: sim-level config (timing, trials, outputs, randomness)
-- `cell_configs/syn_config.json`: synapse group config list (includes `cell_configs/syn_groups/`)
+- `extra_notebooks/act_segmentation.ipynb`: optional ACT-style channel
+  segmentation helper. Use it when manually creating segmented modfiles before
+  passive/active tuning. It is not required for the numbered workflow.
 
-Docs index
-- `docs/README.md`
-- `docs/quickstart.md`
-- `docs/installation.md`
-- `docs/pipeline_overview.md`
-- `docs/step_1_4_stub.md` (Step 1-4 reference and prerequisites)
-- `docs/step_5_simulate.md`
-- `docs/analysis.md` (practical guide for `6_analysis.ipynb`)
-- `docs/step_6_analysis.md`
-- `docs/configs_reference.md`
-- `docs/cli_slurm.md`
-- `docs/outputs_layout.md`
-- `docs/troubleshooting.md`
-- `docs/reproducibility.md`
-- `docs/glossary.md`
-- `docs/naming_conventions.md`
-- `docs/roadmap.md`
-- `docs/example_run.md`
-- `docs/config_cookbook.md`
+## Examples
 
-Contracts
-- `contracts/README.md` indexes contract files and maps them to Step 5.2.3.
-- Contracts are descriptive; only inputs and outputs should be treated as authoritative.
+Bundled example tune directories:
 
-Status notes
-- Step 1 now uses `modules` and writes/validates `cell_configs/` scaffolds.
-- Steps 1-4 run with repo-relative paths and use current notebook helpers.
-- `5_simulate.ipynb` bootstraps Colab when needed and can compile modfiles as needed.
+- `cells/PV/tunes/adb_peri`: raw ADB perisomatic PV setup example.
+- `cells/PV/tunes/seg_tuned`: tuned PV simulation example.
+- `cells/SST/tunes/adb_all`: raw ADB all-active SST setup example.
+- `cells/SST/tunes/seg_tuned`: tuned SST simulation example.
+
+Each tune uses a `cell_configs/` directory containing:
+
+- `cell_config.json`: cell identity, loader, paths, and tuning metadata.
+- `sim_config.json`: simulation timing, saving, plotting, recording, and run options.
+- `geometry.json`: segment grouping/distance settings.
+- `syn_config.json`: list of enabled synapse-group config files.
+- `syn_groups/*.json`: synapse groups and explicit `input_blocks`.
+
+Saved example outputs are not required to use the repo. Generate fresh outputs
+with Step 5 when you want to use Step 6 analysis.
+
+## Local and Colab Use
+
+The root notebooks are the current local and Colab entry points:
+
+- `1_setup.ipynb`
+- `2_passive.ipynb`
+- `3_active.ipynb`
+- `4_synapses.ipynb`
+- `5_simulate.ipynb`
+- `6_analysis.ipynb`
+- `7_tools.ipynb`
+
+CLI and SLURM entry points are intended for local/HPC use after the same tune
+configs have been prepared.
+
+## Documentation
+
+- `docs/README.md`: documentation index.
+- `docs/quickstart.md`: fastest path to run and save an example.
+- `docs/installation.md`: environment, external tools, and Colab setup.
+- `docs/pipeline_overview.md`: step-by-step workflow map.
+- `docs/guides/step_1_setup.md`: Step 1 setup notebook/CLI guide.
+- `docs/guides/step_2_passive.md`: Step 2 passive-tuning guide.
+- `docs/guides/step_3_active.md`: Step 3 active-tuning guide.
+- `docs/guides/step_4_synapses.md`: Step 4 synapse-tuning guide.
+- `docs/guides/step_5_simulate.md`: Step 5 simulation guide.
+- `docs/guides/analysis.md`: Step 6 analysis guide.
+- `docs/guides/step_7_tools.md`: Step 7 utility-notebook guide.
+- `docs/reference/configs_reference.md`: current config schema.
+- `docs/reference/outputs_layout.md`: saved-output structure.
+- `docs/advanced/cli_slurm.md`: CLI and SLURM usage.
+- `docs/troubleshooting.md`: common issues.
+
+Contracts in `contracts/` are developer/design references, not the primary user
+documentation.

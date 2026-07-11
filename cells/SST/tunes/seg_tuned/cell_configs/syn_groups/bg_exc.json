@@ -1,21 +1,7 @@
 {
   "bg_exc": {
     "state": true,
-    "mode": "homogeneous_poisson",
     "color": "#2ca02c",
-    "source": {
-      "freq": 0.75,
-      "baseline": null,
-      "path": null,
-      "bin_ms": null
-    },
-    "timing": {
-      "onset_ms": null,
-      "stim_tstart_ms": null,
-      "duration_ms": null,
-      "input_stim_tstart_ms": null,
-      "input_duration_ms": null
-    },
     "syns": {
       "type": "AMPA_NMDA_STP",
       "N_syn": null,
@@ -40,6 +26,16 @@
         "Fac": 70,
         "NMDA_ratio": 1.5
       }
-    }
+    },
+    "input_blocks": [
+      {
+        "name": "background",
+        "role": "background",
+        "start_ms": 0.0,
+        "stop_ms": 1000.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 0.75
+      }
+    ]
   }
 }

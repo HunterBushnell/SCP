@@ -2,7 +2,7 @@
 # Step 2.3 – Input Generation Module Contract (v1)
 
 > Historical draft: kept for design history. For current behavior, prefer
-> `modules/input_generation/inputs.py` and `docs/configs_reference.md`.
+> `modules/input_generation/inputs.py` and `../docs/reference/configs_reference.md`.
 
 ## 0. Scope
 

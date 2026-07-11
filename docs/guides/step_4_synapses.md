@@ -1,0 +1,408 @@
+# Step 4: Synapse Tuning
+
+Step 4 tunes chemical synapse mechanism parameters for a prepared SCP tune using
+BMTool's synaptic tuner.
+
+Notebook: `../../4_synapses.ipynb`
+
+## Scope
+
+The root `4_synapses.ipynb` is the primary Step 4 entry point for both local and
+Colab use. The notebook intentionally stays close to BMTool's original chemical
+synapse tuner notebook, with a small SCP adapter layer for loading prepared tune
+directories.
+
+Step 4 is manual-first for config edits:
+
+- select a prepared post-synaptic cell/tune,
+- compile/load the tune's mechanisms,
+- build an SCP NEURON cell,
+- define BMTool `general_settings` and `conn_type_settings`,
+- initialize BMTool's `SynapseTuner` with `hoc_cell=session.cell`,
+- run BMTool single-event, interactive, frequency-response, and optional
+  optimizer workflows,
+- print a copyable `syns.params` block,
+- manually paste tuned parameters into the relevant
+  `cell_configs/syn_groups/*.json` file.
+
+Step 4 does not automatically overwrite synapse group configs.
+
+## Expected Inputs
+
+- a tune directory prepared by Step 1,
+- passive/active parameters reviewed in Steps 2-3 when applicable,
+- compiled or compilable `modfiles/`,
+- `cell_configs/cell_config.json`,
+- BMTool available at `../mods/bmtool` or through `SCP_BMTOOL_PATH`,
+- one or more synapse mechanisms present in the tune's compiled modfiles,
+- optional existing `cell_configs/syn_groups/*.json` files to receive tuned
+  parameters.
+
+## Outputs
+
+Step 4 does not create Step 5 simulation runs. Its main output is reviewed
+synapse parameter values.
+
+The export cell prints a JSON block shaped for a synapse-group config:
+
+```json
+"params": {
+  "Dep": 0.0,
+  "Fac": 200.0,
+  "Use": 0.75,
+  "initW": 0.25,
+  "tau_d_AMPA": 1.7,
+  "tau_r_AMPA": 0.2
+}
+```
+
+Paste the printed values into:
+
+```text
+cells/<CELL>/tunes/<TUNE>/cell_configs/syn_groups/<group>.json
+```
+
+under:
+
+```json
+{
+  "<group_name>": {
+    "syns": {
+      "params": {}
+    }
+  }
+}
+```
+
+## BMTool Relationship
+
+BMTool is the core tuning engine for Step 4. SCP only adapts tune-directory
+models to BMTool's expected API.
+
+The adapter lives at:
+
+```text
+modules/tuning/bmtool_synapse_adapter.py
+```
+
+It handles:
+
+- locating the SCP repo,
+- locating or cloning BMTool,
+- compiling/loading tune mechanisms,
+- building the SCP cell,
+- creating BMTool's `SynapseTuner` with a pre-built `hoc_cell`,
+- choosing conservative default slider/record variables for common mechanisms,
+- printing copyable SCP config parameter blocks.
+
+The BMTool tuning methods remain BMTool methods:
+
+- `tuner.SingleEvent()`
+- `tuner.InteractiveTuner()`
+- `tuner.stp_frequency_response(...)`
+- `SynapseOptimizer(tuner)`
+
+## Notebook Workflow
+
+### 4.1 Prepare SCP Cell
+
+Choose the post-synaptic cell/tune used for tuning. The default example is:
+
+```python
+cell_name = "SST"
+tune_name = "seg_tuned"
+```
+
+Important controls:
+
+- `tunes_parent`: normally `tunes`.
+- `tune_dir_override`: optional direct path outside the standard repo layout.
+- `RECOMPILE_MODFILES`: force `nrnivmodl` even if compiled mechanisms exist.
+- `LOAD_COMPILED_DLL`: load the compiled NEURON mechanism library into the
+  current kernel.
+
+The notebook calls:
+
+```python
+session = prepare_scp_synapse_tuning(...)
+cell = session.cell
+tune_dir = session.tune_dir
+```
+
+Restart the kernel if NEURON reports conflicts from a previously loaded
+mechanism library.
+
+### 4.2 Define BMTool Synapse Settings
+
+Define the selected BMTool connection and tuning dictionaries.
+
+Important controls:
+
+- `connection`: key in `conn_type_settings` for the synapse being tuned.
+- `general_settings`: BMTool protocol settings.
+- `conn_type_settings`: per-connection mechanism/location/parameter settings.
+
+`general_settings` controls BMTool's small tuning protocols, not the full Step 5
+simulation. Common fields:
+
+- `vclamp`: start BMTool checks in voltage clamp mode.
+- `rise_interval`: fractional interval for rise-time calculation.
+- `tstart`: single-event start time in ms.
+- `tdur`: post-event simulation duration in ms.
+- `threshold`: NetCon threshold in mV.
+- `delay`: NetCon delay in ms.
+- `weight`: NetCon weight.
+- `dt`: BMTool protocol time step.
+- `celsius`: BMTool protocol temperature.
+
+Each `conn_type_settings` entry has:
+
+- `spec_settings.post_cell`: retained for BMTool compatibility; ignored when
+  SCP supplies `hoc_cell`.
+- `spec_settings.vclamp_amp`: voltage clamp holding value.
+- `spec_settings.sec_id`: section index from `list(cell.all)`.
+- `spec_settings.sec_x`: normalized section location.
+- `spec_settings.level_of_detail`: NEURON point-process mechanism name.
+- `spec_syn_param`: initial mechanism parameters.
+
+The bundled examples include:
+
+- `Fac2SST`: excitatory AMPA/NMDA/STP example.
+- `Dep2PV`: excitatory depressing AMPA/NMDA/STP example.
+- `Inh2SST`: inhibitory GABA example.
+- `PV2SST`: inhibitory GABA/STP example.
+
+For custom mechanisms, keep the dictionary shape and edit the mechanism name,
+location, and parameter names to match the `.mod` file.
+
+### 4.3 Initialize BMTool SynapseTuner
+
+The notebook creates the BMTool tuner through:
+
+```python
+tuner = create_scp_synapse_tuner(
+    session,
+    conn_type_settings=conn_type_settings,
+    connection=connection,
+    general_settings=general_settings,
+    current_name=current_name,
+    other_vars_to_record=resolved_record_vars,
+    slider_vars=resolved_slider_vars,
+)
+```
+
+Important controls:
+
+- `slider_vars`: mechanism parameters exposed as interactive sliders.
+- `other_vars_to_record`: optional mechanism variables to plot/record.
+- `current_name`: synaptic current variable; usually `i`.
+
+Leave `slider_vars = None` to use SCP defaults for common mechanisms. Set it
+explicitly for custom mechanisms.
+
+### 4.4 Single Event
+
+Run:
+
+```python
+tuner.SingleEvent()
+```
+
+This runs a single synaptic event and reports BMTool response metrics such as
+amplitude, latency, rise time, decay time, half width, and baseline.
+
+Use this before opening the interactive tuner to confirm the synapse mechanism,
+section location, clamp settings, and current recording are valid.
+
+### 4.5 Interactive Tuner
+
+Run:
+
+```python
+tuner.InteractiveTuner()
+```
+
+This opens BMTool's widget interface for changing selected synapse parameters
+and inspecting response changes.
+
+Use this as the primary manual tuning interface. If widgets do not render,
+confirm `ipywidgets` is installed and enabled in the active notebook runtime.
+
+### 4.6 Frequency Response
+
+Run:
+
+```python
+results = tuner.stp_frequency_response(log_plot=False)
+```
+
+This evaluates short-term plasticity behavior across stimulation frequencies.
+BMTool returns:
+
+- `frequencies`,
+- `ppr`,
+- `induction`,
+- `recovery`.
+
+These values are useful for checking whether a tuned synapse behaves as
+facilitating, depressing, or neutral across the frequency range of interest.
+
+### 4.7 Optional SynapseOptimizer
+
+The optional optimizer uses BMTool's `SynapseOptimizer` to search parameter
+bounds against target metrics.
+
+Important controls:
+
+- `param_bounds`: parameter search ranges.
+- `target_metrics`: desired BMTool response metrics.
+- `custom_cost`: metric weighting.
+- `run_single_event`: include single-event metrics in optimization.
+- `run_train_input`: include train-response metrics in optimization.
+- `train_frequency` and `train_delay`: STP train protocol controls.
+
+Treat this as optional. Manual tuning is often easier to interpret, and the
+optimizer depends strongly on parameter bounds and cost-function choices.
+
+### 4.8 Export Tuned Parameters
+
+After manual tuning or optimization, run the export cell:
+
+```python
+tuned_params = get_tuned_synapse_params(tuner)
+print_syn_group_param_block(tuned_params)
+```
+
+Then manually paste the printed parameter block into the appropriate synapse
+group config.
+
+If using distributed weights in Step 5, decide whether the tuned amplitude
+belongs in `initW` or should be translated into `wt_mean` / `wt_std`. Step 4
+tunes mechanism parameters for a single test synapse; Step 5 applies group-level
+placement and weight rules.
+
+## Mapping Step 4 to Step 5 Configs
+
+Step 4 tunes mechanism parameters. Step 5 consumes synapse group configs.
+
+Relevant Step 5 config location:
+
+```text
+cells/<CELL>/tunes/<TUNE>/cell_configs/syn_groups/*.json
+```
+
+Relevant config section:
+
+```json
+{
+  "group_name": {
+    "syns": {
+      "type": "AMPA_NMDA_STP",
+      "N_syn": 100,
+      "segs": "all",
+      "dist_func": {"kind": "uniform", "params": {"c": 1.0}},
+      "params": {
+        "initW": 0.25,
+        "tau_r_AMPA": 0.2,
+        "tau_d_AMPA": 1.7,
+        "Use": 0.75,
+        "Dep": 0.0,
+        "Fac": 200.0
+      }
+    },
+    "input_blocks": []
+  }
+}
+```
+
+Field mapping:
+
+- BMTool `spec_settings.level_of_detail` maps to Step 5 `syns.type`.
+- BMTool `spec_syn_param` values map to Step 5 `syns.params`.
+- BMTool `sec_id` / `sec_x` are test-synapse location controls only; Step 5
+  uses `syns.segs` and `syns.dist_func` for group placement.
+- BMTool `general_settings` are tuning-protocol controls only; Step 5 uses
+  `sim_config.json` and `input_blocks` for full simulations.
+
+See `../reference/configs_reference.md` for the full synapse group schema.
+
+## Local vs Colab
+
+The Step 4 notebook uses the same root-notebook bootstrap pattern as the other
+public notebooks.
+
+Local use:
+
+- install SCP's environment,
+- clone BMTool to `../mods/bmtool` or set `SCP_BMTOOL_PATH`,
+- open `4_synapses.ipynb`.
+
+Colab use:
+
+- open the root `4_synapses.ipynb`,
+- run the environment setup cell,
+- allow the notebook to clone SCP and BMTool when needed,
+- make sure any required tune/model files are available in the runtime.
+
+BMTool resolution order:
+
+1. `SCP_BMTOOL_PATH`, `BMTOOL_PATH`, or `BMTOOL_ROOT`,
+2. `../mods/bmtool` relative to SCP,
+3. common local `mods/bmtool` locations,
+4. automatic clone in Colab when enabled.
+
+## Troubleshooting
+
+### BMTool Not Found
+
+Clone BMTool next to SCP:
+
+```bash
+mkdir -p ../mods
+git clone https://github.com/cyneuro/bmtool.git ../mods/bmtool
+```
+
+Or set:
+
+```bash
+export SCP_BMTOOL_PATH=/path/to/bmtool
+```
+
+### Mechanism Already Loaded
+
+NEURON cannot always unload/reload mechanism libraries cleanly inside a live
+kernel. Restart the kernel, then rerun Step 4 from the top.
+
+### Synapse Mechanism Missing
+
+If `level_of_detail` fails:
+
+- confirm the mechanism name matches the `.mod` point-process name,
+- confirm the tune's `modfiles/` directory contains that `.mod` file,
+- recompile mechanisms with `RECOMPILE_MODFILES = True`,
+- restart the kernel if another mechanism library was loaded first.
+
+### Slider Variable Missing
+
+If BMTool skips a slider:
+
+- confirm the variable exists as a range/global parameter in the `.mod` file,
+- add it to `spec_syn_param`,
+- or set `slider_vars` to only the variables the mechanism exposes.
+
+### Current Recorder Missing
+
+If BMTool warns that `_ref_i` is missing, set:
+
+```python
+current_name = "<mechanism_current_variable>"
+```
+
+to the current variable exposed by the synapse mechanism.
+
+### Section Location Is Wrong
+
+`sec_id` indexes `list(cell.all)`, which is useful for a single test synapse but
+not necessarily intuitive. Start with soma/proximal test locations, then use
+Step 5 placement preview for full group-level placement.
+

@@ -1,7 +1,7 @@
 {
   "title": "output_plotting",
   "defaults": {
-    "plot_outputs": true,
+    "plot_outputs": false,
     "plot_output_curve": true,
     "plot_spike_stats": false,
     "plot_raster": false,

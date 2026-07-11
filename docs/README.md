@@ -1,30 +1,54 @@
-# Docs Index
+# SCP Documentation
+
+Use this directory as the user-facing documentation index. The numbered notebooks
+are the primary workflow; docs explain what each notebook expects, writes, and
+how it connects to CLI/SLURM tooling.
 
 ## Start Here
-- `installation.md`: environment setup and readiness checks.
-- `quickstart.md`: shortest path to run an existing tune.
-- `pipeline_overview.md`: notebook and CLI map for steps 1-6.
 
-## Core Usage
-- `analysis.md`: practical guide to `6_analysis.ipynb` workflows and metrics.
-- `step_5_simulate.md`: stable Step 5 simulation details.
-- `step_6_analysis.md`: analysis notebook usage and expected outputs.
-- `cli_slurm.md`: CLI and SLURM execution.
-- `configs_reference.md`: config layout and field reference.
-- `outputs_layout.md`: output folders, manifests, and sidecars.
-- `status_panel.md`: terminal monitor for SLURM status files.
-
-## Supporting References
-- `reproducibility.md`: seeds, snapshots, and append behavior.
+- `installation.md`: local environment, external repositories, and Colab notes.
+- `quickstart.md`: shortest path to run and save a bundled example.
+- `pipeline_overview.md`: full workflow map from setup through analysis.
 - `troubleshooting.md`: common setup and runtime issues.
-- `glossary.md`: SCP terms and definitions.
-- `step_1_4_stub.md`: Steps 1-4 prerequisites and outputs.
-- `naming_conventions.md`: recommended naming patterns.
-- `roadmap.md`: short future plan.
-- `example_run.md`: minimal end-to-end run.
-- `config_cookbook.md`: common config tweaks.
-- `microbit_status.md`: optional hardware status bridge.
 
-## Validation Tools
-- `../scripts/check_setup.py`: environment + workspace readiness checks.
-- `../scripts/check_notebooks.py`: notebook lint for portability and duplicate keys.
+## Step Guides
+
+- `guides/step_1_setup.md`: tune-directory setup, ADB download, config scaffolding, and validation.
+- `guides/step_2_passive.md`: passive tuning, ACT target conversion, manual model edits, and trace checks.
+- `guides/step_3_active.md`: active tuning, optional ACT workspace/CLI integration, Allen/ADB NWB FI targets, manual sweeps, and FI checks.
+- `guides/step_4_synapses.md`: synapse tuning with BMTool and SCP synapse-config export.
+- `guides/step_5_simulate.md`: simulation notebook, CLI, IClamp, saving, plotting, and outputs.
+- `guides/analysis.md`: primary guide for `6_analysis.ipynb`.
+- `guides/step_6_analysis.md`: detailed Step 6 defaults/options reference.
+- `guides/step_7_tools.md`: optional notebook wrappers for small utility scripts.
+- `guides/steps_1_4_overview.md`: compact bridge for early setup/tuning steps.
+
+## Reference
+
+- `reference/configs_reference.md`: current `cell_configs/` schema.
+- `reference/outputs_layout.md`: run folders, manifests, sidecars, plots, and array outputs.
+- `reference/reproducibility.md`: seeds, snapshots, append behavior, and array alignment.
+- `reference/glossary.md`: common SCP terms.
+- `reference/naming_conventions.md`: lightweight naming guidance.
+
+## Recipes
+
+- `recipes/example_run.md`: minimal saved-run example.
+- `recipes/config_cookbook.md`: common config edits and recipes.
+
+## Advanced Interfaces
+
+- `advanced/cli_slurm.md`: `scripts/step1_prepare.py`, `run_pipeline.py`, and `run_slurm.sh`.
+- `advanced/status_panel.md`: terminal monitor for SLURM status files.
+- `advanced/microbit_status.md`: optional hardware status bridge.
+- `../extra_notebooks/README.md`: optional non-pipeline notebooks.
+
+## Project
+
+- `project/roadmap.md`: deferred and planned improvements.
+
+## Developer References
+
+- `../contracts/README.md`: developer design contracts and implementation notes.
+- `../scripts/check_setup.py`: environment/workspace readiness checks.
+- `../scripts/check_notebooks.py`: notebook portability checks.

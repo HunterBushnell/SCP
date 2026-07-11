@@ -1,0 +1,54 @@
+{
+  "input_blocks_template": {
+    "state": false,
+    "color": "#1f77b4",
+    "input_blocks": [
+      {
+        "name": "pre_baseline",
+        "role": "baseline",
+        "start_ms": 0.0,
+        "stop_ms": 300.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 2.0
+      },
+      {
+        "name": "stimulus",
+        "role": "stimulus",
+        "start_ms": 300.0,
+        "stop_ms": 800.0,
+        "mode": "inhomogeneous_poisson",
+        "source": {
+          "path": "external_data/pyrFiringRateAvg.csv",
+          "time_col": "Time",
+          "rate_col": "AvgFiringRate",
+          "bin_ms": 5.0,
+          "crop_start_ms": 0.0,
+          "crop_stop_ms": 500.0
+        }
+      },
+      {
+        "name": "post_baseline",
+        "role": "baseline",
+        "start_ms": 800.0,
+        "stop_ms": 1000.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 2.0
+      }
+    ],
+    "syns": {
+      "type": "AMPA_NMDA_STP",
+      "N_syn": 0,
+      "segs": "all",
+      "dist_func": {
+        "kind": "uniform",
+        "params": {
+          "c": 1.0
+        }
+      },
+      "params": {
+        "wt_mean": 1.0,
+        "wt_std": 0.0
+      }
+    }
+  }
+}

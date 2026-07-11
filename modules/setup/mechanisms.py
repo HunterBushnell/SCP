@@ -1,4 +1,4 @@
-"""NEURON mechanism compilation/loading helpers for Step 1."""
+"""Shared NEURON mechanism compilation/loading helpers."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 
 import shutil
 import subprocess
+import sys
 
 from .fit_json import mechanisms_declared_in_fit_json
 
@@ -20,6 +21,19 @@ def find_compiled_mechanism_dll(tune_dir: Path) -> Optional[Path]:
     for dll in candidates:
         if dll.is_file():
             return dll
+    return None
+
+
+def find_nrnivmodl() -> Optional[str]:
+    """Find `nrnivmodl` on PATH or next to the active Python executable."""
+    found = shutil.which("nrnivmodl")
+    if found:
+        return found
+
+    python_bin = Path(sys.executable).expanduser().resolve().parent
+    candidate = python_bin / "nrnivmodl"
+    if candidate.is_file():
+        return str(candidate)
     return None
 
 
@@ -42,7 +56,13 @@ def compile_modfiles(
     dll = find_compiled_mechanism_dll(tune_dir)
     compiled_now = False
     if dll is None:
-        subprocess.check_call(["nrnivmodl"], cwd=str(mod_dir))
+        nrnivmodl = find_nrnivmodl()
+        if nrnivmodl is None:
+            raise FileNotFoundError(
+                "nrnivmodl not found on PATH or next to the active Python "
+                f"executable: {sys.executable}"
+            )
+        subprocess.check_call([nrnivmodl], cwd=str(mod_dir))
         compiled_now = True
         dll = find_compiled_mechanism_dll(tune_dir)
 
@@ -84,6 +104,7 @@ def compile_modfiles(
         "compiled_dir": str(compiled_dir),
         "dll": str(dll),
         "compiled_now": bool(compiled_now),
+        "nrnivmodl": find_nrnivmodl(),
         "loaded": bool(loaded),
         "dll_preloaded": bool(dll_preloaded),
     }

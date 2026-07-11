@@ -1,0 +1,7 @@
+# Keep log directories but ignore generated run/status files.
+*
+!.gitignore
+!old/
+!old/.gitkeep
+!status/
+!status/.gitkeep

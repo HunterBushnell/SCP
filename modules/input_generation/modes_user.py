@@ -55,8 +55,8 @@ def my_custom_mode_example(
     Example user-defined mode.
 
     Contract:
-    - Read any needed parameters from:
-        group_cfg["source"], group_cfg["timing"], group_cfg["syns"], etc.
+    - Read any needed parameters from the block-level view passed by Step 5:
+        group_cfg["source"], group_cfg["time_cfg"], group_cfg["syns"], etc.
     - syns["N_syn_resolved"] (if present) gives the final synapse count.
     - Use sim_cfg["tstart"] / sim_cfg["tstop"] to keep spikes in the sim window.
     - Return: list[np.ndarray], where each array is a 1D array of spike

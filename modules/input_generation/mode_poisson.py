@@ -28,8 +28,8 @@ def _mode_homogeneous_poisson(
     Semantics:
       - Pure constant-rate Poisson drive.
       - Uses a single rate taken from source["freq"] (Hz).
-      - Respects the onset anchor: drives from max(onset, tstart) to tstop.
-      - Does not use per-block structure (baseline/source blocks are ignored).
+      - Step 5 normally calls this handler once per input block.
+      - Uses the resolved block window when source_tstart/source_tstop are set.
 
     Requirements:
       - source["freq"] must be float-like; if not, raise ValueError.
@@ -134,9 +134,9 @@ def _mode_inhomogeneous_poisson(
         use pre-0 history, or "trimmed" to apply after trimming.
       - Optional source["freq_scale"] and source["freq_shift"] apply as:
         rates_hz = max(0, rates_hz * freq_scale + freq_shift).
-      - Baseline blocks use anchors["baseline_rate_hz"] (numeric) if present; otherwise quiescent.
-      - Source blocks use the rate curve, truncated/padded to the block duration
-        (padding uses baseline_rate_hz or 0.0 if absent).
+      - Step 5 normally calls this handler once per source-driven input block.
+      - The block source crop is passed through anchors["source_trim_ms"].
+      - Source blocks use the rate curve, truncated/padded to the block duration.
     """
     time_cfg = (group_cfg or {}).get("time_cfg") or {}
     anchors = time_cfg.get("anchors", {}) or {}

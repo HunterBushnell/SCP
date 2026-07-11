@@ -1,23 +1,7 @@
 {
   "vip_inh": {
     "state": true,
-    "mode": "inhomogeneous_poisson",
     "color": "#9467bd",
-    "source": {
-      "freq": null,
-      "baseline": 2.3,
-      "path": "external_data/pyrFiringRateAvg.csv",
-      "bin_ms": null,
-      "time_col": "Time",
-      "rate_col": "AvgFiringRate"
-    },
-    "timing": {
-      "onset_ms": null,
-      "stim_tstart_ms": 320.0,
-      "duration_ms": null,
-      "input_stim_tstart_ms": 0.0,
-      "input_duration_ms": null
-    },
     "syns": {
       "type": "GABA_A",
       "N_syn": 95,
@@ -36,6 +20,39 @@
         "tau_r_GABAA": 0.5,
         "tau_d_GABAA": 5.5
       }
-    }
+    },
+    "input_blocks": [
+      {
+        "name": "pre_baseline",
+        "role": "baseline",
+        "start_ms": 0.0,
+        "stop_ms": 320.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 2.3
+      },
+      {
+        "name": "stimulus",
+        "role": "stimulus",
+        "start_ms": 320.0,
+        "stop_ms": 870.0,
+        "mode": "inhomogeneous_poisson",
+        "source": {
+          "path": "external_data/pyrFiringRateAvg.csv",
+          "time_col": "Time",
+          "rate_col": "AvgFiringRate",
+          "bin_ms": 5.0,
+          "crop_start_ms": 0.0,
+          "crop_stop_ms": 550.0
+        }
+      },
+      {
+        "name": "post_baseline",
+        "role": "baseline",
+        "start_ms": 870.0,
+        "stop_ms": 1000.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 2.3
+      }
+    ]
   }
 }

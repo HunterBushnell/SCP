@@ -11,7 +11,7 @@ from .result_appending import (
     _ensure_multi_results,
     append_multi_results,
 )
-from .result_loading import _load_from_manifest, load_old_multi_results, load_results
+from .result_loading import _load_from_manifest, load_results
 from .result_paths import (
     _build_output_path,
     _copy_fit_json_sidecar,

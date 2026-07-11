@@ -125,21 +125,21 @@ def _standard_plot(
     return analysis_plot
 
 
-def _paper_plot(
+def _single_plot_diagnostic(
     results: dict[str, Any],
     *,
     repo_root: Optional[Union[str, Path]] = None,
     preset_path: Optional[Union[str, Path]] = None,
     include_inputs: bool = True,
 ) -> dict[str, Any]:
-    """Use the paper-panel single-plot helper without exporting files."""
+    """Use the single-plot panel helper without exporting files."""
     if results.get("mode") == "iclamp":
         fig = _plot_vm_summary(results)
-        return {"fig": fig, "warnings": ["paper diagnostics unavailable for IClamp"]}
+        return {"fig": fig, "warnings": ["single-plot diagnostics unavailable for IClamp"]}
 
-    from modules.analysis import paper_panel
+    from modules.analysis import single_plot_panel
 
-    preset = paper_panel.load_single_plot_preset(
+    preset = single_plot_panel.load_single_plot_preset(
         repo_root=repo_root,
         preset_path=preset_path,
     )
@@ -154,10 +154,10 @@ def _paper_plot(
         panel_cfg["top_input_groups"] = []
         panel_cfg["raster_input_groups"] = []
 
-    result = paper_panel.plot_paper_panel_from_results(results, **panel_cfg)
+    result = single_plot_panel.plot_single_plot_panel_from_results(results, **panel_cfg)
     result["warnings"] = warnings + list(result.get("warnings", []) or [])
     for warning in result["warnings"]:
-        print(f"diagnostic paper plot warning: {warning}")
+        print(f"diagnostic single-plot warning: {warning}")
     return result
 
 
@@ -171,7 +171,7 @@ def show_run_diagnostics(
     max_traces: int = 3,
     plot_window: Any = None,
     repo_root: Optional[Union[str, Path]] = None,
-    paper_preset_path: Optional[Union[str, Path]] = None,
+    single_plot_preset_path: Optional[Union[str, Path]] = None,
 ) -> dict[str, Any]:
     """
     Show Step 5 notebook diagnostics.
@@ -179,7 +179,7 @@ def show_run_diagnostics(
     `diagnostic_plot` options:
       - "summary": spike counts + Vm trace only
       - "standard": v0-style standard plot; multi runs also show saved Vm traces
-      - "paper": paper-style single composite plot using the single_plot preset
+      - "single_plot": compact composite plot using the single_plot preset
       - None/"off"/False: print counts only
     """
     summary = _print_summary(results)
@@ -206,11 +206,11 @@ def show_run_diagnostics(
                 cell_name=cell_name,
                 tune_name=tune_name,
             )
-        elif mode == "paper":
-            payload["paper"] = _paper_plot(
+        elif mode == "single_plot":
+            payload["single_plot"] = _single_plot_diagnostic(
                 results,
                 repo_root=repo_root,
-                preset_path=paper_preset_path,
+                preset_path=single_plot_preset_path,
                 include_inputs=include_inputs,
             )
         else:

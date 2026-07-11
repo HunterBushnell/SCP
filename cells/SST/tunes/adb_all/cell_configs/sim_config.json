@@ -1,43 +1,42 @@
 {
   "tstart": 0.0,
-  "tstop": 1200.0,
+  "tstop": 1000.0,
   "dt": 0.025,
   "bins": 5.0,
-  "jitter": 100.0,
-  "stim_start_ms": 500.0,
+  "jitter": null,
+  "stim_start_ms": 300.0,
   "stim_duration_ms": 500.0,
   "n_trials": 1,
   "n_traces_to_save": 1,
   "n_inputs_to_save": 1,
-  "load": [
-    false,
-    null
-  ],
-  "save": [
-    false,
-    "step1_bootstrap",
-    "pkl",
-    false
-  ],
-  "append": [
-    false,
-    null
-  ],
+  "load": {
+    "enabled": false,
+    "path": null
+  },
+  "save": {
+    "enabled": false,
+    "stem": "results",
+    "format": "pkl",
+    "full_results": false
+  },
+  "append": {
+    "enabled": false,
+    "path": null
+  },
   "save_input_stats": true,
   "input_stats_bin_ms": 5.0,
   "avg_rate_curve_smooth_ms": 25.0,
   "avg_rate_curve_smooth_mode": "center",
   "plots_win_size": 25.0,
+  "plots_input_bin_ms": null,
   "plots_input_smooth_ms": 25.0,
-  "plots_profile": "off",
+  "plots_raster_style": "dot",
+  "plots_profile": "basic",
+  "save_plots_mode": "single_plot",
+  "save_plots_single_plot_preset": "modules/analysis/analysis_presets/single_plot.json",
+  "save_plots_overwrite": false,
   "randomness_mode": "random",
-  "random_seed": null,
-  "param_study": {
-    "input_type": null,
-    "param_type": null,
-    "param_vals": [],
-    "n_trials": null
-  },
+  "seed": null,
   "iclamp": {
     "enabled": false,
     "amp_nA": 0.2,
@@ -47,12 +46,48 @@
     "dt_ms": null,
     "record_currents": false
   },
+  "cell_recording": {
+    "enabled": false,
+    "n_trials": 1,
+    "sites": [
+      {
+        "sec": "soma",
+        "idx": 0,
+        "x": 0.5
+      }
+    ],
+    "vars": {
+      "v": true,
+      "i_cap": false,
+      "ion_currents": false,
+      "mech_currents": false,
+      "ion_concentrations": false,
+      "ion_reversals": false,
+      "mech_conductances": false,
+      "mech_states": false
+    }
+  },
+  "syn_recording": {
+    "enabled": false,
+    "default_mode": "group",
+    "default_sample_per_group": 10,
+    "default_vars": {
+      "i": true,
+      "g": true,
+      "i_AMPA": false,
+      "i_NMDA": false,
+      "g_AMPA": false,
+      "g_NMDA": false,
+      "record_use": false,
+      "record_Pr": false
+    },
+    "groups": {}
+  },
   "snapshot": {
     "enabled": false,
     "n_trials": 1,
     "save_all_inputs": true,
     "save_all_traces": true,
     "save_syn_records_by_trial": true
-  },
-  "soma_diam_multiplier": 8.0
+  }
 }

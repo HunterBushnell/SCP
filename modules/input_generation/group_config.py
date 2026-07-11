@@ -3,10 +3,29 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List
 
-import copy
 import json
+
+
+_GROUP_FILE_KEYS = ("group_files",)
+
+
+def _has_group_file_manifest(groups_cfg_raw: Any) -> bool:
+    return isinstance(groups_cfg_raw, dict) and (
+        "group_files" in groups_cfg_raw or "__includes__" in groups_cfg_raw
+    )
+
+
+def _read_group_file_list(groups_cfg_raw: Dict[str, Any]) -> List[str]:
+    """Read the canonical group_files manifest."""
+    if "__includes__" in groups_cfg_raw:
+        raise ValueError("syn_config.json no longer supports '__includes__'; use 'group_files'.")
+
+    raw_paths = groups_cfg_raw.get("group_files", []) or []
+    if not isinstance(raw_paths, list):
+        raise TypeError("syn_config.json field 'group_files' must be a list of relative paths.")
+    return [str(path) for path in raw_paths]
 
 
 def _normalize_group_configs(
@@ -15,8 +34,10 @@ def _normalize_group_configs(
     """
     Normalize/validate per-group configs.
 
-    Ensures each group has the expected top-level blocks (state, mode, source,
-    timing, syns) with consistent keys and simple defaults.
+    Ensures each group has the expected top-level blocks with consistent keys.
+    New configs define synaptic input timing/source behavior through
+    ``input_blocks``. Group-level ``mode``/``source`` remain available for
+    advanced direct-mode configs; non-empty group-level ``timing`` is rejected.
     """
     if not isinstance(groups_cfg_raw, dict):
         raise TypeError(
@@ -24,29 +45,6 @@ def _normalize_group_configs(
         )
 
     groups_cfg: Dict[str, Dict[str, Any]] = {}
-
-    timing_keys = (
-        "onset_ms",
-        "stim_tstart_ms",
-        "stim_jitter",
-        "duration_ms",
-        "input_stim_tstart_ms",
-        "input_duration_ms",
-    )
-    source_keys = (
-        "freq",
-        "baseline",
-        "gabab",
-        "freq_scale",
-        "freq_shift",
-        "kind",
-        "path",
-        "time_col",
-        "rate_col",
-        "bin_ms",
-        "ref",
-        "key",
-    )
 
     for gname, gcfg_raw in groups_cfg_raw.items():
         if not isinstance(gcfg_raw, dict):
@@ -61,7 +59,6 @@ def _normalize_group_configs(
         # state: default to True
         state = gcfg.get("state", True)
         if state is None:
-            # None → treated as inactive for now (legacy scratch groups, etc.)
             state = False
         if not isinstance(state, bool):
             raise ValueError(
@@ -69,8 +66,18 @@ def _normalize_group_configs(
             )
         gcfg["state"] = state
 
-        # mode: required
+        input_blocks_raw = gcfg.get("input_blocks", []) or []
+        if not isinstance(input_blocks_raw, list):
+            raise ValueError(
+                f"Group '{gname}': 'input_blocks' must be a list "
+                f"(got {type(input_blocks_raw)!r})"
+            )
+        gcfg["input_blocks"] = [dict(block) for block in input_blocks_raw]
+
+        # mode: required only for configs that do not use input_blocks.
         mode = gcfg.get("mode")
+        if mode is None and gcfg["input_blocks"]:
+            mode = "block_sequence"
         if mode is None:
             raise ValueError(f"Group '{gname}' is missing required key 'mode'")
         if not isinstance(mode, str):
@@ -85,21 +92,20 @@ def _normalize_group_configs(
             raise ValueError(
                 f"Group '{gname}': 'source' must be a dict (got {type(source_raw)!r})"
             )
-        source = dict(source_raw)
-        for key in source_keys:
-            source.setdefault(key, None)
-        gcfg["source"] = source
+        gcfg["source"] = dict(source_raw)
 
-        # timing block
-        timing_raw = gcfg.get("timing", {})
-        if not isinstance(timing_raw, dict):
+        # Old public timing fields were replaced by explicit input_blocks.
+        timing_raw = gcfg.get("timing", None)
+        if timing_raw not in (None, {}):
+            raise ValueError(
+                f"Group '{gname}': 'timing' is no longer supported; "
+                "move timing/source settings into input_blocks."
+            )
+        if timing_raw is not None and not isinstance(timing_raw, dict):
             raise ValueError(
                 f"Group '{gname}': 'timing' must be a dict (got {type(timing_raw)!r})"
             )
-        timing = dict(timing_raw)
-        for key in timing_keys:
-            timing.setdefault(key, None)
-        gcfg["timing"] = timing
+        gcfg.pop("timing", None)
 
         # syns block
         syns_raw = gcfg.get("syns", {})
@@ -128,14 +134,14 @@ def _expand_group_includes(
     Allow syn_config.json to point to per-group files via an include list.
 
     Accepted forms:
-      - Plain dict of groups (legacy/normal).
-      - Dict with key "__includes__": list of relative file paths. Each file
+      - Dict with key "group_files": list of relative file paths. Each file
         must be a dict mapping group_name -> config. Any other keys in the
         top-level dict are treated as inline group definitions and merged.
+      - Plain dict of inline groups.
       - Top-level list: treated as the include list (no inline groups).
     """
-    # Legacy: already a dict of groups
-    if isinstance(groups_cfg_raw, dict) and "__includes__" not in groups_cfg_raw:
+    # Inline group dictionary.
+    if isinstance(groups_cfg_raw, dict) and not _has_group_file_manifest(groups_cfg_raw):
         return groups_cfg_raw
 
     include_list: List[str] = []
@@ -144,11 +150,11 @@ def _expand_group_includes(
     if isinstance(groups_cfg_raw, list):
         include_list = [str(p) for p in groups_cfg_raw]
     elif isinstance(groups_cfg_raw, dict):
-        include_list = [str(p) for p in groups_cfg_raw.get("__includes__", []) or []]
-        inline_groups = {k: v for k, v in groups_cfg_raw.items() if k != "__includes__"}
+        include_list = _read_group_file_list(groups_cfg_raw)
+        inline_groups = {k: v for k, v in groups_cfg_raw.items() if k not in _GROUP_FILE_KEYS}
     else:
         raise TypeError(
-            "syn_config must be a dict of groups, a dict with '__includes__', or a list of include paths"
+            "syn_config must be a dict of groups, a dict with 'group_files', or a list of include paths"
         )
 
     merged: Dict[str, Dict[str, Any]] = {}

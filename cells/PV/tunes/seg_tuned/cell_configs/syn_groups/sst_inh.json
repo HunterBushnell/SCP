@@ -1,22 +1,7 @@
 {
   "sst_inh": {
-    "state": true,
-    "mode": "precomputed",
+    "state": false,
     "color": "#ff7f0e",
-    "source": {
-      "freq": null,
-      "baseline": 3.5,
-      "path": "cells/SST/tunes/seg_tuned/output_data/SST4.0_tuned/results/spikes.npz",
-      "bin_ms": null,
-      "key": "base tune"
-    },
-    "timing": {
-      "onset_ms": null,
-      "stim_tstart_ms": 300.0,
-      "duration_ms": null,
-      "input_stim_tstart_ms": 300.0,
-      "input_duration_ms": null
-    },
     "syns": {
       "type": "GABA_A",
       "N_syn": 52,
@@ -37,6 +22,22 @@
         "tau_r_GABAA": 0.5,
         "tau_d_GABAA": 5.5
       }
-    }
+    },
+    "input_blocks": [
+      {
+        "name": "stimulus",
+        "role": "stimulus",
+        "start_ms": 0.0,
+        "stop_ms": 1000.0,
+        "mode": "precomputed",
+        "source": {
+          "path": "path/to/sst_precomputed_spikes.npz",
+          "selection": "sample",
+          "crop_start_ms": 0.0,
+          "crop_stop_ms": 1000.0,
+          "key": null
+        }
+      }
+    ]
   }
 }

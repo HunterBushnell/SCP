@@ -22,6 +22,7 @@ from .config import (
 )
 from .processing import _process_all_groups
 from .timing import _calculate_timing
+from .mode_helpers import _resolve_source_path
 
 
 def _build_mode_registry():
@@ -55,7 +56,25 @@ def _bin_trains(trains, tstart, tstop, bin_ms):
 def _load_reference_curve(groups_cfg, sim_cfg, group_name, bin_ms):
     """Reconstruct the rate curve actually used for the source block."""
     gcfg = groups_cfg.get(group_name, {}) or {}
-    source = gcfg.get("source", {}) or {}
+    try:
+        time_cfg = _calculate_timing(sim_cfg, gcfg)
+    except Exception:
+        return None
+
+    input_blocks = time_cfg.get("input_blocks", []) or []
+    ref_block = next(
+        (
+            block
+            for block in input_blocks
+            if block.get("mode") == "inhomogeneous_poisson"
+            and (block.get("source", {}) or {}).get("path")
+        ),
+        None,
+    )
+    if ref_block is None:
+        return None
+
+    source = ref_block.get("source", {}) or {}
     path = source.get("path")
     if not path:
         return None
@@ -64,7 +83,7 @@ def _load_reference_curve(groups_cfg, sim_cfg, group_name, bin_ms):
     rate_col = source.get("rate_col") or "AvgFiringRate"
 
     try:
-        df = pd.read_csv(path)
+        df = pd.read_csv(_resolve_source_path(str(path), sim_cfg))
     except Exception:
         return None
     if time_col not in df or rate_col not in df:
@@ -79,21 +98,8 @@ def _load_reference_curve(groups_cfg, sim_cfg, group_name, bin_ms):
         return None
     times_ms = times_ms - times_ms[0]
 
-    # Timing
-    try:
-        time_cfg = _calculate_timing(sim_cfg, gcfg)
-    except Exception:
-        return None
-    blocks = time_cfg.get("blocks", []) or []
-    anchors = time_cfg.get("anchors", {}) or {}
-    baseline_rate = anchors.get("baseline_rate_hz", None)
-
-    src_blocks = [b for b in blocks if b.get("kind") == "source"]
-    if not src_blocks:
-        return None
-    b = src_blocks[0]
-    t0 = float(b["t_start"])
-    t1 = float(b["t_end"])
+    t0 = float(ref_block["t_start"])
+    t1 = float(ref_block["t_end"])
     duration = max(0.0, t1 - t0)
     if duration <= 0.0:
         return None
@@ -102,11 +108,16 @@ def _load_reference_curve(groups_cfg, sim_cfg, group_name, bin_ms):
     if n_bins_needed <= 0:
         return None
 
+    crop_start_ms = float(source.get("crop_start_ms", 0.0) or 0.0)
+    if crop_start_ms > 0.0:
+        trim_bins = int(np.floor(crop_start_ms / float(bin_ms)))
+        if trim_bins > 0:
+            rates_hz = rates_hz[trim_bins:]
+
     avail = min(rates_hz.size, n_bins_needed)
     rates_block = rates_hz[:avail]
     if avail < n_bins_needed:
-        pad_rate = float(baseline_rate) if (baseline_rate is not None) else 0.0
-        pad = np.full(n_bins_needed - avail, pad_rate, dtype=float)
+        pad = np.zeros(n_bins_needed - avail, dtype=float)
         rates_block = np.concatenate([rates_block, pad])
 
     centers = t0 + (np.arange(n_bins_needed) + 0.5) * bin_ms
@@ -130,6 +141,21 @@ def _needs_geometry(groups_cfg: Dict[str, Any], group: str) -> bool:
     gcfg = groups_cfg.get(group, {}) or {}
     syns = gcfg.get("syns", {}) or {}
     return syns.get("N_syn", None) is None
+
+
+def _infer_group_bin_ms(groups_cfg: Dict[str, Any], group: str, fallback: Optional[float]) -> float:
+    if fallback:
+        return float(fallback)
+    gcfg = groups_cfg.get(group, {}) or {}
+    for block in gcfg.get("input_blocks", []) or []:
+        source = (block or {}).get("source", {}) or {}
+        bin_ms = source.get("bin_ms")
+        if bin_ms:
+            return float(bin_ms)
+    source = gcfg.get("source", {}) or {}
+    if source.get("bin_ms"):
+        return float(source["bin_ms"])
+    return 5.0
 
 
 def _sample_group_rates_from_configs(
@@ -161,15 +187,14 @@ def _sample_group_rates_from_configs(
         if tune_dir is None:
             raise ValueError(f"Geometry required for group {group!r}, but tune_dir could not be inferred.")
         try:
-            from . import analysis as analysis_mod
+            from modules.analysis import analysis as analysis_mod
+
             _, geometry, _ = analysis_mod.load_cell_and_geometry(tune_dir)
         except Exception as exc:
             raise ValueError(f"Geometry required for group {group!r}, but load failed: {exc}") from exc
 
     # Determine bin size
-    if bin_ms is None:
-        bin_ms = groups_cfg.get(group, {}).get("source", {}).get("bin_ms", None)
-    bin_ms = float(bin_ms) if bin_ms else 5.0
+    bin_ms = _infer_group_bin_ms(groups_cfg, group, bin_ms)
 
     def _gen_inputs_with_rng(rng):
         return _process_all_groups(

@@ -38,9 +38,9 @@ def _mode_precomputed(
       - source["key"] selects a specific key in pickled dicts
 
     Timing:
-      - Use time_cfg blocks; "source" blocks place sampled trains shifted to block start.
-      - Baseline blocks use baseline_rate_hz (anchors) to generate homogeneous Poisson if set.
-      - Quiescent blocks add nothing.
+      - Step 5 normally calls this handler once per precomputed input block.
+      - The block source crop is passed through anchors["source_trim_ms"].
+      - Source blocks place sampled trains shifted to the block start.
     """
     time_cfg = (group_cfg or {}).get("time_cfg") or {}
     anchors = time_cfg.get("anchors", {}) or {}

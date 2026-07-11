@@ -1,21 +1,7 @@
 {
   "bg_inh": {
     "state": true,
-    "mode": "homogeneous_poisson",
     "color": "#d62728",
-    "source": {
-      "freq": 0.2,
-      "baseline": null,
-      "path": null,
-      "bin_ms": null
-    },
-    "timing": {
-      "onset_ms": null,
-      "stim_tstart_ms": null,
-      "duration_ms": null,
-      "input_stim_tstart_ms": null,
-      "input_duration_ms": null
-    },
     "syns": {
       "type": "GABA_A",
       "N_syn": null,
@@ -36,6 +22,16 @@
         "tau_r_GABAA": 0.5,
         "tau_d_GABAA": 5.5
       }
-    }
+    },
+    "input_blocks": [
+      {
+        "name": "background",
+        "role": "background",
+        "start_ms": 0.0,
+        "stop_ms": 1000.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 0.2
+      }
+    ]
   }
 }

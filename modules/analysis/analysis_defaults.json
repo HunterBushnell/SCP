@@ -18,7 +18,7 @@
   "compare_preset_path": null,
   "compare_list_paths_enabled": true,
   "compare_list_paths": [
-    {"path": "external_data/pyrFiringRateAvg.csv@290;color=k;linestyle=--;label=PN_bio", "enabled": false},
+    {"path": "external_data/pyrFiringRateAvg.csv@290;color=k;linestyle=--;label=PN_bio", "enabled": true},
     {"path": "external_data/SSTFiringRateAvg.csv@300;color=magenta;linestyle=--;label=SST_bio", "enabled": false},
     {"path": "external_data/PVFiringRateAvg.csv@300;color=royalblue;linestyle=--;label=PV_bio", "enabled": false}
   ],

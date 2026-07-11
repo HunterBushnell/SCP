@@ -33,7 +33,6 @@ from .processing import (
     _make_group_signature,
     _process_all_groups,
 )
-from .timing import _build_time_blocks_from_anchors, _calculate_timing, _compute_time_anchors
 from .types import GroupInputs
 
 
@@ -203,15 +202,37 @@ def check_inputs(
         for gname, gcfg in groups_cfg.items():
             state = gcfg.get("state", True)
             mode = gcfg.get("mode")
-            source = gcfg.get("source", {}) or {}
             syns = gcfg.get("syns", {}) or {}
-            src_path = source.get("path")
             n_syn = syns.get("N_syn")
+            blocks = gcfg.get("input_blocks", []) or []
+            source_summary = _summarize_input_block_sources(blocks, gcfg.get("source", {}) or {})
 
             print(
                 f"  - {gname:<12}  state={state!r:5}  mode={mode!r:<18}  "
-                f"source.path={repr(src_path) if src_path is not None else 'None':<30}  "
-                f"N_syn={n_syn}"
+                f"sources={source_summary:<30}  "
+                f"N_syn={n_syn}  input_blocks={len(blocks)}"
             )
 
     return sim_cfg, groups_cfg
+
+
+def _summarize_input_block_sources(
+    blocks: list[Dict[str, Any]],
+    fallback_source: Dict[str, Any],
+) -> str:
+    """Return a compact source-path summary for check_inputs output."""
+    paths: list[str] = []
+    for block in blocks:
+        source = (block or {}).get("source", {}) or {}
+        path = source.get("path")
+        if path is not None and str(path) not in paths:
+            paths.append(str(path))
+
+    if not paths and fallback_source.get("path") is not None:
+        paths.append(str(fallback_source["path"]))
+
+    if not paths:
+        return "None"
+    if len(paths) == 1:
+        return repr(paths[0])
+    return f"{len(paths)} paths"

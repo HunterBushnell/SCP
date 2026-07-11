@@ -40,8 +40,8 @@ def save_default_plots(
     Save a small set of default plots into <run_dir>/plots.
 
     plot_mode:
-      - "default": legacy output/input/synapse plots
-      - "single_plot": paper-panel single composite plot via preset JSON
+      - "default": standard output/input/synapse plots
+      - "single_plot": compact composite plot via preset JSON
 
     Returns a dict of plot name -> file path.
     """
@@ -54,8 +54,8 @@ def save_default_plots(
     saved: Dict[str, Path] = {}
     mode = str(plot_mode or "default").strip().lower()
 
-    if mode in {"single_plot", "single-panel", "paper_panel", "paper-panel"}:
-        from . import paper_panel  # local import to avoid circular deps
+    if mode in {"single_plot", "single-panel", "single_plot_panel", "single-plot-panel"}:
+        from . import single_plot_panel  # local import to avoid circular deps
 
         repo_root = resolve_scp_root_for_results(results, run_dir)
         preset_path = (
@@ -76,12 +76,12 @@ def save_default_plots(
         except Exception as exc:
             print(f"save_plots single_plot preset load failed ({preset_path}): {exc}")
 
-        panel_cfg.setdefault("export_path", "paper_panel")
+        panel_cfg.setdefault("export_path", "single_plot_panel")
         panel_cfg.setdefault("export_formats", ["svg"])
         panel_cfg.setdefault("dpi", 150)
         panel_cfg.setdefault("export_overwrite", bool(overwrite))
 
-        panel_result = paper_panel.plot_paper_panel_from_results(
+        panel_result = single_plot_panel.plot_single_plot_panel_from_results(
             results,
             run_dir=run_dir,
             **panel_cfg,
@@ -110,7 +110,7 @@ def save_default_plots(
                     saved["single_plot"] = saved_path
         return saved
 
-    if mode not in {"default", "legacy"}:
+    if mode != "default":
         print(f"save_default_plots: unknown plot_mode={plot_mode!r}; using default mode.")
 
     # Output plot

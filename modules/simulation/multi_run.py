@@ -60,7 +60,7 @@ def run_multi(
         "spikes": [np.ndarray, ...],      # one per trial
         "traces": {
            "T": 1D np.ndarray,
-           "V": [np.ndarray, ...]         # up to cell_recording.n_trials (legacy: n_traces_to_save)
+           "V": [np.ndarray, ...]         # up to cell_recording.n_trials
         } or {},
         "meta": {
            "n_trials": int,

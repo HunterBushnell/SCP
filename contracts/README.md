@@ -1,27 +1,34 @@
 # Contracts Index
 
-These contracts describe Step 5.2.3/5.2.4 behavior and run-output schemas.
-They are descriptive references; public inputs/outputs remain authoritative.
+Contracts are developer/design references. Public usage is documented in
+`docs/`, especially:
 
-## Step Mapping
-- Legacy 2.3 -> SCP 5.2.3 (Generate inputs).
-- Legacy 2.4 -> SCP 5.2.4 (Build/attach synapses).
+- `../docs/pipeline_overview.md`
+- `../docs/guides/step_1_setup.md`
+- `../docs/guides/step_5_simulate.md`
+- `../docs/reference/configs_reference.md`
+- `../docs/reference/outputs_layout.md`
 
-## Current References
-- `pvsst_results_outputs.contract.v1.md`: output/run artifact schema.
-- `pvsst_step2.3_inputs_modes.contract.v1.md`: mode handler interface expectations.
-- `mode_contract.md`: compact mode contract summary.
+## Current Design References
+
+- `pvsst_results_outputs.contract.v1.md`: run-output artifact schema.
+- `pvsst_step2.3_inputs_modes.contract.v1.md`: input mode handler expectations.
+- `mode_contract.md`: compact input mode contract summary.
 - `5_simulate_randomness.md`: randomness design notes.
 
-## Historical Drafts (Context)
+## Historical Drafts
+
+These files record design history and may describe earlier internal layouts:
+
 - `step2.3_input_generation.contract.v1.md`
 - `pvsst_step2.3_inputs.contract.v2.md`
 - `pvsst_step2.3_inputs.contract.v3.md`
 - `pvsst_step2.3_inputs.contract.v4.md`
 
-## Notes
-- Some historical 2.3 drafts reflect pre-refactor config layouts.
-- For current runtime behavior, cross-check:
-  - `modules/input_generation/inputs.py`
-  - `docs/configs_reference.md`
-  - `docs/step_5_simulate.md`
+## Runtime Code
+
+For implementation details, cross-check:
+
+- `modules/input_generation/`
+- `modules/simulation/`
+- `modules/setup/`

@@ -161,7 +161,7 @@ SCP results and outputs contract (v1)
 from modules import run_sim
 from modules.analysis import plotting
 
-results = run_sim.load_results("cells/SST/tunes/seg_tuned/output_data/SST4.0_tuned")
+results = run_sim.load_results("cells/SST/tunes/seg_tuned/output_data/example_run")
 plotting.plot_results(results)
 ```
   * Notebook alternative: `<repo_root>/6_analysis.ipynb`

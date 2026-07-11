@@ -15,8 +15,8 @@ _SUBMODULES = {
     "analysis_ui",
     "auto_plots",
     "bio_curve",
-    "paper_panel",
-    "sst_self_inh",
+    "single_plot_panel",
+    "ui",
 }
 
 __all__ = sorted(_SUBMODULES)

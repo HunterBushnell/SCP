@@ -3,50 +3,40 @@
   "tstop": 1000.0,
   "dt": 0.025,
   "bins": 5.0,
-  "jitter": 100.0,
+  "jitter": null,
   "stim_start_ms": 300.0,
   "stim_duration_ms": 500.0,
   "n_trials": 1,
   "n_traces_to_save": 1,
   "n_inputs_to_save": 1,
-
+  "load": {
+    "enabled": false,
+    "path": null
+  },
+  "save": {
+    "enabled": false,
+    "stem": "results",
+    "format": "pkl",
+    "full_results": false
+  },
+  "append": {
+    "enabled": false,
+    "path": null
+  },
   "save_input_stats": true,
   "input_stats_bin_ms": 5.0,
   "avg_rate_curve_smooth_ms": 25.0,
   "avg_rate_curve_smooth_mode": "center",
   "plots_win_size": 25.0,
+  "plots_input_bin_ms": null,
   "plots_input_smooth_ms": 25.0,
+  "plots_raster_style": "dot",
   "plots_profile": "basic",
   "save_plots_mode": "single_plot",
   "save_plots_single_plot_preset": "modules/analysis/analysis_presets/single_plot.json",
   "save_plots_overwrite": false,
   "randomness_mode": "random",
-  "random_seed": null,
-
-
-
-    "load": [
-    false,
-    null
-  ],
-  "save": [
-    false,
-    "slurm_test",
-    "pkl",
-    false
-  ],
-  "append": [
-    false,
-    null
-  ],
-
-  "param_study": {
-    "input_type": null,
-    "param_type": null,
-    "param_vals": [],
-    "n_trials": null
-  },
-
+  "seed": null,
   "iclamp": {
     "enabled": false,
     "amp_nA": 0.2,
@@ -56,23 +46,12 @@
     "dt_ms": null,
     "record_currents": false
   },
-
   "cell_recording": {
     "enabled": false,
     "n_trials": 1,
     "sites": [
       {
         "sec": "soma",
-        "idx": 0,
-        "x": 0.5
-      },
-      {
-        "sec": "axon",
-        "idx": 0,
-        "x": 0.5
-      },
-      {
-        "sec": "dend",
         "idx": 0,
         "x": 0.5
       }
@@ -88,7 +67,6 @@
       "mech_states": false
     }
   },
-
   "syn_recording": {
     "enabled": false,
     "default_mode": "group",
@@ -105,7 +83,6 @@
     },
     "groups": {}
   },
-  
   "snapshot": {
     "enabled": false,
     "n_trials": 1,

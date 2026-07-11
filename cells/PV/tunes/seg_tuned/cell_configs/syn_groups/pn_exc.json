@@ -1,20 +1,6 @@
 {
   "pn_exc": {
     "state": true,
-    "mode": "inhomogeneous_poisson",
-    "source": {
-      "freq": null,
-      "baseline": 2.3,
-      "path": "external_data/pyrFiringRateAvg.csv",
-      "bin_ms": 5
-    },
-    "timing": {
-      "onset_ms": null,
-      "stim_tstart_ms": 290.0,
-      "duration_ms": null,
-      "input_stim_tstart_ms": 0.0,
-      "input_duration_ms": null
-    },
     "syns": {
       "type": "AMPA_NMDA_STP",
       "N_syn": 713,
@@ -40,6 +26,39 @@
         "NMDA_ratio": 0.0
       }
     },
-    "color": "#1f77b4"
+    "color": "#1f77b4",
+    "input_blocks": [
+      {
+        "name": "pre_baseline",
+        "role": "baseline",
+        "start_ms": 0.0,
+        "stop_ms": 290.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 2.3
+      },
+      {
+        "name": "stimulus",
+        "role": "stimulus",
+        "start_ms": 290.0,
+        "stop_ms": 840.0,
+        "mode": "inhomogeneous_poisson",
+        "source": {
+          "path": "external_data/pyrFiringRateAvg.csv",
+          "time_col": "Time",
+          "rate_col": "AvgFiringRate",
+          "bin_ms": 5.0,
+          "crop_start_ms": 0.0,
+          "crop_stop_ms": 550.0
+        }
+      },
+      {
+        "name": "post_baseline",
+        "role": "baseline",
+        "start_ms": 840.0,
+        "stop_ms": 1000.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 2.3
+      }
+    ]
   }
 }

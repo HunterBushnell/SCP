@@ -1,51 +1,162 @@
-Pipeline Overview
+# Pipeline Overview
 
-SCP is a notebook-first pipeline for single-cell simulations.
-Step 1 uses `modules`; Steps 2-4 run with updated notebook helpers and
-external ACT/bmtool dependencies; Step 5 is the stable run pipeline; Step 6 is analysis.
+SCP is organized as a notebook-first workflow with optional CLI/SLURM entry
+points for larger simulations.
 
-Execution model
-- Local notebooks (`2_passive.ipynb`, `3_active.ipynb`, `4_synapses.ipynb`, `5_simulate.ipynb`)
-  assume the tune bundle is already prepared and mechanisms are already compiled
-  (typically by Step 1). They validate and load existing files; they do not
-  download/compile mechanisms.
-- Colab notebooks (`colab_notebooks/2_colab.ipynb`, `colab_notebooks/3_colab.ipynb`) are
-  bootstrapped and can run standalone (auto-clone/install/compile as needed).
-- `5_simulate.ipynb` is shared by local and Colab Step 5 workflows.
+## Main Flow
 
-Before running any step on a new machine, complete `installation.md` and run:
-- `python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune seg_tuned`
+1. `1_setup.ipynb`: prepare a tune directory.
+2. `2_passive.ipynb`: tune/check passive cell properties.
+3. `3_active.ipynb`: tune/check active/channel properties.
+4. `4_synapses.ipynb`: define and tune synapse groups.
+5. `5_simulate.ipynb`: run the final simulation workflow.
+6. `6_analysis.ipynb`: analyze and compare saved runs.
+7. `7_tools.ipynb`: run optional utility scripts from a notebook.
 
-Steps (notebooks)
-- 1_setup.ipynb: Set up tune directory (ADB download/compile/scaffold/validate).
-- scripts/step1_prepare.py: CLI equivalent of Step 1.
-- archive/1_segment.ipynb: Optional ACT-derived segmentation reference.
-- 2_passive.ipynb: Passive parameter tuning.
-- colab_notebooks/2_colab.ipynb: Colab-friendly Step 2 (auto-bootstrap + passive tuning).
-- 3_active.ipynb: Active parameter tuning.
-- colab_notebooks/3_colab.ipynb: Colab-friendly Step 3 (auto-bootstrap + active tuning).
-- 4_synapses.ipynb: Synaptic tuning.
-- 5_simulate.ipynb: Stable simulation pipeline (inputs -> synapses -> simulation -> outputs; local + Colab).
-- archive/5_colab.ipynb: Archived Step 5 Colab notebook; use `5_simulate.ipynb`.
-- 6_analysis.ipynb: End-of-pipeline analysis and comparisons.
+Step 5 is the main simulation destination. Earlier notebooks prepare the cell
+and configs; Step 6 is optional post-processing; Step 7 is optional maintenance
+and export tooling.
 
-Step 5 sub-steps (documentation labels)
-- 5.2.1: Load cell
-- 5.2.2: Define geometry
-- 5.2.3: Generate inputs
-- 5.2.4: Preview/attach synapses
-- 5.3: Run sims and save outputs
-- 5.4: Analyze results
+## Step 1 Setup
 
-Entry points
-- Notebook: `5_simulate.ipynb`
-- CLI: `run_pipeline.py`
-- SLURM: `run_slurm.sh`
+Step 1 prepares the tune directory contract used by later steps:
 
-Data flow (high level)
-- Inputs: `cell_configs/` + `manifest.json` + modfiles
-- Outputs: `output_data/<run>/` with `run_manifest.json` and sidecars
+- model source files, usually an Allen Database bundle or an existing local model,
+- `modfiles/` and compiled NEURON mechanisms,
+- `cell_configs/cell_config.json`,
+- `cell_configs/sim_config.json`,
+- `cell_configs/geometry.json`,
+- optional `cell_configs/syn_config.json` and `cell_configs/syn_groups/*.json`,
+- validation checks for files, compiled mechanisms, cell loading, and inputs.
 
-See also
-- `step_5_simulate.md` for simulation details.
-- `step_6_analysis.md` for analysis usage.
+Notebook: `1_setup.ipynb`
+
+CLI equivalent:
+
+```bash
+python scripts/step1_prepare.py --cell PV --tune adb_peri --specimen-id 484635029 --model-type perisomatic
+```
+
+See `guides/step_1_setup.md`.
+
+## Step 2 Passive Tuning
+
+Step 2 uses ACT helper functions to estimate passive membrane values from target
+measurements, then leaves model edits under user control. It can run locally or
+in Colab from the root notebook.
+
+Notebook: `2_passive.ipynb`
+
+See `guides/step_2_passive.md`.
+
+## Step 3 Active Tuning
+
+Step 3 provides:
+
+- manual active current-step checks,
+- active-spiking metrics,
+- voltage/current diagnostic plots,
+- FI-curve checks,
+- optional ACT active-tuning workspace generation and CLI execution.
+
+ACT target data can be supplied as direct FI arrays, FI CSV, Allen/ADB ephys NWB
+files, or ACT-compatible trace `.npy` files. The currently robust public path is
+FI-target CSV generation, including from downloaded Allen/ADB NWB files.
+
+Notebook: `3_active.ipynb`
+
+See `guides/step_3_active.md`.
+
+## Step 4 Synapse Tuning
+
+Step 4 is a BMTool-based chemical synapse tuning workflow. It adapts SCP tune
+files into BMTool's SynapseTuner flow and prints copyable parameter blocks for
+`cell_configs/syn_groups/*.json`.
+
+Notebook: `4_synapses.ipynb`
+
+See `guides/step_4_synapses.md`.
+
+## Step 5 Simulation
+
+Step 5 loads the prepared tune and runs:
+
+- cell loading,
+- geometry definition,
+- input generation from synapse configs,
+- optional synapse-placement preview,
+- synapse attachment,
+- simulation,
+- saving and optional auto-plotting.
+
+Notebook: `5_simulate.ipynb`
+
+CLI:
+
+```bash
+python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 1 --force-save
+```
+
+SLURM:
+
+```bash
+CELL=SST TUNE=seg_tuned N_TRIALS=10 sbatch run_slurm.sh
+```
+
+See `guides/step_5_simulate.md` and `advanced/cli_slurm.md`.
+
+## Step 6 Analysis
+
+Step 6 analyzes saved Step 5 outputs. It includes:
+
+- a compact single-plot workflow,
+- advanced output and input plotting UIs,
+- extra analysis modes for metrics, config comparisons, input sampling,
+  synapse summaries, snapshot comparison, and table exports.
+
+Notebook: `6_analysis.ipynb`
+
+See `guides/analysis.md` for usage and `guides/step_6_analysis.md` for detailed
+preset/default-field references.
+
+## Local vs Colab
+
+The root notebooks are the current local and Colab entry points. Local notebooks
+assume the environment is installed. Colab notebooks can clone SCP and install
+runtime dependencies when needed.
+
+CLI/SLURM entry points are local/HPC-oriented and use the same config files as
+the notebooks.
+
+## Step 7 Extra Tools
+
+Step 7 wraps small utility scripts for notebook-first users:
+
+- restore saved run values into tune configs,
+- export `spikes.npz` to CSV,
+- merge compatible run outputs,
+- clear `slurm_*` output folders.
+
+Notebook: `7_tools.ipynb`
+
+See `guides/step_7_tools.md`.
+
+## Data Flow
+
+Inputs:
+
+- `cells/<CELL>/tunes/<TUNE>/manifest.json`
+- `cells/<CELL>/tunes/<TUNE>/modfiles/`
+- `cells/<CELL>/tunes/<TUNE>/cell_configs/`
+- optional `external_data/` sources
+- optional local Allen/ADB ephys `.nwb` files for Step 3 ACT targets
+
+Outputs:
+
+- `cells/<CELL>/tunes/<TUNE>/output_data/<RUN>/`
+- `run_manifest.json`
+- sidecars such as `sim_cfg.json`, `syn_config.json`, `spikes.npz`, and `traces.npz`
+- notebook-only diagnostics under `notebook_exports/`
+- ACT active-tuning artifacts under `act_workspace/`
+
+See `reference/outputs_layout.md`.

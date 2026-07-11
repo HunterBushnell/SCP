@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Tuple
 
 import math
+import numpy as np
 
 
 def _lognormal_mu_sigma(mean: float, std: float) -> Tuple[float, float]:
@@ -18,6 +19,23 @@ def _lognormal_mu_sigma(mean: float, std: float) -> Tuple[float, float]:
     return mu, sig
 
 
+def _clip_density(value: Any, *, clip_min: Optional[float] = 0.0, clip_max: Optional[float] = None):
+    if clip_min is not None:
+        value = np.maximum(value, float(clip_min))
+    if clip_max is not None:
+        value = np.minimum(value, float(clip_max))
+    return value
+
+
+def _density_clip_params(params: Dict[str, Any]) -> Dict[str, Optional[float]]:
+    clip_min = params.get("clip_min", 0.0)
+    clip_max = params.get("clip_max", None)
+    return {
+        "clip_min": None if clip_min is None else float(clip_min),
+        "clip_max": None if clip_max is None else float(clip_max),
+    }
+
+
 def _compile_density_from_spec(dist_spec: Any):
     """Convert a 'dist_func' spec from JSON into a callable density function.
 
@@ -29,6 +47,13 @@ def _compile_density_from_spec(dist_spec: Any):
       - callable      → dens(d) used as-is
       - dict          → {"kind": "uniform", "params": {"c": float, "multi": optional}}
       - dict          → {"kind": "linear", "params": {"m": float, "b": float, "multi": optional}}
+      - dict          → {"kind": "polynomial", "params": {"coeffs": [c0, c1, c2, ...]}}
+      - dict          → {"kind": "exponential", "params": {"a": float, "tau": float, "b": optional}}
+      - dict          → {"kind": "gaussian", "params": {"a": float, "mu": float, "sigma": float, "b": optional}}
+      - dict          → {"kind": "piecewise_linear", "params": {"points": [[distance, density], ...]}}
+
+    JSON-style specs are clipped at zero by default. Set params.clip_min=null
+    to allow negative values, or params.clip_max to cap high densities.
     """
     # None → uniform density 1.0
     if dist_spec is None:
@@ -39,18 +64,19 @@ def _compile_density_from_spec(dist_spec: Any):
         return dist_spec
     if isinstance(dist_spec, (int, float)):
         const = float(dist_spec)
-        return lambda d, c=const: c
+        return lambda d, c=const: _clip_density(c)
 
     # JSON-style spec
     if isinstance(dist_spec, dict):
         kind = dist_spec.get("kind") or "uniform"
         params = dist_spec.get("params", {}) or {}
+        clip_kwargs = _density_clip_params(params)
 
         if kind == "uniform":
             c = float(params.get("c", 1.0))
             multi = float(params.get("multi", 1.0))
             const = c * multi
-            return lambda d, c=const: c
+            return lambda d, c=const, clip_kwargs=clip_kwargs: _clip_density(c, **clip_kwargs)
 
         if kind == "linear":
             m = params.get("m", params.get("slope", 0.0))
@@ -58,10 +84,73 @@ def _compile_density_from_spec(dist_spec: Any):
             multi = float(params.get("multi", 1.0))
             m = float(m)
             b = float(b)
-            return lambda d, m=m, b=b, multi=multi: (m * d + b) * multi
+            return lambda d, m=m, b=b, multi=multi, clip_kwargs=clip_kwargs: _clip_density(
+                (m * d + b) * multi,
+                **clip_kwargs,
+            )
 
-        # Placeholder for future shapes (gaussian, etc.)
-        raise ValueError(f"dist_func spec with kind={kind!r} is not yet supported for N_syn resolution")
+        if kind == "polynomial":
+            coeffs = params.get("coeffs", params.get("coefficients", None))
+            if not isinstance(coeffs, list) or not coeffs:
+                raise ValueError("dist_func polynomial requires params.coeffs as a non-empty list")
+            coeffs_arr = np.asarray([float(c) for c in coeffs], dtype=float)
+            multi = float(params.get("multi", 1.0))
+
+            def _poly_density(d, coeffs_arr=coeffs_arr, multi=multi, clip_kwargs=clip_kwargs):
+                d_arr = np.asarray(d, dtype=float)
+                out = np.zeros_like(d_arr, dtype=float)
+                for power, coeff in enumerate(coeffs_arr):
+                    out = out + coeff * np.power(d_arr, power)
+                out = out * multi
+                out = _clip_density(out, **clip_kwargs)
+                return float(out) if np.isscalar(d) else out
+
+            return _poly_density
+
+        if kind == "exponential":
+            a = float(params.get("a", params.get("amplitude", 1.0)))
+            tau = float(params.get("tau", params.get("tau_um", 100.0)))
+            b = float(params.get("b", params.get("offset", 0.0)))
+            multi = float(params.get("multi", 1.0))
+            if tau == 0.0:
+                raise ValueError("dist_func exponential requires non-zero params.tau")
+            return lambda d, a=a, tau=tau, b=b, multi=multi, clip_kwargs=clip_kwargs: _clip_density(
+                (a * np.exp(-np.asarray(d, dtype=float) / tau) + b) * multi,
+                **clip_kwargs,
+            )
+
+        if kind == "gaussian":
+            a = float(params.get("a", params.get("amplitude", 1.0)))
+            mu = float(params.get("mu", params.get("mean", 0.0)))
+            sigma = float(params.get("sigma", params.get("std", 1.0)))
+            b = float(params.get("b", params.get("offset", 0.0)))
+            multi = float(params.get("multi", 1.0))
+            if sigma <= 0.0:
+                raise ValueError("dist_func gaussian requires params.sigma > 0")
+            return lambda d, a=a, mu=mu, sigma=sigma, b=b, multi=multi, clip_kwargs=clip_kwargs: _clip_density(
+                (a * np.exp(-0.5 * ((np.asarray(d, dtype=float) - mu) / sigma) ** 2) + b) * multi,
+                **clip_kwargs,
+            )
+
+        if kind == "piecewise_linear":
+            points = params.get("points", None)
+            if not isinstance(points, list) or len(points) < 2:
+                raise ValueError("dist_func piecewise_linear requires params.points with at least two [x, y] pairs")
+            parsed_points = sorted((float(x), float(y)) for x, y in points)
+            xs = np.asarray([x for x, _ in parsed_points], dtype=float)
+            ys = np.asarray([y for _, y in parsed_points], dtype=float)
+            if any((x1 - x0) <= 0.0 for x0, x1 in zip(xs, xs[1:])):
+                raise ValueError("dist_func piecewise_linear params.points must have unique distance values")
+            multi = float(params.get("multi", 1.0))
+
+            def _piecewise_density(d, xs=xs, ys=ys, multi=multi, clip_kwargs=clip_kwargs):
+                out = np.interp(np.asarray(d, dtype=float), xs, ys, left=ys[0], right=ys[-1]) * multi
+                out = _clip_density(out, **clip_kwargs)
+                return float(out) if np.isscalar(d) else out
+
+            return _piecewise_density
+
+        raise ValueError(f"dist_func spec with kind={kind!r} is not supported")
 
     raise TypeError(
         f"dist_func must be None, number, callable, or dict-spec; got {type(dist_spec)!r}"

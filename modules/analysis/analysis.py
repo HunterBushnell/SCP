@@ -3000,9 +3000,7 @@ def _project_restore_like_values_for_run(
             warnings.append(f"{run_label(run_dir)}: target syn_config missing for syn_groups: {syn_cfg_path}")
         else:
             source_groups: Any = source_syn_payload
-            needs_expand = isinstance(source_syn_payload, list) or (
-                isinstance(source_syn_payload, dict) and "__includes__" in source_syn_payload
-            )
+            needs_expand = isinstance(source_syn_payload, list) or restore._has_group_file_manifest(source_syn_payload)
             if needs_expand:
                 source_config_root = (
                     (source_tune_path / "cell_configs")
@@ -3011,7 +3009,7 @@ def _project_restore_like_values_for_run(
                 )
                 if source_config_root is None:
                     warnings.append(
-                        f"{run_label(run_dir)}: cannot expand source syn_config __includes__ without source tune."
+                        f"{run_label(run_dir)}: cannot expand source syn_config group files without source tune."
                     )
                     source_groups = None
                 else:
@@ -3019,7 +3017,7 @@ def _project_restore_like_values_for_run(
                         source_groups = restore._expand_syn_config(source_syn_payload, source_config_root)
                     except Exception as exc:
                         warnings.append(
-                            f"{run_label(run_dir)}: failed to expand source syn_config __includes__: {exc}"
+                            f"{run_label(run_dir)}: failed to expand source syn_config group files: {exc}"
                         )
                         source_groups = None
 
@@ -3766,54 +3764,9 @@ def collect_run_dirs(base_dir: Path) -> list[Path]:
     return sorted(candidates, key=lambda p: (p / "run_manifest.json").stat().st_mtime)
 
 
-def _candidate_mtime(candidate: Path) -> float:
-    if candidate.is_file():
-        return candidate.stat().st_mtime
-    manifest = candidate / "run_manifest.json"
-    if manifest.is_file():
-        return manifest.stat().st_mtime
-    results_manifest = candidate / "results" / "run_manifest.json"
-    if results_manifest.is_file():
-        return results_manifest.stat().st_mtime
-    files = list(candidate.glob("*.pkl")) + list(candidate.glob("*.npz"))
-    if len(files) == 1:
-        return files[0].stat().st_mtime
-    return candidate.stat().st_mtime
-
-
 def collect_run_candidates(base_dir: Path) -> list[Path]:
-    """
-    Collect run folders plus legacy outputs (single .pkl/.npz files or folders
-    containing a single .pkl/.npz) for selection UIs.
-    """
-    candidates: list[Path] = []
-    seen: set[str] = set()
-    if not base_dir.is_dir():
-        return candidates
-
-    for p in base_dir.iterdir():
-        if p.is_dir():
-            resolved = resolve_run_dir(p)
-            if (resolved / "run_manifest.json").is_file():
-                key = str(resolved)
-                if key not in seen:
-                    seen.add(key)
-                    candidates.append(resolved)
-                continue
-            files = list(p.glob("*.pkl")) + list(p.glob("*.npz"))
-            if len(files) == 1:
-                key = str(p)
-                if key not in seen:
-                    seen.add(key)
-                    candidates.append(p)
-            continue
-        if p.is_file() and p.suffix.lower() in (".pkl", ".npz"):
-            key = str(p)
-            if key not in seen:
-                seen.add(key)
-                candidates.append(p)
-
-    return sorted(candidates, key=_candidate_mtime)
+    """Collect current-format run folders for selection UIs."""
+    return collect_run_dirs(base_dir)
 
 
 def resolve_run(base_dir: Path, stem_or_path: Optional[Union[str, Path]]) -> Path:

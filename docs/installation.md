@@ -1,46 +1,98 @@
-Installation
+# Installation
 
-Recommended local setup (Conda)
-1. Clone SCP and enter the repo:
-   `git clone <SCP_REPO_URL> && cd SCP`
-2. Create and activate the environment:
-   `conda env create -f environment.yml`
-   `conda activate scp-py311`
-3. Register a Jupyter kernel:
-   `python -m ipykernel install --user --name scp-py311 --display-name "Python (SCP)"`
+## Local Conda Setup
 
-Alternative local setup (venv + pip)
-1. Create and activate a virtual environment:
-   `python -m venv .venv`
-   `source .venv/bin/activate`
-2. Install dependencies:
-   `pip install -r requirements.txt`
-3. Register a Jupyter kernel:
-   `python -m ipykernel install --user --name scp-venv --display-name "Python (SCP venv)"`
+```bash
+git clone <SCP_REPO_URL>
+cd SCP
+conda env create -f environment.yml
+conda activate scp-py311
+python -m ipykernel install --user --name scp-py311 --display-name "Python (SCP)"
+```
 
-External repos for steps 2-4
-1. Clone ACT and bmtool next to SCP (default discovery path):
-   `mkdir -p ../mods`
-   `git clone https://github.com/V-Marco/ACT.git ../mods/ACT`
-   `git clone https://github.com/cyneuro/bmtool.git ../mods/bmtool`
-2. If stored elsewhere, set env vars before running notebooks:
-   `export SCP_ACT_PATH=/path/to/ACT`
-   `export SCP_BMTOOL_PATH=/path/to/bmtool`
+## Optional venv Setup
 
-Validate environment + workspace
-1. Run the setup checker:
-   `python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune seg_tuned`
-2. If mechanisms are missing, build during check:
-   `python scripts/check_setup.py --steps 5 --cell PV --tune seg_tuned --compile-modfiles`
-3. Lint notebooks for portability and duplicate-key config issues:
-   `python scripts/check_notebooks.py`
+Conda is preferred because NEURON/AllenSDK dependencies are easier to reproduce,
+but a venv can work on compatible systems:
 
-Manual modfile build (per tune)
-- `cd <tune_dir>/modfiles && nrnivmodl`
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m ipykernel install --user --name scp-venv --display-name "Python (SCP venv)"
+```
 
-Colab/Linux bootstrapped notebooks
-- `colab_notebooks/2_colab.ipynb` and `colab_notebooks/3_colab.ipynb` install dependencies and clone required repos in a fresh Colab session.
-- `5_simulate.ipynb` is the unified Step 5 notebook for both local and Colab runs.
-- Optional Colab environment overrides:
-  - SCP repo: `SCP_REPO_URL`, `SCP_REPO_BRANCH`, `SCP_REPO_DIR`, `SCP_GIT_TOKEN`.
-  - ACT repo (Steps 2/3): `SCP_ACT_REPO_URL`, `SCP_ACT_REPO_BRANCH`, `SCP_ACT_DIR`, `SCP_ACT_PATH`.
+## External Repositories
+
+Steps 2-4 use or reserve integrations with external tools:
+
+```bash
+mkdir -p ../mods
+git clone https://github.com/V-Marco/ACT.git ../mods/ACT
+git clone https://github.com/cyneuro/bmtool.git ../mods/bmtool
+```
+
+If stored elsewhere:
+
+```bash
+export SCP_ACT_PATH=/path/to/ACT
+export SCP_BMTOOL_PATH=/path/to/bmtool
+```
+
+ACT is required for Step 2 passive tuning and optional Step 3 ACT active tuning.
+Step 3's manual active sweep/FI checks can run without ACT. BMTool is used by
+Step 4 synapse tuning.
+
+## Validate the Workspace
+
+Run the setup checker:
+
+```bash
+python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune seg_tuned --compile-modfiles
+```
+
+Run notebook checks:
+
+```bash
+python scripts/check_notebooks.py
+```
+
+If a tune is missing compiled mechanisms, build them once:
+
+```bash
+cd cells/PV/tunes/seg_tuned/modfiles
+nrnivmodl
+```
+
+or use `--compile-modfiles` with `scripts/check_setup.py`, or let Step 1 compile
+them. Compiled `x86_64/` folders are generated artifacts and are ignored by Git.
+
+## Colab
+
+The root notebooks can bootstrap a fresh Colab runtime:
+
+- `1_setup.ipynb`
+- `2_passive.ipynb`
+- `3_active.ipynb`
+- `4_synapses.ipynb`
+- `5_simulate.ipynb`
+- `6_analysis.ipynb`
+- `7_tools.ipynb`
+
+Useful environment overrides:
+
+- `SCP_REPO_URL`
+- `SCP_REPO_BRANCH`
+- `SCP_REPO_DIR`
+- `SCP_GIT_TOKEN`, `SCP_GITHUB_TOKEN`, or `GITHUB_TOKEN`
+- `SCP_ACT_REPO_URL`, `SCP_ACT_REPO_BRANCH`, `SCP_ACT_DIR`, `SCP_ACT_PATH`
+- `SCP_BMTOOL_PATH`
+
+For private repositories, store a GitHub token in Colab secrets and set
+`SCP_GIT_TOKEN` before running the notebook bootstrap cell.
+
+## Large Local Data
+
+Do not commit downloaded Allen/ADB ephys `.nwb` files, saved simulation outputs,
+compiled mechanisms, or notebook scratch exports. The default `.gitignore`
+excludes these generated/local artifacts.

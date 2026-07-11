@@ -12,11 +12,16 @@ import argparse
 import importlib
 import importlib.metadata
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Iterable, Optional
+
+REPO_ROOT_HINT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT_HINT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT_HINT))
+
+from modules.setup.mechanisms import find_nrnivmodl
 
 
 ACT_REPO_URL = "https://github.com/V-Marco/ACT.git"
@@ -188,16 +193,16 @@ def _check_python_packages(r: Reporter) -> None:
     except Exception as exc:
         r.fail(f"NEURON import succeeded but runtime probe failed: {exc}")
 
-    nrnivmodl = shutil.which("nrnivmodl")
+    nrnivmodl = find_nrnivmodl()
     if nrnivmodl:
         r.ok(f"nrnivmodl found at {nrnivmodl}")
     else:
-        r.fail("nrnivmodl not found on PATH (required to compile modfiles)")
+        r.fail("nrnivmodl not found on PATH or next to the active Python executable")
 
 
 def _check_external_dependencies(r: Reporter, repo_root: Path, steps: set[str]) -> None:
     if steps.intersection({"2", "3"}):
-        act_marker = Path("act") / "segregation.py"
+        act_marker = Path("act") / "passive.py"
         act_path, act_candidates = _resolve_external_repo(
             repo_name="ACT",
             marker_rel=act_marker,
@@ -215,7 +220,8 @@ def _check_external_dependencies(r: Reporter, repo_root: Path, steps: set[str]) 
         else:
             r.ok(f"ACT repo found: {act_path}")
 
-        # Step 2/3 need act/passive.py specifically.
+        # Step 2 uses ACT passive helpers. Step 3 active checks can be expanded
+        # when that notebook is refactored.
         if steps.intersection({"2", "3"}) and act_path is not None:
             passive_path = act_path / "act" / "passive.py"
             if passive_path.is_file():
@@ -252,9 +258,9 @@ def _compile_modfiles_if_requested(tune_dir: Path, r: Reporter) -> bool:
         r.fail(f"Missing modfiles directory: {mod_dir}")
         return False
 
-    nrnivmodl = shutil.which("nrnivmodl")
+    nrnivmodl = find_nrnivmodl()
     if not nrnivmodl:
-        r.fail("nrnivmodl not found on PATH; cannot compile modfiles")
+        r.fail("nrnivmodl not found on PATH or next to the active Python executable; cannot compile modfiles")
         return False
 
     r.ok(f"Compiling modfiles with {nrnivmodl} in {mod_dir}")

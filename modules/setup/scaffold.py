@@ -10,38 +10,30 @@ import copy
 from .defaults import (
     default_cell_config,
     default_geometry_config,
-    default_placeholder_syn_group,
     default_sim_config,
-    default_syn_config,
+    default_syn_config_for_templates,
+    default_syn_group_templates,
     guess_cell_color,
 )
 from .json_utils import _write_json, _write_scaffold_json
 from .paths import resolve_step1_paths
 
 
-def scaffold_common_configs(
+def scaffold_base_configs(
     *,
     tune_dir: Path,
     cell_name: str,
     tune_name: str,
-    specimen_id: int,
+    specimen_id: Optional[int],
     model_type: str,
     soma_diam_multiplier: float,
     color: Optional[str] = None,
     config_mode: str = "fill",
     sync_cell_metadata: bool = True,
 ) -> Dict[str, Any]:
-    """
-    Ensure common pipeline config files exist under cell_configs/.
-
-    config_mode:
-      - fill: create missing files and fill missing keys in existing files
-      - overwrite: replace existing files with defaults
-      - skip: do not modify existing files
-    """
+    """Ensure first-level config files exist under cell_configs/."""
     paths = resolve_step1_paths(tune_dir)
     paths.config_dir.mkdir(parents=True, exist_ok=True)
-    paths.syn_groups_dir.mkdir(parents=True, exist_ok=True)
 
     statuses: Dict[str, Any] = {}
 
@@ -85,7 +77,6 @@ def scaffold_common_configs(
         specimen_id=specimen_id,
         model_type=model_type,
     )
-    sim_cfg_defaults["soma_diam_multiplier"] = float(soma_diam_multiplier)
     sim_cfg_path = paths.config_dir / "sim_config.json"
     sim_status, sim_cfg_data = _write_scaffold_json(sim_cfg_path, sim_cfg_defaults, config_mode)
     # Keep sim config focused on simulation controls; remove identity metadata.
@@ -93,6 +84,7 @@ def scaffold_common_configs(
         before_sim = copy.deepcopy(sim_cfg_data)
         sim_cfg_data.pop("specimen_id", None)
         sim_cfg_data.pop("model_type", None)
+        sim_cfg_data.pop("soma_diam_multiplier", None)
         if sim_cfg_data != before_sim:
             _write_json(sim_cfg_path, sim_cfg_data)
             if sim_status == "unchanged":
@@ -110,15 +102,41 @@ def scaffold_common_configs(
         "status": geom_status,
     }
 
-    placeholder_group_path = paths.syn_groups_dir / "placeholder_off.json"
-    placeholder_defaults = default_placeholder_syn_group(group_name="placeholder_off")
-    group_status, _ = _write_scaffold_json(placeholder_group_path, placeholder_defaults, config_mode)
-    statuses["syn_group_placeholder"] = {
-        "path": str(placeholder_group_path),
-        "status": group_status,
-    }
+    return statuses
 
-    syn_cfg_defaults = default_syn_config(include_path="syn_groups/placeholder_off.json")
+
+def scaffold_synapse_configs(
+    *,
+    tune_dir: Path,
+    config_mode: str = "fill",
+    template_kinds: Optional[list[str]] = None,
+    weight_style: str = "distributed",
+) -> Dict[str, Any]:
+    """Ensure optional synapse config files exist under cell_configs/."""
+    paths = resolve_step1_paths(tune_dir)
+    paths.config_dir.mkdir(parents=True, exist_ok=True)
+    paths.syn_groups_dir.mkdir(parents=True, exist_ok=True)
+
+    statuses: Dict[str, Any] = {}
+
+    template_payloads = default_syn_group_templates(
+        template_kinds=template_kinds,
+        weight_style=weight_style,
+    )
+
+    for filename, payload in template_payloads.items():
+        template_path = paths.syn_groups_dir / filename
+        template_status, _ = _write_scaffold_json(template_path, payload, config_mode)
+        statuses[f"syn_group_{template_path.stem}"] = {
+            "path": str(template_path),
+            "status": template_status,
+        }
+
+    if template_payloads:
+        syn_cfg_defaults = default_syn_config_for_templates(filenames=template_payloads.keys())
+    else:
+        syn_cfg_defaults = {"group_files": []}
+
     syn_cfg_path = paths.config_dir / "syn_config.json"
     syn_status, _ = _write_scaffold_json(syn_cfg_path, syn_cfg_defaults, config_mode)
     statuses["syn_config"] = {
@@ -126,4 +144,50 @@ def scaffold_common_configs(
         "status": syn_status,
     }
 
+    return statuses
+
+
+def scaffold_common_configs(
+    *,
+    tune_dir: Path,
+    cell_name: str,
+    tune_name: str,
+    specimen_id: Optional[int],
+    model_type: str,
+    soma_diam_multiplier: float,
+    color: Optional[str] = None,
+    config_mode: str = "fill",
+    sync_cell_metadata: bool = True,
+    include_synapses: bool = True,
+    synapse_template_kinds: Optional[list[str]] = None,
+    synapse_weight_style: str = "distributed",
+) -> Dict[str, Any]:
+    """
+    Ensure standard config files exist under cell_configs/.
+
+    config_mode:
+      - fill: create missing files and fill missing keys in existing files
+      - overwrite: replace existing files with defaults
+      - skip: do not modify existing files
+    """
+    statuses = scaffold_base_configs(
+        tune_dir=tune_dir,
+        cell_name=cell_name,
+        tune_name=tune_name,
+        specimen_id=specimen_id,
+        model_type=model_type,
+        soma_diam_multiplier=soma_diam_multiplier,
+        color=color,
+        config_mode=config_mode,
+        sync_cell_metadata=sync_cell_metadata,
+    )
+    if include_synapses:
+        statuses.update(
+            scaffold_synapse_configs(
+                tune_dir=tune_dir,
+                config_mode=config_mode,
+                template_kinds=synapse_template_kinds,
+                weight_style=synapse_weight_style,
+            )
+        )
     return statuses

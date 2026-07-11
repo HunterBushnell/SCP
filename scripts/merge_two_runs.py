@@ -324,8 +324,27 @@ def _load_manifest_json_sidecar(run_dir: Path, files: Dict[str, Any], key: str) 
         return None
 
 
+_GROUP_FILE_KEYS = ("group_files",)
+
+
+def _has_group_file_manifest(groups_cfg_raw: Any) -> bool:
+    return isinstance(groups_cfg_raw, dict) and (
+        "group_files" in groups_cfg_raw or "__includes__" in groups_cfg_raw
+    )
+
+
+def _read_group_file_list(groups_cfg_raw: Dict[str, Any]) -> List[str]:
+    if "__includes__" in groups_cfg_raw:
+        raise ValueError("syn_config no longer supports '__includes__'; use 'group_files'.")
+
+    raw_paths = groups_cfg_raw.get("group_files", []) or []
+    if not isinstance(raw_paths, list):
+        raise TypeError("syn_config field 'group_files' must be a list of relative paths.")
+    return [str(item) for item in raw_paths]
+
+
 def _expand_syn_config(groups_cfg_raw: Any, config_root: Path) -> Dict[str, Any]:
-    if isinstance(groups_cfg_raw, dict) and "__includes__" not in groups_cfg_raw:
+    if isinstance(groups_cfg_raw, dict) and not _has_group_file_manifest(groups_cfg_raw):
         return groups_cfg_raw
 
     include_list: List[str] = []
@@ -333,10 +352,10 @@ def _expand_syn_config(groups_cfg_raw: Any, config_root: Path) -> Dict[str, Any]
     if isinstance(groups_cfg_raw, list):
         include_list = [str(item) for item in groups_cfg_raw]
     elif isinstance(groups_cfg_raw, dict):
-        include_list = [str(item) for item in groups_cfg_raw.get("__includes__", []) or []]
-        inline_groups = {k: v for k, v in groups_cfg_raw.items() if k != "__includes__"}
+        include_list = _read_group_file_list(groups_cfg_raw)
+        inline_groups = {k: v for k, v in groups_cfg_raw.items() if k not in _GROUP_FILE_KEYS}
     else:
-        raise TypeError("syn_config must be dict/list/contains __includes__")
+        raise TypeError("syn_config must be dict/list/contains group_files")
 
     merged: Dict[str, Any] = {}
     for rel_path in include_list:
@@ -428,9 +447,7 @@ def _load_run_bundle(run_path: Path) -> RunBundle:
         warnings.append(msg)
 
     syn_cfg = syn_cfg_raw
-    needs_expand = isinstance(syn_cfg_raw, list) or (
-        isinstance(syn_cfg_raw, dict) and "__includes__" in syn_cfg_raw
-    )
+    needs_expand = isinstance(syn_cfg_raw, list) or _has_group_file_manifest(syn_cfg_raw)
     if needs_expand:
         if source_tune is None:
             warnings.append(

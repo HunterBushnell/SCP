@@ -40,7 +40,7 @@ from .simulation.result_paths import (
     _sha256_file,
     _write_json,
 )
-from .simulation.result_loading import _load_from_manifest, load_old_multi_results, load_results
+from .simulation.result_loading import _load_from_manifest, load_results
 from .simulation.results import (
     _append_results_to_path,
     _ensure_multi_results,

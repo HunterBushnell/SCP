@@ -2,7 +2,7 @@
 # Step 2.3 – Input Generation Module Contract (PV–SST, v2)
 
 > Historical draft: kept for design history. For current behavior, prefer
-> `modules/input_generation/inputs.py` and `docs/configs_reference.md`.
+> `modules/input_generation/inputs.py` and `../docs/reference/configs_reference.md`.
 
 This document specifies the design and behavior of **Step 2.3 – Input Generation** in the PV–SST single-cell pipeline.
 

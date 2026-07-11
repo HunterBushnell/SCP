@@ -18,8 +18,8 @@ from typing import Any, Dict, Iterable, Optional
 
 DEFAULT_STEP5_EXTERNAL_INPUTS = (
     "external_data/pyrFiringRateAvg.csv",
-    "external_data/PV_1000tr.pkl",
-    "external_data/SST_1000tr.pkl",
+    "external_data/PVFiringRateAvg.csv",
+    "external_data/SSTFiringRateAvg.csv",
 )
 
 
@@ -144,4 +144,28 @@ def finish_step5_notebook_setup(
         "repo_root": root,
         "in_colab": is_colab(),
         "missing_external": missing_external,
+    }
+
+
+def finish_step1_notebook_setup(
+    repo_root: Path,
+    *,
+    install_deps: Optional[bool] = None,
+    print_status: bool = True,
+) -> Dict[str, Any]:
+    """Finish Step 1 notebook setup after the SCP repo is available."""
+    from modules.notebooks.helpers import ensure_scp_repo_on_syspath
+
+    root = ensure_scp_repo_on_syspath(Path(repo_root))
+    os.environ["SCP_ROOT"] = str(root)
+
+    ensure_notebook_dependencies(install_deps=install_deps)
+
+    if print_status:
+        print("Runtime:", "Colab" if is_colab() else "local")
+        print("SCP repo:", root)
+
+    return {
+        "repo_root": root,
+        "in_colab": is_colab(),
     }

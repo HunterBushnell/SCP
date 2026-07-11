@@ -23,6 +23,9 @@ APPLY_CHOICES = (
 )
 
 
+_GROUP_FILE_KEYS = ("group_files",)
+
+
 @dataclass
 class Change:
     json_path: str
@@ -271,8 +274,24 @@ def _resolve_tune_path_from_sim(sim_cfg: Optional[Dict[str, Any]]) -> Optional[P
         return None
 
 
+def _has_group_file_manifest(groups_cfg_raw: Any) -> bool:
+    return isinstance(groups_cfg_raw, dict) and (
+        "group_files" in groups_cfg_raw or "__includes__" in groups_cfg_raw
+    )
+
+
+def _read_group_file_list(groups_cfg_raw: Dict[str, Any]) -> List[str]:
+    if "__includes__" in groups_cfg_raw:
+        raise ValueError("syn_config no longer supports '__includes__'; use 'group_files'.")
+
+    raw_paths = groups_cfg_raw.get("group_files", []) or []
+    if not isinstance(raw_paths, list):
+        raise TypeError("syn_config field 'group_files' must be a list of relative paths.")
+    return [str(item) for item in raw_paths]
+
+
 def _expand_syn_config(groups_cfg_raw: Any, config_root: Path) -> Dict[str, Any]:
-    if isinstance(groups_cfg_raw, dict) and "__includes__" not in groups_cfg_raw:
+    if isinstance(groups_cfg_raw, dict) and not _has_group_file_manifest(groups_cfg_raw):
         return groups_cfg_raw
 
     include_list: List[str] = []
@@ -280,10 +299,10 @@ def _expand_syn_config(groups_cfg_raw: Any, config_root: Path) -> Dict[str, Any]
     if isinstance(groups_cfg_raw, list):
         include_list = [str(item) for item in groups_cfg_raw]
     elif isinstance(groups_cfg_raw, dict):
-        include_list = [str(item) for item in groups_cfg_raw.get("__includes__", []) or []]
-        inline_groups = {k: v for k, v in groups_cfg_raw.items() if k != "__includes__"}
+        include_list = _read_group_file_list(groups_cfg_raw)
+        inline_groups = {k: v for k, v in groups_cfg_raw.items() if k not in _GROUP_FILE_KEYS}
     else:
-        raise TypeError("syn_config must be dict/list/contains __includes__")
+        raise TypeError("syn_config must be dict/list/contains group_files")
 
     merged: Dict[str, Any] = {}
     for rel_path in include_list:
@@ -523,9 +542,9 @@ def _collect_target_group_files(
     if isinstance(target_syn_cfg, list):
         include_list = [str(item) for item in target_syn_cfg]
     elif isinstance(target_syn_cfg, dict):
-        if "__includes__" in target_syn_cfg:
-            include_list = [str(item) for item in target_syn_cfg.get("__includes__", []) or []]
-            inline_groups = {k: v for k, v in target_syn_cfg.items() if k != "__includes__"}
+        if _has_group_file_manifest(target_syn_cfg):
+            include_list = _read_group_file_list(target_syn_cfg)
+            inline_groups = {k: v for k, v in target_syn_cfg.items() if k not in _GROUP_FILE_KEYS}
         else:
             inline_groups = dict(target_syn_cfg)
     else:
@@ -595,9 +614,7 @@ def _apply_syn_group_updates(
 
     target_syn_cfg = _read_json(syn_cfg_path)
     source_groups: Any = source_syn_payload
-    needs_expand = isinstance(source_syn_payload, list) or (
-        isinstance(source_syn_payload, dict) and "__includes__" in source_syn_payload
-    )
+    needs_expand = isinstance(source_syn_payload, list) or _has_group_file_manifest(source_syn_payload)
     if needs_expand:
         if source_config_root is None:
             report.file_reports.append(
@@ -606,7 +623,7 @@ def _apply_syn_group_updates(
                     kind="syn_groups",
                     status="skipped",
                     message=(
-                        "Source syn_config uses __includes__, but source_config_root is unavailable."
+                        "Source syn_config uses group file includes, but source_config_root is unavailable."
                     ),
                 )
             )

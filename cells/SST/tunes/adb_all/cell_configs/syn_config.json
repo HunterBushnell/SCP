@@ -1,5 +1,5 @@
 {
-  "__includes__": [
-    "syn_groups/placeholder_off.json"
+  "group_files": [
+    "syn_groups/input_blocks_template.json"
   ]
 }

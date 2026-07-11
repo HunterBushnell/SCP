@@ -88,50 +88,53 @@ def _build_default_mode_registry() -> Dict[str, Any]:
     return input_modes_core.get_default_mode_registry()
 
 
-def _resolve_group_stim_jitter_delay_ms(
+def _resolve_block_jitter_delays_ms(
     sim_cfg: Dict[str, Any],
     group_name: str,
     group_cfg: Dict[str, Any],
     trial_rng: Optional[randomness.TrialRandomness] = None,
-) -> Optional[float]:
-    """
-    Resolve per-group source start jitter delay (ms) from timing['stim_jitter'].
+) -> Dict[int, float]:
+    """Resolve optional per-block jitter delays from ``block['jitter_ms']``."""
+    delays: Dict[int, float] = {}
+    for idx, block in enumerate(group_cfg.get("input_blocks", []) or []):
+        if not isinstance(block, dict) or block.get("state", True) is False:
+            continue
+        jitter_raw = block.get("jitter_ms")
+        if jitter_raw is None:
+            continue
+        try:
+            jitter_ms = float(jitter_raw)
+        except Exception as exc:
+            raise ValueError(
+                f"Group '{group_name}' block {idx}: jitter_ms must be numeric or null "
+                f"(got {jitter_raw!r})"
+            ) from exc
+        if jitter_ms < 0.0:
+            raise ValueError(
+                f"Group '{group_name}' block {idx}: jitter_ms must be >= 0 "
+                f"(got {jitter_ms!r})"
+            )
+        if jitter_ms <= 0.0:
+            continue
 
-    The draw uses the same lognormal parameterization as global sim jitter
-    (mean=std=stim_jitter). When trial_rng is provided, the delay can vary per
-    trial deterministically according to the randomness config.
-    """
-    timing = group_cfg.get("timing", {}) or {}
-    stim_jitter_raw = timing.get("stim_jitter", None)
-    if stim_jitter_raw is None:
-        return None
-    try:
-        stim_jitter = float(stim_jitter_raw)
-    except Exception as exc:
-        raise ValueError(
-            f"Group '{group_name}': timing['stim_jitter'] must be numeric or null "
-            f"(got {stim_jitter_raw!r})"
-        ) from exc
-    if stim_jitter < 0.0:
-        raise ValueError(
-            f"Group '{group_name}': timing['stim_jitter'] must be >= 0 (got {stim_jitter!r})"
-        )
-    if stim_jitter <= 0.0:
-        return None
-
-    if trial_rng is not None:
-        jitter_rng = trial_rng.rng("inputs", group=group_name, stream="stim_jitter")
-    else:
-        seed = sim_cfg.get("seed", None)
-        if seed is None:
-            jitter_rng = np.random.default_rng()
+        block_name = str(block.get("name") or f"block_{idx + 1}")
+        stream = f"block_jitter:{block_name}"
+        if trial_rng is not None:
+            jitter_rng = trial_rng.rng("inputs", group=group_name, stream=stream)
         else:
-            group_hash = randomness.stable_u32_from_str(str(group_name), salt="stim_jitter:")
-            jitter_rng = np.random.default_rng(int(seed) ^ int(group_hash) ^ 0x5A17A5A1)
+            seed = sim_cfg.get("seed", None)
+            if seed is None:
+                jitter_rng = np.random.default_rng()
+            else:
+                block_hash = randomness.stable_u32_from_str(
+                    f"{group_name}:{block_name}",
+                    salt="block_jitter:",
+                )
+                jitter_rng = np.random.default_rng(int(seed) ^ int(block_hash) ^ 0x5A17A5A1)
 
-    mu, sig = _lognormal_mu_sigma(stim_jitter, stim_jitter)
-    jitter_offset = float(jitter_rng.lognormal(mu, sig)) if sig > 0 else stim_jitter
-    return max(0.0, jitter_offset)
+        mu, sig = _lognormal_mu_sigma(jitter_ms, jitter_ms)
+        delays[idx] = max(0.0, float(jitter_rng.lognormal(mu, sig)) if sig > 0 else jitter_ms)
+    return delays
 
 
 def _process_all_groups(
@@ -214,7 +217,7 @@ def _process_all_groups(
             )
 
         # 3) Generate timing configuration for this group
-        source_jitter_delay_ms = _resolve_group_stim_jitter_delay_ms(
+        block_jitter_delays_ms = _resolve_block_jitter_delays_ms(
             sim_cfg=sim_cfg,
             group_name=gname,
             group_cfg=gcfg,
@@ -223,14 +226,11 @@ def _process_all_groups(
         time_cfg = _calculate_timing(
             sim_cfg,
             gcfg,
-            source_jitter_delay_ms=source_jitter_delay_ms,
+            block_jitter_delays_ms=block_jitter_delays_ms,
         )
         gcfg["time_cfg"] = time_cfg  # Attach for modes and downstream consumers
 
-        # 4) Resolve mode handler
-        handler = _resolve_mode_handler(gname, gcfg, mode_registry)
-
-        # 5) Choose RNG for this group and run handler to get spike trains
+        # 4) Choose RNG for this group and run handler(s) to get spike trains
         mode_name = gcfg.get("mode")
         setting_path = "inputs"
         group_rng = rng
@@ -255,14 +255,25 @@ def _process_all_groups(
         elif group_rng is None:
             group_rng = _init_rng(None, sim_cfg)
 
-        spike_trains = _run_mode_handler(
-            handler=handler,
-            sim_cfg=sim_cfg,
-            group_name=gname,
-            group_cfg=gcfg,
-            geometry=geometry,
-            rng=group_rng,
-        )
+        if _uses_input_blocks(gcfg):
+            spike_trains = _run_input_blocks(
+                sim_cfg=sim_cfg,
+                group_name=gname,
+                group_cfg=gcfg,
+                geometry=geometry,
+                mode_registry=mode_registry,
+                rng=group_rng,
+            )
+        else:
+            handler = _resolve_mode_handler(gname, gcfg, mode_registry)
+            spike_trains = _run_mode_handler(
+                handler=handler,
+                sim_cfg=sim_cfg,
+                group_name=gname,
+                group_cfg=gcfg,
+                geometry=geometry,
+                rng=group_rng,
+            )
 
         # Optional consistency check: number of trains vs N_syn_resolved
         if len(spike_trains) != n_syn_resolved:
@@ -304,11 +315,19 @@ def _should_skip_group(
     if state is False:
         return True
 
+    if _uses_input_blocks(group_cfg):
+        return False
+
     mode = group_cfg.get("mode")
     if mode is None or (isinstance(mode, str) and mode.strip() == ""):
         return True
 
     return False
+
+
+def _uses_input_blocks(group_cfg: Dict[str, Any]) -> bool:
+    blocks = group_cfg.get("input_blocks", []) or []
+    return isinstance(blocks, list) and len(blocks) > 0
 
 
 def _resolve_mode_handler(
@@ -371,6 +390,121 @@ def _run_mode_handler(
     return spike_trains
 
 
+def _run_input_blocks(
+    *,
+    sim_cfg: Dict[str, Any],
+    group_name: str,
+    group_cfg: Dict[str, Any],
+    geometry: Optional[Any],
+    mode_registry: Mapping[str, Any],
+    rng: np.random.Generator,
+) -> List[np.ndarray]:
+    """Run each normalized input block and merge spikes per synapse."""
+    syns = group_cfg.get("syns", {}) or {}
+    n_syn = int(syns.get("N_syn_resolved", syns.get("N_syn", 0)) or 0)
+    trains_accum: List[List[float]] = [[] for _ in range(max(n_syn, 0))]
+
+    time_cfg = group_cfg.get("time_cfg", {}) or {}
+    input_blocks = time_cfg.get("input_blocks", []) or []
+    for block in input_blocks:
+        mode_name = block.get("mode")
+        handler = mode_registry.get(mode_name)
+        if handler is None:
+            raise ValueError(
+                f"Group '{group_name}' input block {block.get('name')!r} "
+                f"specifies unknown mode {mode_name!r}."
+            )
+
+        block_cfg = _build_block_group_cfg(group_cfg, block, time_cfg)
+        block_trains = _run_mode_handler(
+            handler=handler,
+            sim_cfg=sim_cfg,
+            group_name=f"{group_name}:{block.get('name')}",
+            group_cfg=block_cfg,
+            geometry=geometry,
+            rng=rng,
+        )
+        if len(block_trains) != n_syn:
+            raise ValueError(
+                f"Group '{group_name}' input block {block.get('name')!r} returned "
+                f"{len(block_trains)} trains, expected {n_syn}."
+            )
+
+        for idx, train in enumerate(block_trains):
+            if train.size:
+                trains_accum[idx].extend(train.tolist())
+
+    tstart = float(sim_cfg.get("tstart", 0.0))
+    tstop = float(sim_cfg.get("tstop", tstart))
+    out: List[np.ndarray] = []
+    for spikes in trains_accum:
+        if not spikes:
+            out.append(np.array([], dtype=float))
+            continue
+        arr = np.asarray(spikes, dtype=float)
+        arr = arr[(arr >= tstart) & (arr <= tstop)]
+        arr.sort()
+        out.append(arr)
+    return out
+
+
+def _build_block_group_cfg(
+    group_cfg: Dict[str, Any],
+    block: Dict[str, Any],
+    group_time_cfg: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Create the mode-handler view for one input block."""
+    source = dict(block.get("source", {}) or {})
+    block_start = float(block["t_start"])
+    block_stop = float(block["t_end"])
+    duration = max(0.0, block_stop - block_start)
+    group_anchors = group_time_cfg.get("anchors", {}) or {}
+
+    jitter_tstart = None
+    if _global_jitter_applies_to_block(block):
+        jitter_tstart = group_anchors.get("jitter_tstart_ms")
+
+    anchors = {
+        "sim_tstart": group_anchors.get("sim_tstart"),
+        "sim_tstop": group_anchors.get("sim_tstop"),
+        "onset": block_start,
+        "source_tstart": block_start,
+        "source_tstop": block_stop,
+        "duration_ms": duration,
+        "source_trim_ms": source.get("crop_start_ms"),
+        "baseline_rate_hz": None,
+        "baseline_spec": {"kind": "none"},
+        "jitter_tstart_ms": jitter_tstart,
+        "block_name": block.get("name"),
+        "block_role": block.get("role"),
+    }
+    block_time_cfg = {
+        "anchors": anchors,
+        "blocks": [
+            {
+                "kind": "source",
+                "t_start": block_start,
+                "t_end": block_stop,
+                "name": block.get("name"),
+                "role": block.get("role"),
+                "mode": block.get("mode"),
+            }
+        ],
+        "input_blocks": [block],
+    }
+
+    block_cfg = dict(group_cfg)
+    block_cfg["mode"] = block.get("mode")
+    block_cfg["source"] = source
+    block_cfg["time_cfg"] = block_time_cfg
+    return block_cfg
+
+
+def _global_jitter_applies_to_block(block: Dict[str, Any]) -> bool:
+    role = str(block.get("role") or "").strip().lower()
+    return block.get("mode") == "homogeneous_poisson" and role in {"baseline", "background"}
+
+
 def _build_group_inputs(
     group_name: str,
     group_cfg: Dict[str, Any],
@@ -397,18 +531,7 @@ def _build_group_inputs(
     time_cfg = group_cfg.get("time_cfg")
     if isinstance(time_cfg, dict):
         anchors = time_cfg.get("anchors", {}) or {}
-        meta["time_anchors_ms"] = {
-            "sim_tstart": float(anchors["sim_tstart"]) if "sim_tstart" in anchors and anchors["sim_tstart"] is not None else None,
-            "sim_tstop": float(anchors["sim_tstop"]) if "sim_tstop" in anchors and anchors["sim_tstop"] is not None else None,
-            "onset": anchors.get("onset"),
-            "source_tstart": anchors.get("source_tstart"),
-            "source_tstop": anchors.get("source_tstop"),
-            "baseline_rate_hz": anchors.get("baseline_rate_hz"),
-            "source_trim_ms": anchors.get("source_trim_ms"),
-            "jitter_tstart_ms": anchors.get("jitter_tstart_ms"),
-            "stim_jitter_ms": anchors.get("stim_jitter_ms"),
-            "stim_jitter_delay_ms": anchors.get("stim_jitter_delay_ms"),
-        }
+        meta["time_anchors_ms"] = dict(anchors)
         meta["time_blocks"] = time_cfg.get("blocks", [])
 
     if randomness_meta:

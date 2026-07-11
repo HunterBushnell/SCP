@@ -7,12 +7,9 @@ import csv
 import json
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import gaussian_kde
 from scipy.signal import find_peaks
-from scipy.ndimage import gaussian_filter1d
 from matplotlib.lines import Line2D
 from itertools import cycle, chain
-from collections import defaultdict
 
 from neuron import h
 
@@ -1451,7 +1448,7 @@ def plot_single(
     else:
         bin_width = float(sim_cfg.get('bins', 25.0))  # default 25 ms
 
-    # stimulus window (prefer explicit sim_cfg markers; fall back to legacy delay)
+    # stimulus window (prefer explicit sim_cfg markers; fall back to delay)
     if delay is not None:
         delay_ms = float(delay)
     else:
@@ -1845,22 +1842,13 @@ def plot_multi(
         axRate.plot(plot_bio[1] * 1000, bio_data, 'k',
                     lw=2, label='In-Vivo Input')
 
-    # optional benchmark curve from old/new results
+    # optional benchmark curve from another current-format run
     if benchmark_path:
         try:
             from modules import run_sim as run_sim_mod
-            try:
-                bench_res = run_sim_mod.load_results(benchmark_path)
-                bench_spikes = bench_res.get("spikes", []) if bench_res.get("mode") == "multi" else []
-            except Exception:
-                bench_res = run_sim_mod.load_old_multi_results(
-                    benchmark_path,
-                    label=None,
-                    tstop=sim_duration_ms,
-                    bins=bin_width,
-                    delay=delay_ms,
-                )
-                bench_spikes = bench_res.get("spikes", [])
+
+            bench_res = run_sim_mod.load_results(benchmark_path)
+            bench_spikes = bench_res.get("spikes", []) if bench_res.get("mode") == "multi" else []
 
             if bench_spikes:
                 bw_s = bin_width / 1000.0

@@ -1,5 +1,5 @@
 {
-  "__includes__": [
+  "group_files": [
     "syn_groups/pn_exc.json",
     "syn_groups/vip_inh.json",
     "syn_groups/bg_exc.json",

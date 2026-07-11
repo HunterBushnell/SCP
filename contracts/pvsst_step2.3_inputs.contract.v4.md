@@ -1,7 +1,7 @@
 # PV–SST Step 2.3 – Input Generation Contract (v4)
 
 > Historical draft: kept for design history. For current behavior, prefer
-> `modules/input_generation/inputs.py` and `docs/configs_reference.md`.
+> `modules/input_generation/inputs.py` and `../docs/reference/configs_reference.md`.
 
 This document fixes the contract for **Step 2.3 – synaptic input generation** as implemented in `inputs.py` plus the default mode handlers in `input_modes_core.py`.
 
@@ -280,7 +280,7 @@ time_cfg = {"anchors": anchors, "blocks": blocks}
 - `source_tstop`     – end of the main source-driven segment (may be `None`).
 - `baseline_rate_hz` – constant baseline rate (Hz) to use in non-source intervals, or `None` for purely quiescent non-source periods.
 
-Current design (reflecting Hunter’s experiments):
+Current design used by the bundled examples:
 
 - `onset` defaults to `sim_cfg["tstart"]` if `timing["onset_ms"] is None`.
 - `source_tstart` is conceptually computed as:

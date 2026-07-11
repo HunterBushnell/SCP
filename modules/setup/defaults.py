@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
+
+
+DEFAULT_SYNAPSE_TEMPLATE_KINDS = (
+    "input_blocks",
+)
+
+SYNAPSE_TEMPLATE_FILENAMES = {
+    "input_blocks": "input_blocks_template.json",
+}
 
 
 def guess_specimen_from_cell(cell_name: str) -> Optional[int]:
@@ -29,8 +38,8 @@ def guess_cell_color(cell_name: str) -> str:
     """Return a default plot color used in existing SCP cell_config files."""
     key = (cell_name or "").strip().upper()
     defaults = {
-        "PV": "b",
-        "SST": "m",
+        "PV": "royalblue",
+        "SST": "mediumorchid",
     }
     return defaults.get(key, "k")
 
@@ -39,7 +48,7 @@ def default_cell_config(
     *,
     cell_name: str,
     tune_name: str,
-    specimen_id: int,
+    specimen_id: Optional[int],
     model_type: str,
     soma_diam_multiplier: float,
     color: Optional[str] = None,
@@ -58,43 +67,46 @@ def default_cell_config(
     }
 
 
-def default_sim_config(*, cell_name: str, specimen_id: int, model_type: str) -> Dict[str, Any]:
-    is_sst = (cell_name or "").strip().upper().startswith("SST")
-    tstop = 1200.0 if is_sst else 1000.0
-    stim_start = 500.0 if is_sst else 300.0
-
+def default_sim_config(*, cell_name: str, specimen_id: Optional[int], model_type: str) -> Dict[str, Any]:
     return {
         "tstart": 0.0,
-        "tstop": tstop,
+        "tstop": 1000.0,
         "dt": 0.025,
         "bins": 5.0,
-        "jitter": 100.0,
-        "stim_start_ms": stim_start,
+        "jitter": None,
+        "stim_start_ms": 300.0,
         "stim_duration_ms": 500.0,
         "n_trials": 1,
         "n_traces_to_save": 1,
         "n_inputs_to_save": 1,
-        "load": [False, None],
-        "save": [False, "step1_bootstrap", "pkl", False],
-        "append": [False, None],
+        "load": {
+            "enabled": False,
+            "path": None,
+        },
+        "save": {
+            "enabled": False,
+            "stem": "results",
+            "format": "pkl",
+            "full_results": False,
+        },
+        "append": {
+            "enabled": False,
+            "path": None,
+        },
         "save_input_stats": True,
         "input_stats_bin_ms": 5.0,
         "avg_rate_curve_smooth_ms": 25.0,
         "avg_rate_curve_smooth_mode": "center",
         "plots_win_size": 25.0,
+        "plots_input_bin_ms": None,
         "plots_input_smooth_ms": 25.0,
-        "plots_profile": "off",
+        "plots_raster_style": "dot",
+        "plots_profile": "basic",
         "save_plots_mode": "single_plot",
         "save_plots_single_plot_preset": "modules/analysis/analysis_presets/single_plot.json",
         "save_plots_overwrite": False,
         "randomness_mode": "random",
-        "random_seed": None,
-        "param_study": {
-            "input_type": None,
-            "param_type": None,
-            "param_vals": [],
-            "n_trials": None,
-        },
+        "seed": None,
         "iclamp": {
             "enabled": False,
             "amp_nA": 0.2,
@@ -144,7 +156,6 @@ def default_sim_config(*, cell_name: str, specimen_id: int, model_type: str) -> 
             "save_all_traces": True,
             "save_syn_records_by_trial": True,
         },
-        "soma_diam_multiplier": float(guess_soma_multiplier(cell_name)),
     }
 
 
@@ -160,41 +171,129 @@ def default_geometry_config(*, cell_name: str) -> Dict[str, Any]:
     }
 
 
-def default_placeholder_syn_group(*, group_name: str = "placeholder_off") -> Dict[str, Any]:
+def default_synapse_weight_params(*, weight_style: str = "distributed") -> Dict[str, Any]:
+    """Return generic weight params for generated synapse templates."""
+    style = str(weight_style or "distributed").strip().lower()
+    if style == "fixed":
+        return {"initW": 1.0}
+    if style == "distributed":
+        return {"wt_mean": 1.0, "wt_std": 0.0}
+    raise ValueError("weight_style must be 'fixed' or 'distributed'")
+
+
+def _default_syns_template(
+    *,
+    syn_type: str,
+    n_syn: Optional[int],
+    segs: str,
+    dist_func: Dict[str, Any],
+    weight_style: str,
+) -> Dict[str, Any]:
     return {
-        group_name: {
-            "state": False,
+        "type": syn_type,
+        "N_syn": n_syn,
+        "segs": segs,
+        "dist_func": dist_func,
+        "params": default_synapse_weight_params(weight_style=weight_style),
+    }
+
+
+def _default_input_blocks_template() -> list[Dict[str, Any]]:
+    return [
+        {
+            "name": "pre_baseline",
+            "role": "baseline",
+            "start_ms": 0.0,
+            "stop_ms": 300.0,
             "mode": "homogeneous_poisson",
+            "rate_hz": 2.0,
+        },
+        {
+            "name": "stimulus",
+            "role": "stimulus",
+            "start_ms": 300.0,
+            "stop_ms": 800.0,
+            "mode": "inhomogeneous_poisson",
             "source": {
-                "freq": 0.0,
-                "baseline": 0.0,
-                "path": None,
+                "path": "external_data/pyrFiringRateAvg.csv",
+                "time_col": "Time",
+                "rate_col": "AvgFiringRate",
                 "bin_ms": 5.0,
+                "crop_start_ms": 0.0,
+                "crop_stop_ms": 500.0,
             },
-            "timing": {
-                "onset_ms": 0.0,
-                "stim_tstart_ms": None,
-                "duration_ms": None,
-                "input_stim_tstart_ms": None,
-                "input_duration_ms": None,
-            },
-            "syns": {
-                "type": "AMPA_NMDA_STP",
-                "N_syn": 0,
-                "segs": "all",
-                "dist_func": {"kind": None, "params": {}},
-                "params": {
-                    "wt_mean": 1.0,
-                    "wt_std": 0.0,
-                    "initW": 1.0,
-                },
-            },
-            "color": "#7f7f7f",
+        },
+        {
+            "name": "post_baseline",
+            "role": "baseline",
+            "start_ms": 800.0,
+            "stop_ms": 1000.0,
+            "mode": "homogeneous_poisson",
+            "rate_hz": 2.0,
+        },
+    ]
+
+
+def default_syn_group_template(
+    *,
+    template_kind: str,
+    group_name: Optional[str] = None,
+    weight_style: str = "distributed",
+) -> Dict[str, Any]:
+    """Return one disabled synapse-group template for Step 1 scaffolding."""
+    kind = str(template_kind or "").strip().lower()
+    if kind not in DEFAULT_SYNAPSE_TEMPLATE_KINDS:
+        allowed = ", ".join(DEFAULT_SYNAPSE_TEMPLATE_KINDS)
+        raise ValueError(f"Unknown synapse template kind {template_kind!r}; expected one of: {allowed}")
+
+    name = group_name or f"{kind}_template"
+
+    return {
+        name: {
+            "state": False,
+            "color": "#1f77b4",
+            "input_blocks": _default_input_blocks_template(),
+            "syns": _default_syns_template(
+                syn_type="AMPA_NMDA_STP",
+                n_syn=0,
+                segs="all",
+                dist_func={"kind": "uniform", "params": {"c": 1.0}},
+                weight_style=weight_style,
+            ),
         }
     }
 
 
-def default_syn_config(*, include_path: str = "syn_groups/placeholder_off.json") -> Dict[str, Any]:
+def default_syn_group_templates(
+    *,
+    template_kinds: Optional[Iterable[str]] = None,
+    weight_style: str = "distributed",
+) -> Dict[str, Dict[str, Any]]:
+    """Return filename -> template payload for selected Step 1 synapse templates."""
+    kinds = list(DEFAULT_SYNAPSE_TEMPLATE_KINDS if template_kinds is None else template_kinds)
+    templates: Dict[str, Dict[str, Any]] = {}
+    for kind_raw in kinds:
+        kind = str(kind_raw).strip().lower()
+        if not kind:
+            continue
+        filename = SYNAPSE_TEMPLATE_FILENAMES.get(kind)
+        if filename is None:
+            allowed = ", ".join(DEFAULT_SYNAPSE_TEMPLATE_KINDS)
+            raise ValueError(f"Unknown synapse template kind {kind_raw!r}; expected one of: {allowed}")
+        templates[filename] = default_syn_group_template(
+            template_kind=kind,
+            weight_style=weight_style,
+        )
+    return templates
+
+
+def default_syn_config(*, include_path: str = "syn_groups/input_blocks_template.json") -> Dict[str, Any]:
     return {
-        "__includes__": [include_path],
+        "group_files": [include_path],
+    }
+
+
+def default_syn_config_for_templates(*, filenames: Iterable[str]) -> Dict[str, Any]:
+    return {
+        "group_files": [f"syn_groups/{filename}" for filename in filenames],
     }
