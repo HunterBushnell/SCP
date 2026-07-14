@@ -42,6 +42,13 @@ cells/<CELL>/tunes/<TUNE>/notebook_exports/
 These exports are scratch artifacts for notebook review, not Step 5 pipeline
 runs. They are intentionally separate from `output_data/`.
 
+Common Step 2 passive target exports:
+
+- `step2_passive/allen_nwb_passive_targets.csv`: aggregated passive targets
+  extracted from an Allen/ADB NWB file.
+- `step2_passive/allen_nwb_passive_sweeps.csv`: per-sweep passive metrics used
+  for the aggregate target values.
+
 ## ACT Workspace Artifacts
 
 Step 3 optional ACT active tuning writes under:

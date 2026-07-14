@@ -13,7 +13,7 @@ In `sim_config.json`:
 CLI override:
 
 ```bash
-python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 10 --force-save
+python run_pipeline.py --tune-dir cells/PV/tunes/tuned --n-trials 10 --force-save
 ```
 
 ## Make Runs Reproducible
@@ -65,6 +65,8 @@ In `sim_config.json`:
 ```
 
 Or set `force_save = True` in `5_simulate.ipynb`, or use the manual save cell after a run you want to keep.
+If `save.stem` and `output_stem` are unset, SCP creates a timestamped `run_...`
+folder under `output_data/`.
 
 ## Enable Auto Plots
 

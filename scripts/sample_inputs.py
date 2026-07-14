@@ -5,7 +5,7 @@ summarize the mean firing-rate curve.
 
 Usage (from repo root):
   python scripts/sample_inputs.py \
-    --tune cells/SST/tunes/seg_tuned \
+    --tune cells/SST/tunes/tuned \
     --group pn_exc \
     --runs 20 \
     --bin-ms 5 \

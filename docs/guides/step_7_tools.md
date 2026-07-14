@@ -75,8 +75,8 @@ CLI equivalent:
 
 ```bash
 python scripts/restore_run_state.py \
-  --from-run cells/SST/tunes/seg_tuned/output_data/example_run \
-  --to-tune cells/SST/tunes/seg_tuned \
+  --from-run cells/SST/tunes/tuned/output_data/example_run \
+  --to-tune cells/SST/tunes/tuned \
   --apply sim_config,cell_config,geometry,syn_config,syn_groups \
   --syn-groups all
 ```
@@ -107,7 +107,7 @@ CLI equivalent:
 
 ```bash
 python scripts/export_spikes_csv.py \
-  --input cells/PV/tunes/seg_tuned/output_data/example_run_a \
+  --input cells/PV/tunes/tuned/output_data/example_run_a \
   --delimiter "," \
   --precision 10 \
   --trial-prefix trial_
@@ -136,9 +136,9 @@ CLI equivalent:
 
 ```bash
 python scripts/merge_two_runs.py \
-  --run-a cells/PV/tunes/seg_tuned/output_data/example_run_a \
-  --run-b cells/PV/tunes/seg_tuned/output_data/example_run_b \
-  --output-dir cells/PV/tunes/seg_tuned/output_data \
+  --run-a cells/PV/tunes/tuned/output_data/example_run_a \
+  --run-b cells/PV/tunes/tuned/output_data/example_run_b \
+  --output-dir cells/PV/tunes/tuned/output_data \
   --output-stem merge_example
 ```
 
@@ -166,7 +166,7 @@ CLI equivalent:
 
 ```bash
 python scripts/clear_slurm_runs.py \
-  --tune-dir cells/SST/tunes/seg_tuned
+  --tune-dir cells/SST/tunes/tuned
 ```
 
 Add `--write` to delete matching entries.

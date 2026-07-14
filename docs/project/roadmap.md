@@ -19,6 +19,8 @@ belong in `contracts/` or issue trackers.
   current saved outputs are not approved for release.
 - Improve ACT active tuning support for direct voltage-trace/NWB workflows once
   ACT trace sampling/window contracts are clarified.
+- Add optional target trace overlays in Step 3 after the active-trace contract
+  can reliably select, align, and label matching target sweeps.
 - Add parametric-study machinery after the repo-wide refactor is complete.
 - Add optional tuning proposal/apply tooling for Steps 2-3. Current notebooks
   should stay manual-first, but future tooling could save computed ACT values,

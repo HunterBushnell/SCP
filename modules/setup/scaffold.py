@@ -17,6 +17,7 @@ from .defaults import (
 )
 from .json_utils import _write_json, _write_scaffold_json
 from .paths import resolve_step1_paths
+from .target_config import prepare_target_config
 
 
 def scaffold_base_configs(
@@ -159,6 +160,7 @@ def scaffold_common_configs(
     config_mode: str = "fill",
     sync_cell_metadata: bool = True,
     include_synapses: bool = True,
+    include_target_config: bool = True,
     synapse_template_kinds: Optional[list[str]] = None,
     synapse_weight_style: str = "distributed",
 ) -> Dict[str, Any]:
@@ -181,6 +183,12 @@ def scaffold_common_configs(
         config_mode=config_mode,
         sync_cell_metadata=sync_cell_metadata,
     )
+    if include_target_config:
+        statuses["target_config"] = prepare_target_config(
+            tune_dir=tune_dir,
+            config_mode=config_mode,
+            target_source_mode=None,
+        )
     if include_synapses:
         statuses.update(
             scaffold_synapse_configs(

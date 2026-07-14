@@ -1,0 +1,12 @@
+{
+  "cell_name": "PV",
+  "tune": "tuned_adb",
+  "color": "blue",
+  "cell_loader": "allen_manifest",
+  "paths": {
+    "manifest": "manifest.json"
+  },
+  "tuning": {
+    "soma_diam_multiplier": 6.0
+  }
+}

@@ -2,7 +2,7 @@
 
 ## Cell
 
-The NEURON model for a specific cell type or model target, such as PV or SST.
+The NEURON model for a specific cell type or model target, such as PV, SST, or PN.
 
 ## Tune
 

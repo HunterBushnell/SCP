@@ -22,6 +22,14 @@ from .analysis import (
 )
 
 
+def _close_figure(fig: Any) -> None:
+    if fig is not None:
+        try:
+            plt.close(fig)
+        except Exception:
+            pass
+
+
 def save_default_plots(
     results: Dict[str, Any],
     run_dir: Union[str, Path],
@@ -86,6 +94,7 @@ def save_default_plots(
             run_dir=run_dir,
             **panel_cfg,
         )
+        fig = panel_result.get("fig")
         for w in panel_result.get("warnings", []) or []:
             print(f"save_plots single_plot warning: {w}")
 
@@ -96,7 +105,6 @@ def save_default_plots(
                 key = "single_plot" if i == 0 else f"single_plot_{i}"
                 saved[key] = path
         elif not requested:
-            fig = panel_result.get("fig")
             if fig is not None:
                 fallback_path = plot_dir / "single_plot.png"
                 saved_path = save_figure(
@@ -108,6 +116,7 @@ def save_default_plots(
                 )
                 if saved_path is not None:
                     saved["single_plot"] = saved_path
+        _close_figure(fig)
         return saved
 
     if mode != "default":
@@ -130,6 +139,7 @@ def save_default_plots(
         dpi=150,
         overwrite=overwrite,
     )
+    _close_figure(fig_out)
     if saved_path is not None:
         saved["output_plot"] = saved_path
 
@@ -158,6 +168,7 @@ def save_default_plots(
                 dpi=150,
                 overwrite=overwrite,
             )
+            _close_figure(fig_in)
             if saved_path is not None:
                 saved["inputs_mean"] = saved_path
         except Exception:
@@ -178,13 +189,15 @@ def save_default_plots(
                 win_size=0.1,
             )
             syn_path = plot_dir / "syn_weight_prob.png"
+            fig_syn = plt.gcf()
             saved_path = save_figure(
-                plt.gcf(),
+                fig_syn,
                 syn_path,
                 enabled=True,
                 dpi=150,
                 overwrite=overwrite,
             )
+            _close_figure(fig_syn)
             if saved_path is not None:
                 saved["syn_weight_prob"] = saved_path
 

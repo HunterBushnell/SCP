@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "target_source": {
+    "mode": "allen_nwb",
+    "description": "Allen/ADB NWB ephys targets"
+  },
+  "allen_nwb": {
+    "file": "../382982929_ephys.nwb",
+    "sweep_ids": [],
+    "passive": {
+      "stimulus_names": [
+        "Long Square"
+      ],
+      "sweep_ids": null,
+      "min_current_pA": null,
+      "max_current_pA": -1.0,
+      "end_margin_ms": 10.0,
+      "reducer": "median",
+      "tau_field": "tau_avg_ms"
+    },
+    "active": {
+      "stimulus_names": [
+        "Long Square"
+      ],
+      "min_current_pA": 0.0,
+      "max_current_pA": null,
+      "include_negative_currents": false,
+      "average_repeats": true,
+      "spike_threshold_mV": -20.0,
+      "refractory_ms": 1.0
+    }
+  },
+  "notes": ""
+}

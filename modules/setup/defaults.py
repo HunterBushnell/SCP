@@ -14,32 +14,33 @@ SYNAPSE_TEMPLATE_FILENAMES = {
 }
 
 
+def _default_key(cell_name: str) -> str:
+    return (cell_name or "").strip().upper().replace("_", "").replace("-", "").replace(" ", "")
+
+
 def guess_specimen_from_cell(cell_name: str) -> Optional[int]:
     """Return a default specimen_id for common SCP cell labels."""
-    key = (cell_name or "").strip().upper()
+    key = _default_key(cell_name)
     defaults = {
         "PV": 484635029,
         "SST": 485466109,
+        "PN": 382982932,
     }
     return defaults.get(key)
 
 
 def guess_soma_multiplier(cell_name: str) -> float:
-    """Return a default soma diameter multiplier for common SCP labels."""
-    key = (cell_name or "").strip().upper()
-    defaults = {
-        "PV": 6.0,
-        "SST": 8.0,
-    }
-    return float(defaults.get(key, 1.0))
+    """Return the neutral default soma diameter multiplier."""
+    return 1.0
 
 
 def guess_cell_color(cell_name: str) -> str:
     """Return a default plot color used in existing SCP cell_config files."""
-    key = (cell_name or "").strip().upper()
+    key = _default_key(cell_name)
     defaults = {
-        "PV": "royalblue",
-        "SST": "mediumorchid",
+        "PV": "blue",
+        "SST": "magenta",
+        "PN": "red",
     }
     return defaults.get(key, "k")
 
@@ -85,7 +86,7 @@ def default_sim_config(*, cell_name: str, specimen_id: Optional[int], model_type
         },
         "save": {
             "enabled": False,
-            "stem": "results",
+            "stem": None,
             "format": "pkl",
             "full_results": False,
         },
@@ -168,6 +169,78 @@ def default_geometry_config(*, cell_name: str) -> Dict[str, Any]:
             "distal": {"low": 100.0, "high": None},
         },
         "label": label,
+    }
+
+
+def default_target_config() -> Dict[str, Any]:
+    """Return the optional biological/experimental target template."""
+    return {
+        "schema_version": 1,
+        "target_source": {
+            "mode": "manual",
+            "description": "",
+        },
+        "manual": {
+            "passive": {
+                "v_rest_mV": None,
+                "rin_MOhm": None,
+                "tau_ms": None,
+            },
+            "fi_curve": {
+                "currents_pA": [],
+                "rates_Hz": [],
+                "csv": None,
+            },
+        },
+        "traces": {
+            "format": "csv",
+            "passive": {
+                "file": None,
+                "time_column": "time_ms",
+                "voltage_column": "voltage_mV",
+                "current_column": "current_pA",
+                "sweep_column": None,
+                "stim_start_ms": None,
+                "stim_stop_ms": None,
+                "current_pA": None,
+                "dt_ms": None,
+                "end_margin_ms": 10.0,
+                "reducer": "median",
+                "tau_field": "tau_avg_ms",
+            },
+            "active": {
+                "file": None,
+                "format": "npy",
+                "stim_start_ms": None,
+                "stim_stop_ms": None,
+                "dt_ms": None,
+                "spike_threshold_mV": -20.0,
+                "refractory_ms": 1.0,
+            },
+        },
+        "allen_nwb": {
+            "file": None,
+            "sweep_ids": [],
+            "passive": {
+                "stimulus_names": ["Long Square"],
+                "sweep_ids": None,
+                "min_current_pA": None,
+                "max_current_pA": -1.0,
+                "end_margin_ms": 10.0,
+                "reducer": "median",
+                "tau_field": "tau_avg_ms",
+            },
+            "active": {
+                "stimulus_names": ["Long Square"],
+                "min_current_pA": 0.0,
+                "max_current_pA": None,
+                "include_negative_currents": False,
+                "average_repeats": True,
+                "spike_threshold_mV": -20.0,
+                "refractory_ms": 1.0,
+            },
+        },
+        "notes": "",
     }
 
 

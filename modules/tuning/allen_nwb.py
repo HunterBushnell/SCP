@@ -1,10 +1,8 @@
 """Allen/ADB NWB helpers for ACT target generation.
 
 The public-facing contract is intentionally narrow: read a user-downloaded
-Allen Cell Types current-clamp NWB file and export FI targets that ACT already
-accepts robustly (`target_sf.csv` with `mean_i` in nA and `spike_frequency` in
-Hz). Raw voltage-trace export can be added later once the ACT trace path is
-more explicit about sampling/window semantics.
+Allen Cell Types current-clamp NWB file and export robust passive and FI targets
+that SCP/ACT tuning notebooks can consume.
 """
 
 from __future__ import annotations
@@ -19,6 +17,7 @@ import numpy as np
 
 
 DEFAULT_FI_STIMULUS_NAMES = ("Long Square",)
+DEFAULT_PASSIVE_STIMULUS_NAMES = ("Long Square",)
 
 
 def summarize_allen_nwb_sweeps(nwb_path: str | Path) -> list[dict[str, Any]]:
@@ -156,6 +155,162 @@ def aggregate_fi_sweeps(
             }
         )
     return out
+
+
+def extract_allen_nwb_passive_sweeps(
+    nwb_path: str | Path,
+    *,
+    act_passive_module: Any,
+    stimulus_names: Sequence[str] = DEFAULT_PASSIVE_STIMULUS_NAMES,
+    sweep_ids: Optional[Sequence[int]] = None,
+    min_current_pA: Optional[float] = None,
+    max_current_pA: Optional[float] = -1.0,
+    end_margin_ms: float = 10.0,
+) -> list[dict[str, Any]]:
+    """Extract ACT passive metrics from negative-current Allen NWB sweeps."""
+    wanted_names = {str(name).strip() for name in stimulus_names}
+    wanted_sweeps = {int(value) for value in (sweep_ids or [])}
+    rows = []
+    with _open_nwb(nwb_path) as handle:
+        acquisition = handle["acquisition/timeseries"]
+        stimulus = handle["stimulus/presentation"]
+        for key in _sorted_sweep_keys(set(acquisition.keys()) & set(stimulus.keys())):
+            sweep = _sweep_number(key)
+            if wanted_sweeps and sweep not in wanted_sweeps:
+                continue
+
+            response_group = acquisition[key]
+            stimulus_group = stimulus[key]
+            stimulus_name = _read_text(response_group.get("aibs_stimulus_name"))
+            if wanted_names and stimulus_name not in wanted_names:
+                continue
+
+            amp_pA = _read_float(response_group.get("aibs_stimulus_amplitude_pa"))
+            if min_current_pA is not None and amp_pA < float(min_current_pA):
+                continue
+            if max_current_pA is not None and amp_pA > float(max_current_pA):
+                continue
+
+            sample_rate_hz = _sample_rate_hz(response_group, stimulus_group)
+            voltage_mV = _voltage_mV(response_group["data"][:])
+            current_pA = _current_pA(stimulus_group["data"][:])
+            n_samples = min(len(voltage_mV), len(current_pA))
+            voltage_mV = voltage_mV[:n_samples]
+            current_pA = current_pA[:n_samples]
+
+            start_idx, stop_idx = _active_current_window(current_pA, amp_pA, sample_rate_hz)
+            dt_ms = 1000.0 / sample_rate_hz
+            stim_start_ms = start_idx * dt_ms
+            stim_stop_ms = stop_idx * dt_ms
+            metric_stop_ms = max(stim_start_ms + dt_ms, stim_stop_ms - float(end_margin_ms))
+            gpp = act_passive_module.compute_gpp(
+                voltage_mV,
+                dt_ms,
+                stim_start_ms,
+                metric_stop_ms,
+                amp_pA / 1000.0,
+            )
+            row = {
+                "sweep": sweep,
+                "stimulus_name": stimulus_name,
+                "stimulus_description": _read_text(response_group.get("aibs_stimulus_description")),
+                "amp_pA": float(amp_pA),
+                "stim_start_ms": float(stim_start_ms),
+                "stim_stop_ms": float(stim_stop_ms),
+                "metric_stop_ms": float(metric_stop_ms),
+                "sample_rate_hz": float(sample_rate_hz),
+            }
+            for attr, out_name in (
+                ("R_in_rest_to_final", "rin_MOhm"),
+                ("tau_rest_to_trough", "tau_rest_to_trough_ms"),
+                ("tau_avg", "tau_avg_ms"),
+                ("sag_ratio", "sag_ratio"),
+                ("V_rest", "v_rest_mV"),
+            ):
+                if hasattr(gpp, attr):
+                    row[out_name] = float(getattr(gpp, attr))
+            rows.append(row)
+    if not rows:
+        raise ValueError(
+            "No matching NWB passive sweeps found. Check stimulus_names, sweep_ids, "
+            f"and current filters for {nwb_path!s}."
+        )
+    return rows
+
+
+def aggregate_passive_sweeps(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    reducer: str = "median",
+    tau_field: str = "tau_avg_ms",
+) -> dict[str, Any]:
+    """Aggregate per-sweep passive metrics into target_config passive fields."""
+    method = str(reducer or "median").strip().lower()
+    if method not in {"median", "mean"}:
+        raise ValueError("reducer must be 'median' or 'mean'")
+    if tau_field not in {"tau_avg_ms", "tau_rest_to_trough_ms"}:
+        raise ValueError("tau_field must be 'tau_avg_ms' or 'tau_rest_to_trough_ms'")
+
+    def reduce_field(field: str) -> float:
+        values = np.asarray(
+            [float(row[field]) for row in rows if row.get(field) is not None],
+            dtype=float,
+        )
+        values = values[np.isfinite(values)]
+        if values.size == 0:
+            raise ValueError(f"No finite passive values found for {field!r}")
+        return float(np.nanmedian(values) if method == "median" else np.nanmean(values))
+
+    return {
+        "v_rest_mV": reduce_field("v_rest_mV"),
+        "rin_MOhm": reduce_field("rin_MOhm"),
+        "tau_ms": reduce_field(tau_field),
+        "tau_source": tau_field,
+        "reducer": method,
+        "n_sweeps": int(len(rows)),
+        "sweeps": ",".join(str(int(row["sweep"])) for row in rows),
+        "currents_pA": [float(row["amp_pA"]) for row in rows],
+    }
+
+
+def write_allen_nwb_passive_target_csv(
+    nwb_path: str | Path,
+    target_path: str | Path,
+    *,
+    act_passive_module: Any,
+    sweep_summary_path: Optional[str | Path] = None,
+    stimulus_names: Sequence[str] = DEFAULT_PASSIVE_STIMULUS_NAMES,
+    sweep_ids: Optional[Sequence[int]] = None,
+    min_current_pA: Optional[float] = None,
+    max_current_pA: Optional[float] = -1.0,
+    end_margin_ms: float = 10.0,
+    reducer: str = "median",
+    tau_field: str = "tau_avg_ms",
+) -> dict[str, Any]:
+    """Write passive target and sweep-summary CSVs from an Allen NWB file."""
+    sweep_rows = extract_allen_nwb_passive_sweeps(
+        nwb_path,
+        act_passive_module=act_passive_module,
+        stimulus_names=stimulus_names,
+        sweep_ids=sweep_ids,
+        min_current_pA=min_current_pA,
+        max_current_pA=max_current_pA,
+        end_margin_ms=end_margin_ms,
+    )
+    targets = aggregate_passive_sweeps(
+        sweep_rows,
+        reducer=reducer,
+        tau_field=tau_field,
+    )
+    _write_rows_csv(target_path, [targets])
+    if sweep_summary_path is not None:
+        _write_rows_csv(sweep_summary_path, sweep_rows)
+    return {
+        "target_path": str(Path(target_path)),
+        "sweep_summary_path": str(Path(sweep_summary_path)) if sweep_summary_path is not None else None,
+        "targets": targets,
+        "n_sweeps": len(sweep_rows),
+    }
 
 
 def write_allen_nwb_fi_target_csv(

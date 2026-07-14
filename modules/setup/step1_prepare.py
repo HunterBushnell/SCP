@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import shutil
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -17,13 +19,14 @@ from .fit_json import (
 )
 from .mechanisms import compile_modfiles
 from .scaffold import scaffold_base_configs, scaffold_synapse_configs
+from .target_config import prepare_target_config as _prepare_target_config
 
 
 def resolve_soma_multiplier(
     cell_name: str,
     soma_diam_multiplier: Optional[float],
 ) -> float:
-    """Resolve an explicit or known-cell soma diameter multiplier."""
+    """Resolve an explicit soma diameter multiplier or the neutral default."""
     if soma_diam_multiplier is not None:
         return float(soma_diam_multiplier)
     return float(guess_soma_multiplier(cell_name))
@@ -116,6 +119,34 @@ def prepare_base_configs(
     )
 
 
+def prepare_target_config(
+    *,
+    tune_dir: Path,
+    config_mode: str = "fill",
+    target_source_mode: Optional[str] = "manual",
+    target_description: Optional[str] = None,
+    manual_passive: Optional[Dict[str, Any]] = None,
+    manual_fi_curve: Optional[Dict[str, Any]] = None,
+    passive_trace: Optional[Dict[str, Any]] = None,
+    active_trace: Optional[Dict[str, Any]] = None,
+    allen_nwb: Optional[Dict[str, Any]] = None,
+    notes: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Phase 4: scaffold optional passive/FI/trace target config."""
+    return _prepare_target_config(
+        tune_dir=tune_dir,
+        config_mode=config_mode,
+        target_source_mode=target_source_mode,
+        target_description=target_description,
+        manual_passive=manual_passive,
+        manual_fi_curve=manual_fi_curve,
+        passive_trace=passive_trace,
+        active_trace=active_trace,
+        allen_nwb=allen_nwb,
+        notes=notes,
+    )
+
+
 def prepare_synapse_configs(
     *,
     tune_dir: Path,
@@ -123,7 +154,7 @@ def prepare_synapse_configs(
     template_kinds: Optional[list[str]] = None,
     weight_style: str = "distributed",
 ) -> Dict[str, Any]:
-    """Phase 4: scaffold optional synapse config files."""
+    """Phase 5: scaffold optional synapse config files."""
     return scaffold_synapse_configs(
         tune_dir=tune_dir,
         config_mode=config_mode,
@@ -157,6 +188,64 @@ def validate_setup(
     )
 
 
+def create_working_copy(
+    *,
+    source_tune_dir: Path,
+    target_tune_name: str = "tuned",
+    overwrite: bool = False,
+) -> Dict[str, Any]:
+    """Copy a validated setup tune to a sibling working tune directory."""
+    source = Path(source_tune_dir).expanduser().resolve()
+    if not source.is_dir():
+        raise FileNotFoundError(f"Source tune directory not found: {source}")
+    if not target_tune_name:
+        raise ValueError("target_tune_name must be non-empty")
+    if Path(target_tune_name).name != target_tune_name or target_tune_name in {".", ".."}:
+        raise ValueError("target_tune_name must be a single sibling directory name")
+
+    target = source.parent / target_tune_name
+    if target == source:
+        return {
+            "status": "skipped",
+            "reason": "target is the source tune",
+            "source": str(source),
+            "target": str(target),
+        }
+    if target.exists():
+        if not overwrite:
+            return {
+                "status": "exists",
+                "source": str(source),
+                "target": str(target),
+                "overwritten": False,
+            }
+        shutil.rmtree(target)
+
+    shutil.copytree(source, target)
+
+    cell_config_path = target / "cell_configs" / "cell_config.json"
+    cell_config_updated = False
+    if cell_config_path.is_file():
+        with cell_config_path.open("r", encoding="utf-8") as handle:
+            cell_config = json.load(handle)
+        if not isinstance(cell_config, dict):
+            raise ValueError(f"Expected JSON object in {cell_config_path}")
+        cell_config["tune"] = target_tune_name
+        with cell_config_path.open("w", encoding="utf-8") as handle:
+            json.dump(cell_config, handle, indent=2)
+            handle.write("\n")
+        cell_config_updated = True
+
+    return {
+        "status": "created",
+        "source": str(source),
+        "target": str(target),
+        "target_tune_name": target_tune_name,
+        "overwritten": bool(overwrite),
+        "cell_config_updated": cell_config_updated,
+    }
+
+
 def prepare_tune(
     *,
     tune_dir: Path,
@@ -178,6 +267,7 @@ def prepare_tune(
     sort_genome_entries_by_section: bool = False,
     do_scaffold_configs: bool = True,
     do_base_configs: Optional[bool] = None,
+    do_target_config: Optional[bool] = None,
     do_synapse_configs: Optional[bool] = None,
     config_mode: str = "fill",
     sync_cell_metadata: bool = True,
@@ -185,6 +275,9 @@ def prepare_tune(
     synapse_weight_style: str = "distributed",
     do_validate: bool = True,
     validate_inputs_cfg: bool = True,
+    create_tuned_copy: bool = False,
+    tuned_tune_name: str = "tuned",
+    overwrite_tuned_copy: bool = False,
 ) -> Dict[str, Any]:
     """
     End-to-end Step 1 entrypoint.
@@ -198,6 +291,8 @@ def prepare_tune(
     soma_mult = resolve_soma_multiplier(cell_name, soma_diam_multiplier)
     if do_base_configs is None:
         do_base_configs = bool(do_scaffold_configs)
+    if do_target_config is None:
+        do_target_config = bool(do_scaffold_configs)
     if do_synapse_configs is None:
         do_synapse_configs = bool(do_scaffold_configs)
 
@@ -250,6 +345,18 @@ def prepare_tune(
     else:
         summary["actions"]["base_configs"] = {"status": "skipped"}
 
+    if do_target_config:
+        summary["actions"]["target_config"] = {
+            "status": "ok",
+            "file": prepare_target_config(
+                tune_dir=tune_dir,
+                config_mode=config_mode,
+                target_source_mode=None,
+            ),
+        }
+    else:
+        summary["actions"]["target_config"] = {"status": "skipped"}
+
     if do_synapse_configs:
         summary["actions"]["synapse_configs"] = {
             "status": "ok",
@@ -278,5 +385,14 @@ def prepare_tune(
         }
     else:
         summary["actions"]["validate"] = {"status": "skipped"}
+
+    if create_tuned_copy:
+        summary["actions"]["working_copy"] = create_working_copy(
+            source_tune_dir=tune_dir,
+            target_tune_name=tuned_tune_name,
+            overwrite=overwrite_tuned_copy,
+        )
+    else:
+        summary["actions"]["working_copy"] = {"status": "skipped"}
 
     return summary

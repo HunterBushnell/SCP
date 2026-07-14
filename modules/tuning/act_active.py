@@ -24,6 +24,7 @@ from .act_integration import ensure_act_on_syspath
 from .active import DEFAULT_BIO_FI_REFERENCE
 from .allen_nwb import DEFAULT_FI_STIMULUS_NAMES, write_allen_nwb_fi_target_csv
 from .notebook_setup import resolve_repo_root, resolve_tune_dir
+from .targets import fi_curve_from_config, load_target_config
 
 
 CONFIG_NAME = "act_active_config.json"
@@ -66,6 +67,15 @@ def default_target_fi(cell_name: str) -> tuple[list[float], list[float]]:
     if not points:
         points = [(50, 0), (100, 5), (150, 15), (200, 30), (250, 45), (300, 60)]
     return [float(p[0]) for p in points], [float(p[1]) for p in points]
+
+
+def target_fi_for_tune(tune_dir: str | Path, cell_name: str) -> tuple[list[float], list[float]]:
+    """Return tune-local FI targets when configured, else bundled defaults."""
+    target_config = load_target_config(tune_dir)
+    currents, rates = fi_curve_from_config(target_config)
+    if currents:
+        return currents, rates
+    return default_target_fi(cell_name)
 
 
 def default_act_module_specs(cell_name: str = "SST") -> dict[str, dict[str, Any]]:
@@ -151,7 +161,7 @@ def default_act_active_config(
     root = resolve_repo_root(Path(repo_root))
     tune_path = Path(tune_dir).expanduser().resolve()
     workspace_path = Path(workspace).expanduser().resolve() if workspace else default_act_workspace(tune_path)
-    target_amps, target_freqs = default_target_fi(cell_name)
+    target_amps, target_freqs = target_fi_for_tune(tune_path, cell_name)
 
     return {
         "version": 1,

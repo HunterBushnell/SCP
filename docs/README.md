@@ -13,8 +13,8 @@ how it connects to CLI/SLURM tooling.
 
 ## Step Guides
 
-- `guides/step_1_setup.md`: tune-directory setup, ADB download, config scaffolding, and validation.
-- `guides/step_2_passive.md`: passive tuning, ACT target conversion, manual model edits, and trace checks.
+- `guides/step_1_setup.md`: tune-directory setup, ADB download, target-data staging, config scaffolding, and validation.
+- `guides/step_2_passive.md`: passive tuning, ACT target conversion, optional Allen/ADB NWB passive targets, manual model edits, and trace checks.
 - `guides/step_3_active.md`: active tuning, optional ACT workspace/CLI integration, Allen/ADB NWB FI targets, manual sweeps, and FI checks.
 - `guides/step_4_synapses.md`: synapse tuning with BMTool and SCP synapse-config export.
 - `guides/step_5_simulate.md`: simulation notebook, CLI, IClamp, saving, plotting, and outputs.
@@ -26,6 +26,7 @@ how it connects to CLI/SLURM tooling.
 ## Reference
 
 - `reference/configs_reference.md`: current `cell_configs/` schema.
+- `reference/target_trace_formats.md`: passive trace, active trace, and FI CSV target data contracts.
 - `reference/outputs_layout.md`: run folders, manifests, sidecars, plots, and array outputs.
 - `reference/reproducibility.md`: seeds, snapshots, append behavior, and array alignment.
 - `reference/glossary.md`: common SCP terms.

@@ -32,6 +32,7 @@ evaluate temporary predictions without overwriting model files.
 - a tune directory from Step 1,
 - compiled or compilable `modfiles/`,
 - `cell_configs/cell_config.json`,
+- optional targets in `cell_configs/target_config.json`,
 - model files referenced by `manifest.json`,
 - passive parameters from Step 2 when applicable,
 - optional ACT target data for active optimization.
@@ -87,7 +88,7 @@ Choose a tune directory prepared by Step 1. The default example is currently:
 
 ```python
 cell_name = "SST"
-tune_name = "seg_tuned"
+tune_name = "tuned"
 ```
 
 Use `tune_dir_override` when working with a path outside the standard
@@ -126,36 +127,51 @@ Important controls:
   ACT outputs.
 - `ACT_MODULE_TO_RUN`: `"all"`, `"lto"`, `"spiking"`, or `"bursting"`.
 - `ACT_WORKSPACE`: tune-local ACT workspace path.
-- `ACT_TARGET_MODE`: `"fi_arrays"`, `"fi_csv"`, `"allen_nwb"`, or
-  `"trace_npy"`.
+- `ACT_TARGET_MODE`: optional advanced override for the resolved ACT target
+  mode; leave `None` to derive it from `target_config.target_source.mode`.
 
-Target modes:
+Step 3 resolves active targets from `cell_configs/target_config.json` source
+modes:
 
-- `fi_arrays`: enter current amplitudes and target firing rates directly in the
-  notebook.
-- `fi_csv`: place a CSV in the workspace and point `ACT_FI_CSV_PATH` to it.
-  Accepted current columns include `amp_pA`, `current_pA`, `amp_nA`, or
-  `mean_i`; accepted frequency columns include `spike_frequency`,
-  `spike_frequency_hz`, or `frequency_hz`.
-- `allen_nwb`: place a downloaded Allen/ADB ephys `.nwb` file in the tune
-  folder and point `ACT_NWB_PATH` to it. SCP extracts selected current-clamp
-  sweeps, writes ACT's `target_sf.csv`, and writes a readable
-  `allen_nwb_fi_curve.csv` summary for review. The default extraction uses
-  `Long Square` sweeps, non-negative current amplitudes, averaged repeated
-  amplitudes, and a `-20 mV` spike threshold.
-- `trace_npy`: place an ACT-compatible target trace `.npy` file in the
-  workspace and point `ACT_TRACE_NPY_PATH` to it.
+- `manual`: use `manual.fi_curve.currents_pA` and `manual.fi_curve.rates_Hz`,
+  or `manual.fi_curve.csv`.
+- `traces`: use `traces.active.file` as an ACT-compatible `.npy` trace target.
+- `allen_nwb`: extract FI targets from an Allen/ADB `.nwb` file using
+  `allen_nwb.active`.
 
-For Allen/ADB models, the intended workflow is to download the ephys NWB from
-the Allen cell page, place it in the selected tune directory, set:
+For exact passive trace, active trace, and FI CSV file requirements, see
+`docs/reference/target_trace_formats.md`.
 
-```python
-ACT_TARGET_MODE = "allen_nwb"
-ACT_NWB_PATH = context.tune_dir / "<allen_ephys_result>_ephys.nwb"
+Resolved ACT target modes:
+
+- `fi_arrays`: manual FI current/rate arrays.
+- `fi_csv`: manual FI CSV file. Accepted current columns include `amp_pA`,
+  `current_pA`, `amp_nA`, or `mean_i`; accepted frequency columns include
+  `spike_frequency`, `spike_frequency_hz`, or `frequency_hz`.
+- `allen_nwb`: Allen/ADB NWB FI extraction.
+- `trace_npy`: ACT-compatible trace target file.
+
+If `USE_ACT_ACTIVE_TUNING = True`, the selected target source must be complete.
+The notebook does not fall back to bundled FI targets.
+
+`trace_npy` is currently a pass-through mode for ACT. The `.npy` file must have
+shape `(n_trials, n_timepoints, n_columns)`, with membrane voltage in mV in
+column 0 and injected current in nA in column 1. SCP only checks that the file
+exists before passing it to ACT. For generic active data, use manual FI
+arrays/CSV or Allen/ADB NWB extraction until SCP has a stable active-trace
+converter.
+
+For Allen/ADB models, download the ephys NWB from the Allen cell page, place it
+in the selected tune directory, and set:
+
+```json
+"target_source": {"mode": "allen_nwb", "description": "Allen/ADB ephys NWB"},
+"allen_nwb": {"file": "<allen_ephys_result>_ephys.nwb"}
 ```
 
 Then run **3.4.3 Prepare ACT Workspace**. The notebook auto-detects a single
-`*_ephys.nwb` file in the tune folder when present.
+`*_ephys.nwb` file in the tune folder when `allen_nwb.file` and `ACT_NWB_PATH`
+are unset.
 
 #### 3.4.2 Cell Adapter and Module Settings
 
@@ -198,19 +214,19 @@ and choose `ACT_MODULE_TO_RUN`.
 The same workspace can be run from the terminal:
 
 ```bash
-python scripts/run_act_active.py --cell SST --tune seg_tuned --run --module all
+python scripts/run_act_active.py --cell SST --tune tuned --run --module all
 ```
 
 Run one module:
 
 ```bash
-python scripts/run_act_active.py --cell SST --tune seg_tuned --run --module lto
+python scripts/run_act_active.py --cell SST --tune tuned --run --module lto
 ```
 
 Prepare only:
 
 ```bash
-python scripts/run_act_active.py --cell SST --tune seg_tuned --prepare --prepare-only
+python scripts/run_act_active.py --cell SST --tune tuned --prepare --prepare-only
 ```
 
 #### 3.4.5 Review Predictions and Optional Evaluation
@@ -240,6 +256,12 @@ Important controls:
 - `active_sim_amps`: current steps in pA.
 - `active_spike_threshold_mv`: spike peak detection threshold.
 
+When FI targets are available, the notebook also displays a target comparison
+table for the active check currents. Exact target-current matches are used
+directly; currents between target points use linear interpolation; currents
+outside the target FI range are marked `out_of_range` instead of being
+extrapolated.
+
 ### 3.6 Plot Active Trace Check
 
 Plots voltage traces and can optionally add a recorded-current subplot for one
@@ -248,6 +270,8 @@ selected current step.
 Important controls:
 
 - `PLOT_XLIM`, `PLOT_YLIM`: voltage plot limits.
+- `TRACE_COLOR`: voltage trace color when one current is plotted; multiple
+  currents use distinct Matplotlib colors.
 - `PLOT_CURRENTS`: include recorded-current subplot.
 - `CURRENT_AMP`: selected amplitude for current traces.
 - `CURRENT_NAMES`: selected recorded currents, or `None` for auto-selection.
@@ -255,15 +279,22 @@ Important controls:
 
 ### 3.7 FI Curve Check
 
-Runs a current sweep, plots model frequency vs. current, and can overlay bundled
-PV/SST biological reference points or user-provided custom reference points.
+Runs a current sweep, plots model frequency vs. current, and can overlay
+tune-local `target_config.json` FI points or user-provided custom reference
+points.
+
+The FI section also displays a comparison table with measured frequency, target
+frequency, signed difference, absolute difference, percent error, and whether
+the target value was exact or interpolated.
 
 Important controls:
 
 - `fi_sim_params`: current-injection timing and integration settings.
 - `FI_AMP_RANGE`: `(start, stop, step)` pA sweep definition.
-- `SHOW_BIO_FI_REFERENCE`: overlay bundled example reference points.
-- `CUSTOM_BIO_FI_REFERENCE`: provide custom `(current_pA, frequency_hz)` points.
+- `SHOW_TARGET_FI_REFERENCE`: overlay configured target reference points.
+- `CUSTOM_FI_REFERENCE`: provide custom `(current_pA, frequency_hz)` points that override config points.
+- `FI_MODEL_COLOR`: model curve color; defaults to `cell_config.json` `color`.
+- `FI_REFERENCE_COLOR`: target/reference curve color; by default it is black, or gray if the model color is black.
 - `EXPORT_FI_FIGURE`, `EXPORT_FI_CSV`: save optional review artifacts.
 
 ## CLI Entry Point for ACT Active Tuning
@@ -273,9 +304,9 @@ The notebook and CLI use the same backend and workspace config.
 Common commands:
 
 ```bash
-python scripts/run_act_active.py --cell SST --tune seg_tuned --prepare --prepare-only
-python scripts/run_act_active.py --cell SST --tune seg_tuned --run --module all
-python scripts/run_act_active.py --cell SST --tune seg_tuned --evaluate
+python scripts/run_act_active.py --cell SST --tune tuned --prepare --prepare-only
+python scripts/run_act_active.py --cell SST --tune tuned --run --module all
+python scripts/run_act_active.py --cell SST --tune tuned --evaluate
 ```
 
 Useful options:
@@ -287,8 +318,8 @@ Useful options:
 - `--fi-currents-pa`, `--fi-frequencies-hz`: comma-separated FI arrays.
 - `--fi-csv`: FI target CSV path.
 - `--nwb`: Allen/ADB ephys NWB file for FI extraction.
-- `--nwb-stimulus-names`: comma-separated NWB stimulus names, default
-  `Long Square`.
+- `--nwb-stimulus-names`: comma-separated NWB stimulus names; defaults to
+  `allen_nwb.active.stimulus_names`.
 - `--nwb-min-current-pa`, `--nwb-max-current-pa`: optional current filters.
 - `--nwb-keep-repeats`: keep repeated current amplitudes as separate target
   rows instead of averaging them.

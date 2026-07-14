@@ -11,10 +11,10 @@ cell models can be adapted without changing the main pipeline code.
    - `conda env create -f environment.yml`
    - `conda activate scp-py311`
 2. Optional setup check:
-   - `python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune seg_tuned --compile-modfiles`
+   - `python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune tuned --compile-modfiles`
 3. Run an example:
    - Notebook: open `5_simulate.ipynb`, set `force_save = True` if you want a saved run.
-   - CLI: `python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 1 --force-save`
+   - CLI: `python run_pipeline.py --tune-dir cells/PV/tunes/tuned --n-trials 1 --force-save`
 4. Analyze saved runs:
    - open `6_analysis.ipynb` after a run has been saved under `output_data/`.
 
@@ -46,15 +46,16 @@ for simulation; Step 6 is optional post-processing.
 
 Bundled example tune directories:
 
-- `cells/PV/tunes/adb_peri`: raw ADB perisomatic PV setup example.
-- `cells/PV/tunes/seg_tuned`: tuned PV simulation example.
-- `cells/SST/tunes/adb_all`: raw ADB all-active SST setup example.
-- `cells/SST/tunes/seg_tuned`: tuned SST simulation example.
+- `cells/PV/tunes/orig`: raw ADB perisomatic PV setup example.
+- `cells/PV/tunes/tuned`: tuned PV simulation example.
+- `cells/SST/tunes/orig`: raw ADB all-active SST setup example.
+- `cells/SST/tunes/tuned`: tuned SST simulation example.
 
 Each tune uses a `cell_configs/` directory containing:
 
 - `cell_config.json`: cell identity, loader, paths, and tuning metadata.
 - `sim_config.json`: simulation timing, saving, plotting, recording, and run options.
+- `target_config.json`: optional passive, FI, and trace targets used by tuning notebooks.
 - `geometry.json`: segment grouping/distance settings.
 - `syn_config.json`: list of enabled synapse-group config files.
 - `syn_groups/*.json`: synapse groups and explicit `input_blocks`.

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "target_source": {
+    "mode": "manual",
+    "description": "custom"
+  },
+  "manual": {
+    "passive": {
+      "v_rest_mV": -74.97,
+      "rin_MOhm": 105.4,
+      "tau_ms": 9.0
+    },
+    "fi_curve": {
+      "currents_pA": [],
+      "rates_Hz": [],
+      "csv": null
+    }
+  },
+  "notes": ""
+}

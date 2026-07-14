@@ -1,0 +1,341 @@
+{
+  "pn_exc": {
+    "state": true,
+    "syns": {
+      "type": "AMPA_NMDA_STP",
+      "N_syn": 713,
+      "segs": "all",
+      "dist_func": {
+        "kind": "linear",
+        "params": {
+          "m": -0.015,
+          "b": 4.25
+        }
+      },
+      "params": {
+        "wt_mean": 0.1,
+        "wt_std": 0.33,
+        "initW": 1.0,
+        "gmax_AMPA": 0.001,
+        "gmax_NMDA": 0.001,
+        "tau_r_AMPA": 3.5,
+        "tau_d_AMPA": 4,
+        "Use": 0.8,
+        "Dep": 100.0,
+        "Fac": 0.0,
+        "NMDA_ratio": 0.0
+      },
+      "N_syn_resolved": 713
+    },
+    "color": "#1f77b4",
+    "input_blocks": [
+      {
+        "name": "pre_baseline",
+        "role": "baseline",
+        "start_ms": 0.0,
+        "stop_ms": 290.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 2.3
+      },
+      {
+        "name": "stimulus",
+        "role": "stimulus",
+        "start_ms": 290.0,
+        "stop_ms": 840.0,
+        "mode": "inhomogeneous_poisson",
+        "source": {
+          "path": "external_data/pyrFiringRateAvg.csv",
+          "time_col": "Time",
+          "rate_col": "AvgFiringRate",
+          "bin_ms": 5.0,
+          "crop_start_ms": 0.0,
+          "crop_stop_ms": 550.0
+        }
+      },
+      {
+        "name": "post_baseline",
+        "role": "baseline",
+        "start_ms": 840.0,
+        "stop_ms": 1000.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 2.3
+      }
+    ],
+    "name": "pn_exc",
+    "mode": "block_sequence",
+    "source": {},
+    "time_cfg": {
+      "anchors": {
+        "sim_tstart": 0.0,
+        "sim_tstop": 1000.0,
+        "jitter_tstart_ms": 17.07281697628526,
+        "input_window_tstart": 0.0,
+        "input_window_tstop": 1000.0,
+        "block_count": 3
+      },
+      "blocks": [
+        {
+          "name": "pre_baseline",
+          "role": "baseline",
+          "kind": "baseline",
+          "mode": "homogeneous_poisson",
+          "t_start": 0.0,
+          "t_end": 290.0,
+          "start_ms": 0.0,
+          "stop_ms": 290.0,
+          "source": {
+            "freq": 2.3
+          },
+          "rate_hz": 2.3
+        },
+        {
+          "name": "stimulus",
+          "role": "stimulus",
+          "kind": "source",
+          "mode": "inhomogeneous_poisson",
+          "t_start": 290.0,
+          "t_end": 840.0,
+          "start_ms": 290.0,
+          "stop_ms": 840.0,
+          "source": {
+            "path": "external_data/pyrFiringRateAvg.csv",
+            "time_col": "Time",
+            "rate_col": "AvgFiringRate",
+            "bin_ms": 5.0,
+            "crop_start_ms": 0.0,
+            "crop_stop_ms": 550.0
+          }
+        },
+        {
+          "name": "post_baseline",
+          "role": "baseline",
+          "kind": "baseline",
+          "mode": "homogeneous_poisson",
+          "t_start": 840.0,
+          "t_end": 1000.0,
+          "start_ms": 840.0,
+          "stop_ms": 1000.0,
+          "source": {
+            "freq": 2.3
+          },
+          "rate_hz": 2.3
+        }
+      ],
+      "input_blocks": [
+        {
+          "name": "pre_baseline",
+          "role": "baseline",
+          "kind": "baseline",
+          "mode": "homogeneous_poisson",
+          "t_start": 0.0,
+          "t_end": 290.0,
+          "start_ms": 0.0,
+          "stop_ms": 290.0,
+          "source": {
+            "freq": 2.3
+          },
+          "rate_hz": 2.3
+        },
+        {
+          "name": "stimulus",
+          "role": "stimulus",
+          "kind": "source",
+          "mode": "inhomogeneous_poisson",
+          "t_start": 290.0,
+          "t_end": 840.0,
+          "start_ms": 290.0,
+          "stop_ms": 840.0,
+          "source": {
+            "path": "external_data/pyrFiringRateAvg.csv",
+            "time_col": "Time",
+            "rate_col": "AvgFiringRate",
+            "bin_ms": 5.0,
+            "crop_start_ms": 0.0,
+            "crop_stop_ms": 550.0
+          }
+        },
+        {
+          "name": "post_baseline",
+          "role": "baseline",
+          "kind": "baseline",
+          "mode": "homogeneous_poisson",
+          "t_start": 840.0,
+          "t_end": 1000.0,
+          "start_ms": 840.0,
+          "stop_ms": 1000.0,
+          "source": {
+            "freq": 2.3
+          },
+          "rate_hz": 2.3
+        }
+      ]
+    }
+  },
+  "bg_exc": {
+    "state": true,
+    "color": "#2ca02c",
+    "syns": {
+      "type": "AMPA_NMDA_STP",
+      "N_syn": null,
+      "segs": "all",
+      "dist_func": {
+        "kind": "linear",
+        "params": {
+          "m": -0.015,
+          "b": 4.25,
+          "multi": 0.8
+        }
+      },
+      "params": {
+        "wt_mean": 0.1,
+        "wt_std": 0.33,
+        "initW": 1.0,
+        "gmax_AMPA": 0.001,
+        "gmax_NMDA": 0.001,
+        "tau_r_AMPA": 3.5,
+        "tau_d_AMPA": 4,
+        "Use": 0.8,
+        "Dep": 100.0,
+        "Fac": 0.0,
+        "NMDA_ratio": 0.0
+      },
+      "N_syn_resolved": 4484
+    },
+    "input_blocks": [
+      {
+        "name": "background",
+        "role": "background",
+        "start_ms": 0.0,
+        "stop_ms": 1000.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 0.2
+      }
+    ],
+    "name": "bg_exc",
+    "mode": "block_sequence",
+    "source": {},
+    "time_cfg": {
+      "anchors": {
+        "sim_tstart": 0.0,
+        "sim_tstop": 1000.0,
+        "jitter_tstart_ms": 17.07281697628526,
+        "input_window_tstart": 0.0,
+        "input_window_tstop": 1000.0,
+        "block_count": 1
+      },
+      "blocks": [
+        {
+          "name": "background",
+          "role": "background",
+          "kind": "baseline",
+          "mode": "homogeneous_poisson",
+          "t_start": 0.0,
+          "t_end": 1000.0,
+          "start_ms": 0.0,
+          "stop_ms": 1000.0,
+          "source": {
+            "freq": 0.2
+          },
+          "rate_hz": 0.2
+        }
+      ],
+      "input_blocks": [
+        {
+          "name": "background",
+          "role": "background",
+          "kind": "baseline",
+          "mode": "homogeneous_poisson",
+          "t_start": 0.0,
+          "t_end": 1000.0,
+          "start_ms": 0.0,
+          "stop_ms": 1000.0,
+          "source": {
+            "freq": 0.2
+          },
+          "rate_hz": 0.2
+        }
+      ]
+    }
+  },
+  "bg_inh": {
+    "state": true,
+    "color": "#d62728",
+    "syns": {
+      "type": "GABA_A",
+      "N_syn": null,
+      "segs": "all",
+      "dist_func": {
+        "kind": "linear",
+        "params": {
+          "m": -0.015,
+          "b": 4.25,
+          "multi": 0.2
+        }
+      },
+      "params": {
+        "wt_mean": 1.5,
+        "wt_std": 0.33,
+        "initW": 1.0,
+        "gmax": 0.001,
+        "tau_r_GABAA": 0.5,
+        "tau_d_GABAA": 5.5
+      },
+      "N_syn_resolved": 1088
+    },
+    "input_blocks": [
+      {
+        "name": "background",
+        "role": "background",
+        "start_ms": 0.0,
+        "stop_ms": 1000.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 0.2
+      }
+    ],
+    "name": "bg_inh",
+    "mode": "block_sequence",
+    "source": {},
+    "time_cfg": {
+      "anchors": {
+        "sim_tstart": 0.0,
+        "sim_tstop": 1000.0,
+        "jitter_tstart_ms": 17.07281697628526,
+        "input_window_tstart": 0.0,
+        "input_window_tstop": 1000.0,
+        "block_count": 1
+      },
+      "blocks": [
+        {
+          "name": "background",
+          "role": "background",
+          "kind": "baseline",
+          "mode": "homogeneous_poisson",
+          "t_start": 0.0,
+          "t_end": 1000.0,
+          "start_ms": 0.0,
+          "stop_ms": 1000.0,
+          "source": {
+            "freq": 0.2
+          },
+          "rate_hz": 0.2
+        }
+      ],
+      "input_blocks": [
+        {
+          "name": "background",
+          "role": "background",
+          "kind": "baseline",
+          "mode": "homogeneous_poisson",
+          "t_start": 0.0,
+          "t_end": 1000.0,
+          "start_ms": 0.0,
+          "stop_ms": 1000.0,
+          "source": {
+            "freq": 0.2
+          },
+          "rate_hz": 0.2
+        }
+      ]
+    }
+  }
+}

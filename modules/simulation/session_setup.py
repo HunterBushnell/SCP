@@ -9,7 +9,7 @@ from modules.loaders import get_cell_loader_name, loader_requires_manifest
 
 
 def _timestamp_stem() -> str:
-    return datetime.now().strftime("slurm_%Y%m%d_%H%M%S")
+    return datetime.now().strftime("run_%Y%m%d_%H%M%S")
 
 
 def normalize_tune_dir(

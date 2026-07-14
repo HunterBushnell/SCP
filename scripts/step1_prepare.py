@@ -4,10 +4,10 @@ Step 1 CLI: set up a tune directory for later SCP steps.
 
 Examples:
   python scripts/step1_prepare.py \
-    --cell PV --tune adb_peri --specimen-id 484635029 --model-type perisomatic
+    --cell PV --tune orig --specimen-id 484635029 --model-type perisomatic
 
   python scripts/step1_prepare.py \
-    --tune-dir cells/SST/tunes/seg_tuned --specimen-id 485466109 \
+    --tune-dir cells/SST/tunes/tuned --specimen-id 485466109 \
     --no-download --no-compile --config-mode fill
 """
 
@@ -50,11 +50,8 @@ def _infer_cell_tune_from_path(tune_dir: Path) -> tuple[str, str]:
 
 
 def _default_tune_for_model_type(model_type: str) -> str:
-    """Return the raw setup tune name implied by an ADB model type."""
-    token = str(model_type or "").strip().lower().replace("_", " ").replace("-", " ")
-    if "all" in token and "active" in token:
-        return "adb_all"
-    return "adb_peri"
+    """Return the default raw setup tune name."""
+    return "orig"
 
 
 def _parse_synapse_templates(raw: str) -> list[str]:
@@ -72,17 +69,16 @@ def parse_args() -> argparse.Namespace:
         "--tune-dir",
         type=str,
         default=None,
-        help="Tune directory path (e.g., cells/PV/tunes/seg_tuned)",
+        help="Tune directory path (e.g., cells/PV/tunes/orig)",
     )
 
-    ap.add_argument("--cell", type=str, default=None, help="Cell label (PV or SST)")
+    ap.add_argument("--cell", type=str, default=None, help="Cell label (PV, SST, or PN)")
     ap.add_argument(
         "--tune",
         type=str,
         default=None,
         help=(
-            "Tune name under cells/<cell>/tunes/. Defaults to adb_peri for "
-            "perisomatic models and adb_all for all-active models."
+            "Tune name under cells/<cell>/tunes/. Defaults to orig for raw setup."
         ),
     )
     ap.add_argument("--tunes-dir", type=str, default="tunes", help="Parent directory for tune names")
@@ -95,7 +91,12 @@ def parse_args() -> argparse.Namespace:
     )
     ap.add_argument("--specimen-id", type=int, default=None, help="Allen specimen_id for --source-type adb")
     ap.add_argument("--model-type", type=str, default="perisomatic", help="Allen model type for --source-type adb")
-    ap.add_argument("--soma-diam-multiplier", type=float, default=None, help="Soma diameter multiplier")
+    ap.add_argument(
+        "--soma-diam-multiplier",
+        type=float,
+        default=None,
+        help="Soma diameter multiplier; omit for neutral 1.0 default",
+    )
     ap.add_argument("--color", type=str, default=None, help="cell_config color field")
 
     ap.add_argument("--list-models", action="store_true", help="Print available ADB models before setup")
@@ -120,6 +121,12 @@ def parse_args() -> argparse.Namespace:
         dest="do_base_configs",
         action="store_false",
         help="Skip cell_config.json, geometry.json, and sim_config.json scaffolding",
+    )
+    ap.add_argument(
+        "--no-target-config",
+        dest="do_target_config",
+        action="store_false",
+        help="Skip target_config.json scaffolding",
     )
     ap.add_argument(
         "--no-synapse-configs",
@@ -161,6 +168,21 @@ def parse_args() -> argparse.Namespace:
         dest="validate_inputs_cfg",
         action="store_false",
         help="Skip inputs.check_inputs validation",
+    )
+    ap.add_argument(
+        "--create-tuned-copy",
+        action="store_true",
+        help="Copy the prepared tune to a sibling working tune after validation.",
+    )
+    ap.add_argument(
+        "--tuned-tune-name",
+        default="tuned",
+        help="Sibling working tune name for --create-tuned-copy.",
+    )
+    ap.add_argument(
+        "--overwrite-tuned-copy",
+        action="store_true",
+        help="Replace an existing tuned working copy when --create-tuned-copy is used.",
     )
 
     ap.set_defaults(
@@ -233,6 +255,7 @@ def main() -> None:
         sort_genome_entries_by_section=bool(args.sort_genome_by_section),
         do_scaffold_configs=bool(args.do_scaffold),
         do_base_configs=bool(args.do_scaffold and args.do_base_configs),
+        do_target_config=bool(args.do_scaffold and args.do_target_config),
         do_synapse_configs=bool(args.do_scaffold and args.do_synapse_configs),
         config_mode=args.config_mode,
         sync_cell_metadata=bool(args.sync_cell_metadata),
@@ -240,6 +263,9 @@ def main() -> None:
         synapse_weight_style=args.synapse_weight_style,
         do_validate=bool(args.do_validate),
         validate_inputs_cfg=bool(args.validate_inputs_cfg),
+        create_tuned_copy=bool(args.create_tuned_copy),
+        tuned_tune_name=args.tuned_tune_name,
+        overwrite_tuned_copy=bool(args.overwrite_tuned_copy),
     )
 
     print(json.dumps(summary, indent=2))

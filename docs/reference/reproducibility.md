@@ -28,7 +28,7 @@ Examples:
 CLI override:
 
 ```bash
-python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --seed 12345 --force-save
+python run_pipeline.py --tune-dir cells/PV/tunes/tuned --seed 12345 --force-save
 ```
 
 ## Trial Alignment
@@ -56,7 +56,7 @@ Use snapshot mode to capture richer comparison metadata:
 CLI:
 
 ```bash
-python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --snapshot
+python run_pipeline.py --tune-dir cells/PV/tunes/tuned --snapshot
 ```
 
 Snapshot mode forces saving, full sidecars, input summaries, and trace/input
@@ -79,7 +79,7 @@ Append mode can add results to an existing run:
 ```json
 "append": {
   "enabled": true,
-  "path": "cells/PV/tunes/seg_tuned/output_data/example_run"
+  "path": "cells/PV/tunes/tuned/output_data/example_run"
 }
 ```
 

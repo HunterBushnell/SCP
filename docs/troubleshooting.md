@@ -5,7 +5,7 @@
 Run the setup checker:
 
 ```bash
-python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune seg_tuned --compile-modfiles
+python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune tuned --compile-modfiles
 ```
 
 Run notebook portability checks:
@@ -33,6 +33,10 @@ nrnivmodl
 
 Step 2 is manual-first and does not overwrite model files automatically.
 
+- If Step 2 reports missing passive targets, provide all three passive values
+  in `manual_passive_targets`, fill `target_config.json` fields
+  `manual.passive.v_rest_mV`, `manual.passive.rin_MOhm`, and
+  `manual.passive.tau_ms`, or set `target_source.mode` to `traces`/`allen_nwb`.
 - Confirm the ACT values were copied into the correct `*_fit.json` or custom
   model source file.
 - Save the edited file before rerunning the notebook.
@@ -43,22 +47,45 @@ Step 2 is manual-first and does not overwrite model files automatically.
 - For passive checks, confirm active conductances are disabled or minimized
   according to your model's passive-tuning convention.
 
+## Step 2 Allen/ADB NWB Passive Targets
+
+For passive targets from a downloaded Allen/ADB ephys NWB file:
+
+- Place the `*_ephys.nwb` file in the selected tune directory, set
+  `target_config.json` field `allen_nwb.file`, or set
+  `NWB_PASSIVE_PATH` explicitly.
+- Start with `allen_nwb.passive.stimulus_names = ["Long Square"]`.
+- The default current filter uses negative-current sweeps only:
+  `allen_nwb.passive.max_current_pA = -1.0`.
+- If no sweeps are found, inspect `allen_nwb.sweep_ids`, `allen_nwb.passive.sweep_ids`,
+  `allen_nwb.passive.min_current_pA`, `allen_nwb.passive.max_current_pA`,
+  and the stimulus names in the NWB file.
+- The notebook writes `notebook_exports/step2_passive/allen_nwb_passive_targets.csv`
+  and `notebook_exports/step2_passive/allen_nwb_passive_sweeps.csv` for review.
+
 ## Step 3 ACT Target Data Issues
 
 For Allen/ADB NWB targets:
 
-- Place the downloaded `*_ephys.nwb` file in the selected tune directory or set
-  `ACT_NWB_PATH` explicitly.
-- Use `ACT_TARGET_MODE = "allen_nwb"`.
-- Start with `ACT_NWB_STIMULUS_NAMES = ["Long Square"]`.
-- If no sweeps are found, inspect `ACT_NWB_MIN_CURRENT_PA`,
-  `ACT_NWB_MAX_CURRENT_PA`, and the stimulus names in the NWB file.
+- Place the downloaded `*_ephys.nwb` file in the selected tune directory, set
+  `target_config.json` field `allen_nwb.file`, or set `ACT_NWB_PATH`
+  explicitly.
+- Use `target_source.mode = "allen_nwb"` in `target_config.json` or
+  `ACT_TARGET_MODE = "allen_nwb"` in the notebook.
+- Start with `allen_nwb.active.stimulus_names = ["Long Square"]`.
+- If no sweeps are found, inspect `allen_nwb.active.min_current_pA`,
+  `allen_nwb.active.max_current_pA`, and the stimulus names in the NWB file.
 - The preparation step writes `act_workspace/allen_nwb_fi_curve.csv` for review
   and `act_workspace/target_sf.csv` for ACT.
 
 For custom FI CSV targets, use a current column such as `amp_pA`, `current_pA`,
 `amp_nA`, or `mean_i`, and a frequency column such as `spike_frequency`,
 `spike_frequency_hz`, or `frequency_hz`.
+
+For `trace_npy` targets, `traces.active.file` must point to an ACT-compatible
+`.npy` array with shape `(n_trials, n_timepoints, n_columns)`, voltage in mV in
+column 0, and injected current in nA in column 1. See
+`docs/reference/target_trace_formats.md`.
 
 ## Missing Configs
 
@@ -81,7 +108,7 @@ Use Step 1 config scaffolding with `CONFIG_MODE = "fill"` or:
 
 ```bash
 python scripts/step1_prepare.py \
-  --tune-dir cells/PV/tunes/adb_peri \
+  --tune-dir cells/PV/tunes/orig \
   --source-type existing \
   --no-download \
   --no-compile \

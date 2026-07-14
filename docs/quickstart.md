@@ -15,7 +15,7 @@ conda activate scp-py311
 Optional checks:
 
 ```bash
-python scripts/check_setup.py --steps 5 --cell PV --tune seg_tuned --compile-modfiles
+python scripts/check_setup.py --steps 5 --cell PV --tune tuned --compile-modfiles
 python scripts/check_notebooks.py
 ```
 
@@ -27,8 +27,8 @@ Generated `x86_64/` mechanism folders are ignored by Git.
 1. Open `5_simulate.ipynb`.
 2. Select:
    - `cell_name = "PV"`
-   - `tune_name = "seg_tuned"`
-3. Set `force_save = True` if you want to create an `output_data/` run for Step 6.
+   - `tune_name = "tuned"`
+3. Set `force_save = True` if you want to create a saved run folder for Step 6.
 4. Run the notebook top to bottom.
 5. Open `6_analysis.ipynb` to inspect saved outputs.
 
@@ -45,19 +45,19 @@ For the full preparation/tuning workflow, use the notebooks in order:
 Run and save one trial:
 
 ```bash
-python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 1 --force-save --output-stem quickstart_pv
+python run_pipeline.py --tune-dir cells/PV/tunes/tuned --n-trials 1 --force-save --output-stem quickstart_pv
 ```
 
 Run by cell/tune labels:
 
 ```bash
-python run_pipeline.py --cell SST --tune seg_tuned --n-trials 1 --force-save --output-stem quickstart_sst
+python run_pipeline.py --cell SST --tune tuned --n-trials 1 --force-save --output-stem quickstart_sst
 ```
 
 Run a simple current-injection check instead of synapse-driven inputs:
 
 ```bash
-python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --iclamp --force-save --output-stem pv_iclamp_check
+python run_pipeline.py --tune-dir cells/PV/tunes/tuned --iclamp --force-save --output-stem pv_iclamp_check
 ```
 
 ## Option C: Prepare a Raw ADB Tune
@@ -65,13 +65,13 @@ python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --iclamp --force-save
 Use Step 1 when creating or refreshing a tune directory:
 
 ```bash
-python scripts/step1_prepare.py --cell PV --tune adb_peri --specimen-id 484635029 --model-type perisomatic
+python scripts/step1_prepare.py --cell PV --tune orig --specimen-id 484635029 --model-type perisomatic
 ```
 
 For SST all-active:
 
 ```bash
-python scripts/step1_prepare.py --cell SST --tune adb_all --specimen-id 485466109 --model-type "all active"
+python scripts/step1_prepare.py --cell SST --tune orig --specimen-id 485466109 --model-type "all active"
 ```
 
 ## Outputs
@@ -83,6 +83,8 @@ under:
 ```text
 cells/<CELL>/tunes/<TUNE>/output_data/<RUN>/
 ```
+
+If no run name is specified, SCP uses a timestamped `run_...` folder.
 
 See `reference/outputs_layout.md` for file details.
 

@@ -1,0 +1,2002 @@
+[
+  {
+    "trial_idx": 0,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1705,
+        "sum_spike_times": 954137.9593120043
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2412,
+        "sum_spike_times": 1304900.2926672
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 732,
+        "sum_spike_times": 386495.1023652157
+      }
+    }
+  },
+  {
+    "trial_idx": 1,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1645,
+        "sum_spike_times": 931230.133770786
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2253,
+        "sum_spike_times": 1227332.0459411154
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 764,
+        "sum_spike_times": 422317.41804827406
+      }
+    }
+  },
+  {
+    "trial_idx": 2,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1633,
+        "sum_spike_times": 899765.5550418064
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2314,
+        "sum_spike_times": 1226319.485815012
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 776,
+        "sum_spike_times": 399185.24446769577
+      }
+    }
+  },
+  {
+    "trial_idx": 3,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1520,
+        "sum_spike_times": 933287.9194920876
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1854,
+        "sum_spike_times": 1157567.6188552682
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 579,
+        "sum_spike_times": 359092.82181236986
+      }
+    }
+  },
+  {
+    "trial_idx": 4,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1639,
+        "sum_spike_times": 899031.6653602517
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2411,
+        "sum_spike_times": 1259409.337720338
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 823,
+        "sum_spike_times": 432026.8188747458
+      }
+    }
+  },
+  {
+    "trial_idx": 5,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1636,
+        "sum_spike_times": 888542.7955441999
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2364,
+        "sum_spike_times": 1242031.4046543303
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 773,
+        "sum_spike_times": 418948.71812113555
+      }
+    }
+  },
+  {
+    "trial_idx": 6,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1728,
+        "sum_spike_times": 952874.4048103965
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2449,
+        "sum_spike_times": 1273369.6834378864
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 777,
+        "sum_spike_times": 410561.8877479079
+      }
+    }
+  },
+  {
+    "trial_idx": 7,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1672,
+        "sum_spike_times": 923513.7129057684
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2359,
+        "sum_spike_times": 1245827.9866671131
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 791,
+        "sum_spike_times": 415442.9649981026
+      }
+    }
+  },
+  {
+    "trial_idx": 8,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1686,
+        "sum_spike_times": 957558.1206056677
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2291,
+        "sum_spike_times": 1248454.8091765405
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 761,
+        "sum_spike_times": 411739.7364759054
+      }
+    }
+  },
+  {
+    "trial_idx": 9,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1733,
+        "sum_spike_times": 958537.672551438
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2459,
+        "sum_spike_times": 1265583.4914900807
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 757,
+        "sum_spike_times": 387363.0196708219
+      }
+    }
+  },
+  {
+    "trial_idx": 10,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1727,
+        "sum_spike_times": 957008.5986618511
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2515,
+        "sum_spike_times": 1249187.023746818
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 761,
+        "sum_spike_times": 390057.7008971507
+      }
+    }
+  },
+  {
+    "trial_idx": 11,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1452,
+        "sum_spike_times": 882518.778060819
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 545,
+        "sum_spike_times": 482296.8872014817
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 200,
+        "sum_spike_times": 175434.03396528974
+      }
+    }
+  },
+  {
+    "trial_idx": 12,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1707,
+        "sum_spike_times": 963343.0625867669
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2406,
+        "sum_spike_times": 1297578.026111664
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 737,
+        "sum_spike_times": 387854.5264111996
+      }
+    }
+  },
+  {
+    "trial_idx": 13,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1771,
+        "sum_spike_times": 954902.4479915182
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2478,
+        "sum_spike_times": 1274198.2827043033
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 755,
+        "sum_spike_times": 390040.3307702113
+      }
+    }
+  },
+  {
+    "trial_idx": 14,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1539,
+        "sum_spike_times": 899997.4390284119
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2048,
+        "sum_spike_times": 1211670.357191696
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 657,
+        "sum_spike_times": 382378.79920019285
+      }
+    }
+  },
+  {
+    "trial_idx": 15,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1714,
+        "sum_spike_times": 978959.2032763582
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2322,
+        "sum_spike_times": 1262945.3226383908
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 721,
+        "sum_spike_times": 392375.56686150294
+      }
+    }
+  },
+  {
+    "trial_idx": 16,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1632,
+        "sum_spike_times": 912825.3425723283
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2393,
+        "sum_spike_times": 1293679.448023113
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 696,
+        "sum_spike_times": 377673.0888596187
+      }
+    }
+  },
+  {
+    "trial_idx": 17,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1641,
+        "sum_spike_times": 912332.3459621354
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2353,
+        "sum_spike_times": 1252308.0926047694
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 724,
+        "sum_spike_times": 396670.95560568874
+      }
+    }
+  },
+  {
+    "trial_idx": 18,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1680,
+        "sum_spike_times": 940787.7339592953
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2378,
+        "sum_spike_times": 1273220.7696453205
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 693,
+        "sum_spike_times": 370229.0032111581
+      }
+    }
+  },
+  {
+    "trial_idx": 19,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1690,
+        "sum_spike_times": 954202.8493068058
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2403,
+        "sum_spike_times": 1290795.8725108241
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 754,
+        "sum_spike_times": 405250.4429393576
+      }
+    }
+  },
+  {
+    "trial_idx": 20,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1522,
+        "sum_spike_times": 913116.4624021736
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1972,
+        "sum_spike_times": 1199058.2625808655
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 662,
+        "sum_spike_times": 398528.0852280316
+      }
+    }
+  },
+  {
+    "trial_idx": 21,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1800,
+        "sum_spike_times": 985265.9143317738
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2572,
+        "sum_spike_times": 1294164.7549039535
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 808,
+        "sum_spike_times": 406996.5032309997
+      }
+    }
+  },
+  {
+    "trial_idx": 22,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1804,
+        "sum_spike_times": 996672.7990395373
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2458,
+        "sum_spike_times": 1292501.8981627962
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 713,
+        "sum_spike_times": 371174.3357494401
+      }
+    }
+  },
+  {
+    "trial_idx": 23,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1717,
+        "sum_spike_times": 934165.3691152128
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2442,
+        "sum_spike_times": 1260419.7483765762
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 796,
+        "sum_spike_times": 412763.78607670736
+      }
+    }
+  },
+  {
+    "trial_idx": 24,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1462,
+        "sum_spike_times": 891682.389143457
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1862,
+        "sum_spike_times": 1164627.2899586663
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 588,
+        "sum_spike_times": 366232.5095646449
+      }
+    }
+  },
+  {
+    "trial_idx": 25,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1710,
+        "sum_spike_times": 953925.0182534014
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2465,
+        "sum_spike_times": 1289949.1506409722
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 772,
+        "sum_spike_times": 396151.55550908117
+      }
+    }
+  },
+  {
+    "trial_idx": 26,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1672,
+        "sum_spike_times": 942347.2306922745
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2463,
+        "sum_spike_times": 1250005.3543348694
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 761,
+        "sum_spike_times": 376925.62542233034
+      }
+    }
+  },
+  {
+    "trial_idx": 27,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1737,
+        "sum_spike_times": 934909.3145891964
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2535,
+        "sum_spike_times": 1269377.5066563454
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 759,
+        "sum_spike_times": 384521.5074471278
+      }
+    }
+  },
+  {
+    "trial_idx": 28,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1469,
+        "sum_spike_times": 902427.5808269153
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1845,
+        "sum_spike_times": 1168800.0216896476
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 556,
+        "sum_spike_times": 346779.744681813
+      }
+    }
+  },
+  {
+    "trial_idx": 29,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1543,
+        "sum_spike_times": 948013.8924431833
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1836,
+        "sum_spike_times": 1179264.6445013986
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 533,
+        "sum_spike_times": 340270.30995332595
+      }
+    }
+  },
+  {
+    "trial_idx": 30,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1462,
+        "sum_spike_times": 903598.9849879318
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1831,
+        "sum_spike_times": 1205081.8584297998
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 532,
+        "sum_spike_times": 358809.0940828781
+      }
+    }
+  },
+  {
+    "trial_idx": 31,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1755,
+        "sum_spike_times": 986273.6823126805
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2225,
+        "sum_spike_times": 1209608.4490367386
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 713,
+        "sum_spike_times": 388224.54685123626
+      }
+    }
+  },
+  {
+    "trial_idx": 32,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1579,
+        "sum_spike_times": 912066.7170204432
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2066,
+        "sum_spike_times": 1194167.7831866979
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 663,
+        "sum_spike_times": 386104.0975425804
+      }
+    }
+  },
+  {
+    "trial_idx": 33,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1730,
+        "sum_spike_times": 962180.4499036272
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2364,
+        "sum_spike_times": 1200673.1810392712
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 735,
+        "sum_spike_times": 387779.5159582673
+      }
+    }
+  },
+  {
+    "trial_idx": 34,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1643,
+        "sum_spike_times": 940974.5871241665
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2322,
+        "sum_spike_times": 1304231.2268602636
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 715,
+        "sum_spike_times": 393598.32552166644
+      }
+    }
+  },
+  {
+    "trial_idx": 35,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1598,
+        "sum_spike_times": 920538.2669923181
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2278,
+        "sum_spike_times": 1270926.1756198835
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 722,
+        "sum_spike_times": 402314.5515304697
+      }
+    }
+  },
+  {
+    "trial_idx": 36,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1665,
+        "sum_spike_times": 941931.3559438735
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2298,
+        "sum_spike_times": 1256900.3481705452
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 705,
+        "sum_spike_times": 387621.4422240239
+      }
+    }
+  },
+  {
+    "trial_idx": 37,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1698,
+        "sum_spike_times": 941045.1930513994
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2437,
+        "sum_spike_times": 1319174.664496734
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 714,
+        "sum_spike_times": 381374.47796728363
+      }
+    }
+  },
+  {
+    "trial_idx": 38,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1713,
+        "sum_spike_times": 937237.3150696004
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2384,
+        "sum_spike_times": 1216573.4351128086
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 762,
+        "sum_spike_times": 393492.240341884
+      }
+    }
+  },
+  {
+    "trial_idx": 39,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1683,
+        "sum_spike_times": 926063.3247379742
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2407,
+        "sum_spike_times": 1268431.6503305347
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 752,
+        "sum_spike_times": 387340.6857412324
+      }
+    }
+  },
+  {
+    "trial_idx": 40,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1570,
+        "sum_spike_times": 913512.6442304392
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2342,
+        "sum_spike_times": 1323125.4198041018
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 699,
+        "sum_spike_times": 386641.0944622762
+      }
+    }
+  },
+  {
+    "trial_idx": 41,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1619,
+        "sum_spike_times": 912374.3240843276
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2350,
+        "sum_spike_times": 1300048.2149266298
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 712,
+        "sum_spike_times": 394104.29840586416
+      }
+    }
+  },
+  {
+    "trial_idx": 42,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1774,
+        "sum_spike_times": 987027.658577164
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2349,
+        "sum_spike_times": 1199421.8370395086
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 750,
+        "sum_spike_times": 386225.0580618821
+      }
+    }
+  },
+  {
+    "trial_idx": 43,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1546,
+        "sum_spike_times": 930320.6420134197
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1944,
+        "sum_spike_times": 1209901.7552968161
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 646,
+        "sum_spike_times": 407674.2049636475
+      }
+    }
+  },
+  {
+    "trial_idx": 44,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1711,
+        "sum_spike_times": 959285.1453676096
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2386,
+        "sum_spike_times": 1253737.1352395318
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 768,
+        "sum_spike_times": 409520.16803102824
+      }
+    }
+  },
+  {
+    "trial_idx": 45,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1507,
+        "sum_spike_times": 938450.8811858536
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1854,
+        "sum_spike_times": 1196453.970787097
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 566,
+        "sum_spike_times": 369476.58517249255
+      }
+    }
+  },
+  {
+    "trial_idx": 46,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1530,
+        "sum_spike_times": 903093.3014266199
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2165,
+        "sum_spike_times": 1251373.4250633349
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 653,
+        "sum_spike_times": 383154.34078814054
+      }
+    }
+  },
+  {
+    "trial_idx": 47,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1493,
+        "sum_spike_times": 916766.6381922808
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1884,
+        "sum_spike_times": 1189727.4536205907
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 592,
+        "sum_spike_times": 374370.8969561331
+      }
+    }
+  },
+  {
+    "trial_idx": 48,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1698,
+        "sum_spike_times": 940684.755756232
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2440,
+        "sum_spike_times": 1254869.9461034215
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 774,
+        "sum_spike_times": 413722.16919444967
+      }
+    }
+  },
+  {
+    "trial_idx": 49,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1462,
+        "sum_spike_times": 901317.6231669844
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 739,
+        "sum_spike_times": 630261.4769710895
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 246,
+        "sum_spike_times": 211672.50483199637
+      }
+    }
+  },
+  {
+    "trial_idx": 50,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1573,
+        "sum_spike_times": 929994.2645402702
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2006,
+        "sum_spike_times": 1204272.063401468
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 635,
+        "sum_spike_times": 383221.1406285996
+      }
+    }
+  },
+  {
+    "trial_idx": 51,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1669,
+        "sum_spike_times": 929775.6058957407
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2383,
+        "sum_spike_times": 1249726.221942226
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 746,
+        "sum_spike_times": 402452.1513862174
+      }
+    }
+  },
+  {
+    "trial_idx": 52,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1615,
+        "sum_spike_times": 969785.880115491
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2082,
+        "sum_spike_times": 1250576.8427021655
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 620,
+        "sum_spike_times": 375075.84024985094
+      }
+    }
+  },
+  {
+    "trial_idx": 53,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1613,
+        "sum_spike_times": 913112.0074625494
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2280,
+        "sum_spike_times": 1229888.0045050483
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 716,
+        "sum_spike_times": 387372.8955878592
+      }
+    }
+  },
+  {
+    "trial_idx": 54,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1677,
+        "sum_spike_times": 970628.2654256287
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2226,
+        "sum_spike_times": 1246057.8697660465
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 681,
+        "sum_spike_times": 376338.14079571125
+      }
+    }
+  },
+  {
+    "trial_idx": 55,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1709,
+        "sum_spike_times": 1007734.1942268546
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2084,
+        "sum_spike_times": 1217861.3258432902
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 640,
+        "sum_spike_times": 376053.5975447834
+      }
+    }
+  },
+  {
+    "trial_idx": 56,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1708,
+        "sum_spike_times": 933203.6297078873
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2431,
+        "sum_spike_times": 1262442.0603798903
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 712,
+        "sum_spike_times": 374495.6029554487
+      }
+    }
+  },
+  {
+    "trial_idx": 57,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1446,
+        "sum_spike_times": 887112.4800985958
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1501,
+        "sum_spike_times": 1051559.7410665397
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 477,
+        "sum_spike_times": 335371.66665519885
+      }
+    }
+  },
+  {
+    "trial_idx": 58,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1548,
+        "sum_spike_times": 941604.2984624163
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1963,
+        "sum_spike_times": 1213328.165161215
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 636,
+        "sum_spike_times": 389483.0689778614
+      }
+    }
+  },
+  {
+    "trial_idx": 59,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1568,
+        "sum_spike_times": 935513.482368905
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1962,
+        "sum_spike_times": 1202303.7219752625
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 630,
+        "sum_spike_times": 379512.85666262987
+      }
+    }
+  },
+  {
+    "trial_idx": 60,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1676,
+        "sum_spike_times": 937458.9709483961
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2323,
+        "sum_spike_times": 1235242.2952851555
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 764,
+        "sum_spike_times": 402149.19065149745
+      }
+    }
+  },
+  {
+    "trial_idx": 61,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1681,
+        "sum_spike_times": 933825.5928461328
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2455,
+        "sum_spike_times": 1273943.214992855
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 784,
+        "sum_spike_times": 404162.49080505315
+      }
+    }
+  },
+  {
+    "trial_idx": 62,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1593,
+        "sum_spike_times": 926104.6289735065
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2000,
+        "sum_spike_times": 1186093.6360304006
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 645,
+        "sum_spike_times": 380554.50493657636
+      }
+    }
+  },
+  {
+    "trial_idx": 63,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1748,
+        "sum_spike_times": 971992.0961216692
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2389,
+        "sum_spike_times": 1252530.6360539768
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 761,
+        "sum_spike_times": 395134.7820958002
+      }
+    }
+  },
+  {
+    "trial_idx": 64,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1704,
+        "sum_spike_times": 975968.0506630751
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2451,
+        "sum_spike_times": 1281217.8183081246
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 712,
+        "sum_spike_times": 370694.30397792975
+      }
+    }
+  },
+  {
+    "trial_idx": 65,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1573,
+        "sum_spike_times": 969924.4256476766
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1995,
+        "sum_spike_times": 1256482.9835104551
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 630,
+        "sum_spike_times": 392897.0856925666
+      }
+    }
+  },
+  {
+    "trial_idx": 66,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1433,
+        "sum_spike_times": 869362.1630368077
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1753,
+        "sum_spike_times": 1163102.6123760673
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 560,
+        "sum_spike_times": 379739.44446259824
+      }
+    }
+  },
+  {
+    "trial_idx": 67,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1804,
+        "sum_spike_times": 998661.988946294
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2493,
+        "sum_spike_times": 1251869.4383766386
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 727,
+        "sum_spike_times": 369965.2767346498
+      }
+    }
+  },
+  {
+    "trial_idx": 68,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1744,
+        "sum_spike_times": 954287.4195911614
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2491,
+        "sum_spike_times": 1282618.8829521816
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 791,
+        "sum_spike_times": 396269.1661442278
+      }
+    }
+  },
+  {
+    "trial_idx": 69,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1684,
+        "sum_spike_times": 954811.0565875557
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2312,
+        "sum_spike_times": 1277140.5735433192
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 678,
+        "sum_spike_times": 367523.3071313018
+      }
+    }
+  },
+  {
+    "trial_idx": 70,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1843,
+        "sum_spike_times": 1021383.8401383853
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2459,
+        "sum_spike_times": 1283526.4640872495
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 781,
+        "sum_spike_times": 412244.81842955534
+      }
+    }
+  },
+  {
+    "trial_idx": 71,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1711,
+        "sum_spike_times": 963157.5353174921
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2335,
+        "sum_spike_times": 1268666.0703381228
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 741,
+        "sum_spike_times": 394325.1273370835
+      }
+    }
+  },
+  {
+    "trial_idx": 72,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1735,
+        "sum_spike_times": 946742.6301760894
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2507,
+        "sum_spike_times": 1258101.8216781507
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 757,
+        "sum_spike_times": 391977.7955540088
+      }
+    }
+  },
+  {
+    "trial_idx": 73,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1673,
+        "sum_spike_times": 939300.5687495833
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2332,
+        "sum_spike_times": 1250377.8650227343
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 776,
+        "sum_spike_times": 410452.5639359659
+      }
+    }
+  },
+  {
+    "trial_idx": 74,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1771,
+        "sum_spike_times": 1000691.2200088522
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2373,
+        "sum_spike_times": 1285510.9653975582
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 721,
+        "sum_spike_times": 391643.3306620137
+      }
+    }
+  },
+  {
+    "trial_idx": 75,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1548,
+        "sum_spike_times": 916065.2849855758
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2126,
+        "sum_spike_times": 1233764.7984419742
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 685,
+        "sum_spike_times": 406666.67301631306
+      }
+    }
+  },
+  {
+    "trial_idx": 76,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1718,
+        "sum_spike_times": 942889.5248706762
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2368,
+        "sum_spike_times": 1267389.2840531399
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 758,
+        "sum_spike_times": 405933.25085636246
+      }
+    }
+  },
+  {
+    "trial_idx": 77,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1633,
+        "sum_spike_times": 937713.02596868
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2204,
+        "sum_spike_times": 1266571.320533514
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 674,
+        "sum_spike_times": 376293.87251022
+      }
+    }
+  },
+  {
+    "trial_idx": 78,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1720,
+        "sum_spike_times": 943957.5900399238
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2416,
+        "sum_spike_times": 1256797.2046262957
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 826,
+        "sum_spike_times": 419454.8154810655
+      }
+    }
+  },
+  {
+    "trial_idx": 79,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1553,
+        "sum_spike_times": 927472.6347858636
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2036,
+        "sum_spike_times": 1227287.469660906
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 680,
+        "sum_spike_times": 409932.61705316434
+      }
+    }
+  },
+  {
+    "trial_idx": 80,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1783,
+        "sum_spike_times": 987377.3850327872
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2471,
+        "sum_spike_times": 1325403.374215285
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 780,
+        "sum_spike_times": 399178.49645497877
+      }
+    }
+  },
+  {
+    "trial_idx": 81,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1618,
+        "sum_spike_times": 936979.8859886632
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2294,
+        "sum_spike_times": 1261691.095927964
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 714,
+        "sum_spike_times": 385910.7441551809
+      }
+    }
+  },
+  {
+    "trial_idx": 82,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1730,
+        "sum_spike_times": 954453.7235010149
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2447,
+        "sum_spike_times": 1285349.8694902966
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 749,
+        "sum_spike_times": 366645.54637589253
+      }
+    }
+  },
+  {
+    "trial_idx": 83,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1594,
+        "sum_spike_times": 915559.1247432393
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2195,
+        "sum_spike_times": 1239925.005671369
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 739,
+        "sum_spike_times": 425655.6753570996
+      }
+    }
+  },
+  {
+    "trial_idx": 84,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1734,
+        "sum_spike_times": 983548.5391112133
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2237,
+        "sum_spike_times": 1196429.183517257
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 732,
+        "sum_spike_times": 398062.7577419834
+      }
+    }
+  },
+  {
+    "trial_idx": 85,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1556,
+        "sum_spike_times": 962451.3775801635
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 1002,
+        "sum_spike_times": 806006.0111875013
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 315,
+        "sum_spike_times": 255026.09698399805
+      }
+    }
+  },
+  {
+    "trial_idx": 86,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1600,
+        "sum_spike_times": 949111.6141823613
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2051,
+        "sum_spike_times": 1240033.0597697257
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 644,
+        "sum_spike_times": 380328.1673794612
+      }
+    }
+  },
+  {
+    "trial_idx": 87,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1740,
+        "sum_spike_times": 953332.702839443
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2461,
+        "sum_spike_times": 1271688.6357748539
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 758,
+        "sum_spike_times": 395603.9287974056
+      }
+    }
+  },
+  {
+    "trial_idx": 88,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1744,
+        "sum_spike_times": 947053.7246682829
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2397,
+        "sum_spike_times": 1251265.9320389775
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 842,
+        "sum_spike_times": 443746.79220814107
+      }
+    }
+  },
+  {
+    "trial_idx": 89,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1756,
+        "sum_spike_times": 964288.1186713157
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2471,
+        "sum_spike_times": 1305830.6505337802
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 762,
+        "sum_spike_times": 404897.10375704366
+      }
+    }
+  },
+  {
+    "trial_idx": 90,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1617,
+        "sum_spike_times": 933047.2470201612
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2199,
+        "sum_spike_times": 1226508.1014392274
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 654,
+        "sum_spike_times": 351037.00490316557
+      }
+    }
+  },
+  {
+    "trial_idx": 91,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1715,
+        "sum_spike_times": 950095.5199678552
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2373,
+        "sum_spike_times": 1250505.6449138573
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 739,
+        "sum_spike_times": 396543.4971934214
+      }
+    }
+  },
+  {
+    "trial_idx": 92,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1558,
+        "sum_spike_times": 934014.1857247772
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2026,
+        "sum_spike_times": 1191747.6180711733
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 645,
+        "sum_spike_times": 381345.4118970205
+      }
+    }
+  },
+  {
+    "trial_idx": 93,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1804,
+        "sum_spike_times": 971649.6946564002
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2529,
+        "sum_spike_times": 1277973.5829045882
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 841,
+        "sum_spike_times": 428193.9238722329
+      }
+    }
+  },
+  {
+    "trial_idx": 94,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1674,
+        "sum_spike_times": 961170.9079787408
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2266,
+        "sum_spike_times": 1238489.1870859494
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 696,
+        "sum_spike_times": 385474.76417280873
+      }
+    }
+  },
+  {
+    "trial_idx": 95,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1663,
+        "sum_spike_times": 959970.5371764447
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2183,
+        "sum_spike_times": 1227965.1925366311
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 675,
+        "sum_spike_times": 395328.3893866167
+      }
+    }
+  },
+  {
+    "trial_idx": 96,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1606,
+        "sum_spike_times": 914330.5693062247
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2163,
+        "sum_spike_times": 1210475.0263026538
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 723,
+        "sum_spike_times": 405535.81319990003
+      }
+    }
+  },
+  {
+    "trial_idx": 97,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1770,
+        "sum_spike_times": 962838.2578256719
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2527,
+        "sum_spike_times": 1280362.5061973075
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 726,
+        "sum_spike_times": 372349.9726475559
+      }
+    }
+  },
+  {
+    "trial_idx": 98,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1712,
+        "sum_spike_times": 927580.4505032299
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2540,
+        "sum_spike_times": 1312278.3309656773
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 813,
+        "sum_spike_times": 420310.2694685299
+      }
+    }
+  },
+  {
+    "trial_idx": 99,
+    "groups": {
+      "pn_exc": {
+        "n_syn": 435,
+        "total_spikes": 1802,
+        "sum_spike_times": 996158.4216274995
+      },
+      "bg_exc": {
+        "n_syn": 3382,
+        "total_spikes": 2460,
+        "sum_spike_times": 1271431.1541114068
+      },
+      "bg_inh": {
+        "n_syn": 796,
+        "total_spikes": 828,
+        "sum_spike_times": 432943.1077677102
+      }
+    }
+  }
+]

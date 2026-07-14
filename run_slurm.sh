@@ -279,7 +279,7 @@ fi
 #   - Set TUNE_DIR to use an explicit path, OR
 #   - Set CELL and TUNE (defaults below)
 CELL=${CELL:-SST}
-TUNE=${TUNE:-seg_tuned}
+TUNE=${TUNE:-tuned}
 TUNE_DIR=${TUNE_DIR:-${REPO_ROOT}/cells/${CELL}/tunes/${TUNE}}
 
 OUTPUT_DIR=${OUTPUT_DIR:-${TUNE_DIR}/output_data}

@@ -1,7 +1,23 @@
 logs/old/
 # logs/status/
 archive/
-cells/**/output_data/
+cells/SST_paper
+cells/PV_paper
+
+# Generated simulation outputs are ignored by default. Keep only curated public
+# example outputs tracked.
+cells/**/output_data/*
+!cells/SST/tunes/tuned/output_data/
+!cells/SST/tunes/tuned/output_data/base_tune_100trials/
+!cells/SST/tunes/tuned/output_data/base_tune_100trials/**
+!cells/SST/tunes/tuned/output_data/notebook_single_trial/
+!cells/SST/tunes/tuned/output_data/notebook_single_trial/**
+!cells/PV/tunes/tuned/output_data/
+!cells/PV/tunes/tuned/output_data/base_tune_100trials/
+!cells/PV/tunes/tuned/output_data/base_tune_100trials/**
+!cells/PV/tunes/tuned/output_data/notebook_single_trial/
+!cells/PV/tunes/tuned/output_data/notebook_single_trial/**
+cells/**/output_data/**/logs/*
 cells/**/notebook_exports/
 cells/**/tuning_exports/
 cells/**/*.nwb

@@ -1,0 +1,37 @@
+{
+  "bg_inh": {
+    "state": true,
+    "color": "#d62728",
+    "syns": {
+      "type": "GABA_A",
+      "N_syn": null,
+      "segs": "all",
+      "dist_func": {
+        "kind": "linear",
+        "params": {
+          "m": -0.015,
+          "b": 4.25,
+          "multi": 0.2
+        }
+      },
+      "params": {
+        "wt_mean": 1.5,
+        "wt_std": 0.33,
+        "initW": 1.0,
+        "gmax": 0.001,
+        "tau_r_GABAA": 0.5,
+        "tau_d_GABAA": 5.5
+      }
+    },
+    "input_blocks": [
+      {
+        "name": "background",
+        "role": "background",
+        "start_ms": 0.0,
+        "stop_ms": 1000.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 0.2
+      }
+    ]
+  }
+}

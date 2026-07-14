@@ -15,6 +15,7 @@ CLI runs, and SLURM jobs.
 cell_configs/
   cell_config.json
   sim_config.json
+  target_config.json
   geometry.json
   syn_config.json
   syn_groups/
@@ -30,31 +31,148 @@ Cell identity, loader selection, and tune-level metadata.
 Generated fields:
 
 - `cell_name`: display/selection label, such as `PV` or `SST`.
-- `tune`: tune directory name, such as `seg_tuned`.
+- `tune`: tune directory name, such as `tuned`.
 - `color`: plotting color for the cell.
 - `cell_loader`: loader adapter name. Current bundled examples use `allen_manifest`.
 - `paths.manifest`: path to `manifest.json`, relative to the tune directory.
-- `tuning.soma_diam_multiplier`: soma diameter multiplier used by setup/tuning/loading code.
+- `tuning.soma_diam_multiplier`: soma diameter multiplier used by setup/tuning/loading code. The generated default is `1.0` so raw cells are not rescaled before tuning.
 
 Example:
 
 ```json
 {
   "cell_name": "PV",
-  "tune": "seg_tuned",
-  "color": "royalblue",
+  "tune": "tuned",
+  "color": "blue",
   "cell_loader": "allen_manifest",
   "paths": {
     "manifest": "manifest.json"
   },
   "tuning": {
-    "soma_diam_multiplier": 6.0
+    "soma_diam_multiplier": 1.0
   }
 }
 ```
 
 Step 1 download inputs such as Allen `specimen_id` and `model_type` are setup
 inputs, not runtime config identity fields.
+
+## `target_config.json`
+
+Optional biological or experimental targets used by tuning notebooks. This file
+stores desired model behavior; it does not control Step 5 simulation execution.
+
+The target config is organized by **source mode**:
+
+- `manual`: user-entered passive values and FI curve values or FI CSV.
+- `traces`: user-provided trace files following the SCP trace contract.
+- `allen_nwb`: Allen/ADB electrophysiology `.nwb` files.
+
+Generated fields:
+
+- `schema_version`: target-config schema version.
+- `target_source.mode`: one of `manual`, `traces`, or `allen_nwb`.
+- `target_source.description`: optional human-readable target-source note.
+- `manual.passive`: direct Step 2 targets: `v_rest_mV`, `rin_MOhm`, `tau_ms`.
+- `manual.fi_curve`: direct Step 3 FI targets: `currents_pA`, `rates_Hz`, or `csv`.
+- `traces.passive`: generic passive trace file contract for Step 2 extraction.
+- `traces.active`: ACT-compatible active trace target file contract for Step 3.
+- `allen_nwb.file`: tune-local or absolute Allen/ADB NWB file path.
+- `allen_nwb.passive`: Step 2 NWB passive sweep/filter settings.
+- `allen_nwb.active`: Step 3 NWB FI sweep/filter settings.
+- `notes`: free-form target notes.
+
+Example:
+
+```json
+{
+  "schema_version": 1,
+  "target_source": {
+    "mode": "manual",
+    "description": ""
+  },
+  "manual": {
+    "passive": {
+      "v_rest_mV": null,
+      "rin_MOhm": null,
+      "tau_ms": null
+    },
+    "fi_curve": {
+      "currents_pA": [],
+      "rates_Hz": [],
+      "csv": null
+    }
+  },
+  "traces": {
+    "format": "csv",
+    "passive": {
+      "file": null,
+      "time_column": "time_ms",
+      "voltage_column": "voltage_mV",
+      "current_column": "current_pA",
+      "sweep_column": null,
+      "stim_start_ms": null,
+      "stim_stop_ms": null,
+      "current_pA": null,
+      "dt_ms": null,
+      "end_margin_ms": 10.0,
+      "reducer": "median",
+      "tau_field": "tau_avg_ms"
+    },
+    "active": {
+      "file": null,
+      "format": "npy",
+      "stim_start_ms": null,
+      "stim_stop_ms": null,
+      "dt_ms": null,
+      "spike_threshold_mV": -20.0,
+      "refractory_ms": 1.0
+    }
+  },
+  "allen_nwb": {
+    "file": null,
+    "sweep_ids": [],
+    "passive": {
+      "stimulus_names": ["Long Square"],
+      "sweep_ids": null,
+      "min_current_pA": null,
+      "max_current_pA": -1.0,
+      "end_margin_ms": 10.0,
+      "reducer": "median",
+      "tau_field": "tau_avg_ms"
+    },
+    "active": {
+      "stimulus_names": ["Long Square"],
+      "min_current_pA": 0.0,
+      "max_current_pA": null,
+      "include_negative_currents": false,
+      "average_repeats": true,
+      "spike_threshold_mV": -20.0,
+      "refractory_ms": 1.0
+    }
+  },
+  "notes": ""
+}
+```
+
+Step 2 uses `manual.passive`, calculates targets from `traces.passive`, or
+calculates targets from `allen_nwb.passive` depending on `target_source.mode`.
+Step 3 uses `manual.fi_curve`, `traces.active`, or `allen_nwb.active` the same
+way. Manual FI CSV is still considered manual mode because it provides already
+summarized FI values rather than raw traces.
+
+Detailed passive trace, active trace, and FI CSV file requirements are in
+`docs/reference/target_trace_formats.md`.
+
+For generic passive CSV traces, `time_column` should start at 0 ms for each
+trace. Required columns are the configured time and voltage columns. A current
+column can be used for automatic stimulus-window detection; otherwise set
+`stim_start_ms`, `stim_stop_ms`, and `current_pA` in `traces.passive`.
+
+For active trace targets, `traces.active` currently expects an ACT-compatible
+`.npy` file with shape `(n_trials, n_timepoints, n_columns)`, voltage in column
+0, and injected current in nA in column 1. SCP currently passes that file
+through to ACT; it does not yet convert generic active voltage traces.
 
 ## `sim_config.json`
 
@@ -85,7 +203,7 @@ Input timing for synaptic groups is defined in each group file with
 - `load.enabled`: load existing output instead of running when supported.
 - `load.path`: path to load.
 - `save.enabled`: write run outputs.
-- `save.stem`: output folder stem under `output_data/`.
+- `save.stem`: output folder stem under `output_data/`; `null` uses a timestamped `run_...` folder when saving is enabled.
 - `save.format`: full-results format, `pkl` or `npz`.
 - `save.full_results`: save the full Python results bundle.
 - `append.enabled`: append/merge into a previous run.
@@ -350,7 +468,7 @@ Precomputed block:
   "stop_ms": 1000.0,
   "mode": "precomputed",
   "source": {
-    "path": "cells/SST/tunes/seg_tuned/output_data/example/results/spikes.npz",
+    "path": "cells/SST/tunes/tuned/output_data/example/results/spikes.npz",
     "selection": "sample",
     "crop_start_ms": 0.0,
     "crop_stop_ms": 1000.0

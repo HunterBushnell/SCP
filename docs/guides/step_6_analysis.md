@@ -281,13 +281,13 @@ Use `scripts/export_spikes_csv.py` to convert `spikes.npz` to a row-per-trial
 CSV.
 
 ```bash
-python scripts/export_spikes_csv.py --input cells/PV/tunes/seg_tuned/output_data/<run_name>/results/spikes.npz
+python scripts/export_spikes_csv.py --input cells/PV/tunes/tuned/output_data/<run_name>/results/spikes.npz
 ```
 
 You can also pass a run directory:
 
 ```bash
-python scripts/export_spikes_csv.py --input cells/PV/tunes/seg_tuned/output_data/<run_name>
+python scripts/export_spikes_csv.py --input cells/PV/tunes/tuned/output_data/<run_name>
 ```
 
 ### Vm trace swap utility
@@ -300,14 +300,14 @@ Examples:
 
 ```bash
 python scripts/swap_vm_trace.py \
-  --target-run cells/SST/tunes/seg_tuned/output_data/<target_run> \
-  --source-run cells/SST/tunes/seg_tuned/output_data/<source_run> \
+  --target-run cells/SST/tunes/tuned/output_data/<target_run> \
+  --source-run cells/SST/tunes/tuned/output_data/<source_run> \
   --update vm
 ```
 
 ```bash
 python scripts/swap_vm_trace.py \
-  --target-run cells/SST/tunes/seg_tuned/output_data/<target_run> \
+  --target-run cells/SST/tunes/tuned/output_data/<target_run> \
   --rerun \
   --update both \
   --write

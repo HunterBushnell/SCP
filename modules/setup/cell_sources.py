@@ -70,5 +70,6 @@ def setup_cell_source(
         "model_id": int(dl_info.get("model_id")),
         "model_name": dl_info.get("model_name"),
         "n_files": int(len(dl_info.get("files", []))),
-        "downloaded": True,
+        "downloaded": bool(dl_info.get("downloaded_now")),
+        "used_existing_cache": bool(dl_info.get("used_existing_cache")),
     }

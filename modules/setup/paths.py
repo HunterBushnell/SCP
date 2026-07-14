@@ -13,6 +13,7 @@ class Step1Paths:
     syn_groups_dir: Path
     cell_config: Path
     sim_config: Path
+    target_config: Path
     geometry_config: Path
     syn_config: Path
     manifest: Path
@@ -27,6 +28,7 @@ def resolve_step1_paths(tune_dir: Path) -> Step1Paths:
         syn_groups_dir=tune_dir / "cell_configs" / "syn_groups",
         cell_config=tune_dir / "cell_configs" / "cell_config.json",
         sim_config=tune_dir / "cell_configs" / "sim_config.json",
+        target_config=tune_dir / "cell_configs" / "target_config.json",
         geometry_config=tune_dir / "cell_configs" / "geometry.json",
         syn_config=tune_dir / "cell_configs" / "syn_config.json",
         manifest=tune_dir / "manifest.json",

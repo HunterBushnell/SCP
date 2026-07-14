@@ -143,7 +143,7 @@ def resolve_tune_dir(
 def prepare_scp_synapse_tuning(
     *,
     cell_name: str = "SST",
-    tune_name: str = "seg_tuned",
+    tune_name: str = "tuned",
     tunes_parent: str = "tunes",
     tune_dir_override: Optional[str | Path] = None,
     repo_root: Optional[Path] = None,

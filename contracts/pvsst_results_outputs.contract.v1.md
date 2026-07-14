@@ -7,7 +7,7 @@ SCP results and outputs contract (v1)
 
 * **Output locations (defaults)**
   * **Run folders:** `{tune_dir}/output_data/<output_stem>/`
-    * `tune_dir` is the cell tune folder, e.g. `<repo_root>/cells/SST/tunes/seg_tuned`.
+    * `tune_dir` is the cell tune folder, e.g. `<repo_root>/cells/SST/tunes/tuned`.
     * Override: `run_pipeline.py --output-dir ...` or `OUTPUT_DIR=...` in `run_slurm.sh`.
   * **SLURM logs (per run):** `{tune_dir}/output_data/<output_stem>/logs/`
     * `run_slurm.sh` moves each task’s `pvsst_*` logs into its run folder.
@@ -161,7 +161,7 @@ SCP results and outputs contract (v1)
 from modules import run_sim
 from modules.analysis import plotting
 
-results = run_sim.load_results("cells/SST/tunes/seg_tuned/output_data/example_run")
+results = run_sim.load_results("cells/SST/tunes/tuned/output_data/example_run")
 plotting.plot_results(results)
 ```
   * Notebook alternative: `<repo_root>/6_analysis.ipynb`

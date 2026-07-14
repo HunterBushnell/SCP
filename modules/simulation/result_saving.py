@@ -259,7 +259,7 @@ def save_results_with_name(
 
     Example:
         results["sim_cfg"]["color"] = "m"
-        save_results_with_name(results, "sst2_seg_tuned_batch1")
+        save_results_with_name(results, "sst2_tuned_batch1")
     """
     sim_cfg = results.setdefault("sim_cfg", {})
     sim_cfg["output"] = str(output_stem)
@@ -322,7 +322,7 @@ def _write_results_to_run_dir(
     if results_name is None:
         cell = sim_cfg.get("cell", "cell")
         tune = sim_cfg.get("tune", "tune")
-        stem = sim_cfg.get("output") or "results"
+        stem = sim_cfg.get("output") or run_dir.name
         suffix = ".npz" if fmt == "npz" else ".pkl"
         results_name = f"{cell}_{tune}_{stem}{suffix}"
 

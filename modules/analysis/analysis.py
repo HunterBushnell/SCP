@@ -3805,16 +3805,20 @@ def resolve_run(base_dir: Path, stem_or_path: Optional[Union[str, Path]]) -> Pat
     )
 
 
+def _is_wrapped_results_dir(run_dir: Path) -> bool:
+    return run_dir.name == "results" and run_dir.parent.name != "output_data"
+
+
 def run_label(run_dir: Path) -> str:
-    return run_dir.parent.name if run_dir.name == "results" else run_dir.name
+    return run_dir.parent.name if _is_wrapped_results_dir(run_dir) else run_dir.name
 
 
 def plot_dir_for_run(run_dir: Path) -> Path:
-    return run_dir.parent / "plots" if run_dir.name == "results" else run_dir / "plots"
+    return run_dir.parent / "plots" if _is_wrapped_results_dir(run_dir) else run_dir / "plots"
 
 
 def analysis_dir_for_run(run_dir: Path) -> Path:
-    return run_dir.parent / "analysis" if run_dir.name == "results" else run_dir / "analysis"
+    return run_dir.parent / "analysis" if _is_wrapped_results_dir(run_dir) else run_dir / "analysis"
 
 
 def plot_dir_for_compare(base_dir: Path, run_a: Path, run_b: Path) -> Path:

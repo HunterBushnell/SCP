@@ -1,0 +1,12 @@
+{
+  "cell_name": "PV",
+  "tune": "orig",
+  "color": "blue",
+  "cell_loader": "allen_manifest",
+  "paths": {
+    "manifest": "manifest.json"
+  },
+  "tuning": {
+    "soma_diam_multiplier": 1.0
+  }
+}

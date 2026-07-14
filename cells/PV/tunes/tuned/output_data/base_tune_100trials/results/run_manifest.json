@@ -1,0 +1,21 @@
+{
+  "format_version": 1,
+  "mode": "multi",
+  "output_stem": "results",
+  "files": {
+    "sim_cfg": "sim_cfg.json",
+    "meta": "meta.json",
+    "syn_config": "syn_config.json",
+    "avg_rate_curve": "avg_rate_curve.json",
+    "input_stats": "input_stats.json",
+    "input_summaries": "input_summaries.json",
+    "fit_json": "484635029_fit.json",
+    "spikes": "spikes.npz",
+    "traces": "traces.npz",
+    "inputs_sample": "inputs_sample.pkl",
+    "plots": {
+      "single_plot": "../plots/single_plot.svg",
+      "single_plot_1": "../plots/single_plot.png"
+    }
+  }
+}

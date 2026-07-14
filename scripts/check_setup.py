@@ -2,8 +2,8 @@
 """SCP environment + workspace readiness checker.
 
 Usage examples:
-  python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune seg_tuned
-  python scripts/check_setup.py --steps 5 --cell SST --tune seg_tuned --compile-modfiles
+  python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune tuned
+  python scripts/check_setup.py --steps 5 --cell SST --tune tuned --compile-modfiles
 """
 
 from __future__ import annotations
@@ -294,7 +294,7 @@ def _check_tune_bundle(
         return
     r.ok(f"Tune directory: {tune_dir}")
 
-    for cfg in ("cell_config.json", "sim_config.json", "syn_config.json"):
+    for cfg in ("cell_config.json", "sim_config.json", "target_config.json", "syn_config.json"):
         if _config_exists(tune_dir, cfg):
             r.ok(f"Config present: {cfg}")
         else:
@@ -349,7 +349,7 @@ def main() -> int:
     ap.add_argument("--repo-root", default=None, help="Path to SCP repo root (auto-detected by default)")
     ap.add_argument("--steps", nargs="*", default=["1", "2", "3", "4", "5"], help="Pipeline steps to validate, e.g. --steps 1 2 3 4 5")
     ap.add_argument("--cell", default="PV", help="Cell name for tune checks (default: PV)")
-    ap.add_argument("--tune", default="seg_tuned", help="Tune directory name (default: seg_tuned)")
+    ap.add_argument("--tune", default="tuned", help="Tune directory name (default: tuned)")
     ap.add_argument("--skip-tune-check", action="store_true", help="Skip tune/config/modfile checks")
     ap.add_argument("--compile-modfiles", action="store_true", help="Compile modfiles if compiled mechanisms are missing")
     args = ap.parse_args()

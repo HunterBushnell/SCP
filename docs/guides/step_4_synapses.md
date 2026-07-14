@@ -17,7 +17,8 @@ Step 4 is manual-first for config edits:
 - select a prepared post-synaptic cell/tune,
 - compile/load the tune's mechanisms,
 - build an SCP NEURON cell,
-- define BMTool `general_settings` and `conn_type_settings`,
+- create or load `cell_configs/synapse_tuning_config.json`,
+- read BMTool `general_settings` and connection settings from that config,
 - initialize BMTool's `SynapseTuner` with `hoc_cell=session.cell`,
 - run BMTool single-event, interactive, frequency-response, and optional
   optimizer workflows,
@@ -33,10 +34,43 @@ Step 4 does not automatically overwrite synapse group configs.
 - passive/active parameters reviewed in Steps 2-3 when applicable,
 - compiled or compilable `modfiles/`,
 - `cell_configs/cell_config.json`,
+- optional `cell_configs/synapse_tuning_config.json`; Step 4 creates it from
+  the default template when missing,
 - BMTool available at `../mods/bmtool` or through `SCP_BMTOOL_PATH`,
 - one or more synapse mechanisms present in the tune's compiled modfiles,
 - optional existing `cell_configs/syn_groups/*.json` files to receive tuned
   parameters.
+
+## Synapse Mechanism Files
+
+Step 4 does not automatically choose or install synapse mechanisms. Before
+initializing BMTool, make sure the mechanism `.mod` file exists in:
+
+```text
+cells/<CELL>/tunes/<TUNE>/modfiles/
+```
+
+Use one of these paths:
+
+1. If you already have a synapse model, copy that `.mod` file into the tune's
+   `modfiles/` directory.
+2. If you need a starting point, use the cyneuro neuron mechanisms library:
+   <https://github.com/cyneuro/neuron-mechanisms-library/tree/main/synaptic-mechanisms>.
+3. For SCP-style examples, the recommended starting folder is:
+   <https://github.com/cyneuro/neuron-mechanisms-library/tree/main/synaptic-mechanisms/blue-brain>.
+
+Typical starting mechanisms:
+
+- Excitatory: `AMPA_NMDA.mod` or `AMPA_NMDA_STP.mod`.
+- Inhibitory: `GABA_A.mod` or `GABA_A_STP.mod`.
+
+After adding or changing `.mod` files:
+
+1. Restart the kernel if mechanisms were already loaded.
+2. Set `RECOMPILE_MODFILES = True` in section 4.1.
+3. Confirm `connections[*]["spec_settings"]["level_of_detail"]` in
+   `synapse_tuning_config.json` matches the NEURON point-process name declared
+   inside the `.mod` file, usually the filename without `.mod`.
 
 ## Outputs
 
@@ -110,7 +144,7 @@ Choose the post-synaptic cell/tune used for tuning. The default example is:
 
 ```python
 cell_name = "SST"
-tune_name = "seg_tuned"
+tune_name = "tuned"
 ```
 
 Important controls:
@@ -132,15 +166,31 @@ tune_dir = session.tune_dir
 Restart the kernel if NEURON reports conflicts from a previously loaded
 mechanism library.
 
-### 4.2 Define BMTool Synapse Settings
+### 4.2 Load Synapse Tuning Config
 
-Define the selected BMTool connection and tuning dictionaries.
+Create or load:
+
+```text
+cells/<CELL>/tunes/<TUNE>/cell_configs/synapse_tuning_config.json
+```
+
+The file stores BMTool-style settings for the selected tune. If the file is
+missing, Step 4 creates it from the default template used by the notebook.
 
 Important controls:
 
-- `connection`: key in `conn_type_settings` for the synapse being tuned.
+- `OVERWRITE_SYNAPSE_TUNING_CONFIG`: recreate the file from the default
+  template. Leave `False` after the first run so manual edits are preserved.
+- `CONNECTION_OVERRIDE`: temporarily choose a connection key without editing
+  `default_connection` in the config.
+- `default_connection`: connection key to use by default.
+- `current_name`: synaptic current variable; usually `i`.
+- `slider_vars`: optional explicit BMTool slider variables; `null` uses SCP
+  defaults for the selected mechanism.
+- `other_vars_to_record`: optional mechanism variables to record; `null` uses
+  SCP defaults.
 - `general_settings`: BMTool protocol settings.
-- `conn_type_settings`: per-connection mechanism/location/parameter settings.
+- `connections`: per-connection mechanism/location/parameter settings.
 
 `general_settings` controls BMTool's small tuning protocols, not the full Step 5
 simulation. Common fields:
@@ -155,8 +205,9 @@ simulation. Common fields:
 - `dt`: BMTool protocol time step.
 - `celsius`: BMTool protocol temperature.
 
-Each `conn_type_settings` entry has:
+Each `connections` entry has:
 
+- `description`: human-readable note for the connection.
 - `spec_settings.post_cell`: retained for BMTool compatibility; ignored when
   SCP supplies `hoc_cell`.
 - `spec_settings.vclamp_amp`: voltage clamp holding value.
@@ -170,10 +221,13 @@ The bundled examples include:
 - `Fac2SST`: excitatory AMPA/NMDA/STP example.
 - `Dep2PV`: excitatory depressing AMPA/NMDA/STP example.
 - `Inh2SST`: inhibitory GABA example.
+- `Inh2PV`: inhibitory GABA example with the same defaults as `Inh2SST`.
 - `PV2SST`: inhibitory GABA/STP example.
 
-For custom mechanisms, keep the dictionary shape and edit the mechanism name,
-location, and parameter names to match the `.mod` file.
+For custom mechanisms, keep the JSON shape and edit the mechanism name,
+location, and parameter names to match the `.mod` file. The notebook converts
+`connections` into BMTool's `conn_type_settings` structure before initializing
+the tuner.
 
 ### 4.3 Initialize BMTool SynapseTuner
 
@@ -193,12 +247,15 @@ tuner = create_scp_synapse_tuner(
 
 Important controls:
 
-- `slider_vars`: mechanism parameters exposed as interactive sliders.
-- `other_vars_to_record`: optional mechanism variables to plot/record.
-- `current_name`: synaptic current variable; usually `i`.
+- `slider_vars`: mechanism parameters exposed as interactive sliders, usually
+  configured in `synapse_tuning_config.json`.
+- `other_vars_to_record`: optional mechanism variables to plot/record, usually
+  configured in `synapse_tuning_config.json`.
+- `current_name`: synaptic current variable, usually configured in
+  `synapse_tuning_config.json`.
 
-Leave `slider_vars = None` to use SCP defaults for common mechanisms. Set it
-explicitly for custom mechanisms.
+Leave `slider_vars` as `null` to use SCP defaults for common mechanisms. Set it
+explicitly in the config for custom mechanisms.
 
 ### 4.4 Single Event
 
@@ -252,14 +309,18 @@ facilitating, depressing, or neutral across the frequency range of interest.
 The optional optimizer uses BMTool's `SynapseOptimizer` to search parameter
 bounds against target metrics.
 
+Optimizer defaults live under `optimizer` in `synapse_tuning_config.json`.
+
 Important controls:
 
-- `param_bounds`: parameter search ranges.
-- `target_metrics`: desired BMTool response metrics.
-- `custom_cost`: metric weighting.
-- `run_single_event`: include single-event metrics in optimization.
-- `run_train_input`: include train-response metrics in optimization.
-- `train_frequency` and `train_delay`: STP train protocol controls.
+- `optimizer.enabled`: run the optimizer when `true`.
+- `optimizer.param_bounds`: parameter search ranges.
+- `optimizer.target_metrics`: desired BMTool response metrics.
+- `optimizer.cost_weights`: relative weights for metric errors.
+- `optimizer.run_single_event`: include single-event metrics in optimization.
+- `optimizer.run_train_input`: include train-response metrics in optimization.
+- `optimizer.train_frequency` and `optimizer.train_delay`: STP train protocol
+  controls.
 
 Treat this as optional. Manual tuning is often easier to interpret, and the
 optimizer depends strongly on parameter bounds and cost-function choices.
@@ -405,4 +466,3 @@ to the current variable exposed by the synapse mechanism.
 `sec_id` indexes `list(cell.all)`, which is useful for a single test synapse but
 not necessarily intuitive. Start with soma/proximal test locations, then use
 Step 5 placement preview for full group-level placement.
-

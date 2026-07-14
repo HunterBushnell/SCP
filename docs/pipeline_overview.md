@@ -34,7 +34,7 @@ Notebook: `1_setup.ipynb`
 CLI equivalent:
 
 ```bash
-python scripts/step1_prepare.py --cell PV --tune adb_peri --specimen-id 484635029 --model-type perisomatic
+python scripts/step1_prepare.py --cell PV --tune orig --specimen-id 484635029 --model-type perisomatic
 ```
 
 See `guides/step_1_setup.md`.
@@ -44,6 +44,10 @@ See `guides/step_1_setup.md`.
 Step 2 uses ACT helper functions to estimate passive membrane values from target
 measurements, then leaves model edits under user control. It can run locally or
 in Colab from the root notebook.
+
+Passive targets can be entered directly in `target_config.json`, set in the
+notebook, or extracted from downloaded Allen/ADB ephys NWB negative-current
+sweeps.
 
 Notebook: `2_passive.ipynb`
 
@@ -60,8 +64,10 @@ Step 3 provides:
 - optional ACT active-tuning workspace generation and CLI execution.
 
 ACT target data can be supplied as direct FI arrays, FI CSV, Allen/ADB ephys NWB
-files, or ACT-compatible trace `.npy` files. The currently robust public path is
-FI-target CSV generation, including from downloaded Allen/ADB NWB files.
+files, or ACT-compatible trace `.npy` files. The exact file contracts are in
+`docs/reference/target_trace_formats.md`. The currently robust public paths
+include passive-target extraction in Step 2 and FI-target CSV generation in
+Step 3 from downloaded Allen/ADB NWB files.
 
 Notebook: `3_active.ipynb`
 
@@ -94,13 +100,13 @@ Notebook: `5_simulate.ipynb`
 CLI:
 
 ```bash
-python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 1 --force-save
+python run_pipeline.py --tune-dir cells/PV/tunes/tuned --n-trials 1 --force-save
 ```
 
 SLURM:
 
 ```bash
-CELL=SST TUNE=seg_tuned N_TRIALS=10 sbatch run_slurm.sh
+CELL=SST TUNE=tuned N_TRIALS=10 sbatch run_slurm.sh
 ```
 
 See `guides/step_5_simulate.md` and `advanced/cli_slurm.md`.
@@ -149,7 +155,7 @@ Inputs:
 - `cells/<CELL>/tunes/<TUNE>/modfiles/`
 - `cells/<CELL>/tunes/<TUNE>/cell_configs/`
 - optional `external_data/` sources
-- optional local Allen/ADB ephys `.nwb` files for Step 3 ACT targets
+- optional local Allen/ADB ephys `.nwb` files for Step 2 passive and Step 3 ACT targets
 
 Outputs:
 

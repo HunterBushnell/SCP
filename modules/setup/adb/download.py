@@ -314,4 +314,6 @@ def download_ADB_cell(
         "tunes_dir": str(target),
         "meta_path": str(meta_path) if meta_path.is_file() else None,
         "files": files,
+        "downloaded_now": downloaded_now,
+        "used_existing_cache": bool(has_files and not force and not downloaded_now),
     }

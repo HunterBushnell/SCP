@@ -138,7 +138,7 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p.add_argument(
         "--tune-dir",
         default=None,
-        help="Tune directory containing output_data (for example: cells/SST/tunes/seg_tuned).",
+        help="Tune directory containing output_data (for example: cells/SST/tunes/tuned).",
     )
     p.add_argument(
         "--output-data-dir",

@@ -3,7 +3,7 @@
 CLI entrypoint for SCP Step 5 simulation runs.
 
 Minimal usage from the repo root:
-    python run_pipeline.py --tune-dir cells/SST/tunes/seg_tuned --mode multi --n-trials 10
+    python run_pipeline.py --tune-dir cells/SST/tunes/tuned --mode multi --n-trials 10
 
 This script intentionally stays thin: notebooks, local CLI runs, and SLURM
 wrappers should all use the same backend in `modules.simulation`.
@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
         "--tune",
         type=str,
         default=None,
-        help="Tune name (e.g., seg_tuned). Used if --tune-dir is not provided.",
+        help="Tune name (e.g., tuned). Used if --tune-dir is not provided.",
     )
     p.add_argument(
         "--mode",

@@ -53,11 +53,11 @@ cells/<CELL>/tunes/<TUNE>/output_data/<output_stem>/
 Typical files include:
 
 - `run_manifest.json`: run metadata and sidecar index,
-- `results.pkl`: main result object unless another format is selected,
 - `sim_cfg.json`: resolved simulation config,
 - `syn_config.json`: resolved synapse group config when used,
 - `spikes.npz`: saved spike trains when requested,
 - `traces.npz`: saved traces when requested,
+- `<cell>_<tune>_<output_stem>.pkl`: optional full result object when `save.full_results` is enabled,
 - `plots/`: optional auto-generated plots.
 
 See `../reference/outputs_layout.md` for the full output layout.
@@ -110,7 +110,7 @@ Important controls:
 - `n_trials`: trial count override for multi-trial runs.
 - `seed`: base random seed override.
 - `force_save`: force saving even if `sim_config.json` disables it.
-- `output_stem`: optional output folder/run-name stem.
+- `output_stem`: optional output folder/run-name stem; `None` uses a timestamped `run_...` folder when saving is forced/enabled.
 - `plots_profile`: optional auto-plot profile override.
 - timing overrides such as `tstop`, `stim_start_ms`, and
   `stim_duration_ms`.
@@ -241,7 +241,7 @@ when set to `null`.
 CLI:
 
 ```bash
-python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --iclamp --force-save
+python run_pipeline.py --tune-dir cells/PV/tunes/tuned --iclamp --force-save
 ```
 
 ## Saving
@@ -251,17 +251,21 @@ python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --iclamp --force-save
 ```json
 "save": {
   "enabled": true,
-  "stem": "results",
+  "stem": null,
   "format": "pkl",
   "full_results": false
 }
 ```
 
+When `save.enabled` or `force_save` is true and `save.stem` is `null`, SCP
+creates a timestamped folder under `output_data/`. Use `output_stem` or
+`save.stem` for a specific run name.
+
 CLI overrides:
 
 ```bash
 python run_pipeline.py \
-  --tune-dir cells/PV/tunes/seg_tuned \
+  --tune-dir cells/PV/tunes/tuned \
   --force-save \
   --output-stem my_run
 ```
@@ -298,7 +302,7 @@ Snapshot mode captures richer sidecars for debugging and comparison:
 CLI:
 
 ```bash
-python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --snapshot
+python run_pipeline.py --tune-dir cells/PV/tunes/tuned --snapshot
 ```
 
 ## CLI
@@ -306,13 +310,13 @@ python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --snapshot
 Run one trial:
 
 ```bash
-python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 1
+python run_pipeline.py --tune-dir cells/PV/tunes/tuned --n-trials 1
 ```
 
 Run by cell/tune:
 
 ```bash
-python run_pipeline.py --cell SST --tune seg_tuned --n-trials 5
+python run_pipeline.py --cell SST --tune tuned --n-trials 5
 ```
 
 Common flags:
@@ -332,7 +336,7 @@ Common flags:
 Minimal batch run:
 
 ```bash
-CELL=SST TUNE=seg_tuned N_TRIALS=10 sbatch run_slurm.sh
+CELL=SST TUNE=tuned N_TRIALS=10 sbatch run_slurm.sh
 ```
 
 Split total trials across array tasks:
@@ -378,4 +382,3 @@ See `../advanced/cli_slurm.md`.
 - Check notebook override values from **5.1**.
 - Check `seed`, `randomness_mode`, `trial_randomness`, and `trial_offset`.
 - Enable `snapshot.enabled` for deeper debugging.
-

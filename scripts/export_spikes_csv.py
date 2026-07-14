@@ -4,11 +4,11 @@ Export spikes.npz to a simple row-per-trial CSV.
 
 Usage (from repo root):
   python scripts/export_spikes_csv.py \
-    --input cells/PV/tunes/seg_tuned/output_data/my_run/results/spikes.npz
+    --input cells/PV/tunes/tuned/output_data/my_run/results/spikes.npz
 
 You may also pass a run directory (containing results/spikes.npz):
   python scripts/export_spikes_csv.py \
-    --input cells/PV/tunes/seg_tuned/output_data/my_run
+    --input cells/PV/tunes/tuned/output_data/my_run
 """
 
 from __future__ import annotations

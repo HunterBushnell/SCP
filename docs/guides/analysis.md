@@ -49,7 +49,7 @@ Notebook variables:
 
 - `cell_name`: cell folder under `cells/`, such as `SST` or `PV`
 - `tunes_dir`: usually `tunes`
-- `model_dir`: tune/model folder, such as `seg_tuned`
+- `model_dir`: tune/model folder, such as `tuned`
 - `run_single_stem`: single-run target; `latest` selects the newest run
 - `run_compare_a`, `run_compare_b`: optional run-vs-run comparison targets
 - `compare_a_path`, `compare_b_path`: explicit path overrides for manual use

@@ -639,7 +639,7 @@ from pathlib import Path
 from modules.input_generation import inputs as stim_inputs
 
 REPO_ROOT = Path("<repo_root>")
-TUNE_DIR = REPO_ROOT / "cells" / "SST" / "tunes" / "seg_tuned"
+TUNE_DIR = REPO_ROOT / "cells" / "SST" / "tunes" / "tuned"
 syn_cfg_path = TUNE_DIR / "cell_configs" / "syn_config.json"
 
 sim_cfg_preview, groups_cfg_preview = stim_inputs.check_inputs(syn_cfg_path)

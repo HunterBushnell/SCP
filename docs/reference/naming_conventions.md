@@ -27,10 +27,10 @@ cells/<CELL>/tunes/<TUNE>/
 
 Examples:
 
-- `cells/PV/tunes/adb_peri`
-- `cells/PV/tunes/seg_tuned`
-- `cells/SST/tunes/adb_all`
-- `cells/SST/tunes/seg_tuned`
+- `cells/PV/tunes/orig`
+- `cells/PV/tunes/tuned`
+- `cells/SST/tunes/orig`
+- `cells/SST/tunes/tuned`
 
 ## Configs
 

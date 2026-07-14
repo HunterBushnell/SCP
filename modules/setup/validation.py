@@ -50,6 +50,7 @@ def validate_tune(
             "tune_dir": tune_dir.is_dir(),
             "cell_config": paths.cell_config.is_file(),
             "sim_config": paths.sim_config.is_file(),
+            "target_config": paths.target_config.is_file(),
             "geometry": paths.geometry_config.is_file(),
             "syn_config": paths.syn_config.is_file(),
         },

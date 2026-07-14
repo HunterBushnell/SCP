@@ -31,6 +31,7 @@ cells/<CELL>/tunes/<TUNE>/
 └── cell_configs/
     ├── cell_config.json
     ├── sim_config.json
+    ├── target_config.json
     └── geometry.json
 ```
 
@@ -58,7 +59,7 @@ Choose the cell and tune, for example:
 
 ```python
 cell_name = "SST"
-tune_name = "seg_tuned"
+tune_name = "tuned"
 ```
 
 The selected tune should already satisfy the Step 1 contract.
@@ -76,13 +77,66 @@ cell object used for the ACT passive calculation and current-injection check.
 
 ### 2.4 Enter Passive Targets
 
-Enter measured passive targets in user-facing units:
+Step 2 resolves passive targets from `cell_configs/target_config.json` using
+`target_source.mode`:
 
-- `target_rin_mohm`: input resistance in MΩ,
-- `target_tau_ms`: membrane time constant in ms,
-- `target_vrest_mv`: resting membrane voltage in mV.
+- `manual`: read direct values from `manual.passive`.
+- `traces`: calculate passive values from a user-provided trace file using
+  `traces.passive`.
+- `allen_nwb`: calculate passive values from an Allen/ADB `.nwb` file using
+  `allen_nwb.passive`.
 
-The notebook converts these into settable passive properties:
+For exact passive trace file requirements, see
+`docs/reference/target_trace_formats.md`.
+
+Manual passive fields use user-facing units:
+
+- `manual.passive.rin_MOhm`: input resistance in MΩ,
+- `manual.passive.tau_ms`: membrane time constant in ms,
+- `manual.passive.v_rest_mV`: resting membrane voltage in mV.
+
+Notebook `manual_passive_targets` values override the config only when a field
+is not `None`. Step 2 requires all three passive targets, either directly or
+from extraction. It does not use hidden example defaults.
+
+Generic trace mode expects either CSV or NPY traces. The recommended CSV
+contract is:
+
+- `time_ms`: time in ms, starting at 0 for the trace,
+- `voltage_mV`: voltage in mV,
+- optional `current_pA`: injected current in pA,
+- optional `sweep`: sweep/trace identifier for multiple traces.
+
+If `current_pA` is not present, provide `traces.passive.stim_start_ms`,
+`traces.passive.stim_stop_ms`, and `traces.passive.current_pA`. For NPY traces,
+provide `dt_ms`, `stim_start_ms`, `stim_stop_ms`, and `current_pA`.
+
+For Allen/ADB ephys files, set `target_source.mode = "allen_nwb"`, place the
+`.nwb` file in the tune directory, and set:
+
+```json
+"allen_nwb": {
+  "file": "<allen_ephys_result>_ephys.nwb",
+  "sweep_ids": [],
+  "passive": {
+    "stimulus_names": ["Long Square"],
+    "sweep_ids": null,
+    "min_current_pA": null,
+    "max_current_pA": -1.0,
+    "end_margin_ms": 10.0,
+    "reducer": "median",
+    "tau_field": "tau_avg_ms"
+  }
+}
+```
+
+By default, Allen/NWB extraction uses `Long Square` negative-current sweeps and
+writes review CSVs to `notebook_exports/step2_passive/`. Set
+`APPLY_EXTRACTED_PASSIVE_TARGETS_TO_CONFIG = True` only when you want extracted
+targets written back into `manual.passive`; otherwise they are used only for the
+current notebook run.
+
+The notebook converts passive targets into ACT settable passive properties:
 
 - `e_rev_leak`,
 - `g_bar_leak`,
@@ -95,31 +149,21 @@ Area handling follows ACT guidance:
 - `total`: total reconstructed cell area explicitly,
 - `custom`: `custom_passive_area_cm2`.
 
-Use `passive_area_scale` only when ACT's analytical estimate should use a scaled
-effective area without changing the morphology.
-
-### Manual Application
-
-For bundled ADB/Allen-style tune directories:
-
-1. Open the `*_fit.json` file printed by the notebook.
-2. During passive tuning, disable or minimize active conductances according to
-   your passive-tuning convention while keeping leak/passive terms available.
-3. Apply the ACT values to the model's passive fields:
-   - `e_rev_leak` maps to leak reversal potential, commonly `e_pas`;
-   - `g_bar_leak` maps to leak conductance, commonly `g_pas`;
-   - `Cm` maps to membrane capacitance, commonly section `cm`.
-4. Preserve the existing JSON structure.
-5. Save the file and rerun from **2.3 Build Cell**.
-
-For generic/custom models, apply the same conceptual values wherever that model
-defines passive parameters. SCP does not assume a universal file layout for
-custom model sources.
-
 ### 2.5 Run Passive Protocol
 
 Run a small current-injection check using negative current steps by default. The
 notebook reports passive diagnostic rows and records voltage traces for plotting.
+
+When passive targets are present, the notebook also displays a comparison table
+for:
+
+- resting voltage (`v_rest_mV`),
+- input resistance (`rin_MOhm`),
+- membrane time constant (`tau_ms`).
+
+The table reports target value, measured value, signed difference, absolute
+difference, and percent error for each simulated current step where the metric
+can be measured.
 
 ### 2.6 Plot and Export Trace Check
 
@@ -132,6 +176,13 @@ cells/<CELL>/tunes/<TUNE>/notebook_exports/
 
 This folder is notebook-only scratch output. It is separate from Step 5
 simulation output and Step 6 analysis output.
+
+Important controls:
+
+- `PLOT_XLIM`, `PLOT_YLIM`: voltage plot limits.
+- `TRACE_COLOR`: voltage trace color when one current is plotted; multiple
+  currents use distinct Matplotlib colors.
+- `EXPORT_FIGURE`: save figure exports to `notebook_exports/`.
 
 ## Outputs
 

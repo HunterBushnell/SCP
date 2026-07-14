@@ -48,7 +48,7 @@ Step 4 synapse tuning.
 Run the setup checker:
 
 ```bash
-python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune seg_tuned --compile-modfiles
+python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune tuned --compile-modfiles
 ```
 
 Run notebook checks:
@@ -60,7 +60,7 @@ python scripts/check_notebooks.py
 If a tune is missing compiled mechanisms, build them once:
 
 ```bash
-cd cells/PV/tunes/seg_tuned/modfiles
+cd cells/PV/tunes/tuned/modfiles
 nrnivmodl
 ```
 

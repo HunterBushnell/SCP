@@ -7,7 +7,7 @@ Prepare a raw PV perisomatic tune:
 ```bash
 python scripts/step1_prepare.py \
   --cell PV \
-  --tune adb_peri \
+  --tune orig \
   --specimen-id 484635029 \
   --model-type perisomatic
 ```
@@ -17,7 +17,7 @@ Prepare a raw SST all-active tune:
 ```bash
 python scripts/step1_prepare.py \
   --cell SST \
-  --tune adb_all \
+  --tune orig \
   --specimen-id 485466109 \
   --model-type "all active"
 ```
@@ -26,7 +26,7 @@ Refresh configs without downloading or compiling:
 
 ```bash
 python scripts/step1_prepare.py \
-  --tune-dir cells/PV/tunes/adb_peri \
+  --tune-dir cells/PV/tunes/orig \
   --source-type existing \
   --no-download \
   --no-compile \
@@ -40,6 +40,7 @@ Useful Step 1 flags:
 - `--force-download`
 - `--no-compile`
 - `--recompile-modfiles`
+- `--no-target-config`
 - `--no-synapse-configs`
 - `--synapse-templates input_blocks|none`
 - `--config-mode fill|overwrite|skip`
@@ -50,7 +51,7 @@ Useful Step 1 flags:
 Run one existing tuned example:
 
 ```bash
-python run_pipeline.py --tune-dir cells/PV/tunes/seg_tuned --n-trials 1 --force-save
+python run_pipeline.py --tune-dir cells/PV/tunes/tuned --n-trials 1 --force-save
 ```
 
 Common flags:
@@ -72,7 +73,7 @@ If `--mode` is omitted, it is inferred from `--n-trials`.
 Minimal batch run:
 
 ```bash
-CELL=SST TUNE=seg_tuned N_TRIALS=10 sbatch run_slurm.sh
+CELL=SST TUNE=tuned N_TRIALS=10 sbatch run_slurm.sh
 ```
 
 Array with one trial per task:

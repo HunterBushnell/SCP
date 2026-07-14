@@ -191,6 +191,7 @@ def plot_active_trace_check(
     current_xlim: Optional[tuple[Optional[float], Optional[float]]] = None,
     current_ylim: Optional[tuple[Optional[float], Optional[float]]] = None,
     max_auto_currents: int = 8,
+    trace_color: Optional[str] = None,
 ) -> Any:
     """Plot active voltage traces plus optional current traces."""
     import matplotlib.pyplot as plt
@@ -215,12 +216,12 @@ def plot_active_trace_check(
     else:
         voltage_axis, current_axis = axes
 
+    use_single_trace_color = trace_color if len(sim_amps) == 1 else None
     for amp_value in sim_amps:
-        voltage_axis.plot(
-            looped_records["T"][amp_value],
-            looped_records["V"][amp_value],
-            label=f"{float(amp_value):g} pA",
-        )
+        plot_kwargs = {"label": f"{float(amp_value):g} pA"}
+        if use_single_trace_color is not None:
+            plot_kwargs["color"] = use_single_trace_color
+        voltage_axis.plot(looped_records["T"][amp_value], looped_records["V"][amp_value], **plot_kwargs)
     _shade_stimulus(voltage_axis, sim_params)
     voltage_axis.set_xlabel("Time (ms)")
     voltage_axis.set_ylabel("Vm (mV)")
@@ -257,19 +258,23 @@ def plot_fi_curve(
     tune_name: str,
     bio_reference: Optional[Sequence[tuple[float, float]]] = None,
     show_bio_reference: bool = True,
+    model_color: Optional[str] = None,
+    reference_color: Optional[str] = None,
 ) -> Any:
     """Plot modeled FI points with optional biological reference points."""
     import matplotlib.pyplot as plt
 
     amp_values = [float(row["amp_pA"]) for row in fi_rows]
     frequency_values = [float(row["spike_frequency_hz"]) for row in fi_rows]
+    resolved_model_color = model_color or "C0"
+    resolved_reference_color = reference_color or ("0.35" if _is_black_color(resolved_model_color) else "black")
 
     fig, axis = plt.subplots(figsize=(6, 3.5))
     axis.plot(
         amp_values,
         frequency_values,
         marker="o",
-        color="m",
+        color=resolved_model_color,
         label=f"{cell_name} model",
     )
     if show_bio_reference and bio_reference:
@@ -279,7 +284,8 @@ def plot_fi_curve(
             bio_amps,
             bio_freqs,
             marker="o",
-            color="k",
+            linestyle="--",
+            color=resolved_reference_color,
             label=f"{cell_name} reference",
         )
 
@@ -290,6 +296,13 @@ def plot_fi_curve(
     axis.legend(loc="best")
     fig.tight_layout()
     return fig
+
+
+def _is_black_color(color: Optional[str]) -> bool:
+    if color is None:
+        return False
+    text = str(color).strip().lower()
+    return text in {"k", "black", "#000", "#000000", "0", "0.0"}
 
 
 def _safe_mean(values: np.ndarray) -> Optional[float]:
