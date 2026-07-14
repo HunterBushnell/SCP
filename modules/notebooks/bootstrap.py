@@ -49,6 +49,91 @@ def ensure_python_package(import_name: str, pip_name: Optional[str] = None) -> N
     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
 
+def _run_pip_install(*packages: str, extra_args: Iterable[str] = ()) -> None:
+    """Run pip install with the current notebook Python executable."""
+    cmd = [sys.executable, "-m", "pip", "install", *extra_args, *packages]
+    subprocess.check_call(cmd)
+
+
+def _allen_imports_work() -> bool:
+    """Return True when the AllenSDK pieces used by SCP can import."""
+    required_modules = (
+        "allensdk.api.queries.biophysical_api",
+        "allensdk.model.biophys_sim.config",
+        "allensdk.model.biophysical.utils",
+    )
+    for module_name in required_modules:
+        try:
+            importlib.import_module(module_name)
+        except Exception:
+            return False
+    return True
+
+
+def _ensure_colab_py312_dependencies() -> None:
+    """
+    Install SCP dependencies in Colab's Python 3.12 runtime.
+
+    AllenSDK 2.16.2 declares older NumPy/SciPy/Pandas constraints that cannot be
+    installed normally on Python 3.12. SCP only needs a narrow AllenSDK subset
+    for Allen biophysical model download/loading, so Colab installs compatible
+    modern dependencies first and then installs AllenSDK without resolving its
+    stale dependency pins.
+    """
+    if _allen_imports_work():
+        return
+
+    print("Installing SCP dependencies for Colab Python 3.12...")
+    _run_pip_install(
+        "setuptools<81",
+        "numpy==1.26.4",
+        "scipy==1.12.0",
+        "pandas==2.2.3",
+        "matplotlib",
+        "h5py",
+        "neuron==8.2.4",
+        "find-libpython",
+        "requests",
+        "requests-toolbelt",
+        "simplejson",
+        "six",
+        "jinja2",
+        "future",
+        "cachetools",
+        "python-dateutil",
+        "psycopg2-binary",
+        "SimpleITK",
+        "xarray==2024.3.0",
+        "pynwb",
+        "hdmf",
+        "pynrrd",
+        "argschema",
+        "semver",
+        "nest-asyncio",
+        "tqdm",
+        "aiohttp",
+        "tables",
+        "seaborn",
+        "statsmodels",
+        "scikit-image",
+        "sqlalchemy",
+        "boto3",
+        "ndx-events",
+        "glymur",
+        "scikit-build",
+        extra_args=("-q", "--upgrade"),
+    )
+    _run_pip_install("allensdk==2.16.2", extra_args=("-q", "--no-deps"))
+
+    importlib.invalidate_caches()
+    if not _allen_imports_work():
+        raise RuntimeError(
+            "AllenSDK installed, but SCP could not import the required AllenSDK "
+            "model-loading modules. Restart the Colab runtime and rerun the first "
+            "notebook cell. If this persists, use the local scp-py311 environment."
+        )
+
+
 def ensure_notebook_dependencies(
     *,
     install_deps: Optional[bool] = None,
@@ -68,8 +153,19 @@ def ensure_notebook_dependencies(
     if not install_deps:
         return
 
-    for import_name in ("numpy", "pandas", "matplotlib", "scipy", "h5py", "neuron", "allensdk"):
-        ensure_python_package(import_name)
+    if in_colab and sys.version_info >= (3, 12):
+        _ensure_colab_py312_dependencies()
+    else:
+        for import_name in (
+            "numpy",
+            "pandas",
+            "matplotlib",
+            "scipy",
+            "h5py",
+            "neuron",
+            "allensdk",
+        ):
+            ensure_python_package(import_name)
 
     if include_system_deps:
         subprocess.check_call(["apt-get", "update"])
