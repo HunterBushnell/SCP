@@ -1,9 +1,8 @@
 """
-Compatibility facade for Step 5 result I/O helpers.
+Stable facade for Step 5 result I/O helpers.
 
 New code should prefer focused modules under `modules.simulation`; this module
-keeps existing imports working while saving, loading, path, and append helpers
-live in smaller files.
+keeps saving, loading, path, and append helpers available from one import path.
 """
 
 from .result_appending import (

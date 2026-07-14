@@ -115,7 +115,7 @@
       "precomputed": true
     }
   },
-  "tune_dir": "/home/hrbncv/SCP/cells/PV/tunes/tuned",
+  "tune_dir": "cells/PV/tunes/tuned",
   "cell": "PV",
   "tune": "tuned",
   "color": "blue",

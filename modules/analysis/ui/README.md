@@ -10,10 +10,9 @@ This package organizes the notebook-facing UI helpers used by `6_analysis.ipynb`
 - `metrics.py`: output metrics tables and metric-distribution helpers.
 - `extra.py`: optional Extra Analysis tools.
 
-## Compatibility
+## Stable Facade
 
-`modules.analysis.analysis_ui` remains the stable facade used by existing
-notebooks:
+`modules.analysis.analysis_ui` is the stable facade used by notebooks:
 
 ```python
 from modules.analysis import analysis_ui

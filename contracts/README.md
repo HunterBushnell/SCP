@@ -20,10 +20,10 @@ Contracts are developer/design references. Public usage is documented in
 
 These files record design history and may describe earlier internal layouts:
 
-- `step2.3_input_generation.contract.v1.md`
-- `pvsst_step2.3_inputs.contract.v2.md`
-- `pvsst_step2.3_inputs.contract.v3.md`
-- `pvsst_step2.3_inputs.contract.v4.md`
+- `archive/step2.3_input_generation.contract.v1.md`
+- `archive/pvsst_step2.3_inputs.contract.v2.md`
+- `archive/pvsst_step2.3_inputs.contract.v3.md`
+- `archive/pvsst_step2.3_inputs.contract.v4.md`
 
 ## Runtime Code
 

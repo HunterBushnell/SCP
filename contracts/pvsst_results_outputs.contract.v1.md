@@ -39,7 +39,7 @@ SCP results and outputs contract (v1)
       * single: `np.ndarray` of spike times (ms).
       * multi: `List[np.ndarray]`, one per trial.
     * `traces`:
-      * if `cell_recording.n_trials > 0` (legacy alias: `n_traces_to_save`): includes `T` and `V`.
+      * if the synchronized trace-save limit is greater than 0: includes `T` and `V`.
       * else: `{}`.
     * If `sim_cfg["load"]` is set, results are loaded from disk and
       `meta["loaded_from"]` is added with the resolved path.
@@ -51,10 +51,10 @@ SCP results and outputs contract (v1)
   * **Multi-only**
     * `inputs_by_trial`: list of up to `n_inputs_to_save` trials (or all if `"all"`), each:
       * `{"trial_idx": int, "inputs": {group: {mode, spike_trains, meta}}}`.
-    * `traces["V"]` is a list of at most `cell_recording.n_trials` trials (legacy alias: `n_traces_to_save`).
+    * `traces["V"]` is a list of at most the synchronized trace-save limit.
     * `syn_records_by_trial` (snapshot/debug): list of `{trial_idx, records}`.
     * `cell_recordings_by_trial`: list of sampled trial payloads
-      (`{"trial_idx": int, "recordings": {site_label: {var_name: trace}}}`), bounded by `cell_recording.n_trials` (legacy alias: `n_traces_to_save`).
+      (`{"trial_idx": int, "recordings": {site_label: {var_name: trace}}}`), bounded by the synchronized trace-save limit.
   * **meta (always present)**
     * `cell`: cell name.
     * `tune`: tune name.
@@ -113,7 +113,7 @@ SCP results and outputs contract (v1)
 * **Output control flags (sim_cfg)**
   * `cell_recording` (optional): enables segment-level cell-variable capture during normal runs.
     * `n_trials`: sampled trace cap for saved `traces["V"]` and `cell_recordings_by_trial`.
-      * Legacy alias: top-level `n_traces_to_save`.
+      Runtime normalization keeps this synchronized with top-level `n_traces_to_save`.
     * `sites`: recording locations (e.g. `"soma[0](0.5)"` or `{"sec":"dend","idx":0,"x":0.5}`).
     * `vars`: toggle classes (`v`, `i_cap`, ion/mechanism currents, concentrations, reversals, conductances, states).
     * Aliases accepted: `rec_sec_list`, `rec_var_toggles` (or `rec_vars`).
@@ -127,7 +127,7 @@ SCP results and outputs contract (v1)
       * `save_plots_inputs` (default true): include input mean plots.
       * `save_plots_synapses` (default false): include synapse distribution plots.
       * `plots_win_size`, `plots_input_bin_ms`, `plots_input_smooth_ms`, `plots_raster_style` tune the plots.
-    * `cell_recording.n_trials` (legacy: `n_traces_to_save`) and `n_inputs_to_save` control how many samples are stored.
+    * The synchronized trace-save limit and `n_inputs_to_save` control how many samples are stored.
       * `n_inputs_to_save` can be `"all"` to keep inputs for every trial.
   * `randomness_mode` (optional): `fixed`, `derived`, or `random` to auto-fill `randomness`.
     * `fixed`: identical trials; use a fixed seed for reproducibility.
@@ -137,7 +137,7 @@ SCP results and outputs contract (v1)
     * `load: [enabled, path]`
     * `save: [enabled, stem, format, full_results]` (if `full_results` is true and `save_sidecars` is unset, sidecars are disabled)
     * `append: [enabled, path]`
-    * Back-compat: `output` and `append_to` are still accepted.
+    * Aliases accepted by the launch-version parser: `output` and `append_to`.
     * `run_pipeline.py` uses the target run’s `sim_cfg` when appending to an existing run.
   * `plots_profile` (optional): `"off" | "basic" | "inputs" | "full"`; fills plot-saving flags
     (`save_plots`, `save_plots_inputs`, `save_plots_synapses`) when those keys are omitted.

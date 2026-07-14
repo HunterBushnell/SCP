@@ -1,7 +1,7 @@
 """
 Step 5.2.1 — Load Cell
 
-Public compatibility entry point:
+Public cell-loading entry point:
 
     cell = load_cell(cell_config)
 

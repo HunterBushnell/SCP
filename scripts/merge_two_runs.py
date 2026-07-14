@@ -238,7 +238,7 @@ def _expects_deterministic_equivalence(sim_cfg: Dict[str, Any]) -> Tuple[bool, s
         seed = _resolve_seed(sim_local)
         if seed is None:
             return False, "No randomness config and no seed set."
-        return True, f"Legacy seed-based config with seed={seed}."
+        return True, f"Seed-based config with seed={seed}."
 
     global_state = bool(randomness_mod.get_by_path(rand_cfg, "global.state", True))
     seed = _resolve_seed(sim_local)

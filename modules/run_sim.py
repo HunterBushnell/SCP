@@ -1,9 +1,8 @@
 """
-Compatibility facade for Step 5 simulation helpers.
+Stable facade for Step 5 simulation helpers.
 
 New code should prefer focused modules under `modules.simulation`; this module
-keeps existing notebooks, scripts, and analysis utilities working while the
-backend is refactored.
+keeps the notebook, script, and analysis import surface concise.
 """
 
 from .simulation.cell_runtime import (

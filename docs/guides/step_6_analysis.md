@@ -17,8 +17,8 @@ technical reference for Step 6 inputs, defaults, and utility outputs.
 
 ## Backend Layout
 
-Notebook-facing helpers are exposed through `modules.analysis.analysis_ui` for
-backward-compatible imports. Internally, the public UI surface is organized in
+Notebook-facing helpers are exposed through `modules.analysis.analysis_ui` as a
+stable import path. Internally, the public UI surface is organized in
 `modules.analysis.ui`:
 
 - `selection.py`: run selection and run-resolution helpers

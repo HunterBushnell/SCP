@@ -114,7 +114,7 @@
       "precomputed": true
     }
   },
-  "tune_dir": "/home/hrbncv/SCP/cells/SST/tunes/tuned",
+  "tune_dir": "cells/SST/tunes/tuned",
   "cell": "SST",
   "tune": "tuned",
   "color": "magenta",

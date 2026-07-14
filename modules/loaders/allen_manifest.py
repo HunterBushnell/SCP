@@ -86,7 +86,7 @@ def _configured_axon_type(cell_config: Dict[str, Any], description: Config) -> s
 
 def _configured_utils_strategy(cell_config: Dict[str, Any]) -> str:
     opts = _allen_options(cell_config)
-    raw = opts.get("utils") or cell_config.get("allen_utils") or "legacy"
+    raw = opts.get("utils") or "standard"
     return str(raw).strip().lower()
 
 
@@ -100,8 +100,8 @@ def _suppress_allen_output(cell_config: Dict[str, Any]):
 
 def _apply_genome_based_parameters(utils: Utils) -> None:
     """
-    Compatibility fallback for Allen fit files that do not satisfy
-    `Utils.load_cell_parameters()`'s perisomatic passive-block assumptions.
+    Apply Allen genome/passive entries directly when `Utils.load_cell_parameters()`
+    cannot read a bundle's passive-block layout.
     """
 
     h = utils.h
@@ -196,7 +196,7 @@ def _build_utils(cell_config: Dict[str, Any], description: Config) -> tuple[Any,
     if use_all_active and model_type == ALL_ACTIVE_MODEL_TYPE:
         axon_type = _configured_axon_type(cell_config, description)
         return AllActiveUtils(description, axon_type), f"all_active:{axon_type}"
-    return Utils(description), f"legacy:{model_type or 'unknown'}"
+    return Utils(description), f"standard:{model_type or 'unknown'}"
 
 
 def _load_parameters(utils: Any, cell_config: Dict[str, Any]) -> str:

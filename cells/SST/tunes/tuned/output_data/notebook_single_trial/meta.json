@@ -62,7 +62,7 @@
   },
   "fit_json": {
     "filename": "496538951_fit.json",
-    "source_path": "/home/hrbncv/SCP/cells/SST/tunes/tuned/496538951_fit.json",
+    "source_path": "cells/SST/tunes/tuned/496538951_fit.json",
     "sha256": "041060bdacc4c305c744beaa86fd6d6a87bea7b5b3b6361a8eff251072c86f91"
   }
 }

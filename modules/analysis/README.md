@@ -6,7 +6,7 @@ This folder holds the analysis helpers and defaults used by `6_analysis.ipynb`.
 
 - `analysis.py`: core curve, metric, table, snapshot, and export helpers.
 - `plotting.py`: plotting routines for outputs, inputs, and synapse records.
-- `analysis_ui.py`: compatibility facade for Jupyter widget builders.
+- `analysis_ui.py`: stable facade for Jupyter widget builders.
 - `ui/`: section-organized Step 6 UI package.
 - `single_plot_panel.py`: compact single-plot wrapper used by Step 6.
 - `bio_curve.py`: external CSV curve loading helper.

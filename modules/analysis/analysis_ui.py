@@ -1,7 +1,7 @@
-"""Compatibility facade for Step 6 notebook UI helpers.
+"""Stable facade for Step 6 notebook UI helpers.
 
 New code can import section-specific helpers from `modules.analysis.ui`, but
-existing notebooks can continue using `from modules.analysis import analysis_ui`.
+notebooks can use `from modules.analysis import analysis_ui` as the main UI API.
 """
 
 from __future__ import annotations

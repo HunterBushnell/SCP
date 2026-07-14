@@ -1,8 +1,7 @@
 """Notebook UI sections for Step 6 analysis.
 
 The public notebook API is organized by section here, while
-`modules.analysis.analysis_ui` remains as the stable compatibility facade used
-by existing notebooks.
+`modules.analysis.analysis_ui` remains the stable notebook-facing facade.
 """
 
 from __future__ import annotations

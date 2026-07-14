@@ -2205,7 +2205,7 @@ def summarize_inputs_from_results(
 
 
 def save_default_plots(*args, **kwargs):
-    """Compatibility wrapper for the Step 5 auto-plot boundary."""
+    """Stable wrapper for the Step 5 auto-plot boundary."""
     from .auto_plots import save_default_plots as _save_default_plots
 
     return _save_default_plots(*args, **kwargs)

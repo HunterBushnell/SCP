@@ -178,7 +178,7 @@ def show_run_diagnostics(
 
     `diagnostic_plot` options:
       - "summary": spike counts + Vm trace only
-      - "standard": v0-style standard plot; multi runs also show saved Vm traces
+      - "standard": Step 5 standard plot; multi runs also show saved Vm traces
       - "single_plot": compact composite plot using the single_plot preset
       - None/"off"/False: print counts only
     """
