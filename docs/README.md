@@ -21,7 +21,7 @@ how it connects to CLI/SLURM tooling.
 - `guides/analysis.md`: primary guide for `6_analysis.ipynb`.
 - `guides/step_6_analysis.md`: detailed Step 6 defaults/options reference.
 - `guides/step_7_tools.md`: optional notebook wrappers for small utility scripts.
-- `guides/steps_1_4_overview.md`: compact bridge for early setup/tuning steps.
+- `guides/steps_1-4_overview.md`: compact bridge for early setup/tuning steps.
 
 ## Reference
 
@@ -47,6 +47,7 @@ how it connects to CLI/SLURM tooling.
 ## Project
 
 - `project/roadmap.md`: deferred and planned improvements.
+- `project/release_notes_v0.1.0.md`: initial public-preview release notes.
 
 ## Developer References
 

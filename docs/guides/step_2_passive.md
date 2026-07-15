@@ -58,7 +58,7 @@ The root `2_passive.ipynb` is the workflow to use for local and Colab runs.
 Choose the cell and tune, for example:
 
 ```python
-cell_name = "SST"
+cell_name = "PV"
 tune_name = "tuned"
 ```
 

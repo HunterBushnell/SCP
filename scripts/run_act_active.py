@@ -124,7 +124,7 @@ def _prepare_if_requested(args: argparse.Namespace, repo_root: Path, config_ref:
 
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--cell", default="SST", help="Cell label under cells/<CELL>.")
+    parser.add_argument("--cell", default="PV", help="Cell label under cells/<CELL>.")
     parser.add_argument("--tune", default="tuned", help="Tune label under cells/<CELL>/tunes/<TUNE>.")
     parser.add_argument("--tunes-parent", default="tunes", help="Tune parent folder name.")
     parser.add_argument("--tune-dir", default=None, help="Explicit tune directory override.")

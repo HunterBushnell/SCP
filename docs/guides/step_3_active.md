@@ -87,7 +87,7 @@ active/channel parameter source.
 Choose a tune directory prepared by Step 1. The default example is currently:
 
 ```python
-cell_name = "SST"
+cell_name = "PV"
 tune_name = "tuned"
 ```
 

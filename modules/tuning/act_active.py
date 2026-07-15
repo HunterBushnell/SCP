@@ -78,7 +78,7 @@ def target_fi_for_tune(tune_dir: str | Path, cell_name: str) -> tuple[list[float
     return default_target_fi(cell_name)
 
 
-def default_act_module_specs(cell_name: str = "SST") -> dict[str, dict[str, Any]]:
+def default_act_module_specs(cell_name: str = "PV") -> dict[str, dict[str, Any]]:
     """Return editable ACT module presets based on the bundled ADB examples."""
     key = str(cell_name).strip().upper()
     if key == "PV":

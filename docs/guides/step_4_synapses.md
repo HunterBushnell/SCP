@@ -143,7 +143,7 @@ The BMTool tuning methods remain BMTool methods:
 Choose the post-synaptic cell/tune used for tuning. The default example is:
 
 ```python
-cell_name = "SST"
+cell_name = "PV"
 tune_name = "tuned"
 ```
 

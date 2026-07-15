@@ -6,8 +6,6 @@ belong in `contracts/` or issue trackers.
 
 ## Near Term
 
-- Decide whether bundled PV/SST saved outputs or fresh smaller public example
-  outputs should ship with the public repo.
 - Add the planned synapse-recording machinery exposed by `sim_config.json`.
 - Add end-to-end smoke tests for at least one small Step 5 run and one Step 6
   analysis load.
