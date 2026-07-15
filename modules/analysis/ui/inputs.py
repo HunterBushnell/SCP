@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from .. import analysis
 from ._engine import (
     HELP_INPUTS,
     _maybe_import_display,
