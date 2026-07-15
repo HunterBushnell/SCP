@@ -5,7 +5,7 @@
     "description": "Allen/ADB NWB ephys targets"
   },
   "allen_nwb": {
-    "file": "../485466103_ephys.nwb",
+    "file": "485466103_ephys.nwb",
     "sweep_ids": [],
     "passive": {
       "stimulus_names": [
