@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import configparser
 import io
 import os
 from pathlib import Path
@@ -14,6 +15,23 @@ from modules.loaders.base import LoadedCell, ensure_section_aliases
 
 PERISOMATIC_MODEL_TYPE = "Biophysical - perisomatic"
 ALL_ACTIVE_MODEL_TYPE = "Biophysical - all active"
+
+
+def _ensure_configparser_readfp() -> None:
+    """
+    Restore the deprecated ConfigParser.readfp alias for AllenSDK on Python 3.12.
+
+    AllenSDK 2.16.2 still calls `ConfigParser.readfp()` while loading
+    manifest.json. Python 3.12 removed that alias. Mapping it to `read_file`
+    lets AllenSDK reach its existing Python-3 fallback path.
+    """
+    if hasattr(configparser.ConfigParser, "readfp"):
+        return
+
+    def readfp(self, fp, filename=None):  # type: ignore[no-untyped-def]
+        return self.read_file(fp, source=filename)
+
+    configparser.ConfigParser.readfp = readfp  # type: ignore[attr-defined]
 
 
 def _resolve_manifest_path(cell_config: Dict[str, Any]) -> Path:
@@ -227,6 +245,7 @@ def load_cell(cell_config: Dict[str, Any]) -> LoadedCell:
     try:
         os.chdir(manifest_dir)
 
+        _ensure_configparser_readfp()
         description = Config().load(str(manifest_path.name))
         utils, utils_label = _build_utils(cell_config, description)
         h = utils.h

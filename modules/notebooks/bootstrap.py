@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -70,6 +71,37 @@ def _allen_imports_work() -> bool:
     return True
 
 
+def _allen_imports_work_in_fresh_python() -> bool:
+    """Check AllenSDK imports in a fresh Python process after pip changes."""
+    code = (
+        "import importlib;"
+        "mods=("
+        "'allensdk.api.queries.biophysical_api',"
+        "'allensdk.model.biophys_sim.config',"
+        "'allensdk.model.biophysical.utils'"
+        ");"
+        "[importlib.import_module(m) for m in mods]"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def _restart_colab_runtime_after_install() -> None:
+    """Restart Colab after dependency installation if configured to do so."""
+    if not env_flag("SCP_AUTO_RESTART_COLAB", default=True):
+        return
+    print(
+        "SCP dependencies were installed successfully. Restarting the Colab "
+        "runtime now; rerun this first notebook cell after the runtime reconnects."
+    )
+    os.kill(os.getpid(), signal.SIGKILL)
+
+
 def _ensure_colab_py312_dependencies() -> None:
     """
     Install SCP dependencies in Colab's Python 3.12 runtime.
@@ -127,10 +159,18 @@ def _ensure_colab_py312_dependencies() -> None:
 
     importlib.invalidate_caches()
     if not _allen_imports_work():
+        if _allen_imports_work_in_fresh_python():
+            _restart_colab_runtime_after_install()
+            raise RuntimeError(
+                "SCP dependencies installed successfully, but the current Colab "
+                "runtime still has pre-install packages loaded. Restart the "
+                "runtime, then rerun the first notebook cell."
+            )
         raise RuntimeError(
             "AllenSDK installed, but SCP could not import the required AllenSDK "
-            "model-loading modules. Restart the Colab runtime and rerun the first "
-            "notebook cell. If this persists, use the local scp-py311 environment."
+            "model-loading modules. Use Runtime > Restart runtime and rerun the "
+            "first notebook cell. If this persists, use the local scp-py311 "
+            "environment."
         )
 
 
