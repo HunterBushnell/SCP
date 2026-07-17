@@ -90,6 +90,69 @@ def _unique_sections(*section_groups: Iterable[Any]) -> List[Any]:
     return unique_sections
 
 
+def _section_list(value: Any) -> List[Any]:
+    """Normalize a NEURON/Python section collection to a plain list."""
+    if value is None:
+        return []
+    if callable(getattr(value, "name", None)) and callable(value) and hasattr(value, "nseg"):
+        return [value]
+    try:
+        return list(value)
+    except TypeError:
+        return [value]
+
+
+def cell_sections(cell: Any, group: str) -> List[Any]:
+    """Return a section collection scoped to one loaded cell.
+
+    New loaders expose canonical section groups directly on ``LoadedCell``.
+    ``cell.model`` is retained as a compatibility source for object-owned
+    models, while the process-global hoc namespace is only consulted for
+    legacy cells that do not expose a model owner.
+    """
+    name = str(group)
+
+    if hasattr(cell, name):
+        return _section_list(getattr(cell, name))
+
+    model = getattr(cell, "model", None)
+    if model is not None and hasattr(model, name):
+        return _section_list(getattr(model, name))
+
+    if name == "all":
+        derived = _unique_sections(
+            cell_sections(cell, "soma"),
+            cell_sections(cell, "dend"),
+            cell_sections(cell, "apic"),
+            cell_sections(cell, "axon"),
+        )
+        if derived or model is not None:
+            return derived
+
+    # Legacy Allen/direct-hoc compatibility. Object-owned loaders must expose
+    # canonical groups so unrelated global sections are never captured here.
+    h_obj = getattr(cell, "h", cell)
+    if model is None and hasattr(h_obj, name):
+        return _section_list(getattr(h_obj, name))
+    if model is None and name == "all" and hasattr(h_obj, "allsec"):
+        return list(h_obj.allsec())
+    return []
+
+
+def cell_soma_segment(cell: Any, x: float = 0.5, *, index: int = 0) -> Any:
+    """Resolve a canonical somatic segment for a loaded cell."""
+    soma = cell_sections(cell, "soma")
+    if not soma:
+        raise AttributeError("Could not find canonical soma sections on the loaded cell.")
+    idx = int(index)
+    if idx < 0 or idx >= len(soma):
+        raise IndexError(f"Soma section index out of range (idx={idx}, n={len(soma)}).")
+    loc = float(x)
+    if not 0.0 <= loc <= 1.0:
+        raise ValueError(f"Section location x must be in [0, 1], got {loc}.")
+    return soma[idx](loc)
+
+
 def define_geometry(cell: Any, geom_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Build a standardized geometry view for the given cell.
@@ -140,11 +203,11 @@ def define_geometry(cell: Any, geom_config: Optional[Dict[str, Any]] = None) -> 
     h = cell.h
 
     # ---- basic section lists ----
-    soma_secs = list(h.soma) if hasattr(h, "soma") else []
-    dend_secs = list(h.dend) if hasattr(h, "dend") else []
-    apic_secs = list(h.apic) if hasattr(h, "apic") else []
-    axon_secs = list(h.axon) if hasattr(h, "axon") else []
-    all_secs = [sec for sec in h.allsec()]
+    soma_secs = cell_sections(cell, "soma")
+    dend_secs = cell_sections(cell, "dend")
+    apic_secs = cell_sections(cell, "apic")
+    axon_secs = cell_sections(cell, "axon")
+    all_secs = cell_sections(cell, "all")
     dendritic_secs = _unique_sections(dend_secs, apic_secs)
 
     if not soma_secs:
@@ -218,7 +281,8 @@ def define_geometry(cell: Any, geom_config: Optional[Dict[str, Any]] = None) -> 
     # ---- label ----
     label = geom_config.get("label")
     if label is None:
-        label = cell.config.get("cell_name", "<cell>") + "_geometry"
+        cell_config = getattr(cell, "config", {}) or {}
+        label = cell_config.get("cell_name", "<cell>") + "_geometry"
 
     geom: Dict[str, Any] = {
         "label": label,
@@ -254,7 +318,7 @@ def define_geometry(cell: Any, geom_config: Optional[Dict[str, Any]] = None) -> 
     }
 
     print(
-        f"Geometry defined for {cell.config.get('cell_name', '<cell>')!r}: "
+        f"Geometry defined for {(getattr(cell, 'config', {}) or {}).get('cell_name', '<cell>')!r}: "
         f"{len(soma_segs)} soma segs, "
         f"{len(proximal_segs)} proximal dend segs, "
         f"{len(distal_segs)} distal dend segs, "

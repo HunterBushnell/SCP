@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
 
+from modules.model.geometry import cell_sections
+
 
 def _cell_h(cell: Any) -> Any:
     return getattr(cell, "h", cell)
@@ -20,25 +22,17 @@ def _iter_section_collection(sections: Any) -> list[Any]:
 
 
 def _soma_section(cell: Any, *, soma_index: int = 0) -> Any:
-    h_obj = _cell_h(cell)
-    soma_sections = getattr(cell, "soma", None)
-    if soma_sections is None:
-        soma_sections = getattr(h_obj, "soma", None)
-    sections = _iter_section_collection(soma_sections)
+    sections = cell_sections(cell, "soma")
     if not sections:
-        raise AttributeError("Could not find soma sections on cell or cell.h.")
+        raise AttributeError("Could not find canonical soma sections on the loaded cell.")
     return sections[int(soma_index)]
 
 
 def iter_cell_sections(cell: Any) -> list[Any]:
     """Return sections scoped to the loaded cell when available."""
-    h_obj = _cell_h(cell)
-    for attr in ("all", "all_sections", "sections"):
-        sections = _iter_section_collection(getattr(cell, attr, None))
-        if sections:
-            return sections
-    if hasattr(h_obj, "allsec"):
-        return list(h_obj.allsec())
+    sections = cell_sections(cell, "all")
+    if sections:
+        return sections
     return [_soma_section(cell)]
 
 

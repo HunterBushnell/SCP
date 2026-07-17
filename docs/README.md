@@ -26,6 +26,7 @@ how it connects to CLI/SLURM tooling.
 ## Reference
 
 - `reference/configs_reference.md`: current `cell_configs/` schema.
+- `reference/model_loaders.md`: loader registry, canonical sections, HOC-template contract, and model artifacts.
 - `reference/target_trace_formats.md`: passive trace, active trace, and FI CSV target data contracts.
 - `reference/outputs_layout.md`: run folders, manifests, sidecars, plots, and array outputs.
 - `reference/reproducibility.md`: seeds, snapshots, append behavior, and array alignment.
@@ -47,6 +48,7 @@ how it connects to CLI/SLURM tooling.
 ## Project
 
 - `project/roadmap.md`: deferred and planned improvements.
+- `project/demo_outline.md`: short speaking guide for lab/advisor demos.
 - `project/release_notes_v0.1.0.md`: initial public-preview release notes.
 
 ## Developer References

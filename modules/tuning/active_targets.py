@@ -66,7 +66,7 @@ def resolve_active_tuning_targets(
     """Resolve Step 3 target data from notebook overrides and `target_config.json`."""
     target_config = load_target_config(context.tune_dir)
     nwb_options = active_nwb_options_from_config(target_config)
-    source_mode = target_source_mode_from_config(target_config)
+    source_mode = target_source_mode_from_config(target_config, default="none")
     resolved_mode = _resolve_target_mode(target_mode, target_config, source_mode)
     detected_nwb_files = sorted(Path(context.tune_dir).glob("*_ephys.nwb"))
 

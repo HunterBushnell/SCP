@@ -17,6 +17,8 @@ Use Step 6 to:
 - compare runs and/or external CSV curves
 - compute output metrics and metric-distribution plots
 - inspect optional saved tables, synapse records, snapshots, and IClamp traces
+- rebuild the selected cell through its registered loader for scoped geometry,
+  mechanism, and density summaries when cell loading is enabled
 
 ## What It Reads
 

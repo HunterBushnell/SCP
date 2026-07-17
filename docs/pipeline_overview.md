@@ -21,13 +21,15 @@ and export tooling.
 
 Step 1 prepares the tune directory contract used by later steps:
 
-- model source files, usually an Allen Database bundle or an existing local model,
-- `modfiles/` and compiled NEURON mechanisms,
+- model source files declared by the selected loader, such as an Allen Database
+  bundle or an existing HOC template,
+- optional tune-local `.mod` sources and compiled NEURON mechanisms,
 - `cell_configs/cell_config.json`,
 - `cell_configs/sim_config.json`,
 - `cell_configs/geometry.json`,
 - optional `cell_configs/syn_config.json` and `cell_configs/syn_groups/*.json`,
-- validation checks for files, compiled mechanisms, cell loading, and inputs.
+- validation checks for files, cell loading, compiled mechanisms when sources
+  exist, and optional inputs.
 
 Notebook: `1_setup.ipynb`
 
@@ -41,9 +43,10 @@ See `guides/step_1_setup.md`.
 
 ## Step 2 Passive Tuning
 
-Step 2 uses ACT helper functions to estimate passive membrane values from target
-measurements, then leaves model edits under user control. It can run locally or
-in Colab from the root notebook.
+Step 2 runs passive current-clamp diagnostics directly through SCP's normalized
+cell interface. Optional ACT helper functions can estimate passive membrane
+values from target measurements; model edits remain under user control. The
+core target-free workflow can run locally or in Colab without ACT.
 
 Passive targets can be entered directly in `target_config.json`, set in the
 notebook, or extracted from downloaded Allen/ADB ephys NWB negative-current
@@ -89,9 +92,9 @@ Step 5 loads the prepared tune and runs:
 
 - cell loading,
 - geometry definition,
-- input generation from synapse configs,
-- optional synapse-placement preview,
-- synapse attachment,
+- optional input generation from synapse configs,
+- optional synapse-placement preview and attachment,
+- cell-only current injection when IClamp is enabled,
 - simulation,
 - saving and optional auto-plotting.
 
@@ -139,6 +142,7 @@ the notebooks.
 Step 7 wraps small utility scripts for notebook-first users:
 
 - restore saved run values into tune configs,
+- inspect and optionally restore archived loader-owned model artifacts,
 - export `spikes.npz` to CSV,
 - merge compatible run outputs,
 - clear `slurm_*` output folders.
@@ -151,8 +155,8 @@ See `guides/step_7_tools.md`.
 
 Inputs:
 
-- `cells/<CELL>/tunes/<TUNE>/manifest.json`
-- `cells/<CELL>/tunes/<TUNE>/modfiles/`
+- loader-owned model sources, such as `manifest.json` or a HOC template
+- optional configured tune-local MOD source directory
 - `cells/<CELL>/tunes/<TUNE>/cell_configs/`
 - optional `external_data/` sources
 - optional local Allen/ADB ephys `.nwb` files for Step 2 passive and Step 3 ACT targets
@@ -162,6 +166,7 @@ Outputs:
 - `cells/<CELL>/tunes/<TUNE>/output_data/<RUN>/`
 - `run_manifest.json`
 - sidecars such as `sim_cfg.json`, `syn_config.json`, `spikes.npz`, and `traces.npz`
+- loader/source provenance under `model_artifacts/` when result sidecars are saved
 - notebook-only diagnostics under `notebook_exports/`
 - ACT active-tuning artifacts under `act_workspace/`
 

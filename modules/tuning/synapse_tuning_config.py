@@ -9,12 +9,26 @@ from typing import Any, Mapping, Optional
 
 
 SYNAPSE_TUNING_CONFIG_FILENAME = "synapse_tuning_config.json"
+DEFAULT_VCLAMP_MV = -65.0
+DEFAULT_CELSIUS_C = 20.0
 
 
-def default_synapse_tuning_config() -> dict[str, Any]:
-    """Return the default Step 4 BMTool-style tuning template."""
+def default_synapse_tuning_config(
+    *,
+    vclamp_amp: float = DEFAULT_VCLAMP_MV,
+    celsius: float = DEFAULT_CELSIUS_C,
+) -> dict[str, Any]:
+    """Return the loader-neutral Step 4 BMTool-style tuning template.
+
+    The point-process names and parameters are editable starting points, not
+    model-specific selections. Tune-local generation replaces the fallback
+    voltage and temperature with values from ``sim_config.conditions`` when
+    they are available.
+    """
+    holding_mV = float(vclamp_amp)
+    temperature_C = float(celsius)
     return {
-        "default_connection": "Fac2SST",
+        "default_connection": "excitatory_facilitating",
         "current_name": "i",
         "slider_vars": None,
         "other_vars_to_record": None,
@@ -27,14 +41,14 @@ def default_synapse_tuning_config() -> dict[str, Any]:
             "delay": 1.3,
             "weight": 1.0,
             "dt": 0.025,
-            "celsius": 20,
+            "celsius": temperature_C,
         },
         "connections": {
-            "Fac2SST": {
-                "description": "Excitatory AMPA/NMDA/STP example used for SST-like cells.",
+            "excitatory_facilitating": {
+                "description": "Editable starting point for a facilitating excitatory synapse.",
                 "spec_settings": {
                     "post_cell": "SCP_Cell",
-                    "vclamp_amp": -65.0,
+                    "vclamp_amp": holding_mV,
                     "sec_x": 0.5,
                     "sec_id": 0,
                     "level_of_detail": "AMPA_NMDA_STP",
@@ -49,11 +63,11 @@ def default_synapse_tuning_config() -> dict[str, Any]:
                     "NMDA_ratio": 1.5,
                 },
             },
-            "Dep2PV": {
-                "description": "Excitatory depressing AMPA/NMDA/STP example used for PV-like cells.",
+            "excitatory_depressing": {
+                "description": "Editable starting point for a depressing excitatory synapse.",
                 "spec_settings": {
                     "post_cell": "SCP_Cell",
-                    "vclamp_amp": -71.0,
+                    "vclamp_amp": holding_mV,
                     "sec_x": 0.5,
                     "sec_id": 0,
                     "level_of_detail": "AMPA_NMDA_STP",
@@ -68,11 +82,11 @@ def default_synapse_tuning_config() -> dict[str, Any]:
                     "NMDA_ratio": 0.0,
                 },
             },
-            "Inh2SST": {
-                "description": "Inhibitory GABA_A example.",
+            "inhibitory_static": {
+                "description": "Editable starting point for a static inhibitory synapse.",
                 "spec_settings": {
                     "post_cell": "SCP_Cell",
-                    "vclamp_amp": -65.0,
+                    "vclamp_amp": holding_mV,
                     "sec_x": 0.5,
                     "sec_id": 0,
                     "level_of_detail": "GABA_A",
@@ -85,28 +99,11 @@ def default_synapse_tuning_config() -> dict[str, Any]:
                     "gmax": 0.001,
                 },
             },
-            "Inh2PV": {
-                "description": "Inhibitory GABA_A example with the same defaults as Inh2SST.",
+            "inhibitory_stp": {
+                "description": "Editable starting point for an inhibitory synapse with STP.",
                 "spec_settings": {
                     "post_cell": "SCP_Cell",
-                    "vclamp_amp": -65.0,
-                    "sec_x": 0.5,
-                    "sec_id": 0,
-                    "level_of_detail": "GABA_A",
-                },
-                "spec_syn_param": {
-                    "initW": 0.1,
-                    "tau_r_GABAA": 0.5,
-                    "tau_d_GABAA": 5.5,
-                    "e_GABAA": -75.0,
-                    "gmax": 0.001,
-                },
-            },
-            "PV2SST": {
-                "description": "Inhibitory GABA_A/STP example.",
-                "spec_settings": {
-                    "post_cell": "SCP_Cell",
-                    "vclamp_amp": -65.0,
+                    "vclamp_amp": holding_mV,
                     "sec_x": 0.5,
                     "sec_id": 0,
                     "level_of_detail": "GABA_A_STP",
@@ -174,7 +171,14 @@ def ensure_synapse_tuning_config(
     if path.exists() and not overwrite:
         return path, load_synapse_tuning_config(tune_dir), "existing"
 
-    config = deepcopy(dict(defaults) if defaults is not None else default_synapse_tuning_config())
+    if defaults is None:
+        vclamp_amp, celsius = _runtime_defaults_from_tune(tune_dir)
+        config = default_synapse_tuning_config(
+            vclamp_amp=vclamp_amp,
+            celsius=celsius,
+        )
+    else:
+        config = deepcopy(dict(defaults))
     path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     return path, config, "created" if not overwrite else "overwritten"
 
@@ -195,7 +199,6 @@ def normalize_synapse_tuning_config(config: Mapping[str, Any]) -> dict[str, Any]
     """Return a copy with required top-level keys and BMTool-compatible names."""
     data = deepcopy(dict(config))
     defaults = default_synapse_tuning_config()
-    data.setdefault("default_connection", defaults["default_connection"])
     data.setdefault("current_name", defaults["current_name"])
     data.setdefault("slider_vars", defaults["slider_vars"])
     data.setdefault("other_vars_to_record", defaults["other_vars_to_record"])
@@ -206,7 +209,48 @@ def normalize_synapse_tuning_config(config: Mapping[str, Any]) -> dict[str, Any]
         raise ValueError("synapse_tuning_config general_settings must be an object")
     if not isinstance(data["connections"], dict) or not data["connections"]:
         raise ValueError("synapse_tuning_config connections must be a non-empty object")
+    data.setdefault("default_connection", next(iter(data["connections"])))
     return data
+
+
+def _runtime_defaults_from_tune(tune_dir: str | Path) -> tuple[float, float]:
+    """Read Step 4 holding voltage and temperature from tune conditions."""
+    sim_config_path = (
+        Path(tune_dir).expanduser().resolve() / "cell_configs" / "sim_config.json"
+    )
+    if not sim_config_path.is_file():
+        return DEFAULT_VCLAMP_MV, DEFAULT_CELSIUS_C
+
+    with sim_config_path.open("r", encoding="utf-8") as handle:
+        sim_config = json.load(handle)
+    if not isinstance(sim_config, dict):
+        raise ValueError(f"Expected JSON object in {sim_config_path}")
+    conditions = sim_config.get("conditions")
+    if conditions is None:
+        return DEFAULT_VCLAMP_MV, DEFAULT_CELSIUS_C
+    if not isinstance(conditions, dict):
+        raise ValueError(f"conditions must be an object in {sim_config_path}")
+
+    raw_vclamp = conditions.get("v_init_mV", DEFAULT_VCLAMP_MV)
+    raw_celsius = conditions.get("celsius_C", DEFAULT_CELSIUS_C)
+    return (
+        _numeric_condition(
+            DEFAULT_VCLAMP_MV if raw_vclamp is None else raw_vclamp,
+            name="conditions.v_init_mV",
+            source=sim_config_path,
+        ),
+        _numeric_condition(
+            DEFAULT_CELSIUS_C if raw_celsius is None else raw_celsius,
+            name="conditions.celsius_C",
+            source=sim_config_path,
+        ),
+    )
+
+
+def _numeric_condition(value: Any, *, name: str, source: Path) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be numeric in {source}; got {value!r}")
+    return float(value)
 
 
 def connection_settings_for_bmtool(config: Mapping[str, Any]) -> dict[str, Any]:

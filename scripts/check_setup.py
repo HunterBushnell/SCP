@@ -11,6 +11,8 @@ from __future__ import annotations
 import argparse
 import importlib
 import importlib.metadata
+import json
+import math
 import os
 import subprocess
 import sys
@@ -21,7 +23,12 @@ REPO_ROOT_HINT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT_HINT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT_HINT))
 
-from modules.setup.mechanisms import find_nrnivmodl
+from modules.setup.mechanisms import (
+    find_compiled_mechanism_dll,
+    find_nrnivmodl,
+    resolve_modfiles_dir,
+)
+from modules import loaders as cell_loaders
 
 
 ACT_REPO_URL = "https://github.com/V-Marco/ACT.git"
@@ -142,10 +149,9 @@ def _check_python_packages(r: Reporter) -> None:
         ("pandas", "pandas"),
         ("matplotlib", "matplotlib"),
         ("h5py", "h5py"),
-        ("allensdk", "allensdk"),
         ("neuron", "neuron"),
     ]
-    optional = [("ipywidgets", "ipywidgets")]
+    optional = [("allensdk", "allensdk"), ("ipywidgets", "ipywidgets")]
 
     for import_name, dist_name in required:
         try:
@@ -197,11 +203,18 @@ def _check_python_packages(r: Reporter) -> None:
     if nrnivmodl:
         r.ok(f"nrnivmodl found at {nrnivmodl}")
     else:
-        r.fail("nrnivmodl not found on PATH or next to the active Python executable")
+        r.warn("nrnivmodl not found; only tunes with custom .mod sources need it")
 
 
-def _check_external_dependencies(r: Reporter, repo_root: Path, steps: set[str]) -> None:
-    if steps.intersection({"2", "3"}):
+def _check_external_dependencies(
+    r: Reporter,
+    repo_root: Path,
+    steps: set[str],
+    *,
+    check_act: bool = False,
+    check_bmtool: bool = False,
+) -> None:
+    if check_act and steps.intersection({"2", "3"}):
         act_marker = Path("act") / "passive.py"
         act_path, act_candidates = _resolve_external_repo(
             repo_name="ACT",
@@ -229,7 +242,7 @@ def _check_external_dependencies(r: Reporter, repo_root: Path, steps: set[str]) 
             else:
                 r.fail(f"ACT repo found but missing {passive_path}")
 
-    if "4" in steps:
+    if check_bmtool and "4" in steps:
         bmtool_path, bmtool_candidates = _resolve_external_repo(
             repo_name="bmtool",
             marker_rel=Path("bmtool") / "synapses.py",
@@ -252,11 +265,35 @@ def _config_exists(tune_dir: Path, name: str) -> bool:
     return (tune_dir / "cell_configs" / name).is_file() or (tune_dir / name).is_file()
 
 
-def _compile_modfiles_if_requested(tune_dir: Path, r: Reporter) -> bool:
-    mod_dir = tune_dir / "modfiles"
+def _config_path(tune_dir: Path, name: str) -> Optional[Path]:
+    for candidate in (tune_dir / "cell_configs" / name, tune_dir / name):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _read_json_object(path: Path) -> dict:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise TypeError(f"Expected JSON object in {path}")
+    return data
+
+
+def _compile_modfiles_if_requested(
+    tune_dir: Path,
+    r: Reporter,
+    cell_config: Optional[dict] = None,
+) -> bool:
+    mod_dir = resolve_modfiles_dir(tune_dir, cell_config)
+    if mod_dir is None:
+        r.ok("No configured modfiles directory; model uses available NEURON mechanisms")
+        return True
     if not mod_dir.is_dir():
-        r.fail(f"Missing modfiles directory: {mod_dir}")
-        return False
+        r.ok("No configured MOD source directory; model may use built-in NEURON mechanisms only")
+        return True
+    if not any(mod_dir.glob("*.mod")):
+        r.ok(f"No .mod sources in {mod_dir}; compilation is not required")
+        return True
 
     nrnivmodl = find_nrnivmodl()
     if not nrnivmodl:
@@ -287,45 +324,142 @@ def _check_tune_bundle(
     cell: str,
     tune: str,
     compile_modfiles: bool,
+    steps: set[str],
+    tune_dir_override: Optional[Path] = None,
 ) -> None:
-    tune_dir = repo_root / "cells" / cell / "tunes" / tune
+    tune_dir = (
+        Path(tune_dir_override).expanduser().resolve()
+        if tune_dir_override is not None
+        else repo_root / "cells" / cell / "tunes" / tune
+    )
     if not tune_dir.is_dir():
         r.fail(f"Tune directory not found: {tune_dir}")
         return
     r.ok(f"Tune directory: {tune_dir}")
 
-    for cfg in ("cell_config.json", "sim_config.json", "target_config.json", "syn_config.json"):
+    for cfg in ("cell_config.json", "sim_config.json", "geometry.json"):
         if _config_exists(tune_dir, cfg):
             r.ok(f"Config present: {cfg}")
         else:
             r.fail(f"Missing config: {cfg} (expected in {tune_dir}/cell_configs or tune root)")
 
-    mech_candidates = [
-        tune_dir / "modfiles" / "x86_64" / ".libs" / "libnrnmech.so",
-        tune_dir / "modfiles" / "x86_64" / "libnrnmech.so",
-    ]
-    if any(p.is_file() for p in mech_candidates):
-        for p in mech_candidates:
-            if p.is_file():
-                r.ok(f"Compiled mechanisms found: {p}")
-                break
+    target_path = _config_path(tune_dir, "target_config.json")
+    if target_path is None:
+        r.ok("No target_config.json; Steps 2-3 can run in characterization mode")
     else:
+        try:
+            target_cfg = _read_json_object(target_path)
+            source = target_cfg.get("target_source", {})
+            mode = source.get("mode", "manual") if isinstance(source, dict) else "manual"
+            r.ok(f"Target config present: target_source.mode={mode}")
+        except Exception as exc:
+            r.fail(f"Invalid target_config.json: {exc}")
+
+    sim_path = _config_path(tune_dir, "sim_config.json")
+    sim_config: dict = {}
+    if sim_path is not None:
+        try:
+            sim_config = _read_json_object(sim_path)
+        except Exception as exc:
+            r.fail(f"Invalid sim_config.json: {exc}")
+
+    syn_path = _config_path(tune_dir, "syn_config.json")
+    if syn_path is not None:
+        r.ok("Config present: syn_config.json")
+    elif "5" in steps and not bool((sim_config.get("iclamp", {}) or {}).get("enabled", False)):
+        r.fail(
+            "Step 5 needs syn_config.json for synapse-driven runs, or "
+            "sim_config.iclamp.enabled=true for a cell-only run"
+        )
+    else:
+        r.ok("No syn_config.json; valid for intrinsic/current-injection workflows")
+
+    if "4" in steps:
+        step4_path = _config_path(tune_dir, "synapse_tuning_config.json")
+        if step4_path is None:
+            r.ok("No synapse_tuning_config.json; Step 4 will create a neutral starting config")
+        else:
+            r.ok(f"Step 4 tuning config present: {step4_path}")
+
+    cell_cfg_path = _config_path(tune_dir, "cell_config.json")
+    cell_config: dict = {}
+    if cell_cfg_path is not None:
+        try:
+            cell_config = _read_json_object(cell_cfg_path)
+            loader_name = cell_loaders.get_cell_loader_name(cell_config)
+            r.ok(f"Cell loader: {loader_name}")
+            validator = getattr(cell_loaders, "validate_cell_loader_config", None)
+            if callable(validator):
+                resolved = validator(cell_config, base_dir=tune_dir)
+                for key, path in resolved.items():
+                    r.ok(f"Loader path {key}: {path}")
+            elif cell_loaders.loader_requires_manifest(loader_name):
+                raw_manifest = cell_config.get("paths", {}).get("manifest", "manifest.json")
+                manifest = Path(str(raw_manifest)).expanduser()
+                if not manifest.is_absolute():
+                    manifest = tune_dir / manifest
+                if manifest.is_file():
+                    r.ok(f"Loader manifest: {manifest}")
+                else:
+                    r.fail(f"Missing loader manifest: {manifest}")
+            if loader_name == "allen_manifest":
+                try:
+                    importlib.import_module("allensdk")
+                except Exception as exc:
+                    r.fail(f"Allen loader requires a working allensdk installation ({exc})")
+            elif loader_name == "hoc_template":
+                try:
+                    conditions = sim_config.get("conditions")
+                    if not isinstance(conditions, dict):
+                        raise KeyError("missing conditions object")
+                    resolved_conditions = {}
+                    for field in ("v_init_mV", "celsius_C"):
+                        raw_value = conditions.get(field)
+                        if isinstance(raw_value, bool) or raw_value in (None, ""):
+                            raise ValueError(f"conditions.{field} must be explicitly numeric")
+                        value = float(raw_value)
+                        if not math.isfinite(value):
+                            raise ValueError(f"conditions.{field} must be finite")
+                        resolved_conditions[field] = value
+                    r.ok(
+                        "Explicit HOC conditions: "
+                        f"v_init_mV={resolved_conditions['v_init_mV']}, "
+                        f"celsius_C={resolved_conditions['celsius_C']}"
+                    )
+                except Exception as exc:
+                    r.fail(
+                        "hoc_template requires explicit sim_config.conditions.v_init_mV "
+                        f"and celsius_C ({exc})"
+                    )
+        except Exception as exc:
+            r.fail(f"Invalid cell loader configuration: {exc}")
+
+    mod_dir = resolve_modfiles_dir(tune_dir, cell_config)
+    has_mod_sources = bool(
+        mod_dir is not None and mod_dir.is_dir() and any(mod_dir.glob("*.mod"))
+    )
+    compiled_dll = find_compiled_mechanism_dll(tune_dir, cell_config=cell_config)
+    if compiled_dll is not None:
+        r.ok(f"Compiled mechanisms found: {compiled_dll}")
+    elif has_mod_sources:
         r.warn("Compiled mechanisms not found")
         if compile_modfiles:
-            compiled = _compile_modfiles_if_requested(tune_dir, r)
-            if compiled and any(p.is_file() for p in mech_candidates):
-                for p in mech_candidates:
-                    if p.is_file():
-                        r.ok(f"Compiled mechanisms created: {p}")
-                        break
+            compiled = _compile_modfiles_if_requested(tune_dir, r, cell_config)
+            compiled_dll = find_compiled_mechanism_dll(
+                tune_dir, cell_config=cell_config
+            )
+            if compiled and compiled_dll is not None:
+                r.ok(f"Compiled mechanisms created: {compiled_dll}")
             elif compiled:
                 r.fail("nrnivmodl finished but no libnrnmech.so found in expected locations")
         else:
             r.warn("Use --compile-modfiles to build now")
+    else:
+        r.ok("No configured .mod sources; compiled mechanisms are optional")
 
 
 def _parse_steps(raw_steps: Iterable[str]) -> set[str]:
-    valid = {"1", "2", "3", "4", "5", "6"}
+    valid = {"1", "2", "3", "4", "5", "6", "7"}
     steps: set[str] = set()
     for token in raw_steps:
         tok = token.strip()
@@ -350,8 +484,23 @@ def main() -> int:
     ap.add_argument("--steps", nargs="*", default=["1", "2", "3", "4", "5"], help="Pipeline steps to validate, e.g. --steps 1 2 3 4 5")
     ap.add_argument("--cell", default="PV", help="Cell name for tune checks (default: PV)")
     ap.add_argument("--tune", default="tuned", help="Tune directory name (default: tuned)")
+    ap.add_argument("--tune-dir", default=None, help="Explicit tune directory path")
     ap.add_argument("--skip-tune-check", action="store_true", help="Skip tune/config/modfile checks")
-    ap.add_argument("--compile-modfiles", action="store_true", help="Compile modfiles if compiled mechanisms are missing")
+    ap.add_argument(
+        "--compile-modfiles",
+        action="store_true",
+        help="Compile configured paths.modfiles sources when their library is missing",
+    )
+    ap.add_argument(
+        "--check-act",
+        action="store_true",
+        help="Check the optional ACT optimizer for Steps 2-3.",
+    )
+    ap.add_argument(
+        "--check-bmtool",
+        action="store_true",
+        help="Check the optional BMTool integration when Step 4 is selected.",
+    )
     args = ap.parse_args()
 
     try:
@@ -389,15 +538,23 @@ def main() -> int:
         r.fail(f"Python version {pyv}; expected Python >=3.9 (recommended 3.11)")
 
     _check_python_packages(r)
-    _check_external_dependencies(r, repo_root=repo_root, steps=steps)
+    _check_external_dependencies(
+        r,
+        repo_root=repo_root,
+        steps=steps,
+        check_act=bool(args.check_act),
+        check_bmtool=bool(args.check_bmtool),
+    )
 
-    if not args.skip_tune_check and steps.intersection({"1", "2", "3", "4", "5", "6"}):
+    if not args.skip_tune_check and steps.intersection({"1", "2", "3", "4", "5", "6", "7"}):
         _check_tune_bundle(
             r,
             repo_root=repo_root,
             cell=args.cell,
             tune=args.tune,
             compile_modfiles=args.compile_modfiles,
+            steps=steps,
+            tune_dir_override=(Path(args.tune_dir) if args.tune_dir else None),
         )
 
     print("\nSummary:")

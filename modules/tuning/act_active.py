@@ -17,6 +17,7 @@ import json
 import os
 import shutil
 import sys
+import warnings
 
 import numpy as np
 
@@ -44,6 +45,32 @@ DEFAULT_ACTIVE_CHANNELS = [
     "gbar_Kv2like",
     "gbar_Kv3_1",
 ]
+
+
+def _configured_loader_name(tune_dir: Path) -> str:
+    from modules.loaders import get_cell_loader_name
+
+    for candidate in (
+        tune_dir / "cell_configs" / "cell_config.json",
+        tune_dir / "cell_config.json",
+    ):
+        if candidate.is_file():
+            value = json.loads(candidate.read_text(encoding="utf-8"))
+            if not isinstance(value, dict):
+                raise TypeError(f"Expected a JSON object in {candidate}")
+            return get_cell_loader_name(value)
+    raise FileNotFoundError(f"Missing cell_config.json under ACT tune {tune_dir}")
+
+
+def _warn_for_experimental_act_loader(cfg: Mapping[str, Any]) -> None:
+    loader_name = str(cfg.get("cell_loader", "allen_manifest"))
+    if loader_name != "allen_manifest":
+        warnings.warn(
+            f"ACT execution with SCP loader {loader_name!r} is experimental; "
+            "the model-neutral SCP protocols remain supported independently of ACT.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
 
 @contextmanager
@@ -249,6 +276,11 @@ def prepare_act_active_workspace(
         tune_name=tune_name,
         workspace=workspace,
     )
+    loader_name = _configured_loader_name(tune_path)
+    cfg["cell_loader"] = loader_name
+    cfg["act_loader_status"] = (
+        "supported" if loader_name == "allen_manifest" else "experimental"
+    )
     workspace_path = Path(cfg["workspace"])
     workspace_path.mkdir(parents=True, exist_ok=True)
 
@@ -309,6 +341,8 @@ def workspace_summary(config_path: str | Path) -> dict[str, Any]:
         "builder": str(workspace / BUILDER_NAME),
         "target": str(target_path),
         "target_mode": cfg.get("target", {}).get("mode"),
+        "cell_loader": cfg.get("cell_loader", "allen_manifest"),
+        "act_loader_status": cfg.get("act_loader_status", "supported"),
         "modules": [key for key, spec in modules.items() if spec.get("enabled", True)],
     }
 
@@ -337,6 +371,7 @@ def run_act_active_module(
 ) -> dict[str, Any]:
     """Run one configured ACT active module and save JSON predictions."""
     cfg = load_act_active_config(config_or_workspace)
+    _warn_for_experimental_act_loader(cfg)
     workspace = Path(cfg["workspace"]).resolve()
     module_spec = _get_module_spec(cfg, module_key)
     if not module_spec.get("enabled", True):
@@ -704,23 +739,17 @@ def build_cell():
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
 
-    from modules.notebooks.helpers import build_cell_for_notebook
+    from modules.model.load_cell import load_cell
 
     cfg_path = TUNE_DIR / "cell_configs" / "cell_config.json"
     cell_config = json.loads(cfg_path.read_text(encoding="utf-8"))
     cell_config.setdefault("cell_name", CELL_NAME)
-    paths = cell_config.setdefault("paths", {{}})
-    manifest = Path(paths.get("manifest", "manifest.json"))
-    if not manifest.is_absolute():
-        manifest = TUNE_DIR / manifest
-    paths["manifest"] = str(manifest)
-    paths["tune_dir"] = str(TUNE_DIR)
+    cell_config.setdefault("paths", {{}})["tune_dir"] = str(TUNE_DIR)
 
     old_cwd = Path.cwd()
     os.chdir(str(TUNE_DIR))
     try:
-        loaded = build_cell_for_notebook(cell_config)
-        return getattr(loaded, "h", loaded)
+        return load_cell(cell_config, base_dir=TUNE_DIR)
     finally:
         os.chdir(str(old_cwd))
 '''
@@ -775,6 +804,8 @@ def _build_act_cell(
     module_spec: Optional[Mapping[str, Any]] = None,
     active_channels: Optional[Sequence[str]] = None,
 ) -> Any:
+    from modules.setup.mechanisms import resolve_modfiles_dir
+
     if active_channels is None:
         if module_spec is not None:
             active_channels = [
@@ -783,10 +814,11 @@ def _build_act_cell(
             ]
         else:
             active_channels = cfg.get("act_cell", {}).get("active_channels", [])
+    modfiles_dir = resolve_modfiles_dir(Path(cfg["tune_dir"]).resolve())
     cell = act_api["ACTCellModel"](
         cell_name=None,
         path_to_hoc_file=None,
-        path_to_mod_files=str(Path(cfg["tune_dir"]).resolve() / "modfiles"),
+        path_to_mod_files=None if modfiles_dir is None else str(modfiles_dir),
         passive=list(cfg.get("act_cell", {}).get("passive", DEFAULT_PASSIVE_NAMES)),
         active_channels=list(active_channels),
     )

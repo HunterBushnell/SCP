@@ -66,6 +66,7 @@ Common controls:
 - `from_run`: saved run folder, results folder, or `run_manifest.json`.
 - `to_tune`: target tune directory.
 - `apply`: config classes to restore.
+- `model_artifacts`: opt-in native HOC/Allen/MOD source restoration with hash verification.
 - `syn_groups`: `all` or a comma-separated subset.
 - `allow_source_fallback`: allow fallback reads from source tune files when run
   sidecars are missing.
@@ -82,6 +83,11 @@ python scripts/restore_run_state.py \
 ```
 
 Add `--write` to apply changes.
+
+`model_artifacts` is deliberately absent from both the CLI and notebook default
+selection. Add it only after reviewing the dry-run. Restoration refuses paths
+outside the saved run or target tune, backs up replaced files, reports MOD
+recompilation, and reports when restored HOC definitions require a restart.
 
 ### 7.2 Export Spikes CSV
 
@@ -180,4 +186,3 @@ Good Step 7 additions should:
 - need only a few user-facing options,
 - be useful to notebook-first users,
 - not duplicate a full workflow from Steps 1-6.
-

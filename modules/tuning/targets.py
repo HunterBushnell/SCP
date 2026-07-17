@@ -8,7 +8,7 @@ from typing import Any, Mapping, Optional
 
 
 TARGET_CONFIG_FILENAME = "target_config.json"
-VALID_TARGET_SOURCE_MODES = {"manual", "traces", "allen_nwb"}
+VALID_TARGET_SOURCE_MODES = {"none", "manual", "traces", "allen_nwb"}
 
 DEFAULT_MANUAL_BLOCK = {
     "passive": {

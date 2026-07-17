@@ -13,6 +13,8 @@ from itertools import cycle, chain
 
 from neuron import h
 
+from modules.model.geometry import cell_sections
+
 # ---------------------------------------------------------------------------
 def moving_average(arr, 
                 #    *,
@@ -1060,9 +1062,6 @@ def plot_syn_records(
     COLOR_CYCLER = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     alpha = 0.6
 
-    # support both old direct-hoc cells and new LoadedCell wrapper
-    hoc_cell = getattr(cell, "h", cell)
-
     # normalise prop names
     def _norm(s):
         return s.strip().lower().replace(' ', '_')
@@ -1100,9 +1099,17 @@ def plot_syn_records(
             if use_density_mode:
                 # ---- per-µm exposure in each distance bin ----
                 len_exposure = np.zeros(len(edges) - 1)  # total dendritic length (µm) in each bin
-                # Robust distance computation for hoc_cell (supports cell.h wrapper)
-                h.distance(0, hoc_cell.soma[0](0.5))
-                dend_secs = getattr(hoc_cell, "dend", []) if hasattr(hoc_cell, "dend") else []
+                soma_secs = cell_sections(cell, "soma")
+                if not soma_secs:
+                    raise ValueError("Synapse density plotting requires a canonical soma section.")
+                h.distance(0, soma_secs[0](0.5))
+                dend_secs = []
+                seen_sections = set()
+                for sec in cell_sections(cell, "dend") + cell_sections(cell, "apic"):
+                    sec_name = sec.name()
+                    if sec_name not in seen_sections:
+                        seen_sections.add(sec_name)
+                        dend_secs.append(sec)
                 for sec in dend_secs:
                     seg_len = sec.L / max(sec.nseg, 1)
                     for seg in sec:

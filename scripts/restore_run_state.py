@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import re
 import shutil
@@ -20,6 +21,7 @@ APPLY_CHOICES = (
     "syn_config",
     "syn_groups",
     "fit_json",
+    "model_artifacts",
 )
 
 
@@ -56,7 +58,11 @@ class RestoreReport:
 
     @property
     def changed_files(self) -> int:
-        return sum(1 for item in self.file_reports if item.status in {"changed", "would_change"})
+        return sum(
+            1
+            for item in self.file_reports
+            if item.status in {"changed", "would_change", "created", "would_create"}
+        )
 
 
 def _read_json(path: Path) -> Any:
@@ -70,7 +76,7 @@ def _write_json(path: Path, payload: Any) -> None:
 
 
 def _backup_file(path: Path) -> Path:
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     backup = path.with_name(f"{path.name}.bak_{stamp}")
     shutil.copy2(path, backup)
     return backup
@@ -324,13 +330,47 @@ def _expand_syn_config(groups_cfg_raw: Any, config_root: Path) -> Dict[str, Any]
 
 
 def _find_fit_json_in_tune(tune_dir: Path, preferred_name: Optional[str] = None) -> Optional[Path]:
+    tune_root = tune_dir.expanduser().resolve()
+    cell_config: Optional[Dict[str, Any]] = None
+    for config_path in (
+        tune_root / "cell_configs" / "cell_config.json",
+        tune_root / "cell_config.json",
+    ):
+        if not config_path.is_file():
+            continue
+        try:
+            from modules.loaders import get_cell_loader_name
+
+            cell_config = _read_json(config_path)
+            if get_cell_loader_name(cell_config) != "allen_manifest":
+                return None
+        except Exception:
+            # Preserve compatibility for historical tunes whose loader metadata
+            # cannot be determined.
+            pass
+        break
     if preferred_name:
-        preferred = (tune_dir / preferred_name).resolve()
-        if preferred.is_file():
+        preferred = (tune_root / preferred_name).resolve()
+        if _path_is_within(preferred, tune_root) and preferred.is_file():
             return preferred
 
-    manifest_path = tune_dir / "manifest.json"
-    if manifest_path.is_file():
+    manifest_paths: List[Path] = []
+    if isinstance(cell_config, dict):
+        paths = cell_config.get("paths", {})
+        if isinstance(paths, dict):
+            raw_manifest = paths.get("manifest", "manifest.json")
+            if raw_manifest not in (None, ""):
+                configured = Path(str(raw_manifest)).expanduser()
+                if not configured.is_absolute():
+                    configured = tune_root / configured
+                manifest_paths.append(configured.resolve())
+    legacy_manifest = (tune_root / "manifest.json").resolve()
+    if legacy_manifest not in manifest_paths:
+        manifest_paths.append(legacy_manifest)
+
+    for manifest_path in manifest_paths:
+        if not manifest_path.is_file():
+            continue
         try:
             manifest_data = _read_json(manifest_path)
             biophys = manifest_data.get("biophys", [])
@@ -346,13 +386,17 @@ def _find_fit_json_in_tune(tune_dir: Path, preferred_name: Optional[str] = None)
                         cand = Path(item)
                         if not cand.name.endswith("_fit.json"):
                             continue
-                        resolved = (tune_dir / cand).resolve() if not cand.is_absolute() else cand.resolve()
-                        if resolved.is_file():
+                        resolved = (
+                            (manifest_path.parent / cand).resolve()
+                            if not cand.is_absolute()
+                            else cand.resolve()
+                        )
+                        if _path_is_within(resolved, tune_root) and resolved.is_file():
                             return resolved
         except Exception:
-            pass
+            continue
 
-    candidates = sorted(tune_dir.glob("*_fit.json"))
+    candidates = sorted(tune_root.glob("*_fit.json"))
     return candidates[0].resolve() if candidates else None
 
 
@@ -374,6 +418,8 @@ def _collect_source_payloads(
         "syn_config": None,
         "fit_json": None,
         "fit_json_path": None,
+        "model_artifacts": None,
+        "model_artifacts_path": None,
         "source_tune": None,
     }
     warnings: List[str] = []
@@ -383,6 +429,11 @@ def _collect_source_payloads(
         if not isinstance(rel, str):
             return None
         cand = (run_dir / rel).resolve()
+        if not _path_is_within(cand, run_dir):
+            warnings.append(
+                f"Refusing manifest {key} path outside the saved run: {rel!r}"
+            )
+            return None
         if cand.is_file():
             return _read_json(cand)
         warnings.append(f"Manifest referenced missing file for {key}: {cand}")
@@ -392,6 +443,22 @@ def _collect_source_payloads(
     source["cell_config"] = _load_from_manifest_file("cell_config")
     source["geometry"] = _load_from_manifest_file("geometry_config")
     source["syn_config"] = _load_from_manifest_file("syn_config")
+
+    artifact_rel = files.get("model_artifacts")
+    if isinstance(artifact_rel, str):
+        artifact_path = (run_dir / artifact_rel).resolve()
+        if not _path_is_within(artifact_path, run_dir):
+            warnings.append(
+                "Refusing model-artifact manifest path outside the saved run: "
+                f"{artifact_rel!r}"
+            )
+        elif artifact_path.is_file():
+            source["model_artifacts_path"] = artifact_path
+            source["model_artifacts"] = _read_json(artifact_path)
+        else:
+            warnings.append(
+                f"Manifest referenced missing model-artifact manifest: {artifact_path}"
+            )
 
     source_tune = source_tune_override
     if source_tune is None:
@@ -416,7 +483,11 @@ def _collect_source_payloads(
     fit_rel = files.get("fit_json")
     if isinstance(fit_rel, str):
         fit_path = (run_dir / fit_rel).resolve()
-        if fit_path.is_file():
+        if not _path_is_within(fit_path, run_dir):
+            warnings.append(
+                f"Refusing fit_json sidecar path outside the saved run: {fit_rel!r}"
+            )
+        elif fit_path.is_file():
             source["fit_json_path"] = fit_path
             source["fit_json"] = _read_json(fit_path)
         else:
@@ -553,6 +624,11 @@ def _collect_target_group_files(
 
     for rel in include_list:
         include_path = (config_root / rel).expanduser().resolve()
+        if not _path_is_within(include_path, config_root.parent.resolve()):
+            warnings.append(
+                f"Refusing synapse group path outside target tune: {rel!r}"
+            )
+            continue
         if not include_path.is_file():
             warnings.append(f"Included syn group file not found: {include_path}")
             continue
@@ -711,6 +787,177 @@ def _apply_syn_group_updates(
         report.file_reports.append(file_report)
 
 
+def _path_is_within(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
+def _apply_model_artifacts(
+    *,
+    target_tune: Path,
+    artifact_manifest: Any,
+    artifact_manifest_path: Optional[Path],
+    dry_run: bool,
+    report: RestoreReport,
+    backup: bool = True,
+) -> None:
+    """Restore archived native model sources without writing outside a tune."""
+    if not isinstance(artifact_manifest, dict) or artifact_manifest_path is None:
+        report.file_reports.append(
+            FileReport(
+                path=target_tune / "<model_artifacts>",
+                kind="model_artifacts",
+                status="skipped",
+                message="No archived model-artifact manifest is available.",
+            )
+        )
+        return
+
+    artifacts = artifact_manifest.get("artifacts", [])
+    if artifact_manifest.get("format_version") != 1:
+        report.errors.append(
+            "Unsupported model_artifacts format_version; expected 1, got "
+            f"{artifact_manifest.get('format_version')!r}."
+        )
+        return
+    archive_errors = artifact_manifest.get("errors", [])
+    if isinstance(archive_errors, list):
+        report.warnings.extend(
+            f"Saved model-artifact discovery warning: {message}"
+            for message in archive_errors
+            if message not in (None, "")
+        )
+    if not isinstance(artifacts, list):
+        report.errors.append("model_artifacts manifest field 'artifacts' must be a list.")
+        return
+
+    archive_root = artifact_manifest_path.parent.resolve()
+    tune_root = target_tune.resolve()
+    restored_mod_source = False
+    restored_hoc_source = False
+
+    archived_loader = artifact_manifest.get("loader")
+    target_cell_config = tune_root / "cell_configs" / "cell_config.json"
+    if archived_loader and target_cell_config.is_file():
+        try:
+            from modules.loaders import get_cell_loader_name
+
+            target_loader = get_cell_loader_name(_read_json(target_cell_config))
+        except Exception as exc:
+            report.errors.append(f"Could not validate target tune loader: {exc}")
+            return
+        if str(archived_loader) != target_loader:
+            report.errors.append(
+                "Refusing model-artifact restore across loader types: "
+                f"archive={archived_loader!r}, target={target_loader!r}."
+            )
+            return
+
+    for entry in artifacts:
+        if not isinstance(entry, dict):
+            report.warnings.append("Skipped malformed model-artifact entry (expected object).")
+            continue
+
+        rel_target = entry.get("target_relative_path")
+        archive_rel = entry.get("archive_path")
+        kind = str(entry.get("kind", "model_source"))
+        if entry.get("restorable", True) is False:
+            report.file_reports.append(
+                FileReport(
+                    path=tune_root / str(rel_target or "<external_artifact>"),
+                    kind=kind,
+                    status="skipped",
+                    message="Artifact was archived from outside the tune and is not restorable.",
+                )
+            )
+            continue
+        if (
+            not isinstance(rel_target, str)
+            or not rel_target.strip()
+            or not isinstance(archive_rel, str)
+            or not archive_rel.strip()
+        ):
+            report.warnings.append("Skipped model artifact missing archive/target relative path.")
+            continue
+
+        target_path = (tune_root / rel_target).resolve()
+        source_path = (archive_root / archive_rel).resolve()
+        if target_path == tune_root or not _path_is_within(target_path, tune_root):
+            report.errors.append(
+                f"Refusing to restore model artifact outside target tune: {rel_target!r}"
+            )
+            continue
+        if source_path == archive_root or not _path_is_within(source_path, archive_root):
+            report.errors.append(
+                f"Refusing model artifact archive path outside run archive: {archive_rel!r}"
+            )
+            continue
+        if not source_path.is_file():
+            report.file_reports.append(
+                FileReport(
+                    path=target_path,
+                    kind=kind,
+                    status="missing",
+                    message=f"Archived source file is missing: {source_path}",
+                )
+            )
+            continue
+
+        expected_hash = entry.get("sha256")
+        actual_hash = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        if not isinstance(expected_hash, str) or actual_hash != expected_hash.lower():
+            report.errors.append(
+                f"Refusing model artifact with a missing or mismatched SHA-256: {source_path}"
+            )
+            continue
+
+        source_bytes = source_path.read_bytes()
+        target_exists = target_path.is_file()
+        if target_exists and target_path.read_bytes() == source_bytes:
+            report.file_reports.append(
+                FileReport(path=target_path, kind=kind, status="unchanged")
+            )
+            continue
+
+        file_report = FileReport(
+            path=target_path,
+            kind=kind,
+            status=(
+                "would_change"
+                if dry_run and target_exists
+                else "would_create"
+                if dry_run
+                else "changed"
+                if target_exists
+                else "created"
+            ),
+        )
+        if not dry_run:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            if target_exists and backup:
+                file_report.backup_path = _backup_file(target_path)
+            shutil.copy2(source_path, target_path)
+        report.file_reports.append(file_report)
+        if kind == "mechanism_source" or target_path.suffix.lower() == ".mod":
+            restored_mod_source = True
+        if target_path.suffix.lower() == ".hoc":
+            restored_hoc_source = True
+
+    if restored_mod_source:
+        report.warnings.append(
+            "One or more MOD sources differ from the archived run. Recompile the target "
+            "tune's mechanisms before loading or simulating it."
+        )
+    if restored_hoc_source:
+        report.warnings.append(
+            "One or more HOC sources differ from the archived run. Restart the "
+            "Python/Jupyter process before reconstructing that template."
+        )
+
+
 def restore_run_state(
     *,
     from_run: Path,
@@ -841,6 +1088,16 @@ def restore_run_state(
         if fit_entry and str(fit_entry.path).endswith("<missing_fit_json>"):
             fit_entry.status = "missing"
             fit_entry.message = "Target fit JSON could not be resolved in target tune."
+
+    if "model_artifacts" in apply_set:
+        _apply_model_artifacts(
+            target_tune=target_tune,
+            artifact_manifest=source_payloads.get("model_artifacts"),
+            artifact_manifest_path=source_payloads.get("model_artifacts_path"),
+            dry_run=dry_run,
+            report=report,
+            backup=backup,
+        )
 
     _ = manifest_files  # keeps explicit that source comes from manifest sidecars
     return report

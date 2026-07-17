@@ -30,11 +30,11 @@ state and produces simulation outputs.
 
 A simulation tune directory should contain:
 
-- `manifest.json`,
-- `modfiles/` with compiled mechanisms,
+- native model source(s) declared by the selected loader,
 - `cell_configs/cell_config.json`,
 - `cell_configs/sim_config.json`,
 - `cell_configs/geometry.json`,
+- optional configured `modfiles/` with compiled mechanisms when custom `.mod` sources exist,
 - optional `cell_configs/syn_config.json`,
 - optional `cell_configs/syn_groups/*.json`.
 
@@ -57,6 +57,7 @@ Typical files include:
 - `syn_config.json`: resolved synapse group config when used,
 - `spikes.npz`: saved spike trains when requested,
 - `traces.npz`: saved traces when requested,
+- `model_artifacts/manifest.json`: loader-aware native-source provenance and hashes,
 - `<cell>_<tune>_<output_stem>.pkl`: optional full result object when `save.full_results` is enabled,
 - `plots/`: optional auto-generated plots.
 
@@ -71,7 +72,7 @@ Local use:
 
 - install the SCP environment,
 - launch Jupyter from the repo or set `SCP_ROOT`,
-- ensure the selected tune's mechanisms are compiled.
+- ensure custom mechanisms are compiled when the model has `.mod` sources.
 
 Colab use:
 
@@ -353,7 +354,8 @@ See `../advanced/cli_slurm.md`.
 
 - Rerun Step 1 validation.
 - Confirm `cell_configs/cell_config.json` points to the correct loader/files.
-- Confirm mechanisms are compiled and loadable.
+- Confirm custom mechanisms are compiled and loadable when `.mod` sources exist.
+- For HOC templates, confirm both explicit runtime conditions are present.
 
 ### No Synapses Are Attached
 

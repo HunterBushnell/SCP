@@ -19,7 +19,9 @@ Step 4 is manual-first for config edits:
 - build an SCP NEURON cell,
 - create or load `cell_configs/synapse_tuning_config.json`,
 - read BMTool `general_settings` and connection settings from that config,
-- initialize BMTool's `SynapseTuner` with `hoc_cell=session.cell`,
+- validate the configured point process and canonical section index before
+  resolving optional BMTool,
+- initialize BMTool's `SynapseTuner` with SCP's cell-scoped BMTool facade,
 - run BMTool single-event, interactive, frequency-response, and optional
   optimizer workflows,
 - print a copyable `syns.params` block,
@@ -32,19 +34,21 @@ Step 4 does not automatically overwrite synapse group configs.
 
 - a tune directory prepared by Step 1,
 - passive/active parameters reviewed in Steps 2-3 when applicable,
-- compiled or compilable `modfiles/`,
+- custom compiled/compilable `.mod` sources when the selected point process is not built in,
 - `cell_configs/cell_config.json`,
-- optional `cell_configs/synapse_tuning_config.json`; Step 4 creates it from
-  the default template when missing,
+- optional `cell_configs/synapse_tuning_config.json`; Step 4 creates a neutral
+  four-entry starting catalog when it is missing,
 - BMTool available at `../mods/bmtool` or through `SCP_BMTOOL_PATH`,
-- one or more synapse mechanisms present in the tune's compiled modfiles,
+- a NEURON synapse point process supplied either by built-in mechanisms or the tune's compiled sources,
 - optional existing `cell_configs/syn_groups/*.json` files to receive tuned
   parameters.
 
 ## Synapse Mechanism Files
 
-Step 4 does not automatically choose or install synapse mechanisms. Before
-initializing BMTool, make sure the mechanism `.mod` file exists in:
+Step 4 does not automatically choose or install custom synapse mechanisms.
+Built-in point processes need no MOD directory. For custom mechanisms, make
+sure the `.mod` file exists in the directory configured by `paths.modfiles`,
+normally:
 
 ```text
 cells/<CELL>/tunes/<TUNE>/modfiles/
@@ -52,8 +56,8 @@ cells/<CELL>/tunes/<TUNE>/modfiles/
 
 Use one of these paths:
 
-1. If you already have a synapse model, copy that `.mod` file into the tune's
-   `modfiles/` directory.
+1. If you already have a synapse model, place that `.mod` file in the tune's
+   configured `paths.modfiles` directory.
 2. If you need a starting point, use the cyneuro neuron mechanisms library:
    <https://github.com/cyneuro/neuron-mechanisms-library/tree/main/synaptic-mechanisms>.
 3. For SCP-style examples, the recommended starting folder is:
@@ -125,6 +129,8 @@ It handles:
 - locating or cloning BMTool,
 - compiling/loading tune mechanisms,
 - building the SCP cell,
+- rejecting unavailable point-process names and invalid `sec_id` values before
+  importing or cloning BMTool,
 - creating BMTool's `SynapseTuner` with a pre-built `hoc_cell`,
 - choosing conservative default slider/record variables for common mechanisms,
 - printing copyable SCP config parameter blocks.
@@ -140,10 +146,11 @@ The BMTool tuning methods remain BMTool methods:
 
 ### 4.1 Prepare SCP Cell
 
-Choose the post-synaptic cell/tune used for tuning. The default example is:
+Choose the post-synaptic cell/tune used for tuning. Selection is explicit; the
+notebook does not choose a production cell by default:
 
 ```python
-cell_name = "PV"
+cell_name = None  # set this, or set tune_dir_override
 tune_name = "tuned"
 ```
 
@@ -153,7 +160,7 @@ Important controls:
 - `tune_dir_override`: optional direct path outside the standard repo layout.
 - `RECOMPILE_MODFILES`: force `nrnivmodl` even if compiled mechanisms exist.
 - `LOAD_COMPILED_DLL`: load the compiled NEURON mechanism library into the
-  current kernel.
+  current kernel when custom `.mod` sources are present.
 
 The notebook calls:
 
@@ -174,8 +181,11 @@ Create or load:
 cells/<CELL>/tunes/<TUNE>/cell_configs/synapse_tuning_config.json
 ```
 
-The file stores BMTool-style settings for the selected tune. If the file is
-missing, Step 4 creates it from the default template used by the notebook.
+The file stores BMTool-style settings for the selected tune. If it is missing,
+Step 4 creates a loader-neutral template. Generated `vclamp_amp` values come
+from `sim_config.conditions.v_init_mV`, and generated `general_settings.celsius`
+comes from `sim_config.conditions.celsius_C`. An existing file is read without
+being rewritten unless overwrite is explicitly enabled.
 
 Important controls:
 
@@ -216,13 +226,16 @@ Each `connections` entry has:
 - `spec_settings.level_of_detail`: NEURON point-process mechanism name.
 - `spec_syn_param`: initial mechanism parameters.
 
-The bundled examples include:
+The generated starting catalog contains exactly four neutral entries:
 
-- `Fac2SST`: excitatory AMPA/NMDA/STP example.
-- `Dep2PV`: excitatory depressing AMPA/NMDA/STP example.
-- `Inh2SST`: inhibitory GABA example.
-- `Inh2PV`: inhibitory GABA example with the same defaults as `Inh2SST`.
-- `PV2SST`: inhibitory GABA/STP example.
+- `excitatory_facilitating`
+- `excitatory_depressing`
+- `inhibitory_static`
+- `inhibitory_stp`
+
+These are editable mechanism/parameter starting points, not cell-type
+selections. SCP never substitutes `ExpSyn` or another point process when a
+configured mechanism is unavailable.
 
 For custom mechanisms, keep the JSON shape and edit the mechanism name,
 location, and parameter names to match the `.mod` file. The notebook converts
@@ -439,7 +452,8 @@ kernel. Restart the kernel, then rerun Step 4 from the top.
 If `level_of_detail` fails:
 
 - confirm the mechanism name matches the `.mod` point-process name,
-- confirm the tune's `modfiles/` directory contains that `.mod` file,
+- confirm the directory selected by `cell_config.paths.modfiles` contains that
+  `.mod` file,
 - recompile mechanisms with `RECOMPILE_MODFILES = True`,
 - restart the kernel if another mechanism library was loaded first.
 

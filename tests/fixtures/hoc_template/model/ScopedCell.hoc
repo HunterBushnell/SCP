@@ -1,0 +1,43 @@
+// Synthetic, non-biological fixture for SCP loader/runtime tests.
+begintemplate ScopedCell
+
+public soma, branch, somatic, basal, apical, axonal, all
+create soma[1], branch[1]
+objref somatic, basal, apical, axonal, all
+
+proc init() { local scale
+    scale = 1
+    if (numarg() >= 1) {
+        scale = $1
+    }
+
+    somatic = new SectionList()
+    basal = new SectionList()
+    apical = new SectionList()
+    axonal = new SectionList()
+    all = new SectionList()
+
+    soma[0] {
+        L = 20 * scale
+        diam = 20 * scale
+        nseg = 1
+        insert pas
+        g_pas = 0.0001
+        e_pas = -68
+        somatic.append()
+        all.append()
+    }
+    branch[0] {
+        L = 100 * scale
+        diam = 2
+        nseg = 3
+        insert pas
+        g_pas = 0.0001
+        e_pas = -68
+        basal.append()
+        all.append()
+    }
+    connect branch[0](0), soma[0](1)
+}
+
+endtemplate ScopedCell

@@ -133,13 +133,21 @@ def _collect_neuron_state() -> Dict[str, Any]:
 
 
 def _collect_mechanism_info(sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    from modules.setup.mechanisms import (
+        find_compiled_mechanism_dll,
+        resolve_modfiles_dir,
+    )
+
     info: Dict[str, Any] = {}
     tune_path = _resolve_tune_path(sim_cfg)
     if tune_path is None:
         return info
 
     info["tune_dir"] = str(tune_path)
-    mod_dir = tune_path / "modfiles"
+    mod_dir = resolve_modfiles_dir(tune_path)
+    info["modfiles_dir"] = None if mod_dir is None else str(mod_dir)
+    if mod_dir is None:
+        return info
     mod_files = sorted(p for p in mod_dir.glob("*.mod")) if mod_dir.is_dir() else []
     if mod_files:
         info["modfiles_count"] = len(mod_files)
@@ -153,24 +161,19 @@ def _collect_mechanism_info(sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
                 continue
         info["modfiles_sha256"] = hsh.hexdigest()
 
-    dll_candidates = [
-        mod_dir / "x86_64" / ".libs" / "libnrnmech.so",
-        mod_dir / "x86_64" / "libnrnmech.so",
-    ]
-    for dll in dll_candidates:
-        if dll.is_file():
-            info["dll_path"] = str(dll)
-            try:
-                stat = dll.stat()
-                info["dll_size"] = int(stat.st_size)
-                info["dll_mtime"] = float(stat.st_mtime)
-            except Exception:
-                pass
-            try:
-                info["dll_sha256"] = _sha256_file(dll)
-            except Exception:
-                pass
-            break
+    dll = find_compiled_mechanism_dll(tune_path)
+    if dll is not None:
+        info["dll_path"] = str(dll)
+        try:
+            stat = dll.stat()
+            info["dll_size"] = int(stat.st_size)
+            info["dll_mtime"] = float(stat.st_mtime)
+        except Exception:
+            pass
+        try:
+            info["dll_sha256"] = _sha256_file(dll)
+        except Exception:
+            pass
 
     return info
 

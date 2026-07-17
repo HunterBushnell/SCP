@@ -10,7 +10,7 @@ from .defaults import default_target_config
 from .json_utils import CONFIG_MODE_VALUES, _write_json, _write_scaffold_json
 from .paths import resolve_step1_paths
 
-TARGET_SOURCE_MODES = ("manual", "traces", "allen_nwb")
+TARGET_SOURCE_MODES = ("none", "manual", "traces", "allen_nwb")
 
 
 def prepare_target_config(

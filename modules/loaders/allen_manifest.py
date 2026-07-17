@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import configparser
 import io
+import json
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -10,7 +11,12 @@ from typing import Any, Dict, Optional
 from allensdk.model.biophys_sim.config import Config
 from allensdk.model.biophysical.utils import AllActiveUtils, Utils
 
-from modules.loaders.base import LoadedCell, ensure_section_aliases
+from modules.loaders.base import (
+    LoadedCell,
+    apply_soma_diameter_multiplier,
+    ensure_section_aliases,
+)
+from modules.loaders.paths import resolve_loader_path
 
 
 PERISOMATIC_MODEL_TYPE = "Biophysical - perisomatic"
@@ -34,30 +40,86 @@ def _ensure_configparser_readfp() -> None:
     configparser.ConfigParser.readfp = readfp  # type: ignore[attr-defined]
 
 
-def _resolve_manifest_path(cell_config: Dict[str, Any]) -> Path:
-    paths = cell_config.get("paths", {})
-    manifest_path = Path(paths.get("manifest", "manifest.json"))
-    if manifest_path.is_file():
-        return manifest_path
-
-    base_candidates = []
-    for key in ("tune_dir", "base_dir", "root"):
-        raw = paths.get(key)
-        if raw:
-            base_candidates.append(Path(raw))
-    raw_tune_dir = cell_config.get("tune_dir")
-    if raw_tune_dir:
-        base_candidates.append(Path(raw_tune_dir))
-
-    for base in base_candidates:
-        candidate = base / manifest_path
-        if candidate.is_file():
-            return candidate
-
-    raise FileNotFoundError(
-        f"allen_manifest loader: manifest.json not found at {manifest_path}. "
-        "Set cell_config['paths']['manifest'] to an existing file."
+def _resolve_manifest_path(
+    cell_config: Dict[str, Any],
+    *,
+    base_dir: Optional[str | Path] = None,
+) -> Path:
+    return resolve_loader_path(
+        cell_config,
+        "manifest",
+        default="manifest.json",
+        base_dir=base_dir,
+        loader_name="allen_manifest",
     )
+
+
+def validate_config(
+    cell_config: Dict[str, Any],
+    *,
+    base_dir: Optional[str | Path] = None,
+) -> Dict[str, Path]:
+    """Validate Allen loader paths without constructing the model."""
+
+    return {"manifest": _resolve_manifest_path(cell_config, base_dir=base_dir)}
+
+
+def discover_source_artifacts(
+    cell_config: Dict[str, Any],
+    *,
+    base_dir: Optional[str | Path] = None,
+) -> Dict[str, Path]:
+    """Return tune-local native model sources declared by an Allen manifest."""
+
+    artifacts = validate_config(cell_config, base_dir=base_dir)
+    manifest_path = artifacts["manifest"]
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise ValueError(f"Could not parse Allen manifest {manifest_path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise TypeError(f"Allen manifest must contain a JSON object: {manifest_path}")
+
+    declared: list[tuple[str, str]] = []
+    for entry in payload.get("biophys", []) or []:
+        if not isinstance(entry, dict):
+            continue
+        raw_files = entry.get("model_file", [])
+        if not isinstance(raw_files, list):
+            raw_files = [raw_files]
+        for raw in raw_files:
+            if isinstance(raw, str) and raw and Path(raw).name != manifest_path.name:
+                declared.append(("model_file", raw))
+
+    # MORPHOLOGY and MARKER are model morphology sources. Stimulus/output NWB
+    # entries are experimental/run data, not native cell-model artifacts.
+    for entry in payload.get("manifest", []) or []:
+        if not isinstance(entry, dict) or entry.get("type") != "file":
+            continue
+        key = str(entry.get("key", "")).strip().upper()
+        spec = entry.get("spec")
+        if key in {"MORPHOLOGY", "MARKER"} and isinstance(spec, str) and spec:
+            declared.append((key.lower(), spec))
+
+    seen: set[Path] = {manifest_path}
+    counts: Dict[str, int] = {}
+    for role, raw in declared:
+        source = Path(raw).expanduser()
+        if not source.is_absolute():
+            source = manifest_path.parent / source
+        source = source.resolve()
+        if source in seen:
+            continue
+        if not source.is_file():
+            raise FileNotFoundError(
+                f"Allen manifest {manifest_path} declares missing model source: {source}"
+            )
+        seen.add(source)
+        index = counts.get(role, 0)
+        counts[role] = index + 1
+        artifact_role = role if index == 0 else f"{role}_{index}"
+        artifacts[artifact_role] = source
+    return artifacts
 
 
 def _allen_options(cell_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -116,7 +178,48 @@ def _suppress_allen_output(cell_config: Dict[str, Any]):
     return contextlib.redirect_stdout(io.StringIO())
 
 
-def _apply_genome_based_parameters(utils: Utils) -> None:
+def _section_group_name(section: Any) -> str:
+    name = str(section.name()).rsplit(".", 1)[-1]
+    return name.split("[", 1)[0]
+
+
+def _sections_for_group(sections: tuple[Any, ...], group: str) -> tuple[Any, ...]:
+    return tuple(section for section in sections if _section_group_name(section) == group)
+
+
+def _set_scoped_genome_parameter(section: Any, name: str, value: float) -> None:
+    """Set one Allen genome value without relying on a global ``forsec`` block."""
+
+    try:
+        setattr(section, name, value)
+        return
+    except AttributeError as exc:
+        # Some legacy all-active Allen fits spell the sodium reversal as e_na.
+        # NEURON exposes that ion property as ``ena`` once a sodium mechanism
+        # has been inserted. Keep this compatibility translation Allen-local.
+        alias = {"e_na": "ena"}.get(name)
+        if alias is None:
+            raise AttributeError(
+                f"Allen genome parameter {name!r} is not available on "
+                f"section {section.name()!r}. Check the fit JSON parameter name "
+                "and its declared mechanism."
+            ) from exc
+        try:
+            setattr(section, alias, value)
+        except AttributeError as alias_exc:
+            raise AttributeError(
+                f"Allen genome parameter {name!r} maps to NEURON property "
+                f"{alias!r}, but {alias!r} is unavailable on section "
+                f"{section.name()!r} after declared mechanisms were inserted."
+            ) from alias_exc
+
+
+def _apply_genome_based_parameters(
+    utils: Utils,
+    sections: tuple[Any, ...],
+    *,
+    apply_all_active_conditions: bool = False,
+) -> None:
     """
     Apply Allen genome/passive entries directly when `Utils.load_cell_parameters()`
     cannot read a bundle's passive-block layout.
@@ -143,9 +246,7 @@ def _apply_genome_based_parameters(utils: Utils) -> None:
     if not isinstance(conditions, dict):
         conditions = {}
 
-    h("access soma")
-
-    for sec in h.allsec():
+    for sec in sections:
         if "ra" in passive:
             sec.Ra = float(passive["ra"])
         sec.insert("pas")
@@ -163,8 +264,10 @@ def _apply_genome_based_parameters(utils: Utils) -> None:
             cm_val = cm_cfg.get("cm")
             if section is None or cm_val is None:
                 continue
-            h('forsec "' + str(section) + '" { cm = %g }' % float(cm_val))
+            for sec in _sections_for_group(sections, str(section)):
+                sec.cm = float(cm_val)
 
+    scoped_parameters: list[tuple[Any, str, float]] = []
     for param in genome:
         if not isinstance(param, dict):
             continue
@@ -186,9 +289,17 @@ def _apply_genome_based_parameters(utils: Utils) -> None:
         if not section:
             continue
 
-        if mechanism:
-            h('forsec "' + str(section) + '" { insert ' + str(mechanism) + " }")
-        h('forsec "' + str(section) + '" { ' + str(name) + " = %g }" % val)
+        target_sections = _sections_for_group(sections, str(section))
+        for sec in target_sections:
+            if mechanism and h.ismembrane(str(mechanism), sec=sec) != 1:
+                sec.insert(str(mechanism))
+            scoped_parameters.append((sec, str(name), val))
+
+    # Parameter assignment is deliberately a second pass. Legacy fit files can
+    # place an ion reversal before the channel entry that creates that ion's
+    # NEURON property (for example e_na before Nap/NaTa).
+    for sec, name, val in scoped_parameters:
+        _set_scoped_genome_parameter(sec, name, val)
 
     erev_entries = conditions.get("erev", [])
     if isinstance(erev_entries, list):
@@ -198,10 +309,17 @@ def _apply_genome_based_parameters(utils: Utils) -> None:
             section = erev.get("section")
             if not section:
                 continue
-            if "ek" in erev:
-                h('forsec "' + str(section) + '" { ek = %g }' % float(erev["ek"]))
-            if "ena" in erev:
-                h('forsec "' + str(section) + '" { ena = %g }' % float(erev["ena"]))
+            for sec in _sections_for_group(sections, str(section)):
+                if "ek" in erev and h.ismembrane("k_ion", sec=sec) == 1:
+                    sec.ek = float(erev["ek"])
+                if "ena" in erev and h.ismembrane("na_ion", sec=sec) == 1:
+                    sec.ena = float(erev["ena"])
+
+    if apply_all_active_conditions:
+        if conditions.get("v_init") is not None:
+            h.v_init = float(conditions["v_init"])
+        if conditions.get("celsius") is not None:
+            h.celsius = float(conditions["celsius"])
 
 
 def _build_utils(cell_config: Dict[str, Any], description: Config) -> tuple[Any, str]:
@@ -217,28 +335,47 @@ def _build_utils(cell_config: Dict[str, Any], description: Config) -> tuple[Any,
     return Utils(description), f"standard:{model_type or 'unknown'}"
 
 
-def _load_parameters(utils: Any, cell_config: Dict[str, Any]) -> str:
+def _load_parameters(
+    utils: Any,
+    cell_config: Dict[str, Any],
+    sections: tuple[Any, ...],
+    *,
+    force_scoped: bool,
+) -> str:
+    if force_scoped:
+        _apply_genome_based_parameters(
+            utils,
+            sections,
+            apply_all_active_conditions=isinstance(utils, AllActiveUtils),
+        )
+        return "scoped_genome"
     try:
         with _suppress_allen_output(cell_config):
             utils.load_cell_parameters()
         return "allensdk_default"
     except KeyError as exc:
         if str(exc).strip("'\"") in {"e_pas", "cm"}:
-            _apply_genome_based_parameters(utils)
+            _apply_genome_based_parameters(
+                utils,
+                sections,
+                apply_all_active_conditions=isinstance(utils, AllActiveUtils),
+            )
             return "genome_fallback"
         raise
 
 
-def load_cell(cell_config: Dict[str, Any]) -> LoadedCell:
+def load_cell(
+    cell_config: Dict[str, Any],
+    *,
+    base_dir: Optional[str | Path] = None,
+) -> LoadedCell:
     """
     Build a NEURON cell from an AllenSDK/ADB `manifest.json` bundle.
     """
 
     cell_name = cell_config.get("cell_name", "<unknown>")
-    manifest_path = _resolve_manifest_path(cell_config)
-
-    tuning = cell_config.get("tuning", {})
-    soma_diam_multiplier = float(tuning.get("soma_diam_multiplier", 1.0))
+    artifacts = validate_config(cell_config, base_dir=base_dir)
+    manifest_path = artifacts["manifest"]
 
     original_cwd = Path.cwd()
     manifest_dir = manifest_path.parent
@@ -249,6 +386,7 @@ def load_cell(cell_config: Dict[str, Any]) -> LoadedCell:
         description = Config().load(str(manifest_path.name))
         utils, utils_label = _build_utils(cell_config, description)
         h = utils.h
+        preexisting_section_names = {str(sec.name()) for sec in h.allsec()}
 
         genome = utils.description.data.get("genome", [])
         for entry in genome:
@@ -257,12 +395,22 @@ def load_cell(cell_config: Dict[str, Any]) -> LoadedCell:
 
         morphology_path = description.manifest.get_path("MORPHOLOGY")
         utils.generate_morphology(morphology_path.encode("ascii", "ignore"))
-        parameter_loader = _load_parameters(utils, cell_config)
+        model_sections = tuple(
+            sec for sec in h.allsec() if str(sec.name()) not in preexisting_section_names
+        )
+        if not model_sections:
+            raise RuntimeError(
+                "Allen loader did not create a distinct set of sections. Restart the "
+                "Python/Jupyter process before loading another legacy Allen model."
+            )
+        parameter_loader = _load_parameters(
+            utils,
+            cell_config,
+            model_sections,
+            force_scoped=bool(preexisting_section_names),
+        )
     finally:
         os.chdir(original_cwd)
-
-    if hasattr(h, "soma") and len(h.soma) > 0:
-        h.soma[0].diam = h.soma[0].diam * soma_diam_multiplier
 
     Vinit: Optional[float] = None
     data = utils.description.data
@@ -276,6 +424,15 @@ def load_cell(cell_config: Dict[str, Any]) -> LoadedCell:
     config = dict(cell_config)
     config["cell_loader"] = "allen_manifest"
     config.setdefault("allen_model_type", _manifest_model_type(description))
+    paths = dict(config.get("paths", {}) or {})
+    paths["manifest"] = str(manifest_path)
+    config["paths"] = paths
+
+    scoped_sections = {
+        group: tuple(sec for sec in model_sections if _section_group_name(sec) == group)
+        for group in ("soma", "dend", "apic", "axon")
+    }
+    scoped_sections["all"] = model_sections
 
     cell = LoadedCell(
         h=h,
@@ -284,8 +441,17 @@ def load_cell(cell_config: Dict[str, Any]) -> LoadedCell:
         Vinit=Vinit,
         config=config,
         loader="allen_manifest",
+        model=h,
+        sections=scoped_sections,
+        source_artifacts={role: str(path) for role, path in artifacts.items()},
     )
-    ensure_section_aliases(cell)
+    ensure_section_aliases(
+        cell,
+        owner=h,
+        allow_global_fallback=False,
+        require_soma=True,
+    )
+    soma_diam_multiplier = apply_soma_diameter_multiplier(cell)
 
     print(
         f"Loaded Allen cell for {cell_name!r} from {manifest_path}, "

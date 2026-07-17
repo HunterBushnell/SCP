@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
+import math
 import os
 
-from modules.loaders import get_cell_loader_name, loader_requires_manifest
+from modules import loaders as cell_loaders
 
-from .mechanisms import find_compiled_mechanism_dll
+from .mechanisms import find_compiled_mechanism_dll, resolve_modfiles_dir
 from .paths import resolve_step1_paths
 from .json_utils import _read_json
 
@@ -35,13 +36,17 @@ def validate_tune(
     *,
     tune_dir: Path,
     cell_name: str,
-    soma_diam_multiplier: float,
+    soma_diam_multiplier: Optional[float] = None,
     validate_modfiles: bool = True,
     validate_load_cell: bool = True,
     validate_inputs: bool = True,
     validate_synapses: bool = True,
+    allow_missing_modfiles: bool = False,
 ) -> Dict[str, Any]:
     """Run lightweight validation checks for Step-1 output layout."""
+    # Retained as an optional argument for callers using the pre-registry API.
+    # Loader validation reads any Allen-only multiplier from cell_config itself.
+    _ = soma_diam_multiplier
     tune_dir = Path(tune_dir).expanduser().resolve()
     paths = resolve_step1_paths(tune_dir)
 
@@ -61,17 +66,41 @@ def validate_tune(
 
     cell_config = _read_json(paths.cell_config) if paths.cell_config.is_file() else {}
     cell_config.setdefault("cell_name", cell_name)
-    tuning = cell_config.setdefault("tuning", {})
-    if not isinstance(tuning, dict) or "soma_diam_multiplier" not in tuning:
-        raise KeyError(
-            "cell_config.json must define tuning.soma_diam_multiplier; "
-            "this value is no longer read from sim_config.json."
-        )
-    tuning["soma_diam_multiplier"] = float(tuning["soma_diam_multiplier"])
+    tuning = cell_config.get("tuning")
+    if tuning is not None and not isinstance(tuning, dict):
+        raise TypeError("cell_config.json tuning must be an object when provided.")
+    if isinstance(tuning, dict) and "soma_diam_multiplier" in tuning:
+        tuning["soma_diam_multiplier"] = float(tuning["soma_diam_multiplier"])
 
-    loader_name = get_cell_loader_name(cell_config)
+    loader_name = cell_loaders.get_cell_loader_name(cell_config)
     checks["cell_loader"] = loader_name
-    if loader_requires_manifest(loader_name):
+    if loader_name == "hoc_template":
+        if not paths.sim_config.is_file():
+            raise FileNotFoundError(
+                "hoc_template setup requires cell_configs/sim_config.json with explicit "
+                "conditions.v_init_mV and conditions.celsius_C values."
+            )
+        sim_config = _read_json(paths.sim_config)
+        conditions = sim_config.get("conditions")
+        if not isinstance(conditions, dict):
+            raise KeyError(
+                "hoc_template sim_config.json must define a conditions object with "
+                "numeric v_init_mV and celsius_C values."
+            )
+        from modules.simulation.current_injection import validate_required_sim_conditions
+
+        validate_required_sim_conditions(cell_config, sim_config)
+        checks["conditions"] = {
+            "v_init_mV": float(conditions["v_init_mV"]),
+            "celsius_C": float(conditions["celsius_C"]),
+        }
+    loader_validator = getattr(cell_loaders, "validate_cell_loader_config", None)
+    if callable(loader_validator):
+        resolved_loader_paths = loader_validator(cell_config, base_dir=tune_dir)
+        checks["loader_paths"] = {
+            str(key): str(value) for key, value in resolved_loader_paths.items()
+        }
+    elif cell_loaders.loader_requires_manifest(loader_name):
         manifest_path = Path(str(cell_config.get("paths", {}).get("manifest", "manifest.json")))
         if not manifest_path.is_absolute():
             manifest_path = tune_dir / manifest_path
@@ -80,18 +109,28 @@ def validate_tune(
             raise FileNotFoundError(f"Missing manifest.json at {manifest_path}")
 
     if validate_modfiles:
-        dll = find_compiled_mechanism_dll(tune_dir)
+        dll = find_compiled_mechanism_dll(tune_dir, cell_config=cell_config)
         checks["compiled_dll"] = str(dll) if dll else None
         if dll is None:
-            raise FileNotFoundError(
-                "Compiled mechanisms not found. Run compile_modfiles first."
+            mod_dir = resolve_modfiles_dir(tune_dir, cell_config)
+            has_mod_sources = bool(
+                mod_dir is not None and mod_dir.is_dir() and any(mod_dir.glob("*.mod"))
             )
+            if allow_missing_modfiles and not has_mod_sources:
+                checks["mechanisms"] = {
+                    "status": "skipped",
+                    "reason": "model has no configured .mod sources",
+                }
+            else:
+                raise FileNotFoundError(
+                    "Compiled mechanisms not found. Run compile_modfiles first."
+                )
 
     if validate_load_cell:
         from modules.model.load_cell import load_cell
 
         with _pushd(tune_dir):
-            cell = load_cell(cell_config)
+            cell = load_cell(cell_config, base_dir=tune_dir)
         checks["load_cell"] = {
             "ok": True,
             "Vinit": getattr(cell, "Vinit", None),

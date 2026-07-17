@@ -22,6 +22,7 @@ cell_configs/
     <group>.json
 ```
 
+`target_config.json` is optional for characterization without biological targets.
 `syn_config.json` and `syn_groups/` are optional for cell-only or IClamp runs.
 
 ## `cell_config.json`
@@ -33,9 +34,15 @@ Generated fields:
 - `cell_name`: display/selection label, such as `PV` or `SST`.
 - `tune`: tune directory name, such as `tuned`.
 - `color`: plotting color for the cell.
-- `cell_loader`: loader adapter name. Current bundled examples use `allen_manifest`.
-- `paths.manifest`: path to `manifest.json`, relative to the tune directory.
-- `tuning.soma_diam_multiplier`: soma diameter multiplier used by setup/tuning/loading code. The generated default is `1.0` so raw cells are not rescaled before tuning.
+- `cell_loader`: registered adapter name. Supported values are
+  `allen_manifest` (default, with legacy Allen aliases) and `hoc_template`.
+- `paths.manifest`: Allen manifest path, relative to the tune directory.
+- `paths.hoc_template`: HOC entry source for the HOC-template loader.
+- `paths.modfiles`: optional mechanism-source directory; `null` means built-in
+  NEURON mechanisms only.
+- `tuning.soma_diam_multiplier`: optional Allen-only geometry compatibility
+  setting. It defaults to `1.0` for Allen and is not added or applied to HOC
+  templates.
 
 Example:
 
@@ -57,6 +64,35 @@ Example:
 Step 1 download inputs such as Allen `specimen_id` and `model_type` are setup
 inputs, not runtime config identity fields.
 
+Generic object-owned HOC example:
+
+```json
+{
+  "cell_name": "example_cell",
+  "tune": "orig",
+  "cell_loader": "hoc_template",
+  "paths": {
+    "hoc_template": "model/CellTemplate.hoc",
+    "modfiles": null
+  },
+  "hoc_template": {
+    "template_name": "CellTemplate",
+    "constructor_args": [],
+    "section_map": {
+      "soma": "somatic",
+      "dend": ["basal"],
+      "apic": ["apical"],
+      "axon": ["axonal"],
+      "all": "all"
+    }
+  }
+}
+```
+
+Mapping values may be a string or list of owner attributes. Optional groups can
+be omitted or map to empty section collections; soma must resolve to at least
+one section. See `model_loaders.md` for construction and process-lifetime rules.
+
 ## `target_config.json`
 
 Optional biological or experimental targets used by tuning notebooks. This file
@@ -64,6 +100,7 @@ stores desired model behavior; it does not control Step 5 simulation execution.
 
 The target config is organized by **source mode**:
 
+- `none`: no biological target; Steps 2–3 run intrinsic trace/FI checks only.
 - `manual`: user-entered passive values and FI curve values or FI CSV.
 - `traces`: user-provided trace files following the SCP trace contract.
 - `allen_nwb`: Allen/ADB electrophysiology `.nwb` files.
@@ -71,7 +108,7 @@ The target config is organized by **source mode**:
 Generated fields:
 
 - `schema_version`: target-config schema version.
-- `target_source.mode`: one of `manual`, `traces`, or `allen_nwb`.
+- `target_source.mode`: one of `none`, `manual`, `traces`, or `allen_nwb`.
 - `target_source.description`: optional human-readable target-source note.
 - `manual.passive`: direct Step 2 targets: `v_rest_mV`, `rin_MOhm`, `tau_ms`.
 - `manual.fi_curve`: direct Step 3 FI targets: `currents_pA`, `rates_Hz`, or `csv`.
@@ -177,6 +214,16 @@ through to ACT; it does not yet convert generic active voltage traces.
 ## `sim_config.json`
 
 Simulation-level timing, trial, saving, plotting, recording, and debug options.
+
+### Runtime Conditions
+
+- `conditions.v_init_mV`: initialization voltage in mV.
+- `conditions.celsius_C`: NEURON temperature in degrees Celsius.
+
+Both values are required and must be finite for new `hoc_template` tunes. SCP
+applies them before every passive, active/FI, and Step 5 protocol or trial.
+Legacy Allen tunes without this block retain their existing loader/runtime
+fallbacks.
 
 ### Timing
 

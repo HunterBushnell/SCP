@@ -38,33 +38,14 @@ def _find_fit_json_path(sim_cfg: Dict[str, Any]) -> Optional[Path]:
     if tune_path is None or not tune_path.is_dir():
         return None
 
-    manifest_path = tune_path / "manifest.json"
-    if manifest_path.is_file():
-        try:
-            manifest_data = json.loads(manifest_path.read_text())
-            biophys = manifest_data.get("biophys", [])
-            if isinstance(biophys, list):
-                for entry in biophys:
-                    if not isinstance(entry, dict):
-                        continue
-                    model_file = entry.get("model_file")
-                    model_file_items = model_file if isinstance(model_file, list) else [model_file]
-                    for item in model_file_items:
-                        if not isinstance(item, str):
-                            continue
-                        cand = Path(item)
-                        if not cand.name.endswith("_fit.json"):
-                            continue
-                        cand = (tune_path / cand).resolve() if not cand.is_absolute() else cand.resolve()
-                        if cand.is_file():
-                            return cand
-        except Exception:
-            pass
+    try:
+        from modules.setup.fit_json import find_fit_json
 
-    fit_candidates = sorted(tune_path.glob("*_fit.json"))
-    if fit_candidates:
-        return fit_candidates[0].resolve()
-    return None
+        return find_fit_json(tune_path)
+    except Exception:
+        # Saving should remain best-effort for historical/malformed tune
+        # metadata; the generic model-artifact sidecar is handled separately.
+        return None
 
 
 def _copy_fit_json_sidecar(sim_cfg: Dict[str, Any], run_dir: Path) -> Optional[Dict[str, str]]:

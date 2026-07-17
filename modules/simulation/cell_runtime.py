@@ -6,7 +6,9 @@ from typing import Any, Dict, Tuple
 import numpy as np
 from neuron import h
 
-from .current_injection import _get_hoc
+from modules.model.geometry import cell_sections, cell_soma_segment
+
+from .current_injection import apply_sim_conditions
 
 
 _SITE_SPEC_RE = re.compile(
@@ -16,20 +18,9 @@ _SITE_SPEC_RE = re.compile(
 
 def _get_soma_segment(cell):
     """
-    Return a NEURON soma(0.5) segment for both the new LoadedCell
-    (which exposes `cell.h.soma`) and older cell wrappers that have
-    `cell.soma` directly.
+    Return the canonical soma(0.5) segment for a loaded cell.
     """
-    # Prefer the NEURON hoc object inside LoadedCell.
-    h_obj = getattr(cell, "h", None)
-    if h_obj is not None and hasattr(h_obj, "soma") and len(h_obj.soma) > 0:
-        return h_obj.soma[0](0.5)
-
-    # Fallback to older pattern where the cell itself had `soma`.
-    if hasattr(cell, "soma") and len(cell.soma) > 0:
-        return cell.soma[0](0.5)
-
-    raise AttributeError("run_sim: could not find soma on cell or cell.h")
+    return cell_soma_segment(cell)
 
 
 def _parse_bool_like(value: Any, *, default: bool = False) -> bool:
@@ -144,11 +135,10 @@ def _get_cell_recording_cfg(sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _resolve_recording_site(cell: Any, site: Dict[str, Any]) -> Tuple[Any, str]:
-    hoc = _get_hoc(cell)
     sec_name = str(site["sec"])
-    if not hasattr(hoc, sec_name):
+    sec_list = cell_sections(cell, sec_name)
+    if not sec_list:
         raise ValueError(f"run_cell: section list '{sec_name}' not found on cell")
-    sec_list = getattr(hoc, sec_name)
     idx = int(site["idx"])
     if idx < 0 or idx >= len(sec_list):
         raise ValueError(
@@ -220,8 +210,11 @@ def run_cell(cell, sim_cfg):
     isynvec = None
     gsynvec = None
     if hasattr(cell, "synapses") and len(cell.synapses) > 0:
-        isynvec = h.Vector().record(cell.synapses[0]._ref_i)
-        gsynvec = h.Vector().record(cell.synapses[0]._ref_g)
+        first_synapse = cell.synapses[0]
+        if hasattr(first_synapse, "_ref_i"):
+            isynvec = h.Vector().record(first_synapse._ref_i)
+        if hasattr(first_synapse, "_ref_g"):
+            gsynvec = h.Vector().record(first_synapse._ref_g)
 
     cell_recording_cfg = _get_cell_recording_cfg(sim_cfg)
     cell_recorders: Dict[str, Dict[str, Any]] = {}
@@ -242,11 +235,11 @@ def run_cell(cell, sim_cfg):
     tstart = float(sim_cfg.get("tstart", 0.0))
     tstop  = float(sim_cfg["tstop"])
 
-    h.t = tstart
-    v_init = float(getattr(cell, "Vinit", -65.0))
-    h.finitialize(v_init)
     h.dt = dt
     h.tstop = tstop
+    conditions = apply_sim_conditions(cell, sim_cfg)
+    h.finitialize(conditions["v_init_mV"])
+    h.t = tstart
 
     h.run()
 
@@ -254,6 +247,7 @@ def run_cell(cell, sim_cfg):
     sim_traces["V"] = np.array(vvec)
     if isynvec is not None:
         sim_traces["I"] = np.array(isynvec)
+    if gsynvec is not None:
         sim_traces["G"] = np.array(gsynvec)
     if cell_recorders:
         sim_traces["cell_recordings"] = {
@@ -262,4 +256,3 @@ def run_cell(cell, sim_cfg):
         }
 
     return sim_traces
-

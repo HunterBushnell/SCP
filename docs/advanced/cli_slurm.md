@@ -33,9 +33,20 @@ python scripts/step1_prepare.py \
   --config-mode fill
 ```
 
+For an existing HOC-template model, select `--cell-loader hoc_template` and
+provide `--hoc-template-file`, `--hoc-template-name`, optional constructor and
+section-map JSON, plus explicit `--v-init-mv` and `--celsius-c` conditions. See
+[`../guides/step_1_setup.md`](../guides/step_1_setup.md) for the full generic
+scaffolding example and contract.
+
 Useful Step 1 flags:
 
 - `--source-type adb|existing`
+- `--cell-loader allen_manifest|hoc_template`
+- `--hoc-template-file`, `--hoc-template-name`
+- `--hoc-constructor-args`, `--hoc-section-map`
+- `--v-init-mv`, `--celsius-c`
+- `--target-source-mode none|manual|traces|allen_nwb`
 - `--no-download`
 - `--force-download`
 - `--no-compile`
@@ -109,7 +120,8 @@ Common environment variables:
 
 Notes:
 
-- `run_slurm.sh` auto-builds modfiles if missing.
+- `run_slurm.sh` resolves the configured MOD source directory and auto-builds it
+  when `.mod` files exist; built-in-only models skip compilation.
 - Per-task array outputs go under `output_data/<batch>/parts/` before merge.
 - Logs are copied into the run folder when possible.
 - The pipeline resolves configs from `cell_configs/`.

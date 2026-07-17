@@ -5,8 +5,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from modules.loaders import get_cell_loader_name, loader_requires_manifest
-
+from modules.setup.mechanisms import (
+    find_compiled_mechanism_dll,
+    load_compiled_mechanism_library,
+    resolve_modfiles_dir,
+)
 
 def _timestamp_stem() -> str:
     return datetime.now().strftime("run_%Y%m%d_%H%M%S")
@@ -47,39 +50,43 @@ def infer_cell_name(tune_dir: Path, cell_config: Optional[Dict[str, Any]] = None
     return tune_dir.parent.name
 
 
-def load_mechanisms(tune_dir: Path) -> None:
+def load_mechanisms(
+    tune_dir: Path,
+    cell_config: Optional[Dict[str, Any]] = None,
+) -> Optional[Path]:
     """
-    Load compiled NEURON mechanisms from a tune directory.
+    Load compiled NEURON mechanisms from the tune's configured source directory.
+
+    Mechanism identity is based on the compiled library path, not on a list of
+    model-specific mechanism names. A tune without configured MOD sources is
+    allowed to use NEURON's built-in mechanisms.
     """
-    from neuron import h
+    tune_dir = Path(tune_dir).expanduser().resolve()
+    mod_dir = resolve_modfiles_dir(tune_dir, cell_config)
+    if mod_dir is None:
+        print("No configured modfiles directory; using NEURON built-in mechanisms.")
+        return None
+    if not mod_dir.is_dir():
+        print(f"No configured MOD source directory; using available NEURON mechanisms: {mod_dir}")
+        return None
+    if not any(mod_dir.glob("*.mod")):
+        print(f"No configured .mod sources; using available NEURON mechanisms: {mod_dir}")
+        return None
 
-    mech_names = ("AMPA_NMDA_STP", "GABA_A", "GABA_A_STP", "vecstim", "Ih")
-    if any(hasattr(h, mech) for mech in mech_names):
-        print("Mechanisms already loaded; skipping duplicate load.")
-        return
-
-    candidates = [
-        tune_dir / "modfiles" / "x86_64" / ".libs" / "libnrnmech.so",
-        tune_dir / "modfiles" / "x86_64" / "libnrnmech.so",
-    ]
-    for dll in candidates:
-        if dll.is_file():
-            try:
-                h.nrn_load_dll(str(dll))
-                print(f"Loaded mechanisms from {dll}")
-                return
-            except Exception as exc:
-                already_loaded = any(hasattr(h, mech) for mech in mech_names)
-                if already_loaded:
-                    print(f"Mechanisms already loaded (skipping reload of {dll})")
-                    return
-                raise RuntimeError(
-                    f"Found compiled mechanisms at {dll} but failed to load: {exc}"
-                ) from exc
+    dll = find_compiled_mechanism_dll(tune_dir, cell_config=cell_config)
+    if dll is not None:
+        summary = load_compiled_mechanism_library(dll)
+        action = (
+            "Mechanisms already loaded from"
+            if summary.get("dll_preloaded")
+            else "Loaded mechanisms from"
+        )
+        print(f"{action} {dll}")
+        return Path(summary["dll"])
 
     raise FileNotFoundError(
-        "Compiled mechanisms not found. Run `nrnivmodl` inside the tune directory "
-        f"{tune_dir}/modfiles to build modfiles/x86_64/.libs/libnrnmech.so, then rerun."
+        "Compiled mechanisms not found. Run `nrnivmodl` inside the configured "
+        f"MOD source directory {mod_dir} to build {mod_dir / 'x86_64'}, then rerun."
     )
 
 
@@ -117,32 +124,3 @@ def _resolve_append_target(sim_cfg_raw: Dict[str, Any], output_base: Path) -> Op
         else:
             append_path = output_base / append_path
     return append_path
-
-
-def resolve_loader_manifest_path(
-    *,
-    cell_config: Dict[str, Any],
-    cell_config_path: Path,
-    tune_dir: Path,
-) -> None:
-    paths = cell_config.setdefault("paths", {})
-    loader_name = get_cell_loader_name(cell_config)
-    if not loader_requires_manifest(loader_name):
-        return
-
-    raw_manifest = Path(str(paths.get("manifest", "manifest.json")))
-    if raw_manifest.is_absolute():
-        resolved_manifest = raw_manifest
-    else:
-        candidates = [
-            Path.cwd() / raw_manifest,
-            cell_config_path.parent / raw_manifest,
-            tune_dir / raw_manifest,
-        ]
-        resolved_manifest = next((p for p in candidates if p.is_file()), candidates[1])
-
-    if not resolved_manifest.is_file():
-        raise FileNotFoundError(
-            f"Missing manifest.json for cell_loader={loader_name!r}: {resolved_manifest}"
-        )
-    paths["manifest"] = str(resolved_manifest)

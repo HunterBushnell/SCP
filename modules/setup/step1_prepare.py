@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Mapping, Optional
 
 from .cell_sources import setup_cell_source
 from .defaults import (
@@ -17,9 +17,11 @@ from .fit_json import (
     coerce_fit_genome_values_to_numeric,
     sort_genome_by_section,
 )
-from .mechanisms import compile_modfiles
+from .mechanisms import compile_modfiles, load_tune_cell_config
 from .scaffold import scaffold_base_configs, scaffold_synapse_configs
 from .target_config import prepare_target_config as _prepare_target_config
+
+from modules.loaders import get_cell_loader_name
 
 
 def resolve_soma_multiplier(
@@ -35,7 +37,7 @@ def resolve_soma_multiplier(
 def prepare_cell_source(
     *,
     tune_dir: Path,
-    source_type: str = "adb",
+    source_type: Optional[str] = None,
     specimen_id: Optional[int] = None,
     model_type: str = "perisomatic",
     do_download: bool = True,
@@ -64,18 +66,26 @@ def prepare_mechanisms(
     load_compiled_dll: bool = True,
     coerce_genome_values_to_numeric: bool = False,
     sort_genome_entries_by_section: bool = False,
+    allow_missing_modfiles: bool = True,
+    cell_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Phase 2: normalize fit JSON if requested, then compile/load modfiles."""
     tune_dir = Path(tune_dir).expanduser().resolve()
     actions: Dict[str, Any] = {}
 
     if coerce_genome_values_to_numeric:
-        actions["coerce_genome_values"] = coerce_fit_genome_values_to_numeric(tune_dir)
+        actions["coerce_genome_values"] = coerce_fit_genome_values_to_numeric(
+            tune_dir,
+            cell_config=cell_config,
+        )
     else:
         actions["coerce_genome_values"] = {"status": "skipped"}
 
     if sort_genome_entries_by_section:
-        actions["sort_genome"] = sort_genome_by_section(tune_dir)
+        actions["sort_genome"] = sort_genome_by_section(
+            tune_dir,
+            cell_config=cell_config,
+        )
     else:
         actions["sort_genome"] = {"status": "skipped"}
 
@@ -84,8 +94,10 @@ def prepare_mechanisms(
             tune_dir,
             recompile=recompile_modfiles,
             load_dll=load_compiled_dll,
+            allow_missing=allow_missing_modfiles,
+            cell_config=cell_config,
         )
-        actions["compile_modfiles"] = {"status": "ok", **compile_info}
+        actions["compile_modfiles"] = compile_info
     else:
         actions["compile_modfiles"] = {"status": "skipped"}
 
@@ -103,9 +115,19 @@ def prepare_base_configs(
     color: Optional[str] = None,
     config_mode: str = "fill",
     sync_cell_metadata: bool = True,
+    cell_loader: Optional[str] = None,
+    loader_paths: Optional[Mapping[str, Any]] = None,
+    loader_config: Optional[Mapping[str, Any]] = None,
+    v_init_mV: Optional[float] = None,
+    celsius_C: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Phase 3: scaffold first-level cell, geometry, and simulation configs."""
-    soma_mult = resolve_soma_multiplier(cell_name, soma_diam_multiplier)
+    loader_name = get_cell_loader_name({"cell_loader": cell_loader or "allen_manifest"})
+    soma_mult = (
+        resolve_soma_multiplier(cell_name, soma_diam_multiplier)
+        if loader_name == "allen_manifest"
+        else None
+    )
     return scaffold_base_configs(
         tune_dir=tune_dir,
         cell_name=cell_name,
@@ -116,6 +138,11 @@ def prepare_base_configs(
         color=color,
         config_mode=config_mode,
         sync_cell_metadata=sync_cell_metadata,
+        cell_loader=loader_name,
+        loader_paths=loader_paths,
+        loader_config=loader_config,
+        v_init_mV=v_init_mV,
+        celsius_C=celsius_C,
     )
 
 
@@ -172,19 +199,20 @@ def validate_setup(
     validate_load_cell: bool = True,
     validate_inputs_cfg: bool = True,
     validate_synapses: bool = True,
+    allow_missing_modfiles: bool = True,
 ) -> Dict[str, Any]:
     """Phase 5: validate files, loader, optional mechanisms, and inputs."""
     from .validation import validate_tune
 
-    soma_mult = resolve_soma_multiplier(cell_name, soma_diam_multiplier)
     return validate_tune(
         tune_dir=tune_dir,
         cell_name=cell_name,
-        soma_diam_multiplier=soma_mult,
+        soma_diam_multiplier=soma_diam_multiplier,
         validate_modfiles=validate_modfiles,
         validate_load_cell=validate_load_cell,
         validate_inputs=validate_inputs_cfg,
         validate_synapses=validate_synapses,
+        allow_missing_modfiles=allow_missing_modfiles,
     )
 
 
@@ -253,7 +281,10 @@ def prepare_tune(
     tune_name: str,
     specimen_id: Optional[int] = None,
     model_type: str = "perisomatic",
-    source_type: str = "adb",
+    source_type: Optional[str] = None,
+    cell_loader: str = "allen_manifest",
+    loader_paths: Optional[Mapping[str, Any]] = None,
+    loader_config: Optional[Mapping[str, Any]] = None,
     soma_diam_multiplier: Optional[float] = None,
     color: Optional[str] = None,
     do_download: bool = True,
@@ -263,6 +294,7 @@ def prepare_tune(
     do_compile_modfiles: bool = True,
     recompile_modfiles: bool = False,
     load_compiled_dll: bool = True,
+    allow_missing_modfiles: Optional[bool] = None,
     coerce_genome_values_to_numeric: bool = False,
     sort_genome_entries_by_section: bool = False,
     do_scaffold_configs: bool = True,
@@ -271,6 +303,9 @@ def prepare_tune(
     do_synapse_configs: Optional[bool] = None,
     config_mode: str = "fill",
     sync_cell_metadata: bool = True,
+    v_init_mV: Optional[float] = None,
+    celsius_C: Optional[float] = None,
+    target_source_mode: Optional[str] = None,
     synapse_template_kinds: Optional[list[str]] = None,
     synapse_weight_style: str = "distributed",
     do_validate: bool = True,
@@ -288,7 +323,20 @@ def prepare_tune(
     tune_dir = Path(tune_dir).expanduser().resolve()
     tune_dir.mkdir(parents=True, exist_ok=True)
 
-    soma_mult = resolve_soma_multiplier(cell_name, soma_diam_multiplier)
+    loader_name = get_cell_loader_name({"cell_loader": cell_loader})
+    source_type = source_type or ("adb" if loader_name == "allen_manifest" else "existing")
+    if source_type == "adb" and loader_name != "allen_manifest":
+        raise ValueError("source_type='adb' is only valid with cell_loader='allen_manifest'.")
+    soma_mult = (
+        resolve_soma_multiplier(cell_name, soma_diam_multiplier)
+        if loader_name == "allen_manifest"
+        else None
+    )
+    if allow_missing_modfiles is None:
+        allow_missing_modfiles = True
+    resolved_target_source_mode = target_source_mode
+    if resolved_target_source_mode is None:
+        resolved_target_source_mode = "manual" if loader_name == "allen_manifest" else "none"
     if do_base_configs is None:
         do_base_configs = bool(do_scaffold_configs)
     if do_target_config is None:
@@ -301,11 +349,13 @@ def prepare_tune(
         "cell_name": cell_name,
         "tune_name": tune_name,
         "source_type": source_type,
+        "cell_loader": loader_name,
         "specimen_id": None if specimen_id is None else int(specimen_id),
         "model_type": model_type,
-        "soma_diam_multiplier": soma_mult,
         "actions": {},
     }
+    if soma_mult is not None:
+        summary["soma_diam_multiplier"] = soma_mult
 
     summary["actions"]["cell_source"] = prepare_cell_source(
         tune_dir=tune_dir,
@@ -318,6 +368,15 @@ def prepare_tune(
         download_match=download_match,
     )
 
+    stored_cell_config = load_tune_cell_config(tune_dir)
+    mechanism_cell_config = (
+        stored_cell_config
+        if stored_cell_config is not None and loader_paths is None
+        else {
+            "cell_loader": loader_name,
+            "paths": dict(loader_paths or {}),
+        }
+    )
     summary["actions"]["mechanisms"] = prepare_mechanisms(
         tune_dir=tune_dir,
         do_compile_modfiles=do_compile_modfiles,
@@ -325,6 +384,8 @@ def prepare_tune(
         load_compiled_dll=load_compiled_dll,
         coerce_genome_values_to_numeric=coerce_genome_values_to_numeric,
         sort_genome_entries_by_section=sort_genome_entries_by_section,
+        allow_missing_modfiles=bool(allow_missing_modfiles),
+        cell_config=mechanism_cell_config,
     )
 
     if do_base_configs:
@@ -340,6 +401,11 @@ def prepare_tune(
                 color=color,
                 config_mode=config_mode,
                 sync_cell_metadata=sync_cell_metadata,
+                cell_loader=loader_name,
+                loader_paths=loader_paths,
+                loader_config=loader_config,
+                v_init_mV=v_init_mV,
+                celsius_C=celsius_C,
             ),
         }
     else:
@@ -351,7 +417,7 @@ def prepare_tune(
             "file": prepare_target_config(
                 tune_dir=tune_dir,
                 config_mode=config_mode,
-                target_source_mode=None,
+                target_source_mode=resolved_target_source_mode,
             ),
         }
     else:
@@ -381,6 +447,7 @@ def prepare_tune(
                 validate_load_cell=True,
                 validate_inputs_cfg=validate_inputs_cfg,
                 validate_synapses=bool(do_synapse_configs),
+                allow_missing_modfiles=bool(allow_missing_modfiles),
             ),
         }
     else:

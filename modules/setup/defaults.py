@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Mapping, Optional
 
 
 DEFAULT_SYNAPSE_TEMPLATE_KINDS = (
@@ -51,28 +51,57 @@ def default_cell_config(
     tune_name: str,
     specimen_id: Optional[int],
     model_type: str,
-    soma_diam_multiplier: float,
+    soma_diam_multiplier: Optional[float] = None,
     color: Optional[str] = None,
+    cell_loader: str = "allen_manifest",
+    loader_paths: Optional[Mapping[str, Any]] = None,
+    loader_config: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
-    return {
+    from modules.loaders import get_cell_loader_name
+
+    loader_name = get_cell_loader_name({"cell_loader": cell_loader or "allen_manifest"})
+    paths: Dict[str, Any] = {}
+    if loader_name == "allen_manifest":
+        paths["manifest"] = "manifest.json"
+    if loader_paths:
+        paths.update(dict(loader_paths))
+
+    config: Dict[str, Any] = {
         "cell_name": cell_name,
         "tune": tune_name,
         "color": color if color is not None else guess_cell_color(cell_name),
-        "cell_loader": "allen_manifest",
-        "paths": {
-            "manifest": "manifest.json",
-        },
-        "tuning": {
-            "soma_diam_multiplier": float(soma_diam_multiplier),
-        },
+        "cell_loader": loader_name,
+        "paths": paths,
     }
+    # Soma rescaling is an Allen-adapter compatibility option, not part of the
+    # model-neutral cell contract. Object-owned loaders preserve native geometry.
+    if loader_name == "allen_manifest":
+        multiplier = 1.0 if soma_diam_multiplier is None else float(soma_diam_multiplier)
+        config["tuning"] = {"soma_diam_multiplier": multiplier}
+    if loader_config:
+        for key, value in loader_config.items():
+            if key in {"cell_name", "tune", "color", "cell_loader", "paths", "tuning"}:
+                raise ValueError(f"loader_config cannot replace reserved cell-config key {key!r}")
+            config[str(key)] = value
+    return config
 
 
-def default_sim_config(*, cell_name: str, specimen_id: Optional[int], model_type: str) -> Dict[str, Any]:
+def default_sim_config(
+    *,
+    cell_name: str,
+    specimen_id: Optional[int],
+    model_type: str,
+    v_init_mV: Optional[float] = None,
+    celsius_C: Optional[float] = None,
+) -> Dict[str, Any]:
     return {
         "tstart": 0.0,
         "tstop": 1000.0,
         "dt": 0.025,
+        "conditions": {
+            "v_init_mV": None if v_init_mV is None else float(v_init_mV),
+            "celsius_C": None if celsius_C is None else float(celsius_C),
+        },
         "bins": 5.0,
         "jitter": None,
         "stim_start_ms": 300.0,

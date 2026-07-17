@@ -7,8 +7,8 @@ belong in `contracts/` or issue trackers.
 ## Near Term
 
 - Add the planned synapse-recording machinery exposed by `sim_config.json`.
-- Add end-to-end smoke tests for at least one small Step 5 run and one Step 6
-  analysis load.
+- Extend the current IClamp/analysis smoke coverage to a small synapse-driven
+  Step 5 run when a public mechanism fixture is available.
 - Keep local and Colab notebook entry points aligned as docs and examples change.
 
 ## Later
@@ -24,5 +24,5 @@ belong in `contracts/` or issue trackers.
   should stay manual-first, but future tooling could save computed ACT values,
   review target model fields, and safely apply loader-specific edits such as
   ADB `*_fit.json` passive-parameter updates.
-- Add generic/non-ADB model adapters beyond the current ADB-focused examples.
-- Add lightweight tests around config validation and example smoke runs.
+- Add future loader adapters, such as the deferred Python-factory loader, after
+  the Allen-manifest and HOC-template contracts have matured.

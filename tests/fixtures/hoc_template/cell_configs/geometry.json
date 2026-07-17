@@ -1,0 +1,17 @@
+{
+  "label": "synthetic_scoped_geometry",
+  "distance_origin": {
+    "kind": "soma",
+    "x": 0.5
+  },
+  "thresholds_um": {
+    "proximal": {
+      "low": 0.0,
+      "high": 80.0
+    },
+    "distal": {
+      "low": 80.0,
+      "high": null
+    }
+  }
+}

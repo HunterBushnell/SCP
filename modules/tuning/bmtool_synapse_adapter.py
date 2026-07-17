@@ -12,17 +12,19 @@ import json
 import os
 import subprocess
 import sys
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Sequence
 
+from modules.model.geometry import cell_sections
 from modules.notebooks.helpers import (
     build_synapse_test_cell,
     ensure_external_repo_on_syspath,
     ensure_scp_repo_on_syspath,
     resolve_cell_config_for_notebook,
 )
-from modules.setup.mechanisms import compile_modfiles
+from modules.setup.mechanisms import compile_modfiles, resolve_modfiles_dir
 
 
 BMTOOL_REPO_URL = "https://github.com/cyneuro/bmtool.git"
@@ -41,6 +43,28 @@ class SynapseTuningSession:
     cell: Any
     mechanism_summary: Dict[str, Any]
     bmtool_path: Optional[Path] = None
+
+
+@dataclass
+class _BMToolCellFacade:
+    """Expose BMTool's required fields without leaking global hoc sections."""
+
+    source: Any
+    soma: list[Any]
+    all: list[Any]
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.source, name)
+
+
+def _bmtool_cell_facade(cell: Any) -> _BMToolCellFacade:
+    soma = cell_sections(cell, "soma")
+    all_sections = cell_sections(cell, "all")
+    if not soma:
+        raise ValueError("BMTool synapse tuning requires at least one canonical soma section.")
+    if not all_sections:
+        raise ValueError("BMTool synapse tuning requires a non-empty canonical all section group.")
+    return _BMToolCellFacade(source=cell, soma=soma, all=all_sections)
 
 
 def _env_flag(name: str, default: bool) -> bool:
@@ -142,48 +166,69 @@ def resolve_tune_dir(
 
 def prepare_scp_synapse_tuning(
     *,
-    cell_name: str = "PV",
+    cell_name: Optional[str] = None,
     tune_name: str = "tuned",
     tunes_parent: str = "tunes",
     tune_dir_override: Optional[str | Path] = None,
     repo_root: Optional[Path] = None,
     recompile_modfiles: bool = False,
     load_compiled_dll: bool = True,
-    resolve_bmtool: bool = True,
+    resolve_bmtool: bool = False,
 ) -> SynapseTuningSession:
-    """Compile/load mechanisms and build an SCP cell for BMTool tuning."""
+    """Compile/load mechanisms and build an SCP cell for BMTool tuning.
+
+    BMTool resolution is deferred by default until a configured mechanism and
+    canonical section index have been validated by ``create_scp_synapse_tuner``.
+    The legacy ``resolve_bmtool`` flag is retained as a warning-only compatibility
+    input; it cannot resolve BMTool early without bypassing that preflight.
+    """
 
     root = ensure_scp_repo_on_syspath(repo_root)
+    if not cell_name and not tune_dir_override:
+        raise ValueError(
+            "prepare_scp_synapse_tuning requires cell_name or tune_dir_override; "
+            "SCP does not choose a model default for Step 4."
+        )
+    requested_cell_name = str(cell_name or "")
     tune_dir = resolve_tune_dir(
         repo_root=root,
-        cell_name=cell_name,
+        cell_name=requested_cell_name,
         tune_name=tune_name,
         tunes_parent=tunes_parent,
         tune_dir_override=tune_dir_override,
+    )
+    cell_config = resolve_cell_config_for_notebook(requested_cell_name, tune_dir=tune_dir)
+    resolved_cell_name = str(
+        cell_config.get("cell_name")
+        or requested_cell_name
+        or tune_dir.parent.parent.name
     )
     mechanism_summary = compile_modfiles(
         tune_dir,
         recompile=recompile_modfiles,
         load_dll=load_compiled_dll,
+        allow_missing=True,
+        cell_config=cell_config,
     )
 
-    cell_config = resolve_cell_config_for_notebook(cell_name, tune_dir=tune_dir)
     cell_config.setdefault("paths", {})
     cell_config["paths"].setdefault("tune_dir", str(tune_dir))
     cell_config.setdefault("tune_dir", str(tune_dir))
 
-    previous_cwd = Path.cwd()
-    try:
-        os.chdir(tune_dir)
-        cell = build_synapse_test_cell(cell_config)
-    finally:
-        os.chdir(previous_cwd)
+    cell = build_synapse_test_cell(cell_config, base_dir=tune_dir)
 
-    bmtool_path = ensure_bmtool_on_syspath(repo_root=root) if resolve_bmtool else None
+    if resolve_bmtool:
+        warnings.warn(
+            "resolve_bmtool=True is deferred until create_scp_synapse_tuner() "
+            "can validate the selected point process and canonical section index.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    bmtool_path = None
 
     return SynapseTuningSession(
         repo_root=root,
-        cell_name=cell_name,
+        cell_name=resolved_cell_name,
         tune_name=tune_name,
         tune_dir=tune_dir,
         cell_config=cell_config,
@@ -249,23 +294,125 @@ def create_scp_synapse_tuner(
             f"connection={connection!r} not found. Available: {sorted(conn_type_settings)}"
         )
 
-    SynapseTuner, _ = import_bmtool_synapse_api(repo_root=session.repo_root)
     conn_settings = conn_type_settings[connection]
+    hoc_cell = _bmtool_cell_facade(session.cell)
+    _validate_bmtool_selection(
+        session=session,
+        connection=connection,
+        connection_settings=conn_settings,
+        hoc_cell=hoc_cell,
+    )
+
     if other_vars_to_record is None:
         other_vars_to_record = default_record_vars_for_connection(conn_settings)
     if slider_vars is None:
         slider_vars = default_slider_vars_for_connection(conn_settings)
 
+    SynapseTuner, _ = import_bmtool_synapse_api(repo_root=session.repo_root)
+    modfiles_dir = resolve_modfiles_dir(session.tune_dir, session.cell_config)
+    mechanisms_dir = modfiles_dir if modfiles_dir is not None else session.tune_dir
+
     return SynapseTuner(
-        mechanisms_dir=str(session.tune_dir),
+        mechanisms_dir=str(mechanisms_dir),
         conn_type_settings=conn_type_settings,
         general_settings=general_settings,
         connection=connection,
         current_name=current_name,
         other_vars_to_record=list(other_vars_to_record),
         slider_vars=list(slider_vars),
-        hoc_cell=session.cell,
+        hoc_cell=hoc_cell,
     )
+
+
+def _validate_bmtool_selection(
+    *,
+    session: SynapseTuningSession,
+    connection: str,
+    connection_settings: Dict[str, Any],
+    hoc_cell: _BMToolCellFacade,
+) -> None:
+    """Validate one configured selection before importing or cloning BMTool."""
+    spec_settings = connection_settings.get("spec_settings")
+    if not isinstance(spec_settings, dict):
+        raise ValueError(
+            f"Connection {connection!r} must define a spec_settings object in "
+            "cell_configs/synapse_tuning_config.json."
+        )
+
+    raw_sec_id = spec_settings.get("sec_id", 0)
+    if isinstance(raw_sec_id, bool):
+        raise ValueError(
+            f"Connection {connection!r} sec_id must be an integer; got {raw_sec_id!r}."
+        )
+    try:
+        sec_id = int(raw_sec_id)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"Connection {connection!r} sec_id must be an integer; got {raw_sec_id!r}."
+        ) from exc
+    if isinstance(raw_sec_id, float) and raw_sec_id != sec_id:
+        raise ValueError(
+            f"Connection {connection!r} sec_id must be an integer; got {raw_sec_id!r}."
+        )
+    if sec_id < 0 or sec_id >= len(hoc_cell.all):
+        raise IndexError(
+            "BMTool sec_id out of range for canonical all sections "
+            f"(connection={connection!r}, sec_id={sec_id}, n={len(hoc_cell.all)}). "
+            "Edit connections.<name>.spec_settings.sec_id in "
+            "cell_configs/synapse_tuning_config.json."
+        )
+
+    mechanism_name = str(spec_settings.get("level_of_detail", "")).strip()
+    if not mechanism_name:
+        raise ValueError(
+            f"Connection {connection!r} has no level_of_detail mechanism name. "
+            "Set connections.<name>.spec_settings.level_of_detail in "
+            "cell_configs/synapse_tuning_config.json."
+        )
+
+    hoc = getattr(session.cell, "h", None)
+    if hoc is None:
+        raise ValueError(
+            "The loaded SCP cell does not expose its NEURON runtime as cell.h; "
+            "reload it through the common SCP loader before starting Step 4."
+        )
+    try:
+        mechanism_constructor = getattr(hoc, mechanism_name)
+    except (AttributeError, TypeError):
+        raise RuntimeError(
+            f"NEURON point-process mechanism {mechanism_name!r} configured for "
+            f"connection {connection!r} is unavailable. Edit level_of_detail to "
+            "match an installed point process, or add/compile the corresponding "
+            "MOD source and restart the Python/Jupyter process before retrying."
+        ) from None
+
+    raw_sec_x = spec_settings.get("sec_x", 0.5)
+    if isinstance(raw_sec_x, bool) or not isinstance(raw_sec_x, (int, float)):
+        raise ValueError(
+            f"Connection {connection!r} sec_x must be numeric in [0, 1]; "
+            f"got {raw_sec_x!r}."
+        )
+    sec_x = float(raw_sec_x)
+    if sec_x < 0.0 or sec_x > 1.0:
+        raise ValueError(
+            f"Connection {connection!r} sec_x must be in [0, 1]; got {sec_x}."
+        )
+    if not callable(mechanism_constructor):
+        raise RuntimeError(
+            f"NEURON symbol {mechanism_name!r} configured for connection "
+            f"{connection!r} is available but is not a point-process constructor. "
+            "Edit level_of_detail to name the intended synapse point process."
+        )
+    try:
+        probe = mechanism_constructor(hoc_cell.all[sec_id](sec_x))
+    except Exception as exc:
+        raise RuntimeError(
+            f"NEURON could not construct point process {mechanism_name!r} for "
+            f"connection {connection!r} at sec_id={sec_id}, sec_x={sec_x}. "
+            "Check level_of_detail and the compiled MOD source, then restart "
+            "the Python/Jupyter process before retrying."
+        ) from exc
+    del probe
 
 
 def get_tuned_synapse_params(

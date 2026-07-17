@@ -28,6 +28,9 @@ Use `force_save = True` in `5_simulate.ipynb` or `--force-save` in
 - `cell_recordings.pkl`: single-run extra cell recordings.
 - `cell_recordings_by_trial.pkl`: multi-run extra cell recordings.
 - `<fit-file-name>.json`: fit sidecar when `save_fit_json_sidecar` is enabled and found.
+- `cell_config.json` and `geometry_config.json`: tune-state sidecars used for loader-aware reconstruction.
+- `model_artifacts/manifest.json`: loader name, tune-relative native-source paths, and SHA-256 hashes.
+- `model_artifacts/files/`: loader-declared HOC/Allen sources and tune-local `.mod` sources; compiled outputs are excluded.
 - `plots/`: auto plots when enabled by `plots_profile` or lower-level save flags.
 - `<cell>_<tune>_<output_stem>.pkl`: full results bundle when `save.full_results` is enabled.
 
@@ -93,6 +96,10 @@ output_data/<batch_stem>/logs/
 
 `run_manifest.json` is the authoritative index of files written for a run. Use
 it instead of inferring run contents from filenames.
+
+Model-artifact archiving is enabled by default, including for full-results
+runs. Restoring these files is a separate, opt-in Step 7 action and remains a
+dry run until `--write` is supplied.
 
 ## Ignored Generated Artifacts
 

@@ -10,18 +10,84 @@ from .json_utils import _read_json, _write_json
 DEFAULT_GENOME_SECTION_ORDER = ("glob", "soma", "axon", "apic", "dend")
 
 
-def find_fit_json(tune_dir: Path) -> Optional[Path]:
+def _stored_cell_config(tune_dir: Path) -> Optional[Dict[str, Any]]:
+    for candidate in (
+        tune_dir / "cell_configs" / "cell_config.json",
+        tune_dir / "cell_config.json",
+    ):
+        if not candidate.is_file():
+            continue
+        try:
+            value = _read_json(candidate)
+        except Exception:
+            return None
+        return value if isinstance(value, dict) else None
+    return None
+
+
+def _manifest_paths(
+    tune_dir: Path,
+    cell_config: Optional[Dict[str, Any]],
+) -> tuple[Path, ...]:
+    candidates: list[Path] = []
+    if cell_config is not None:
+        paths = cell_config.get("paths", {})
+        if paths is not None and not isinstance(paths, dict):
+            raise TypeError("cell_config['paths'] must be an object/dict.")
+        raw = paths.get("manifest", "manifest.json") if isinstance(paths, dict) else None
+        if raw not in (None, ""):
+            configured = Path(str(raw)).expanduser()
+            if not configured.is_absolute():
+                configured = tune_dir / configured
+            candidates.append(configured.resolve())
+
+    legacy = (tune_dir / "manifest.json").resolve()
+    if legacy not in candidates:
+        candidates.append(legacy)
+    return tuple(path for path in candidates if path.is_file())
+
+
+def find_fit_json(
+    tune_dir: Path,
+    *,
+    cell_config: Optional[Dict[str, Any]] = None,
+) -> Optional[Path]:
     """
     Locate the Allen fit JSON associated with this tune directory.
 
     Priority:
-    1) `manifest.json` -> `biophys[*].model_file` entry ending in `_fit.json`
-    2) fallback to first `*_fit.json` file in tune root
+    1) configured Allen manifest -> `_fit.json` model file
+    2) historical root `manifest.json` -> `_fit.json` model file
+    3) fallback to first `*_fit.json` file in tune root
+
+    Registered non-Allen tunes intentionally return ``None`` because their
+    native sources are captured by generic model-artifact provenance instead.
     """
     tune_dir = Path(tune_dir).expanduser().resolve()
-    manifest_path = tune_dir / "manifest.json"
+    if cell_config is not None and not isinstance(cell_config, dict):
+        raise TypeError("cell_config must be an object/dict when provided.")
+    stored_config = _stored_cell_config(tune_dir)
+    if cell_config is None or stored_config is None:
+        effective_config = cell_config if cell_config is not None else stored_config
+    else:
+        effective_config = dict(stored_config)
+        effective_config.update(cell_config)
+        stored_paths = stored_config.get("paths", {})
+        supplied_paths = cell_config.get("paths", {})
+        if stored_paths is not None and not isinstance(stored_paths, dict):
+            raise TypeError("stored cell_config['paths'] must be an object/dict.")
+        if supplied_paths is not None and not isinstance(supplied_paths, dict):
+            raise TypeError("cell_config['paths'] must be an object/dict.")
+        merged_paths = dict(stored_paths or {})
+        merged_paths.update(supplied_paths or {})
+        effective_config["paths"] = merged_paths
+    if effective_config is not None:
+        from modules.loaders import get_cell_loader_name
 
-    if manifest_path.is_file():
+        if get_cell_loader_name(effective_config) != "allen_manifest":
+            return None
+
+    for manifest_path in _manifest_paths(tune_dir, effective_config):
         try:
             manifest_data = _read_json(manifest_path)
             biophys = manifest_data.get("biophys", [])
@@ -37,12 +103,15 @@ def find_fit_json(tune_dir: Path) -> Optional[Path]:
                         cand = Path(item)
                         if not cand.name.endswith("_fit.json"):
                             continue
-                        cand = (tune_dir / cand).resolve() if not cand.is_absolute() else cand.resolve()
+                        cand = (
+                            (manifest_path.parent / cand).resolve()
+                            if not cand.is_absolute()
+                            else cand.resolve()
+                        )
                         if cand.is_file():
                             return cand
         except Exception:
-            # Fall back to glob search below.
-            pass
+            continue
 
     fit_candidates = sorted(tune_dir.glob("*_fit.json"))
     if fit_candidates:
@@ -54,6 +123,7 @@ def sort_genome_by_section(
     tune_dir: Path,
     *,
     section_order: Tuple[str, ...] = DEFAULT_GENOME_SECTION_ORDER,
+    cell_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Optionally reorder fit JSON `genome` entries by section.
@@ -63,7 +133,7 @@ def sort_genome_by_section(
     parameter values.
     """
     tune_dir = Path(tune_dir).expanduser().resolve()
-    fit_json = find_fit_json(tune_dir)
+    fit_json = find_fit_json(tune_dir, cell_config=cell_config)
     if fit_json is None:
         return {
             "status": "skipped",
@@ -108,7 +178,11 @@ def sort_genome_by_section(
     }
 
 
-def coerce_fit_genome_values_to_numeric(tune_dir: Path) -> Dict[str, Any]:
+def coerce_fit_genome_values_to_numeric(
+    tune_dir: Path,
+    *,
+    cell_config: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Convert numeric-like string values in fit JSON genome entries to floats.
 
@@ -117,7 +191,7 @@ def coerce_fit_genome_values_to_numeric(tune_dir: Path) -> Dict[str, Any]:
     types can use the fit JSON directly.
     """
     tune_dir = Path(tune_dir).expanduser().resolve()
-    fit_json = find_fit_json(tune_dir)
+    fit_json = find_fit_json(tune_dir, cell_config=cell_config)
     if fit_json is None:
         return {
             "status": "skipped",
@@ -169,12 +243,16 @@ def coerce_fit_genome_values_to_numeric(tune_dir: Path) -> Dict[str, Any]:
     }
 
 
-def mechanisms_declared_in_fit_json(tune_dir: Path) -> set[str]:
+def mechanisms_declared_in_fit_json(
+    tune_dir: Path,
+    *,
+    cell_config: Optional[Dict[str, Any]] = None,
+) -> set[str]:
     """
     Return non-empty mechanism names declared in fit JSON genome entries.
     """
     tune_dir = Path(tune_dir).expanduser().resolve()
-    fit_json = find_fit_json(tune_dir)
+    fit_json = find_fit_json(tune_dir, cell_config=cell_config)
     if fit_json is None:
         return set()
 

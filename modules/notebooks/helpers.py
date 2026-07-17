@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Sequence
 
+from modules.model.geometry import cell_sections
 from modules.model.load_cell import load_cell
 
 
@@ -163,36 +164,27 @@ def resolve_cell_config_for_notebook(cell_name: str, tune_dir: Path | None = Non
     if not isinstance(paths, dict):
         paths = {}
         cell_config["paths"] = paths
-    paths.setdefault("manifest", "manifest.json")
-
     tuning = cell_config.get("tuning")
-    if not isinstance(tuning, dict) or "soma_diam_multiplier" not in tuning:
-        raise KeyError(
-            "cell_configs/cell_config.json must define tuning.soma_diam_multiplier. "
-            "Run Step 1 scaffold or set it manually before Steps 2-5."
-        )
-    tuning["soma_diam_multiplier"] = float(tuning["soma_diam_multiplier"])
+    if tuning is not None and not isinstance(tuning, dict):
+        raise TypeError("cell_config tuning must be an object when provided.")
+    if isinstance(tuning, dict) and "soma_diam_multiplier" in tuning:
+        tuning["soma_diam_multiplier"] = float(tuning["soma_diam_multiplier"])
 
     return cell_config
 
 
-def build_cell_for_notebook(cell_config: Dict[str, Any]):
+def build_cell_for_notebook(cell_config: Dict[str, Any], *, base_dir: Path | None = None):
     """
     Build a cell via `modules.model.load_cell` and expose common section attrs.
 
     The returned object is compatible with existing notebook calls that access
     `cell.soma`, `cell.dend`, `cell.apic`, and `cell.axon`.
     """
-    loaded = load_cell(cell_config)
+    loaded = load_cell(cell_config, base_dir=base_dir)
 
-    if not hasattr(loaded, "soma"):
-        loaded.soma = loaded.h.soma
-    if not hasattr(loaded, "dend"):
-        loaded.dend = list(loaded.h.dend) if hasattr(loaded.h, "dend") else []
-    if not hasattr(loaded, "apic"):
-        loaded.apic = list(loaded.h.apic) if hasattr(loaded.h, "apic") else []
-    if not hasattr(loaded, "axon"):
-        loaded.axon = list(loaded.h.axon) if hasattr(loaded.h, "axon") else []
+    for group in ("soma", "dend", "apic", "axon", "all"):
+        if not hasattr(loaded, group):
+            setattr(loaded, group, cell_sections(loaded, group))
 
     return loaded
 
@@ -209,7 +201,7 @@ def _ensure_synapse_test_state(cell: Any) -> None:
             setattr(cell, attr, [])
 
 
-def build_synapse_test_cell(cell_config: Dict[str, Any]):
+def build_synapse_test_cell(cell_config: Dict[str, Any], *, base_dir: Path | None = None):
     """
     Build a notebook-compatible cell for manual synapse tests/tuning.
 
@@ -217,12 +209,10 @@ def build_synapse_test_cell(cell_config: Dict[str, Any]):
       - `cell.all` is present for bmtool section lookup,
       - synapse state containers exist (`synapses/netcons/stims/vecs/syn_locs`).
     """
-    loaded = build_cell_for_notebook(cell_config)
+    loaded = build_cell_for_notebook(cell_config, base_dir=base_dir)
 
     if not hasattr(loaded, "all"):
-        loaded.all = loaded.h.SectionList()
-        for sec in loaded.h.allsec():
-            loaded.all.append(sec)
+        loaded.all = cell_sections(loaded, "all")
 
     _ensure_synapse_test_state(loaded)
     return loaded

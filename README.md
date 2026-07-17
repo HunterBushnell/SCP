@@ -1,9 +1,9 @@
 # Single Cell Pipeline (SCP)
 
 SCP is a notebook-first workflow for preparing, tuning, simulating, and analyzing
-single-cell NEURON models. The current examples focus on PV and SST cells, but
-the repo is organized around reusable tune directories and JSON configs so other
-cell models can be adapted without changing the main pipeline code.
+single-cell NEURON models. The current examples focus on PV and SST cells. A
+registered loader interface supports both Allen manifest bundles and object-owned
+HOC templates through the same cell-scoped pipeline machinery.
 
 ## Quick Start
 
@@ -23,8 +23,8 @@ See `docs/quickstart.md` for the shortest runnable path and
 
 ## Pipeline
 
-- `1_setup.ipynb`: set up a tune directory with model files, compiled mechanisms,
-  config templates, and validation.
+- `1_setup.ipynb`: set up a tune directory with model files, optional compiled
+  mechanisms when custom `.mod` sources exist, config templates, and validation.
 - `2_passive.ipynb`: passive-parameter tuning workflow.
 - `3_active.ipynb`: active-parameter tuning workflow, including optional ACT
   active-tuning workspace support.
@@ -92,6 +92,7 @@ configs have been prepared.
 - `docs/guides/analysis.md`: Step 6 analysis guide.
 - `docs/guides/step_7_tools.md`: Step 7 utility-notebook guide.
 - `docs/reference/configs_reference.md`: current config schema.
+- `docs/reference/model_loaders.md`: canonical cell interface and loader contracts.
 - `docs/reference/outputs_layout.md`: saved-output structure.
 - `docs/advanced/cli_slurm.md`: CLI and SLURM usage.
 - `docs/troubleshooting.md`: common issues.

@@ -38,11 +38,11 @@ DEFAULT_NWB_PASSIVE_OPTIONS = {
 class PassiveTargetResolution:
     """Resolved Step 2 target/config values."""
 
-    act_passive_module: Any
+    act_passive_module: Optional[Any]
     target_config: dict[str, Any]
     passive_targets: dict[str, Any]
     passive_area: dict[str, Any]
-    settable_passive_properties: Any
+    settable_passive_properties: Optional[Any]
     detected_nwb_files: list[Path]
     nwb_passive_path: Optional[Path]
     nwb_passive_summary: Optional[dict[str, Any]]
@@ -58,6 +58,7 @@ def resolve_passive_tuning_inputs(
     cell: Any,
     manual_passive_targets: Optional[Mapping[str, Any]] = None,
     use_target_config: bool = True,
+    compute_act_proposal: bool = False,
     extract_from_nwb: bool = False,
     apply_nwb_targets_to_config: bool = False,
     apply_extracted_targets_to_config: bool = False,
@@ -69,9 +70,24 @@ def resolve_passive_tuning_inputs(
     custom_passive_area_cm2: Optional[float] = None,
     nwb_export_dir: Optional[str | Path] = None,
 ) -> PassiveTargetResolution:
-    """Resolve Step 2 passive targets, optional NWB extraction, and ACT values."""
-    target_config = ensure_target_config_shape(load_target_config(context.tune_dir))
-    resolved_source_mode = _resolve_source_mode(target_source_mode, target_config)
+    """Resolve passive targets and explicitly requested ACT extraction/proposals."""
+    raw_target_config = load_target_config(context.tune_dir)
+    target_config = ensure_target_config_shape(
+        raw_target_config
+        or {"target_source": {"mode": "none", "description": ""}}
+    )
+    resolved_source_mode = _resolve_source_mode(
+        target_source_mode,
+        target_config,
+        target_config_present=bool(raw_target_config),
+    )
+    if (
+        target_source_mode in (None, "")
+        and not raw_target_config
+        and manual_passive_targets
+        and any(value not in (None, "") for value in manual_passive_targets.values())
+    ):
+        resolved_source_mode = "manual"
     nwb_options = passive_nwb_options_from_config(target_config)
     trace_options = passive_trace_options_from_config(target_config)
     detected_nwb_files = sorted(Path(context.tune_dir).glob("*_ephys.nwb"))
@@ -82,7 +98,7 @@ def resolve_passive_tuning_inputs(
         detected_nwb_files=detected_nwb_files,
     )
 
-    act_passive_module = import_act_passive_module(repo_root=context.repo_root)
+    act_passive_module = None
     config_passive_targets = passive_targets_from_config(target_config)
     nwb_passive_summary = None
     passive_trace_summary = None
@@ -93,6 +109,7 @@ def resolve_passive_tuning_inputs(
     )
 
     if resolved_source_mode == "traces":
+        act_passive_module = import_act_passive_module(repo_root=context.repo_root)
         if resolved_trace_path is None:
             raise FileNotFoundError(
                 "No generic passive trace file selected. Set target_config.traces.passive.file "
@@ -128,6 +145,7 @@ def resolve_passive_tuning_inputs(
             )
             config_passive_targets = passive_targets_from_config(target_config)
     elif extract_from_nwb or resolved_source_mode == "allen_nwb":
+        act_passive_module = import_act_passive_module(repo_root=context.repo_root)
         if resolved_nwb_path is None:
             raise FileNotFoundError(
                 "No NWB file selected. Set target_config.allen_nwb.file, "
@@ -158,41 +176,56 @@ def resolve_passive_tuning_inputs(
             )
             config_passive_targets = passive_targets_from_config(target_config)
 
-    target_rin_mohm = _resolve_passive_target(
-        "target_rin_mohm",
-        manual_passive_targets=manual_passive_targets,
-        config_passive_targets=config_passive_targets,
-        use_target_config=use_target_config,
-    )
-    target_tau_ms = _resolve_passive_target(
-        "target_tau_ms",
-        manual_passive_targets=manual_passive_targets,
-        config_passive_targets=config_passive_targets,
-        use_target_config=use_target_config,
-    )
-    target_v_rest_mv = _resolve_passive_target(
-        "target_v_rest_mv",
-        manual_passive_targets=manual_passive_targets,
-        config_passive_targets=config_passive_targets,
-        use_target_config=use_target_config,
-    )
-
     passive_area = passive_area_summary(
         cell,
         area_mode=passive_area_mode,
         area_scale=passive_area_scale,
         custom_area_cm2=custom_passive_area_cm2,
     )
-    settable_passive_properties = compute_settable_passive_properties(
-        act_passive_module=act_passive_module,
-        cell=cell,
-        rin_mohm=target_rin_mohm,
-        tau_ms=target_tau_ms,
-        v_rest_mv=target_v_rest_mv,
-        area_mode=passive_area_mode,
-        area_scale=passive_area_scale,
-        custom_area_cm2=custom_passive_area_cm2,
-    )
+    target_rin_mohm = None
+    target_tau_ms = None
+    target_v_rest_mv = None
+    settable_passive_properties = None
+    if resolved_source_mode != "none" or extract_from_nwb:
+        target_rin_mohm = _resolve_passive_target(
+            "target_rin_mohm",
+            manual_passive_targets=manual_passive_targets,
+            config_passive_targets=config_passive_targets,
+            use_target_config=use_target_config,
+        )
+        target_tau_ms = _resolve_passive_target(
+            "target_tau_ms",
+            manual_passive_targets=manual_passive_targets,
+            config_passive_targets=config_passive_targets,
+            use_target_config=use_target_config,
+        )
+        target_v_rest_mv = _resolve_passive_target(
+            "target_v_rest_mv",
+            manual_passive_targets=manual_passive_targets,
+            config_passive_targets=config_passive_targets,
+            use_target_config=use_target_config,
+        )
+    if compute_act_proposal:
+        if any(
+            value is None
+            for value in (target_rin_mohm, target_tau_ms, target_v_rest_mv)
+        ):
+            raise ValueError(
+                "ACT passive proposal generation requires explicit Rin, tau, and "
+                "resting-voltage targets; select a target source before enabling it."
+            )
+        if act_passive_module is None:
+            act_passive_module = import_act_passive_module(repo_root=context.repo_root)
+        settable_passive_properties = compute_settable_passive_properties(
+            act_passive_module=act_passive_module,
+            cell=cell,
+            rin_mohm=target_rin_mohm,
+            tau_ms=target_tau_ms,
+            v_rest_mv=target_v_rest_mv,
+            area_mode=passive_area_mode,
+            area_scale=passive_area_scale,
+            custom_area_cm2=custom_passive_area_cm2,
+        )
     passive_targets = {
         "target_rin_mohm": target_rin_mohm,
         "target_tau_ms": target_tau_ms,
@@ -209,11 +242,26 @@ def resolve_passive_tuning_inputs(
         detected_nwb_files=detected_nwb_files,
         nwb_passive_path=resolved_nwb_path,
         nwb_passive_summary=nwb_passive_summary,
-        fit_json_candidates=sorted(Path(context.tune_dir).glob("*_fit.json")),
+        fit_json_candidates=_fit_json_candidates_for_context(context),
         target_source_mode=resolved_source_mode,
         passive_trace_path=resolved_trace_path,
         passive_trace_summary=passive_trace_summary,
     )
+
+
+def _fit_json_candidates_for_context(context: Any) -> list[Path]:
+    """Return the configured Allen fit JSON, if this tune has one."""
+    from modules.loaders import get_cell_loader_name
+
+    if get_cell_loader_name(context.cell_config) != "allen_manifest":
+        return []
+    from modules.setup.fit_json import find_fit_json
+
+    fit_json = find_fit_json(
+        context.tune_dir,
+        cell_config=context.cell_config,
+    )
+    return [fit_json] if fit_json is not None else []
 
 
 def passive_nwb_options_from_config(config: Mapping[str, Any]) -> dict[str, Any]:
@@ -319,9 +367,16 @@ def _resolve_trace_path(
     return resolve_tune_path(passive.get("file"), tune_dir)
 
 
-def _resolve_source_mode(explicit_mode: Optional[str], target_config: Mapping[str, Any]) -> str:
+def _resolve_source_mode(
+    explicit_mode: Optional[str],
+    target_config: Mapping[str, Any],
+    *,
+    target_config_present: bool = True,
+) -> str:
     if explicit_mode not in (None, ""):
         return target_source_mode_from_config({"target_source": {"mode": explicit_mode}})
+    if not target_config_present:
+        return "none"
     return target_source_mode_from_config(target_config)
 
 

@@ -1,8 +1,48 @@
 from __future__ import annotations
 
+import math
+
 import matplotlib.pyplot as plt
 import numpy as np
 from neuron import h
+
+from modules.model.geometry import cell_soma_segment, cell_sections
+
+
+def validate_required_sim_conditions(cell_or_config, sim_cfg=None):
+    """Validate loader-required runtime conditions without changing NEURON state."""
+    sim_cfg = sim_cfg or {}
+    config = (
+        cell_or_config
+        if isinstance(cell_or_config, dict)
+        else (getattr(cell_or_config, "config", {}) or {})
+    )
+    from modules.loaders import get_cell_loader_name
+
+    if get_cell_loader_name(config) != "hoc_template":
+        return
+    conditions = sim_cfg.get("conditions")
+    if not isinstance(conditions, dict):
+        raise KeyError(
+            "hoc_template runs require sim_config.conditions with explicit "
+            "v_init_mV and celsius_C values."
+        )
+    for field in ("v_init_mV", "celsius_C"):
+        value = conditions.get(field)
+        if isinstance(value, bool) or value in (None, ""):
+            raise ValueError(
+                f"hoc_template runs require explicit numeric conditions.{field}."
+            )
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"hoc_template sim_config.conditions.{field} must be numeric, got {value!r}."
+            ) from exc
+        if not math.isfinite(numeric):
+            raise ValueError(
+                f"hoc_template sim_config.conditions.{field} must be finite, got {value!r}."
+            )
 
 
 def get_rec_vars_for_i_in_sec(sec,seg):#create recording variables for every current in a section
@@ -48,13 +88,64 @@ def _get_hoc(cell):
     return getattr(cell, "h", cell)
 
 
+def resolve_sim_conditions(cell, sim_cfg=None):
+    """Resolve loader-neutral initialization conditions for one simulation."""
+    sim_cfg = sim_cfg or {}
+    validate_required_sim_conditions(cell, sim_cfg)
+    conditions = sim_cfg.get("conditions", {}) or {}
+    if not isinstance(conditions, dict):
+        raise TypeError("sim_config.conditions must be an object/dict.")
+
+    hoc = _get_hoc(cell)
+    previous = getattr(cell, "runtime_conditions", {}) or {}
+    if not isinstance(previous, dict):
+        previous = {}
+    v_init = conditions.get("v_init_mV")
+    if v_init is None:
+        v_init = previous.get("v_init_mV")
+    if v_init is None:
+        v_init = getattr(cell, "Vinit", None)
+    if v_init is None:
+        v_init = getattr(hoc, "v_init", -65.0)
+
+    celsius = conditions.get("celsius_C")
+    if celsius is None:
+        celsius = previous.get("celsius_C")
+    if celsius is None:
+        celsius = getattr(hoc, "celsius", None)
+
+    resolved = {
+        "v_init_mV": float(v_init),
+        "celsius_C": None if celsius is None else float(celsius),
+    }
+    for key, value in resolved.items():
+        if value is not None and not math.isfinite(value):
+            raise ValueError(f"sim_config.conditions.{key} must be finite, got {value!r}.")
+    return resolved
+
+
+def apply_sim_conditions(cell, sim_cfg=None):
+    """Apply temperature and initialization voltage after cell construction."""
+    hoc = _get_hoc(cell)
+    resolved = resolve_sim_conditions(cell, sim_cfg)
+    if resolved["celsius_C"] is not None:
+        hoc.celsius = resolved["celsius_C"]
+    if hasattr(hoc, "v_init"):
+        hoc.v_init = resolved["v_init_mV"]
+    try:
+        cell.runtime_conditions = dict(resolved)
+    except Exception:
+        pass
+    return resolved
+
+
 def run_current_injection(cell,sim_params,):
     
     # from neuron import h
     # h.load_file("stdrun.hoc")
 
-    hoc = _get_hoc(cell)
-    stim = h.IClamp(hoc.soma[0](0.5))
+    soma_seg = cell_soma_segment(cell)
+    stim = h.IClamp(soma_seg)
     stim.amp = sim_params['stim_amp']
     stim.delay = sim_params['stim_delay']
     stim.dur = sim_params['stim_dur']
@@ -66,14 +157,15 @@ def run_current_injection(cell,sim_params,):
     recorded_data = {}
 
     # Attach recorders
-    vvec = h.Vector().record(hoc.soma[0](0.5)._ref_v)
+    vvec = h.Vector().record(soma_seg._ref_v)
     tvec = h.Vector().record(h._ref_t)
 
     # Attach *all* the current recorders in that section
-    current_recording_vars = get_rec_vars_for_i_in_sec(hoc.soma[0], 0.5)
+    current_recording_vars = get_rec_vars_for_i_in_sec(cell_sections(cell, "soma")[0], 0.5)
 
     # Run
-    h.finitialize()
+    resolved_conditions = apply_sim_conditions(cell, sim_params)
+    h.finitialize(resolved_conditions["v_init_mV"])
     h.run()
 
     # Stash numpy arrays
@@ -122,6 +214,7 @@ def run_iclamp_test(cell, sim_cfg, iclamp_cfg=None):
         "stim_dur": dur_ms,
         "h_tstop": tstop_ms,
         "h_dt": dt_ms,
+        "conditions": sim_cfg.get("conditions", {}) or {},
     }
 
     record_currents = bool(iclamp.get("record_currents", False))
@@ -138,6 +231,7 @@ def run_iclamp_test(cell, sim_cfg, iclamp_cfg=None):
         "dt_ms": dt_ms,
         "record_currents": record_currents,
         "frequency_hz": recorded.get("F"),
+        "conditions": resolve_sim_conditions(cell, sim_cfg),
     }
 
     results = {

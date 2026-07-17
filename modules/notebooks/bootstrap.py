@@ -234,22 +234,41 @@ def check_required_external_inputs(
     return missing
 
 
-def ensure_modfiles(tune_dir: Path, *, compile_modfiles: bool = True) -> None:
-    """Ensure compiled NEURON mechanisms exist for a tune directory."""
-    tune_path = Path(tune_dir).expanduser().resolve()
-    mod_dir = tune_path / "modfiles"
-    dll_candidates = (
-        mod_dir / "x86_64" / ".libs" / "libnrnmech.so",
-        mod_dir / "x86_64" / "libnrnmech.so",
+def ensure_modfiles(
+    tune_dir: Path,
+    *,
+    compile_modfiles: bool = True,
+    cell_config: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Ensure configured NEURON mechanisms exist for a tune directory."""
+    from modules.setup.mechanisms import (
+        find_compiled_mechanism_dll,
+        find_nrnivmodl,
+        resolve_modfiles_dir,
     )
-    if any(path.is_file() for path in dll_candidates):
+
+    tune_path = Path(tune_dir).expanduser().resolve()
+    mod_dir = resolve_modfiles_dir(tune_path, cell_config)
+    if mod_dir is None:
+        print("No configured modfiles directory; using NEURON built-in mechanisms.")
+        return
+    if find_compiled_mechanism_dll(tune_path, cell_config=cell_config) is not None:
         return
     if not mod_dir.is_dir():
         print(f"Missing modfiles dir: {mod_dir}")
         return
+    if not any(mod_dir.glob("*.mod")):
+        print(f"No .mod sources in {mod_dir}; using NEURON built-in mechanisms.")
+        return
     if compile_modfiles:
+        nrnivmodl = find_nrnivmodl()
+        if nrnivmodl is None:
+            raise FileNotFoundError(
+                "nrnivmodl not found on PATH or next to the active Python "
+                f"executable: {sys.executable}"
+            )
         print("Compiling modfiles with nrnivmodl...")
-        subprocess.check_call(["nrnivmodl"], cwd=str(mod_dir))
+        subprocess.check_call([nrnivmodl], cwd=str(mod_dir))
     else:
         print("Missing compiled modfiles; run nrnivmodl in", mod_dir)
 
@@ -258,7 +277,7 @@ def finish_step5_notebook_setup(
     repo_root: Path,
     *,
     install_deps: Optional[bool] = None,
-    check_external_inputs: bool = True,
+    check_external_inputs: bool = False,
     print_status: bool = True,
 ) -> Dict[str, Any]:
     """Finish Step 5 notebook setup after the SCP repo is available."""

@@ -1,0 +1,25 @@
+{
+  "tstart": 0.0,
+  "tstop": 80.0,
+  "dt": 0.025,
+  "stim_start_ms": 20.0,
+  "stim_duration_ms": 40.0,
+  "n_trials": 1,
+  "conditions": {
+    "v_init_mV": -68.0,
+    "celsius_C": 32.0
+  },
+  "iclamp": {
+    "enabled": true,
+    "amp_nA": 0.05,
+    "delay_ms": 20.0,
+    "dur_ms": 40.0,
+    "tstop_ms": 80.0
+  },
+  "save": {
+    "enabled": false,
+    "stem": null,
+    "format": "pkl",
+    "full_results": false
+  }
+}

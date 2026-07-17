@@ -1,0 +1,20 @@
+{
+  "cell_name": "synthetic_scoped_cell",
+  "tune": "hoc_template",
+  "cell_loader": "hoc_template",
+  "paths": {
+    "hoc_template": "model/ScopedCell.hoc",
+    "modfiles": null
+  },
+  "hoc_template": {
+    "template_name": "ScopedCell",
+    "constructor_args": [1.0],
+    "section_map": {
+      "soma": "somatic",
+      "dend": "basal",
+      "apic": "apical",
+      "axon": "axonal",
+      "all": "all"
+    }
+  }
+}

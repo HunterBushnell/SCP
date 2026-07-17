@@ -17,6 +17,8 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
+from modules.model.geometry import cell_sections
+
 
 def _get_duration_ms(results: Dict[str, Any]) -> Optional[float]:
     sim_cfg = results.get("sim_cfg", {}) or {}
@@ -1133,17 +1135,10 @@ def _bin_trains(
     return centers, rate
 
 
-def _hoc(cell: Any):
-    return getattr(cell, "h", cell)
-
-
-def _collect_sections(h: Any) -> Dict[str, list]:
+def _collect_sections(cell: Any) -> Dict[str, list]:
     return {
-        "soma": list(h.soma) if hasattr(h, "soma") else [],
-        "dend": list(h.dend) if hasattr(h, "dend") else [],
-        "apic": list(h.apic) if hasattr(h, "apic") else [],
-        "axon": list(h.axon) if hasattr(h, "axon") else [],
-        "all": [sec for sec in h.allsec()],
+        name: cell_sections(cell, name)
+        for name in ("soma", "dend", "apic", "axon", "all")
     }
 
 
@@ -1183,8 +1178,7 @@ def summarize_cell_sections(cell: Any, *, include_names: bool = False) -> Dict[s
     """
     Summarize section/segment counts, lengths, and diameters per section group.
     """
-    h = _hoc(cell)
-    sections = _collect_sections(h)
+    sections = _collect_sections(cell)
     summary = {
         name: _section_stats(secs, include_names=include_names)
         for name, secs in sections.items()
@@ -1196,8 +1190,7 @@ def summarize_mechanisms(cell: Any, *, max_mechs: Optional[int] = 20) -> Dict[st
     """
     Summarize density/point mechanisms per section group.
     """
-    h = _hoc(cell)
-    sections = _collect_sections(h)
+    sections = _collect_sections(cell)
     summary: Dict[str, Any] = {}
 
     for group, sec_list in sections.items():
@@ -3956,30 +3949,13 @@ def load_cell_and_geometry(
     cell_cfg = json.loads(cell_cfg_path.read_text())
     geom_cfg = json.loads(geom_cfg_path.read_text()) if geom_cfg_path.is_file() else None
 
-    manifest = cell_cfg.get("paths", {}).get("manifest", "manifest.json")
-    manifest_path = Path(manifest)
-    if not manifest_path.is_absolute():
-        manifest_path = (tune_dir / manifest).resolve()
-    if not manifest_path.is_file():
-        fallback = (tune_dir / "manifest.json").resolve()
-        if fallback.is_file():
-            manifest_path = fallback
-        else:
-            raise FileNotFoundError(
-                f"manifest.json not found. Tried {manifest_path} and {fallback} (tune_dir={tune_dir})"
-            )
-    cell_cfg.setdefault("paths", {})["manifest"] = str(manifest_path)
-
     from modules.model import geometry as geom_mod
     from modules.model import load_cell
+    from modules.simulation.session_setup import load_mechanisms
 
-    cwd = Path.cwd()
-    try:
-        os.chdir(tune_dir)
-        cell = load_cell(cell_cfg)
-        geom = geom_mod.define_geometry(cell, geom_cfg)
-    finally:
-        os.chdir(cwd)
+    load_mechanisms(tune_dir, cell_cfg)
+    cell = load_cell(cell_cfg, base_dir=tune_dir)
+    geom = geom_mod.define_geometry(cell, geom_cfg)
 
     return cell, geom, geom_cfg
 

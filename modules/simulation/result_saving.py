@@ -12,8 +12,26 @@ from .result_paths import (
     _build_output_path,
     _copy_fit_json_sidecar,
     _json_default,
+    _resolve_tune_path,
     _write_json,
 )
+from .model_artifacts import archive_model_artifacts
+
+
+def _load_tune_config_fallback(sim_cfg: Dict[str, Any], filename: str) -> Optional[Dict[str, Any]]:
+    tune_dir = _resolve_tune_path(sim_cfg)
+    if tune_dir is None:
+        return None
+    for path in (tune_dir / "cell_configs" / filename, tune_dir / filename):
+        if not path.is_file():
+            continue
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if isinstance(value, dict):
+            return value
+    return None
 
 
 def _save_sidecars(results: Dict[str, Any], run_dir: Path) -> Dict[str, str]:
@@ -30,12 +48,25 @@ def _save_sidecars(results: Dict[str, Any], run_dir: Path) -> Dict[str, str]:
     syn_config = meta.pop("syn_config", None)
     cell_config = meta.pop("cell_config", None)
     geometry_config = meta.pop("geometry_config", None)
+    if cell_config is None:
+        cell_config = _load_tune_config_fallback(sim_cfg, "cell_config.json")
+    if geometry_config is None:
+        geometry_config = _load_tune_config_fallback(sim_cfg, "geometry.json")
+    if syn_config is None:
+        syn_config = _load_tune_config_fallback(sim_cfg, "syn_config.json")
     avg_rate_curve = meta.pop("avg_rate_curve", None)
     input_stats = meta.pop("input_stats", None)
     input_summaries = meta.pop("input_summaries", None)
     fit_sidecar = _copy_fit_json_sidecar(sim_cfg, run_dir)
     if fit_sidecar is not None:
         meta["fit_json"] = fit_sidecar
+    artifact_info = archive_model_artifacts(
+        sim_cfg,
+        run_dir,
+        cell_config=cell_config,
+    )
+    if artifact_info is not None:
+        meta["model_artifacts"] = artifact_info
 
     _write_json(run_dir / "meta.json", meta)
     files["meta"] = "meta.json"
@@ -60,6 +91,8 @@ def _save_sidecars(results: Dict[str, Any], run_dir: Path) -> Dict[str, str]:
         files["input_summaries"] = "input_summaries.json"
     if fit_sidecar is not None:
         files["fit_json"] = fit_sidecar["filename"]
+    if artifact_info is not None:
+        files["model_artifacts"] = artifact_info["filename"]
 
     spikes = results.get("spikes", None)
     if spikes is not None:
@@ -160,6 +193,10 @@ def save_results(
 
     save_sidecars = sim_cfg.get("save_sidecars", True)
     save_full_results = sim_cfg.get("save_full_results", False)
+    # Native model provenance is a Step-7 contract, including for full-results
+    # runs whose older defaults disabled ordinary sidecars.
+    if sim_cfg.get("save_model_artifacts", True):
+        save_sidecars = True
     if not save_sidecars and not save_full_results:
         # ensure at least one artifact is written
         save_sidecars = True
@@ -336,6 +373,8 @@ def _write_results_to_run_dir(
     }
 
     save_sidecars = sim_cfg.get("save_sidecars", True)
+    if sim_cfg.get("save_model_artifacts", True):
+        save_sidecars = True
     if save_sidecars:
         manifest["files"].update(_save_sidecars(results, run_dir))
 

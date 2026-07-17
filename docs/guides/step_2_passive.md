@@ -1,8 +1,8 @@
 # Step 2: Passive Tuning
 
-Step 2 estimates passive membrane parameters for a tune prepared by Step 1. It
-uses ACT's passive helper to compute candidate values, then leaves final model
-edits under user control.
+Step 2 runs passive current-injection traces and diagnostics for a tune prepared
+by Step 1. When targets and ACT are explicitly selected, it can also compute
+candidate passive values while leaving final model edits under user control.
 
 Notebook: `../../2_passive.ipynb`
 
@@ -12,7 +12,7 @@ Use Step 2 to:
 
 - build and inspect the selected tune's NEURON cell,
 - compile/load the tune's mechanisms when needed,
-- compute ACT-compatible passive values from measured targets,
+- optionally compute ACT-compatible passive values from measured targets,
 - manually apply those values to the model files,
 - rerun a simple current-injection check,
 - optionally plot/export trace diagnostics.
@@ -26,17 +26,18 @@ Step 2 expects a tune directory created or validated by Step 1:
 
 ```text
 cells/<CELL>/tunes/<TUNE>/
-├── manifest.json
-├── modfiles/
+├── <loader-owned model sources>
+├── <configured MOD directory>/ # optional; selected by paths.modfiles
 └── cell_configs/
     ├── cell_config.json
     ├── sim_config.json
-    ├── target_config.json
+    ├── target_config.json       # optional
     └── geometry.json
 ```
 
-For ADB/Allen examples, Step 2 also expects the model fit JSON referenced by
-the manifest, such as `*_fit.json`.
+The selected loader resolves native model sources. A target config and ACT are
+not required for targetless trace checks. Allen-specific proposal work may also
+use the fit JSON referenced by its manifest.
 
 ## Local and Colab Use
 
@@ -44,7 +45,7 @@ the manifest, such as `*_fit.json`.
 use. The notebook can:
 
 - add the SCP checkout to `sys.path`,
-- locate or clone ACT when configured,
+- locate or clone ACT only when ACT-dependent work is selected,
 - compile mechanisms through `nrnivmodl`,
 - load the selected tune,
 - run the passive protocol.
@@ -66,20 +67,22 @@ The selected tune should already satisfy the Step 1 contract.
 
 ### 2.2 Compile and Load Mechanisms
 
-Compile the tune's `modfiles/` only when compiled mechanism outputs are missing
-or stale. The shared mechanism helper searches for `nrnivmodl` on `PATH` and
-next to the active Python executable, which covers typical Conda environments.
+Compile the configured `paths.modfiles` only when `.mod` sources exist and
+compiled outputs are missing or stale. Models using only built-in mechanisms
+skip this phase.
 
 ### 2.3 Build Cell
 
 Build the selected NEURON cell and review the section/area summary. This is the
-cell object used for the ACT passive calculation and current-injection check.
+cell object used for current-injection checks and, when requested, the optional
+ACT passive calculation.
 
 ### 2.4 Enter Passive Targets
 
 Step 2 resolves passive targets from `cell_configs/target_config.json` using
 `target_source.mode`:
 
+- `none` or a missing target config: run passive traces without target/ACT proposals.
 - `manual`: read direct values from `manual.passive`.
 - `traces`: calculate passive values from a user-provided trace file using
   `traces.passive`.
@@ -96,8 +99,10 @@ Manual passive fields use user-facing units:
 - `manual.passive.v_rest_mV`: resting membrane voltage in mV.
 
 Notebook `manual_passive_targets` values override the config only when a field
-is not `None`. Step 2 requires all three passive targets, either directly or
-from extraction. It does not use hidden example defaults.
+is not `None`. Set `COMPUTE_ACT_PASSIVE_PROPOSAL = True` to explicitly request
+the ACT proposal calculation; it requires all three passive targets, either
+directly or from extraction. Reading or comparing manual targets alone does not
+import ACT. Targetless trace checks do not use hidden example defaults.
 
 Generic trace mode expects either CSV or NPY traces. The recommended CSV
 contract is:
@@ -136,7 +141,8 @@ writes review CSVs to `notebook_exports/step2_passive/`. Set
 targets written back into `manual.passive`; otherwise they are used only for the
 current notebook run.
 
-The notebook converts passive targets into ACT settable passive properties:
+When `COMPUTE_ACT_PASSIVE_PROPOSAL` is enabled, the notebook converts passive
+targets into ACT settable passive properties:
 
 - `e_rev_leak`,
 - `g_bar_leak`,
@@ -193,8 +199,8 @@ Step 2 does not create a pipeline run under `output_data/`.
 
 ## Troubleshooting
 
-- **ACT not found**: install ACT at `../mods/ACT`, set `SCP_ACT_PATH`, or let the
-  Colab bootstrap clone it.
+- **ACT not found**: this matters only for ACT-based estimates. Install ACT at
+  `../mods/ACT`, set `SCP_ACT_PATH`, or let the Colab bootstrap clone it.
 - **`nrnivmodl` not found**: activate the project environment, then rerun the
   compile/load cell.
 - **Values do not change the trace**: confirm the fit/config file was saved,

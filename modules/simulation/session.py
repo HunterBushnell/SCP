@@ -15,7 +15,7 @@ from modules.input_generation.config import (
 from modules.model import geometry, synapses
 from modules.model.load_cell import load_cell
 
-from .current_injection import run_iclamp_test
+from .current_injection import apply_sim_conditions, run_iclamp_test
 from .multi_run import run_multi
 from .result_loading import load_results
 from .result_saving import save_results
@@ -27,7 +27,6 @@ from .session_setup import (
     infer_cell_name,
     load_mechanisms,
     normalize_tune_dir,
-    resolve_loader_manifest_path,
 )
 
 
@@ -130,9 +129,6 @@ class SimulationSession:
             raise FileNotFoundError(
                 f"Missing sim_config.json in {self.config_root}. Resolved tune_dir: {self.tune_dir}"
             )
-        if not self.syn_path.is_file():
-            raise FileNotFoundError(f"Missing syn_config.json in {self.config_root}")
-
         self.sim_cfg_preview = _load_json_dict(self.sim_path)
         self.cell_config = _load_json_dict(self.cell_config_path)
         self.geom_config = _load_json_dict(self.geom_config_path)
@@ -142,18 +138,9 @@ class SimulationSession:
         if not isinstance(paths, dict):
             paths = {}
             self.cell_config["paths"] = paths
-        paths.setdefault("manifest", "manifest.json")
         paths.setdefault("tune_dir", str(self.tune_dir))
-        self._resolve_loader_paths()
 
         return self
-
-    def _resolve_loader_paths(self) -> None:
-        resolve_loader_manifest_path(
-            cell_config=self.cell_config,
-            cell_config_path=self.cell_config_path,
-            tune_dir=self.tune_dir,
-        )
 
     def _resolve_append_override(self) -> None:
         append_target = _resolve_append_target(self.sim_cfg_preview, self.tune_dir / "output_data")
@@ -207,12 +194,12 @@ class SimulationSession:
 
     def _validate_cell_tuning(self) -> None:
         tuning = self.cell_config.get("tuning")
-        if not isinstance(tuning, dict) or "soma_diam_multiplier" not in tuning:
-            raise KeyError(
-                "cell_configs/cell_config.json must define tuning.soma_diam_multiplier. "
-                "Run Step 1 setup or set it manually before simulation."
-            )
-        tuning["soma_diam_multiplier"] = float(tuning["soma_diam_multiplier"])
+        if tuning is None:
+            return
+        if not isinstance(tuning, dict):
+            raise TypeError("cell_config tuning must be an object when provided.")
+        if "soma_diam_multiplier" in tuning:
+            tuning["soma_diam_multiplier"] = float(tuning["soma_diam_multiplier"])
 
     def _apply_run_overrides(self, sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
         """Apply options that affect input generation and simulation behavior."""
@@ -264,20 +251,22 @@ class SimulationSession:
 
     def prepare(self, *, generate_inputs: bool = True) -> "SimulationSession":
         if self.options.load_mechanisms:
-            load_mechanisms(self.tune_dir)
+            load_mechanisms(self.tune_dir, self.cell_config)
 
         self._resolve_append_override()
         self._apply_snapshot_option()
         self._validate_cell_tuning()
-
-        self.cell = load_cell(self.cell_config)
-        self.geom = geometry.define_geometry(self.cell, self.geom_config)
 
         sim_cfg_for_mode = self._apply_run_overrides(
             copy.deepcopy(self.sim_cfg_override or self.sim_cfg_preview)
         )
         self.iclamp_cfg = sim_cfg_for_mode.get("iclamp", {}) or {}
         self.iclamp_enabled = bool(self.iclamp_cfg.get("enabled", False)) or bool(self.options.iclamp)
+
+        self.cell = load_cell(self.cell_config, base_dir=self.tune_dir)
+        apply_sim_conditions(self.cell, sim_cfg_for_mode)
+        self.geom = geometry.define_geometry(self.cell, self.geom_config)
+
         if self.snapshot_enabled and self.iclamp_enabled:
             print("Snapshot mode ignored because IClamp is enabled.")
             self.snapshot_enabled = False

@@ -24,7 +24,7 @@ python -m ipykernel install --user --name scp-venv --display-name "Python (SCP v
 
 ## External Repositories
 
-Steps 2-4 use or reserve integrations with external tools:
+Steps 2-4 can optionally use external tuning tools:
 
 ```bash
 mkdir -p ../mods
@@ -39,9 +39,9 @@ export SCP_ACT_PATH=/path/to/ACT
 export SCP_BMTOOL_PATH=/path/to/bmtool
 ```
 
-ACT is required for Step 2 passive tuning and optional Step 3 ACT active tuning.
-Step 3's manual active sweep/FI checks can run without ACT. BMTool is used by
-Step 4 synapse tuning.
+ACT is optional for Step 2 target-derived proposals and Step 3 optimization.
+Core passive sweeps and manual active/FI checks run without ACT. BMTool is
+optional and used only when Step 4 synapse tuning is requested.
 
 ## Validate the Workspace
 
@@ -51,13 +51,17 @@ Run the setup checker:
 python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune tuned --compile-modfiles
 ```
 
+ACT and BMTool remain optional in this check. Add `--check-act` and/or
+`--check-bmtool` only when validating those external integrations.
+
 Run notebook checks:
 
 ```bash
 python scripts/check_notebooks.py
 ```
 
-If a tune is missing compiled mechanisms, build them once:
+If a tune contains custom `.mod` sources and is missing compiled mechanisms,
+build them once (using that tune's configured MOD source directory):
 
 ```bash
 cd cells/PV/tunes/tuned/modfiles
@@ -65,7 +69,8 @@ nrnivmodl
 ```
 
 or use `--compile-modfiles` with `scripts/check_setup.py`, or let Step 1 compile
-them. Compiled `x86_64/` folders are generated artifacts and are ignored by Git.
+them. Models that use only built-in NEURON mechanisms need no compilation.
+Compiled `x86_64/` folders are generated artifacts and are ignored by Git.
 
 ## Colab
 

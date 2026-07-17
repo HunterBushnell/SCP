@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -20,6 +19,7 @@ class Step1ValidationReport:
     tune_dir: Path
     checks: Dict[str, bool]
     paths: Dict[str, Path]
+    errors: Dict[str, str] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -32,7 +32,11 @@ class Step1ValidationReport:
     def raise_for_missing(self) -> None:
         if self.ok:
             return
-        lines = [f"{name}: {path}" for name, path in self.missing.items()]
+        lines = []
+        for name, path in self.missing.items():
+            detail = self.errors.get(name)
+            suffix = f" ({detail})" if detail else ""
+            lines.append(f"{name}: {path}{suffix}")
         raise FileNotFoundError(
             "Step 1 validation failed; missing required paths:\n" + "\n".join(lines)
         )
@@ -63,17 +67,20 @@ class TuningNotebookContext:
         return self.tune_dir / "tuning_exports"
 
     def summary(self) -> Dict[str, Any]:
-        return {
+        summary = {
             "repo_root": str(self.repo_root),
             "tune_dir": str(self.tune_dir),
             "cell_name": self.cell_name,
             "tune_name": self.tune_name,
             "cell_loader": self.cell_config.get("cell_loader"),
-            "soma_diam_multiplier": (
-                self.cell_config.get("tuning", {}) or {}
-            ).get("soma_diam_multiplier"),
             "validation_ok": self.validation.ok,
         }
+        multiplier = (self.cell_config.get("tuning", {}) or {}).get(
+            "soma_diam_multiplier"
+        )
+        if multiplier is not None:
+            summary["soma_diam_multiplier"] = multiplier
+        return summary
 
 
 def _looks_like_repo_root(path: Path) -> bool:
@@ -154,8 +161,12 @@ def _read_json(path: Path) -> Dict[str, Any]:
     return data
 
 
-def _compiled_mechanism_exists(tune_dir: Path) -> bool:
-    mod_dir = tune_dir / "modfiles"
+def _compiled_mechanism_exists(tune_dir: Path, cell_config: Dict[str, Any]) -> bool:
+    from modules.setup.mechanisms import resolve_modfiles_dir
+
+    mod_dir = resolve_modfiles_dir(tune_dir, cell_config)
+    if mod_dir is None:
+        return False
     candidates = (
         mod_dir / "x86_64" / ".libs" / "libnrnmech.so",
         mod_dir / "x86_64" / "libnrnmech.so",
@@ -179,9 +190,6 @@ def validate_step1_outputs(
     cell_configs = tune_path / "cell_configs"
     paths: Dict[str, Path] = {
         "tune_dir": tune_path,
-        "manifest": tune_path / "manifest.json",
-        "modfiles": tune_path / "modfiles",
-        "compiled_modfiles": tune_path / "modfiles",
         "cell_config": cell_configs / "cell_config.json",
     }
     if require_sim_config:
@@ -193,11 +201,42 @@ def validate_step1_outputs(
 
     checks: Dict[str, bool] = {
         "tune_dir": tune_path.is_dir(),
-        "manifest": paths["manifest"].is_file(),
-        "modfiles": paths["modfiles"].is_dir(),
-        "compiled_modfiles": (not require_compiled_modfiles) or _compiled_mechanism_exists(tune_path),
         "cell_config": paths["cell_config"].is_file(),
     }
+    errors: Dict[str, str] = {}
+    cell_config: Dict[str, Any] = {}
+    if paths["cell_config"].is_file():
+        from modules.loaders import validate_cell_loader_config
+
+        try:
+            cell_config = _read_json(paths["cell_config"])
+            for role, resolved in validate_cell_loader_config(
+                cell_config,
+                base_dir=tune_path,
+            ).items():
+                key = f"loader:{role}"
+                paths[key] = resolved
+                checks[key] = resolved.is_file()
+        except Exception as exc:
+            if raise_on_missing:
+                raise
+            paths["loader_config"] = paths["cell_config"]
+            checks["loader_config"] = False
+            errors["loader_config"] = f"{type(exc).__name__}: {exc}"
+
+    from modules.setup.mechanisms import resolve_modfiles_dir
+
+    mod_dir = resolve_modfiles_dir(tune_path, cell_config)
+    mod_sources = (
+        sorted(mod_dir.glob("*.mod")) if mod_dir is not None and mod_dir.is_dir() else []
+    )
+    if mod_sources:
+        paths["modfiles"] = mod_dir
+        paths["compiled_modfiles"] = mod_dir
+        checks["modfiles"] = True
+        checks["compiled_modfiles"] = (
+            not require_compiled_modfiles
+        ) or _compiled_mechanism_exists(tune_path, cell_config)
     if require_sim_config:
         checks["sim_config"] = paths["sim_config"].is_file()
     if require_geometry_config:
@@ -205,7 +244,12 @@ def validate_step1_outputs(
     if require_synapse_config:
         checks["syn_config"] = paths["syn_config"].is_file()
 
-    report = Step1ValidationReport(tune_dir=tune_path, checks=checks, paths=paths)
+    report = Step1ValidationReport(
+        tune_dir=tune_path,
+        checks=checks,
+        paths=paths,
+        errors=errors,
+    )
     if raise_on_missing:
         report.raise_for_missing()
     return report
@@ -223,18 +267,9 @@ def load_tune_configs(
     if cell_name:
         cell_config.setdefault("cell_name", str(cell_name))
     cell_config.setdefault("cell_loader", "allen_manifest")
-    paths = cell_config.setdefault("paths", {})
-    if not isinstance(paths, dict):
-        paths = {}
-        cell_config["paths"] = paths
-    paths.setdefault("manifest", "manifest.json")
-
     tuning = cell_config.get("tuning")
-    if not isinstance(tuning, dict) or "soma_diam_multiplier" not in tuning:
-        raise KeyError(
-            "cell_configs/cell_config.json must define tuning.soma_diam_multiplier."
-        )
-    tuning["soma_diam_multiplier"] = float(tuning["soma_diam_multiplier"])
+    if isinstance(tuning, dict) and "soma_diam_multiplier" in tuning:
+        tuning["soma_diam_multiplier"] = float(tuning["soma_diam_multiplier"])
 
     sim_path = tune_path / "cell_configs" / "sim_config.json"
     sim_config = _read_json(sim_path) if sim_path.is_file() else {}
@@ -308,21 +343,12 @@ def print_tuning_context_summary(context: TuningNotebookContext) -> None:
     print("Tune dir:", context.tune_dir)
     print("Cell:", context.cell_name, "| Tune:", context.tune_name)
     print("Cell loader:", context.cell_config.get("cell_loader"))
-    print(
-        "Soma diameter multiplier:",
-        (context.cell_config.get("tuning", {}) or {}).get("soma_diam_multiplier"),
+    multiplier = (context.cell_config.get("tuning", {}) or {}).get(
+        "soma_diam_multiplier"
     )
+    if multiplier is not None:
+        print("Soma diameter multiplier (Allen adapter):", multiplier)
     print("Step 1 validation:", "ok" if context.validation.ok else "missing files")
-
-
-@contextmanager
-def _pushd(path: Path):
-    old = Path.cwd()
-    os.chdir(str(path))
-    try:
-        yield
-    finally:
-        os.chdir(str(old))
 
 
 def build_tuning_cell(context: TuningNotebookContext | Dict[str, Any], tune_dir: Optional[Path] = None):
@@ -338,8 +364,12 @@ def build_tuning_cell(context: TuningNotebookContext | Dict[str, Any], tune_dir:
 
     from modules.notebooks.helpers import build_cell_for_notebook
 
-    with _pushd(base_dir):
-        return build_cell_for_notebook(cell_config)
+    cell = build_cell_for_notebook(cell_config, base_dir=base_dir)
+    if isinstance(context, TuningNotebookContext):
+        from modules.simulation.current_injection import apply_sim_conditions
+
+        apply_sim_conditions(cell, context.sim_config)
+    return cell
 
 
 def section_summary(cell: Any) -> Dict[str, Any]:
@@ -358,9 +388,9 @@ def section_summary(cell: Any) -> Dict[str, Any]:
             summary[attr] = 1
 
     h_obj = getattr(cell, "h", None)
-    if h_obj is not None and hasattr(h_obj, "allsec"):
+    all_sections = list(getattr(cell, "all", ()) or ())
+    if h_obj is not None and all_sections:
         try:
-            all_sections = list(h_obj.allsec())
             summary["all_sections"] = len(all_sections)
             summary["total_area_um2"] = float(
                 sum(h_obj.area(seg.x, sec=sec) for sec in all_sections for seg in sec)

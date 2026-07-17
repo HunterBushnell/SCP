@@ -8,6 +8,9 @@ Run the setup checker:
 python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune tuned --compile-modfiles
 ```
 
+Use `--check-act` or `--check-bmtool` only when you want the checker to require
+the corresponding optional external integration.
+
 Run notebook portability checks:
 
 ```bash
@@ -16,11 +19,14 @@ python scripts/check_notebooks.py
 
 ## Missing Modfiles or NEURON Errors
 
-- Prepare or refresh the tune with `1_setup.ipynb`.
-- Or build manually:
+- A model using only built-in NEURON mechanisms needs no `modfiles/` directory
+  or compiled library. Confirm `cell_config.json` omits `paths.modfiles` or sets
+  it to `null`.
+- If the selected tune declares custom `.mod` sources, prepare or refresh it
+  with `1_setup.ipynb`, or build the configured source directory manually:
 
 ```bash
-cd <tune_dir>/modfiles
+cd <configured_modfiles_dir>
 nrnivmodl
 ```
 
@@ -166,7 +172,7 @@ Step 6 reads saved Step 5 output folders. If no runs appear:
 
 ## Notebook vs SLURM Mismatch
 
-- Use the same `tune_dir`, config files, and compiled mechanisms.
+- Use the same `tune_dir`, config files, and (when applicable) compiled mechanisms.
 - Use the same `randomness_mode` and `seed`.
 - Confirm SLURM `TOTAL_TRIALS`, `N_TRIALS`, and `--trial-offset` settings.
 - Enable `snapshot.enabled` for deeper comparison.
@@ -188,6 +194,6 @@ export SCP_ACT_PATH=/path/to/ACT
 export SCP_BMTOOL_PATH=/path/to/bmtool
 ```
 
-ACT is required for Step 2 passive tuning and optional Step 3 ACT active
-tuning. Step 3 manual active/FI checks can run without ACT. BMTool is used by
-Step 4 synapse workflows.
+ACT is optional for Step 2 target-derived proposals and Step 3 ACT active
+tuning. Core passive sweeps and manual active/FI checks run without ACT.
+BMTool is needed only when Step 4 synapse tuning is requested.

@@ -348,19 +348,41 @@ fi
 
 cd "$TUNE_DIR"
 
-# Build mechanisms if not already compiled (compile inside modfiles/)
-if [[ ! -f "${TUNE_DIR}/modfiles/x86_64/.libs/libnrnmech.so" && ! -f "${TUNE_DIR}/modfiles/x86_64/libnrnmech.so" ]]; then
-    echo "Compiling NEURON mechanisms with nrnivmodl in modfiles/..."
-    if [[ ! -d "${TUNE_DIR}/modfiles" ]]; then
-        echo "Missing modfiles directory in ${TUNE_DIR}" >&2
-        exit 1
-    fi
-    (cd "${TUNE_DIR}/modfiles" && nrnivmodl)
-    if [[ ! -f "${TUNE_DIR}/modfiles/x86_64/.libs/libnrnmech.so" && ! -f "${TUNE_DIR}/modfiles/x86_64/libnrnmech.so" ]]; then
-        echo "Mechanism build failed: libnrnmech.so not found after nrnivmodl." >&2
-        exit 1
-    fi
-fi
+# Compile the configured tune-local MOD sources when present. The simulation
+# process loads the resulting library through the same cell_config-aware helper.
+TUNE_DIR="$TUNE_DIR" REPO_ROOT="$REPO_ROOT" \
+PYTHONPATH="${REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
+"${PYTHON_BIN}" - <<'PY'
+import json
+import os
+from pathlib import Path
+
+from modules.setup.mechanisms import compile_modfiles
+
+tune_dir = Path(os.environ["TUNE_DIR"]).expanduser().resolve()
+for candidate in (
+    tune_dir / "cell_configs" / "cell_config.json",
+    tune_dir / "cell_config.json",
+):
+    if candidate.is_file():
+        cell_config = json.loads(candidate.read_text(encoding="utf-8"))
+        break
+else:
+    raise FileNotFoundError(f"Missing cell_config.json under {tune_dir}")
+
+summary = compile_modfiles(
+    tune_dir,
+    load_dll=False,
+    allow_missing=True,
+    cell_config=cell_config,
+)
+if summary["status"] == "skipped":
+    print(f"NEURON mechanism compilation skipped: {summary['reason']}")
+elif summary["compiled_now"]:
+    print(f"Compiled NEURON mechanisms in {summary['modfiles_dir']}")
+else:
+    print(f"Using compiled NEURON mechanisms from {summary['dll']}")
+PY
 
 # If running as a job array, default to single-trial tasks and unique outputs
 if [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then

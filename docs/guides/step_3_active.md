@@ -27,13 +27,16 @@ ACT active tuning is integrated as an optional helper, not a mandatory path. The
 notebook can prepare ACT inputs, run ACT modules, collect predictions, and
 evaluate temporary predictions without overwriting model files.
 
+Manual current sweeps and FI diagnostics run without ACT or biological targets.
+A missing target config is equivalent to `target_source.mode = "none"`.
+
 ## Expected Inputs
 
 - a tune directory from Step 1,
-- compiled or compilable `modfiles/`,
+- optional compiled/compilable sources from `paths.modfiles`,
 - `cell_configs/cell_config.json`,
 - optional targets in `cell_configs/target_config.json`,
-- model files referenced by `manifest.json`,
+- native model files declared by the selected loader,
 - passive parameters from Step 2 when applicable,
 - optional ACT target data for active optimization.
 
@@ -96,7 +99,8 @@ Use `tune_dir_override` when working with a path outside the standard
 
 ### 3.2 Compile and Load Mechanisms
 
-Compile and/or load the tune's `modfiles/`.
+Compile and/or load the configured mechanism sources when `.mod` files exist.
+Built-in-mechanism models skip this phase.
 
 Important controls:
 

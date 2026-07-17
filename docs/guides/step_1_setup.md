@@ -27,12 +27,12 @@ Step 1 does not tune model parameters and does not run final simulations.
 For a tune directory such as `cells/PV/tunes/orig`, Step 1 prepares:
 
 ```text
-manifest.json
-modfiles/
+<loader-owned model sources>
+modfiles/                         # optional
 cell_configs/
   cell_config.json
   sim_config.json
-  target_config.json
+  target_config.json              # optional
   geometry.json
   syn_config.json
   syn_groups/
@@ -48,8 +48,9 @@ Before running Step 1, decide:
 - `cell_name`: display/model label, such as `PV`, `SST`, or `PN`.
 - `tune_name`: tune folder name, usually `orig` for raw setup or `tuned` for the working model.
 - `source_type`: `adb` to download Allen Database files, or `existing` for staged local files.
+- `cell_loader`: `allen_manifest` (default) or `hoc_template`.
 - `CONFIG_MODE`: `fill`, `overwrite`, or `skip` for generated configs.
-- Target source mode: `manual`, `traces`, or `allen_nwb` for Step 2-3 targets.
+- Target source mode: `none`, `manual`, `traces`, or `allen_nwb` for Step 2-3 targets.
 - Synapse scaffolding: create `input_blocks_template.json`, create an empty `syn_config.json`, or skip synapse configs.
 
 Recommended default for normal work:
@@ -150,15 +151,17 @@ when preparing ADB tunes.
 
 ### `source_type = "existing"`
 
-Uses files already staged in the tune directory. Currently this means an
-Allen-compatible tune layout with a valid `manifest.json`, model files, and
-`modfiles/`.
+Uses model files already staged in the tune directory. Construction is then
+validated by the selected loader: an Allen manifest bundle for
+`allen_manifest`, or an object-owned HOC source/template contract for
+`hoc_template`.
 
 Use this when files already exist locally and you only want to compile,
 scaffold configs, or validate.
 
-Generic/non-ADB model support is a planned extension. The public setup contract
-for now is an Allen-compatible model bundle or an already working tune directory.
+Source acquisition and construction are separate: `existing` never downloads
+or rewrites native model sources. See `../reference/model_loaders.md` for the
+generic HOC configuration and canonical section contract.
 
 ## Mechanisms
 
@@ -167,6 +170,10 @@ Step 1 can compile NEURON mechanisms from:
 ```text
 <tune_dir>/modfiles/
 ```
+
+The directory is resolved from `cell_config.paths.modfiles`. It may use another
+tune-relative path or be `null`. If there are no `.mod` sources, compilation and
+DLL loading are skipped and built-in NEURON mechanisms remain available.
 
 Notebook controls:
 
@@ -195,8 +202,8 @@ Base config scaffolding creates or updates:
 
 Generated defaults include:
 
-- `cell_config.json`: cell label, tune name, color, loader, manifest path, and soma diameter multiplier. New setup uses a neutral `1.0` multiplier unless you explicitly set another value.
-- `sim_config.json`: simulation timing, trial/save settings, plotting, IClamp, recording, randomness, and snapshot defaults.
+- `cell_config.json`: cell label, tune name, loader-owned paths/options, and display metadata. Allen tunes may also contain the optional `soma_diam_multiplier`; HOC geometry is not rescaled.
+- `sim_config.json`: simulation timing, explicit HOC runtime conditions, trial/save settings, plotting, IClamp, recording, randomness, and snapshot defaults.
 - `geometry.json`: soma-origin distance reference and proximal/distal thresholds.
 
 See `../reference/configs_reference.md` for every generated field.
@@ -213,6 +220,7 @@ Step 3 computes or loads active/FI targets.
 
 Source modes:
 
+- `none`: no target data; use Steps 2–3 for intrinsic traces and FI diagnostics.
 - `manual`: enter `manual.passive` values and `manual.fi_curve` points directly,
   or point `manual.fi_curve.csv` to a summarized FI CSV.
 - `traces`: point to user-provided passive or active trace files.
@@ -283,14 +291,15 @@ CLI equivalents:
 Validation can check:
 
 - required files,
-- compiled mechanisms,
+- compiled mechanisms when `.mod` sources exist,
 - cell loading,
 - synapse config structure,
 - input config normalization.
 
-For a newly staged `source_type="existing"` tune without a complete
-Allen-compatible bundle, validation will fail until `manifest.json` and model
-files are present.
+For `source_type="existing"`, validation reports loader-owned missing paths.
+New HOC tunes also require finite `conditions.v_init_mV` and
+`conditions.celsius_C`. Targets and synapse configs are not required for
+cell-only/IClamp work.
 
 Validation can be skipped with:
 
@@ -371,6 +380,28 @@ python scripts/step1_prepare.py \
   --config-mode fill
 ```
 
+### Prepare an Existing HOC Template
+
+```bash
+python scripts/step1_prepare.py \
+  --tune-dir cells/example_cell/tunes/orig \
+  --cell example_cell \
+  --source-type existing \
+  --cell-loader hoc_template \
+  --hoc-template-file model/CellTemplate.hoc \
+  --hoc-template-name CellTemplate \
+  --hoc-constructor-args '[]' \
+  --hoc-section-map '{}' \
+  --v-init-mv -70 \
+  --celsius-c 34 \
+  --target-source-mode none \
+  --no-synapse-configs
+```
+
+Use `--loader-paths-json '{"modfiles": null}'` when the template uses built-in
+mechanisms only. Add section-map entries only when common owner aliases do not
+match the template.
+
 ### Create Empty Synapse Manifest
 
 ```bash
@@ -412,7 +443,7 @@ Typical next actions:
 - optionally run `extra_notebooks/act_segmentation.ipynb` on the copied `tuned`
   tune if your workflow needs ACT-style channel/mechanism segmentation before
   tuning,
-- open `2_passive.ipynb` for ACT passive tuning,
+- open `2_passive.ipynb` for passive traces/diagnostics and optional ACT-based proposals,
 - open `3_active.ipynb` for manual active checks and optional ACT active tuning,
 - open `4_synapses.ipynb` for synapse tuning,
 - open `5_simulate.ipynb` for IClamp checks or full simulations,

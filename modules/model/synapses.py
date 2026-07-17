@@ -189,6 +189,13 @@ def add_synapses(
 
         seg_refs = geom["groups"].get(geom_group_name, [])
         seg_list = [ref.sec(ref.x) for ref in seg_refs]
+        if not seg_list:
+            raise ValueError(
+                f"add_synapses: syn_group {syn_group!r} requests {n_syn} synapse(s) "
+                f"on selector {segs_key!r}, but geometry group "
+                f"{geom_group_name!r} is empty. Choose a populated canonical "
+                "section group (for a soma-only model, use segs='soma')."
+            )
 
         # Compile dist_func spec into a density function, as in Step 5.2.3
         dist_spec = syn_cfg.get("dist_func", None)
