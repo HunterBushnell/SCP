@@ -204,7 +204,9 @@ Step 2 does not create a pipeline run under `output_data/`.
 - **`nrnivmodl` not found**: activate the project environment, then rerun the
   compile/load cell.
 - **Values do not change the trace**: confirm the fit/config file was saved,
-  then rerun from **2.3 Build Cell** so NEURON rebuilds the model.
+  restart the kernel, then rerun from the environment setup through
+  **2.3 Build Cell** so NEURON constructs the updated model once. Legacy Allen
+  models cannot be constructed twice in one NEURON process.
 - **Unexpected passive estimates**: verify `passive_area_mode`,
   `passive_area_scale`, and whether active conductances are disabled for the
   passive check.

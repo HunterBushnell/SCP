@@ -76,8 +76,8 @@ files can be reviewed and tracked if desired.
 
 Step 3 does not automatically overwrite model files. Use the active sweep, FI
 curve, and optional ACT prediction outputs to decide which active/channel
-parameters to adjust. Then edit the model source files manually and rerun from
-**3.3 Build Cell**.
+parameters to adjust. Then edit the model source files manually, restart the
+kernel, and rerun from the environment setup through **3.3 Build Cell**.
 
 For ADB/Allen-style tunes, this usually means reviewing the tune's `*_fit.json`
 or related mechanism parameters. For custom loaders, edit the model-specific
@@ -112,7 +112,10 @@ Important controls:
 ### 3.3 Build Cell
 
 Build the NEURON cell using `cell_configs/cell_config.json`, then print section
-and area summaries. Rerun this cell after editing model parameters.
+and area summaries. The later active and FI protocols reuse this instance.
+After editing model parameters, restart the kernel and rerun from the
+environment setup through this cell; legacy Allen models cannot be constructed
+twice in one NEURON process.
 
 ### 3.4 ACT Active Tuning Setup
 

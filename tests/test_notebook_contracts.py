@@ -101,6 +101,18 @@ def _keyword(call: ast.Call, name: str) -> ast.AST:
 
 
 class NotebookContractTests(unittest.TestCase):
+    def test_step2_and_step3_construct_one_cell_per_kernel(self) -> None:
+        for notebook_name in ("2_passive.ipynb", "3_active.ipynb"):
+            with self.subTest(notebook_name=notebook_name):
+                build_calls = _calls(notebook_name, "build_tuning_cell")
+                self.assertEqual(
+                    len(build_calls),
+                    1,
+                    "tuning notebooks must reuse the cell built in their Build Cell "
+                    "section because legacy Allen models cannot be constructed twice "
+                    "in one NEURON process",
+                )
+
     def test_step2_passive_protocol_copies_runtime_conditions(self) -> None:
         _, sim_params = _assigned_dict("2_passive.ipynb", "sim_params")
         _assert_reads_sim_conditions(self, _dict_value(sim_params, "conditions"))
