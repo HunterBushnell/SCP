@@ -4,8 +4,9 @@ These are lightweight conventions for the public SCP repo.
 
 ## Notebooks
 
-Use numeric prefixes for pipeline order:
+Use numeric prefixes for the compact entry point and detailed pipeline order:
 
+- `0_pipeline.ipynb`: compact start-to-finish entry point
 - `1_setup.ipynb`
 - `2_passive.ipynb`
 - `3_active.ipynb`
@@ -14,8 +15,10 @@ Use numeric prefixes for pipeline order:
 - `6_analysis.ipynb`
 - `7_tools.ipynb`
 
-`5_simulate.ipynb` is the primary simulation entry point. Optional notebooks live
-under `extra_notebooks/` and should not be required by the numbered workflow.
+`0_pipeline.ipynb` is the simplest end-to-end entry point, while
+`5_simulate.ipynb` is the detailed simulation entry point. Optional notebooks
+live under `extra_notebooks/` and should not be required by the numbered
+workflow.
 
 ## Tune Directories
 

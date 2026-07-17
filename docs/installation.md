@@ -76,6 +76,7 @@ Compiled `x86_64/` folders are generated artifacts and are ignored by Git.
 
 The root notebooks can bootstrap a fresh Colab runtime:
 
+- `0_pipeline.ipynb` (compact Steps 1–5 entry point)
 - `1_setup.ipynb`
 - `2_passive.ipynb`
 - `3_active.ipynb`

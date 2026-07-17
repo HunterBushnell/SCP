@@ -101,6 +101,34 @@ def _keyword(call: ast.Call, name: str) -> ast.AST:
 
 
 class NotebookContractTests(unittest.TestCase):
+    def test_compact_pipeline_has_one_prepare_call_and_fresh_final_run(self) -> None:
+        prepare_calls = _calls("0_pipeline.ipynb", "prepare_pipeline_notebook")
+        self.assertEqual(len(prepare_calls), 1)
+
+        fresh_calls = _calls("0_pipeline.ipynb", "run_fresh_simulation")
+        self.assertEqual(len(fresh_calls), 1)
+
+        single_event_calls = _calls("0_pipeline.ipynb", "SingleEvent")
+        interactive_calls = _calls("0_pipeline.ipynb", "InteractiveTuner")
+        self.assertEqual(len(single_event_calls), 1)
+        self.assertEqual(len(interactive_calls), 1)
+        self.assertEqual(_calls("0_pipeline.ipynb", "stp_frequency_response"), [])
+        self.assertEqual(_calls("0_pipeline.ipynb", "optimize_parameters"), [])
+
+        source = "\n".join(_code_cells("0_pipeline.ipynb"))
+        for expected in (
+            'cell_name = "PV"',
+            'tune_name = "tuned"',
+            "adb_specimen_id = None",
+            "passive_amps_pA = [-50, -100]",
+            "active_amps_pA = [150, 300]",
+            "compute_act_passive_proposal = False",
+            "enable_synapse_tuning = False",
+            "n_trials = 1",
+            "run_iclamp = False",
+        ):
+            self.assertIn(expected, source)
+
     def test_step2_and_step3_construct_one_cell_per_kernel(self) -> None:
         for notebook_name in ("2_passive.ipynb", "3_active.ipynb"):
             with self.subTest(notebook_name=notebook_name):

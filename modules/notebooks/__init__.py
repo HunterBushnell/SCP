@@ -14,6 +14,18 @@ from .bootstrap import (
 )
 from .synapse_preview import show_synapse_preview
 from .run_diagnostics import show_run_diagnostics
+from .pipeline_workflow import (
+    PipelineActiveResult,
+    PipelineNotebookState,
+    PipelinePassiveResult,
+    PipelineSimulationResult,
+    RestartKernelRequired,
+    prepare_interactive_synapse_tuner,
+    prepare_pipeline_notebook,
+    run_active_stage,
+    run_fresh_simulation,
+    run_passive_stage,
+)
 
 __all__ = [
     "build_cell_for_notebook",
@@ -24,6 +36,16 @@ __all__ = [
     "ensure_scp_repo_on_syspath",
     "finish_step5_notebook_setup",
     "is_colab",
+    "PipelineActiveResult",
+    "PipelineNotebookState",
+    "PipelinePassiveResult",
+    "PipelineSimulationResult",
+    "RestartKernelRequired",
+    "prepare_interactive_synapse_tuner",
+    "prepare_pipeline_notebook",
+    "run_active_stage",
+    "run_fresh_simulation",
+    "run_passive_stage",
     "show_run_diagnostics",
     "show_synapse_preview",
 ]

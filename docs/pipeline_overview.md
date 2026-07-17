@@ -3,7 +3,24 @@
 SCP is organized as a notebook-first workflow with optional CLI/SLURM entry
 points for larger simulations.
 
-## Main Flow
+## Compact Flow
+
+`0_pipeline.ipynb` is the simple front door for Steps 1–5. A compact settings cell
+selects an existing tune or an optional Allen/ADB specimen, then the notebook:
+
+1. safely fills missing standard configs and builds one shared tuning cell,
+2. runs passive checks and an optional review-only ACT passive proposal,
+3. runs active traces and an FI-curve comparison,
+4. optionally opens BMTool's `SingleEvent()` and `InteractiveTuner()`, and
+5. launches the final simulation in a fresh Python process, reloads the saved
+   manifest, and displays standard diagnostics.
+
+Existing config values are preserved. Changes to runtime, target, geometry, and
+synapse JSON files are refreshed at their consuming stage. Changes to the cell
+loader, morphology, fit/HOC sources, or MOD sources require a kernel restart so
+the in-memory model cannot silently diverge from disk.
+
+## Detailed Flow
 
 1. `1_setup.ipynb`: prepare a tune directory.
 2. `2_passive.ipynb`: tune/check passive cell properties.
@@ -13,9 +30,10 @@ points for larger simulations.
 6. `6_analysis.ipynb`: analyze and compare saved runs.
 7. `7_tools.ipynb`: run optional utility scripts from a notebook.
 
-Step 5 is the main simulation destination. Earlier notebooks prepare the cell
-and configs; Step 6 is optional post-processing; Step 7 is optional maintenance
-and export tooling.
+Use the numbered flow when you need its extended setup, ACT active optimization,
+synapse placement/optimization/export, simulation, or analysis controls. Step 5
+is its main simulation destination; Step 6 is optional post-processing; Step 7
+is optional maintenance and export tooling.
 
 ## Step 1 Setup
 
@@ -130,9 +148,9 @@ preset/default-field references.
 
 ## Local vs Colab
 
-The root notebooks are the current local and Colab entry points. Local notebooks
-assume the environment is installed. Colab notebooks can clone SCP and install
-runtime dependencies when needed.
+The root notebooks, including `0_pipeline.ipynb`, are the current local and Colab
+entry points. Local notebooks assume the environment is installed. Colab
+notebooks can clone SCP and install runtime dependencies when needed.
 
 CLI/SLURM entry points are local/HPC-oriented and use the same config files as
 the notebooks.

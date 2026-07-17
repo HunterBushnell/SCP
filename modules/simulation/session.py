@@ -239,11 +239,16 @@ class SimulationSession:
         if output_stem not in (None, ""):
             sim_cfg["output"] = output_stem
 
+        # An explicit runtime option is the highest-precedence output-name
+        # control. Keep both normalized aliases aligned because result saving
+        # also accepts legacy configs that still contain ``output_stem``.
+        if self.options.output_stem:
+            sim_cfg["output"] = self.options.output_stem
+            sim_cfg["output_stem"] = self.options.output_stem
+
         if save_output:
             if not sim_cfg.get("output"):
                 sim_cfg["output"] = self.options.output_stem or _timestamp_stem()
-            elif self.options.output_stem:
-                sim_cfg["output"] = self.options.output_stem
         elif self.options.output_stem and not sim_cfg.get("output"):
             sim_cfg["output"] = self.options.output_stem
 

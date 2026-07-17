@@ -23,6 +23,7 @@ from typing import Iterable, Optional
 
 
 DEFAULT_NOTEBOOKS = [
+    "0_pipeline.ipynb",
     "1_setup.ipynb",
     "2_passive.ipynb",
     "3_active.ipynb",

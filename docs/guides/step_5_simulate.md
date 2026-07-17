@@ -5,6 +5,7 @@ tune directories from the same backend in notebooks, CLI runs, and SLURM jobs.
 
 Entry points:
 
+- Compact Steps 1–5 notebook: `../../0_pipeline.ipynb`
 - Notebook: `../../5_simulate.ipynb`
 - CLI: `../../run_pipeline.py`
 - SLURM: `../../run_slurm.sh`
@@ -65,8 +66,8 @@ See `../reference/outputs_layout.md` for the full output layout.
 
 ## Local and Colab Use
 
-The root `5_simulate.ipynb` is the current notebook entry point for both local
-and Colab use.
+The root `0_pipeline.ipynb` is the compact end-to-end notebook for both local and
+Colab use. The root `5_simulate.ipynb` remains the detailed Step 5 notebook.
 
 Local use:
 
@@ -76,7 +77,7 @@ Local use:
 
 Colab use:
 
-- open the root notebook,
+- open either root notebook,
 - run the environment setup cell,
 - allow the notebook to clone SCP and install dependencies when needed,
 - ensure any private data or external input files are present in the runtime.
