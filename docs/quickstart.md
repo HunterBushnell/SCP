@@ -25,20 +25,26 @@ Generated `x86_64/` mechanism folders are ignored by Git.
 ## Option A: Compact Pipeline Notebook
 
 1. Open `0_pipeline.ipynb`.
-2. Select:
-   - `cell_name = "PV"`
-   - `tune_name = "tuned"`
-3. Keep synapse tuning disabled for the first run; it is an optional interactive
-   BMTool stage.
-4. Run the notebook top to bottom. The final simulation runs in a fresh Python
-   process and is always saved under a unique `pipeline_...` name.
-5. Review the inline diagnostics or open `6_analysis.ipynb` for the full saved-run
+2. Choose **Run All** once. This renders five independent panels but does not
+   load a model or start a simulation.
+3. In Step 1, select `PV` / `tuned` and click **Prepare and load**.
+4. Run the enabled Step 2 and Step 3 panels. Keep the optional BMTool Step 4
+   disabled for the first run.
+5. In Step 5, choose the run options and click **Run simulation**. The final
+   simulation runs in a fresh Python process and is always saved under a unique
+   `pipeline_...` name unless an output stem is supplied.
+6. Review the inline diagnostics or open `6_analysis.ipynb` for the full saved-run
    analysis workflow.
 
 The compact notebook safely fills missing standard configs without replacing
 existing values. Set `adb_specimen_id` only when you want it to download and
 prepare an Allen/ADB model. Existing custom models must already have a registered
 loader; use `1_setup.ipynb` for custom-loader setup.
+
+The `pipeline_settings` Python mapping initializes the widgets. Widget edits
+update that mapping, and rerunning the settings cell refreshes controls that are
+not locked. Step 1 model-selection fields lock after loading because changing
+the in-memory cell requires a kernel restart.
 
 ## Option B: Detailed Notebooks
 

@@ -13,7 +13,7 @@ HOC templates through the same cell-scoped pipeline machinery.
 2. Optional setup check:
    - `python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune tuned --compile-modfiles`
 3. Run an example:
-   - Simple notebook: open `0_pipeline.ipynb`, select a prepared tune, and run top to bottom.
+   - Simple notebook: open `0_pipeline.ipynb`, choose Run All to render its panels, then click Steps 1–5 in order.
    - Detailed simulation notebook: open `5_simulate.ipynb`, setting `force_save = True` if you want a saved run.
    - CLI: `python run_pipeline.py --tune-dir cells/PV/tunes/tuned --n-trials 1 --force-save`
 4. Analyze saved runs:
@@ -28,6 +28,7 @@ See `docs/quickstart.md` for the shortest runnable path and
   notebook. It can safely fill missing standard configs, optionally prepare an
   Allen/ADB model, run passive and active checks, opt into the core BMTool
   interactions, and launch a clean final simulation with inline diagnostics.
+  Each step has its own small widget panel and output area.
 - `1_setup.ipynb`: set up a tune directory with model files, optional compiled
   mechanisms when custom `.mod` sources exist, config templates, and validation.
 - `2_passive.ipynb`: passive-parameter tuning workflow.
@@ -40,8 +41,9 @@ See `docs/quickstart.md` for the shortest runnable path and
 
 Use `0_pipeline.ipynb` for the shortest end-to-end route. Use the numbered
 notebooks when you need the full setup, optimization, export, placement, or
-analysis controls. Step 5 remains the detailed simulation destination; Step 6
-is optional post-processing.
+analysis controls. Its Python settings mapping and widgets stay synchronized,
+so common choices can be made either way. Step 5 remains the detailed simulation
+destination; Step 6 is optional post-processing.
 
 ## Optional Notebooks
 

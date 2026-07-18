@@ -101,33 +101,61 @@ def _keyword(call: ast.Call, name: str) -> ast.AST:
 
 
 class NotebookContractTests(unittest.TestCase):
-    def test_compact_pipeline_has_one_prepare_call_and_fresh_final_run(self) -> None:
-        prepare_calls = _calls("0_pipeline.ipynb", "prepare_pipeline_notebook")
-        self.assertEqual(len(prepare_calls), 1)
-
-        fresh_calls = _calls("0_pipeline.ipynb", "run_fresh_simulation")
-        self.assertEqual(len(fresh_calls), 1)
-
-        single_event_calls = _calls("0_pipeline.ipynb", "SingleEvent")
-        interactive_calls = _calls("0_pipeline.ipynb", "InteractiveTuner")
-        self.assertEqual(len(single_event_calls), 1)
-        self.assertEqual(len(interactive_calls), 1)
-        self.assertEqual(_calls("0_pipeline.ipynb", "stp_frequency_response"), [])
-        self.assertEqual(_calls("0_pipeline.ipynb", "optimize_parameters"), [])
-
-        source = "\n".join(_code_cells("0_pipeline.ipynb"))
-        for expected in (
-            'cell_name = "PV"',
-            'tune_name = "tuned"',
-            "adb_specimen_id = None",
-            "passive_amps_pA = [-50, -100]",
-            "active_amps_pA = [150, 300]",
-            "compute_act_passive_proposal = False",
-            "enable_synapse_tuning = False",
-            "n_trials = 1",
-            "run_iclamp = False",
+    def test_compact_pipeline_uses_one_controller_and_five_step_panels(self) -> None:
+        self.assertEqual(len(_calls("0_pipeline.ipynb", "PipelineNotebookUI")), 1)
+        for panel_method in (
+            "step1_panel",
+            "step2_panel",
+            "step3_panel",
+            "step4_panel",
+            "step5_panel",
         ):
-            self.assertIn(expected, source)
+            with self.subTest(panel_method=panel_method):
+                self.assertEqual(len(_calls("0_pipeline.ipynb", panel_method)), 1)
+
+        for direct_call in (
+            "prepare_pipeline_notebook",
+            "run_passive_stage",
+            "run_active_stage",
+            "prepare_interactive_synapse_tuner",
+            "run_fresh_simulation",
+            "SingleEvent",
+            "InteractiveTuner",
+            "stp_frequency_response",
+            "optimize_parameters",
+        ):
+            with self.subTest(direct_call=direct_call):
+                self.assertEqual(_calls("0_pipeline.ipynb", direct_call), [])
+
+        _, settings = _assigned_dict("0_pipeline.ipynb", "pipeline_settings")
+        expected_literals = {
+            "cell_name": "PV",
+            "tune_name": "tuned",
+            "adb_specimen_id": None,
+            "passive_amps_pA": [-50, -100],
+            "active_amps_pA": [150, 300],
+            "compute_act_passive_proposal": False,
+            "enable_synapse_tuning": False,
+            "n_trials": 1,
+            "run_iclamp": False,
+        }
+        for key, expected in expected_literals.items():
+            with self.subTest(setting=key):
+                self.assertEqual(ast.literal_eval(_dict_value(settings, key)), expected)
+        self.assertEqual(
+            ast.unparse(_dict_value(settings, "fi_amps_pA")),
+            "list(range(0, 301, 50))",
+        )
+
+        notebook = json.loads(
+            (REPO_ROOT / "0_pipeline.ipynb").read_text(encoding="utf-8")
+        )
+        all_source = "\n".join(
+            "".join(cell.get("source", [])) for cell in notebook["cells"]
+        )
+        self.assertIn("Run All does not start a model or simulation", all_source)
+        self.assertNotIn("widgets.Accordion", all_source)
+        self.assertNotIn("widgets.Tab", all_source)
 
     def test_step2_and_step3_construct_one_cell_per_kernel(self) -> None:
         for notebook_name in ("2_passive.ipynb", "3_active.ipynb"):

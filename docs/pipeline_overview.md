@@ -5,8 +5,9 @@ points for larger simulations.
 
 ## Compact Flow
 
-`0_pipeline.ipynb` is the simple front door for Steps 1–5. A compact settings cell
-selects an existing tune or an optional Allen/ADB specimen, then the notebook:
+`0_pipeline.ipynb` is the simple front door for Steps 1–5. Run All renders five
+independent widget panels; it does not automatically load or simulate a model.
+The user then runs the enabled panels in order:
 
 1. safely fills missing standard configs and builds one shared tuning cell,
 2. runs passive checks and an optional review-only ACT passive proposal,
@@ -14,6 +15,11 @@ selects an existing tune or an optional Allen/ADB specimen, then the notebook:
 4. optionally opens BMTool's `SingleEvent()` and `InteractiveTuner()`, and
 5. launches the final simulation in a fresh Python process, reloads the saved
    manifest, and displays standard diagnostics.
+
+Each panel owns its controls, Run button, status, and output area. There is no
+global dashboard or accordion. The editable `pipeline_settings` mapping and
+visible widgets synchronize in both directions, while advanced protocol
+override dictionaries remain available in Python.
 
 Existing config values are preserved. Changes to runtime, target, geometry, and
 synapse JSON files are refreshed at their consuming stage. Changes to the cell

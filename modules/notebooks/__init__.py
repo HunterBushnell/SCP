@@ -14,6 +14,7 @@ from .bootstrap import (
 )
 from .synapse_preview import show_synapse_preview
 from .run_diagnostics import show_run_diagnostics
+from .pipeline_ui import PIPELINE_UI_DEFAULTS, PipelineNotebookUI
 from .pipeline_workflow import (
     PipelineActiveResult,
     PipelineNotebookState,
@@ -36,6 +37,8 @@ __all__ = [
     "ensure_scp_repo_on_syspath",
     "finish_step5_notebook_setup",
     "is_colab",
+    "PIPELINE_UI_DEFAULTS",
+    "PipelineNotebookUI",
     "PipelineActiveResult",
     "PipelineNotebookState",
     "PipelinePassiveResult",

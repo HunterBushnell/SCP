@@ -89,5 +89,9 @@
     "save_all_inputs": true,
     "save_all_traces": true,
     "save_syn_records_by_trial": true
+  },
+  "conditions": {
+    "v_init_mV": null,
+    "celsius_C": null
   }
 }
