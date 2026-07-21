@@ -12,11 +12,13 @@ from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 
 import csv
+import hashlib
 import importlib
 import json
 import os
 import shutil
 import sys
+import time
 import warnings
 
 import numpy as np
@@ -32,6 +34,10 @@ CONFIG_NAME = "act_active_config.json"
 BUILDER_NAME = "cell_builder.py"
 TARGET_SF_NAME = "target_sf.csv"
 PREDICTION_PREFIX = "prediction_"
+METRICS_PREFIX = "metrics_"
+RUN_MANIFEST_PREFIX = "run_manifest_"
+EVALUATION_MANIFEST_NAME = "evaluation_manifest.json"
+FIXED_PREDICTIONS_NAME = "fixed_predictions.json"
 
 DEFAULT_PASSIVE_NAMES = ["g_pas", "e_pas", "gbar_Ih"]
 DEFAULT_ACTIVE_CHANNELS = [
@@ -187,7 +193,11 @@ def default_act_active_config(
     """Build a JSON-serializable default ACT active-tuning config."""
     root = resolve_repo_root(Path(repo_root))
     tune_path = Path(tune_dir).expanduser().resolve()
-    workspace_path = Path(workspace).expanduser().resolve() if workspace else default_act_workspace(tune_path)
+    workspace_path = (
+        Path(workspace).expanduser().resolve()
+        if workspace
+        else default_act_workspace(tune_path)
+    )
     target_amps, target_freqs = target_fi_for_tune(tune_path, cell_name)
 
     return {
@@ -245,7 +255,7 @@ def prepare_act_active_workspace(
     cell_name: str,
     tune_name: str,
     workspace: Optional[str | Path] = None,
-    target_mode: str = "fi_arrays",
+    target_mode: Optional[str] = None,
     fi_currents_pA: Optional[Sequence[float]] = None,
     fi_frequencies_hz: Optional[Sequence[float]] = None,
     fi_csv_path: Optional[str | Path] = None,
@@ -265,17 +275,44 @@ def prepare_act_active_workspace(
     optimizer: Optional[Mapping[str, Any]] = None,
     filter_params: Optional[Mapping[str, Any]] = None,
     overwrite_config: bool = True,
+    preserve_existing: bool = False,
 ) -> dict[str, Any]:
     """Create/update an ACT workspace and write its config, builder, and target."""
     root = resolve_repo_root(Path(repo_root))
     tune_path = Path(tune_dir).expanduser().resolve()
-    cfg = default_act_active_config(
-        repo_root=root,
-        tune_dir=tune_path,
-        cell_name=cell_name,
-        tune_name=tune_name,
-        workspace=workspace,
+    requested_workspace = (
+        Path(workspace).expanduser().resolve()
+        if workspace is not None
+        else default_act_workspace(tune_path)
     )
+    existing_path = requested_workspace / CONFIG_NAME
+    if preserve_existing and existing_path.is_file():
+        cfg = load_act_active_config(existing_path)
+        cfg = json.loads(json.dumps(cfg))
+        cfg.update(
+            {
+                "repo_root": str(root),
+                "tune_dir": str(tune_path),
+                "workspace": str(requested_workspace),
+                "cell_name": str(cell_name),
+                "tune_name": str(tune_name),
+            }
+        )
+        cfg.setdefault("cell_builder", {"path": BUILDER_NAME, "function": "build_cell"})
+        cfg.setdefault("target", {})
+        cfg.setdefault("act_cell", {})
+        cfg.setdefault("simulation", {})
+        cfg.setdefault("optimizer", {})
+        cfg.setdefault("filter", {})
+        cfg.setdefault("modules", {})
+    else:
+        cfg = default_act_active_config(
+            repo_root=root,
+            tune_dir=tune_path,
+            cell_name=cell_name,
+            tune_name=tune_name,
+            workspace=requested_workspace,
+        )
     loader_name = _configured_loader_name(tune_path)
     cfg["cell_loader"] = loader_name
     cfg["act_loader_status"] = (
@@ -283,6 +320,9 @@ def prepare_act_active_workspace(
     )
     workspace_path = Path(cfg["workspace"])
     workspace_path.mkdir(parents=True, exist_ok=True)
+    # A killed multiprocessing run can leave this transient adapter input behind.
+    # It is never a user result and must not affect preparation/probing.
+    (workspace_path / FIXED_PREDICTIONS_NAME).unlink(missing_ok=True)
 
     if passive_names is not None:
         cfg["act_cell"]["passive"] = list(passive_names)
@@ -297,7 +337,8 @@ def prepare_act_active_workspace(
     if filter_params:
         cfg["filter"].update(dict(filter_params))
 
-    cfg["target"]["mode"] = str(target_mode)
+    cfg["target"]["mode"] = str(target_mode or cfg["target"].get("mode") or "fi_arrays")
+    validate_act_module_specs(cfg.get("modules") or {})
     _write_cell_builder(
         workspace=workspace_path,
         repo_root=root,
@@ -321,6 +362,8 @@ def prepare_act_active_workspace(
         nwb_refractory_ms=nwb_refractory_ms,
     )
     cfg["target"]["path"] = str(_path_relative_to_workspace(target_path, workspace_path))
+    if _target_point_count(cfg) < 1:
+        raise ValueError("Prepared ACT target contains no usable traces or FI points.")
 
     config_path = workspace_path / CONFIG_NAME
     if config_path.exists() and not overwrite_config:
@@ -335,6 +378,7 @@ def workspace_summary(config_path: str | Path) -> dict[str, Any]:
     workspace = Path(cfg["workspace"]).expanduser().resolve()
     target_path = resolve_workspace_path(workspace, cfg["target"]["path"])
     modules = cfg.get("modules", {}) or {}
+    target_points = _target_point_count(cfg)
     return {
         "workspace": str(workspace),
         "config": str(workspace / CONFIG_NAME),
@@ -344,6 +388,10 @@ def workspace_summary(config_path: str | Path) -> dict[str, Any]:
         "cell_loader": cfg.get("cell_loader", "allen_manifest"),
         "act_loader_status": cfg.get("act_loader_status", "supported"),
         "modules": [key for key, spec in modules.items() if spec.get("enabled", True)],
+        "target_point_count": target_points,
+        "workload": estimate_act_workload(cfg),
+        "output_status": act_output_status(cfg),
+        "fingerprint": act_config_fingerprint(cfg),
     }
 
 
@@ -360,6 +408,216 @@ def load_act_active_config(config_or_workspace: str | Path) -> dict[str, Any]:
     data.setdefault("repo_root", str(resolve_repo_root(Path.cwd())))
     data.setdefault("tune_dir", str(workspace.parent))
     return data
+
+
+def validate_act_module_specs(modules: Mapping[str, Any]) -> None:
+    """Validate compact ACT module definitions before expensive execution."""
+
+    if not isinstance(modules, Mapping) or not modules:
+        raise ValueError("ACT configuration must define at least one module.")
+    for module_key, raw_spec in modules.items():
+        if not isinstance(raw_spec, Mapping):
+            raise TypeError(f"ACT module {module_key!r} must be an object/dict.")
+        if not raw_spec.get("enabled", True):
+            continue
+        conductances = raw_spec.get("conductances") or []
+        if not conductances:
+            raise ValueError(f"ACT module {module_key!r} has no conductances.")
+        names: set[str] = set()
+        for index, item in enumerate(conductances):
+            if not isinstance(item, Mapping):
+                raise TypeError(
+                    f"ACT module {module_key!r} conductance {index} must be an object/dict."
+                )
+            variable = str(item.get("variable_name") or "").strip()
+            if not variable:
+                raise ValueError(
+                    f"ACT module {module_key!r} conductance {index} needs variable_name."
+                )
+            if variable in names:
+                raise ValueError(f"ACT conductance {variable!r} is defined more than once.")
+            names.add(variable)
+            if bool(item.get("blocked", False)):
+                continue
+            low = _float_or_none(item.get("low"))
+            high = _float_or_none(item.get("high"))
+            variation = _float_or_none(item.get("bounds_variation"))
+            if variation is None and (low is None or high is None):
+                raise ValueError(
+                    f"ACT conductance {variable!r} needs low/high bounds or bounds_variation."
+                )
+            if low is not None and high is not None and low >= high:
+                raise ValueError(
+                    f"ACT conductance {variable!r} requires low < high; got {low:g}, {high:g}."
+                )
+            if int(item.get("n_slices", 1)) < 1:
+                raise ValueError(f"ACT conductance {variable!r} n_slices must be at least 1.")
+
+
+def estimate_act_workload(
+    config_or_mapping: str | Path | Mapping[str, Any],
+    *,
+    modules: str | Sequence[str] = "all",
+) -> dict[str, Any]:
+    """Estimate ACT simulations without constructing a model or importing ACT."""
+
+    cfg = _coerce_act_config(config_or_mapping)
+    target_points = _target_point_count(cfg)
+    requested = None
+    if modules != "all":
+        requested = {str(modules)} if isinstance(modules, str) else {str(v) for v in modules}
+    per_module: dict[str, dict[str, int]] = {}
+    for key, spec in (cfg.get("modules") or {}).items():
+        if not spec.get("enabled", True) or (requested is not None and key not in requested):
+            continue
+        combinations = 1
+        for item in spec.get("conductances", []) or []:
+            if not bool(item.get("blocked", False)):
+                combinations *= max(1, int(item.get("n_slices", 1)))
+        training = combinations * target_points
+        per_module[str(key)] = {
+            "conductance_combinations": combinations,
+            "current_steps": target_points,
+            "training_traces": training,
+            "evaluation_traces": target_points,
+            "total_traces": training + target_points,
+        }
+    return {
+        "target_points": target_points,
+        "modules": per_module,
+        "training_traces": sum(v["training_traces"] for v in per_module.values()),
+        "evaluation_traces": sum(v["evaluation_traces"] for v in per_module.values()),
+        "total_traces": sum(v["total_traces"] for v in per_module.values()),
+    }
+
+
+def act_config_fingerprint(config_or_mapping: str | Path | Mapping[str, Any]) -> str:
+    """Hash the resolved ACT configuration and target contents."""
+
+    cfg = _coerce_act_config(config_or_mapping)
+    payload = json.loads(json.dumps(cfg))
+    target_path = _target_file_for_act(cfg)
+    digest = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    )
+    if target_path.is_file():
+        digest.update(target_path.read_bytes())
+    else:
+        digest.update(f"missing:{target_path}".encode("utf-8"))
+    return digest.hexdigest()
+
+
+def act_source_fingerprints(
+    config_or_mapping: str | Path | Mapping[str, Any],
+) -> dict[str, str]:
+    """Return separate ACT config and prepared-target content hashes."""
+
+    cfg = _coerce_act_config(config_or_mapping)
+    workspace = Path(cfg["workspace"]).resolve()
+    config_path = workspace / CONFIG_NAME
+    target_path = _target_file_for_act(cfg)
+    return {
+        "config": _file_fingerprint(config_path),
+        "target": _file_fingerprint(target_path),
+    }
+
+
+def act_output_status(
+    config_or_mapping: str | Path | Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Describe saved module outputs as current, stale, legacy, partial, or missing."""
+
+    cfg = _coerce_act_config(config_or_mapping)
+    workspace = Path(cfg["workspace"]).resolve()
+    config_hash = act_config_fingerprint(cfg)
+    source_hashes = act_source_fingerprints(cfg)
+    status: dict[str, dict[str, Any]] = {}
+    prior: dict[str, float] = {}
+    for key, spec in (cfg.get("modules") or {}).items():
+        if not spec.get("enabled", True):
+            continue
+        prediction_path = workspace / f"{PREDICTION_PREFIX}{key}.json"
+        metrics_path = workspace / f"{METRICS_PREFIX}{key}.csv"
+        manifest_path = workspace / f"{RUN_MANIFEST_PREFIX}{key}.json"
+        expected_prior_hash = _mapping_fingerprint(prior)
+        state = "missing"
+        manifest: dict[str, Any] = {}
+        saved_prediction: dict[str, float] = {}
+        if prediction_path.is_file():
+            try:
+                raw_prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
+                saved_prediction = {
+                    str(name): float(value) for name, value in raw_prediction.items()
+                }
+            except Exception:
+                saved_prediction = {}
+        if manifest_path.is_file():
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except Exception:
+                state = "partial"
+            else:
+                if (
+                    manifest.get("status") != "complete"
+                    or not prediction_path.is_file()
+                    or not metrics_path.is_file()
+                ):
+                    state = "partial"
+                elif any(
+                    name not in manifest
+                    for name in (
+                        "config_fingerprint",
+                        "prior_predictions_fingerprint",
+                        "prediction_fingerprint",
+                    )
+                ):
+                    state = "legacy"
+                elif (
+                    manifest.get("config_fingerprint") != config_hash
+                    or (
+                        "config_file_fingerprint" in manifest
+                        and manifest.get("config_file_fingerprint")
+                        != source_hashes["config"]
+                    )
+                    or (
+                        "target_file_fingerprint" in manifest
+                        and manifest.get("target_file_fingerprint")
+                        != source_hashes["target"]
+                    )
+                    or manifest.get("prior_predictions_fingerprint") != expected_prior_hash
+                    or manifest.get("prediction_fingerprint")
+                    != _mapping_fingerprint(saved_prediction)
+                ):
+                    state = "stale"
+                else:
+                    state = "current"
+        elif prediction_path.is_file():
+            state = "legacy"
+        elif metrics_path.is_file():
+            state = "partial"
+        status[str(key)] = {
+            "status": state,
+            "prediction_path": str(prediction_path),
+            "metrics_path": str(metrics_path),
+            "manifest_path": str(manifest_path),
+            "provenance_verified": state == "current",
+        }
+        prior.update(saved_prediction)
+    return status
+
+
+def load_act_module_metrics(config_or_workspace: str | Path) -> dict[str, list[dict[str, Any]]]:
+    """Load available per-module ACT metrics CSV files."""
+
+    cfg = load_act_active_config(config_or_workspace)
+    workspace = Path(cfg["workspace"]).resolve()
+    result: dict[str, list[dict[str, Any]]] = {}
+    for key in (cfg.get("modules") or {}):
+        path = workspace / f"{METRICS_PREFIX}{key}.csv"
+        if path.is_file():
+            with path.open("r", encoding="utf-8", newline="") as handle:
+                result[str(key)] = list(csv.DictReader(handle))
+    return result
 
 
 def run_act_active_module(
@@ -379,41 +637,115 @@ def run_act_active_module(
 
     module_name = module_spec.get("name") or str(module_key)
     output_dir = workspace / f"module_{module_name}"
-    if output_dir.exists():
-        if not overwrite:
-            raise FileExistsError(
-                f"ACT output already exists for module {module_key!r}: {output_dir}. "
-                "Use overwrite=True to rerun."
-            )
-        shutil.rmtree(output_dir)
     prediction_path = workspace / f"{PREDICTION_PREFIX}{module_key}.json"
-    metrics_path = workspace / f"metrics_{module_key}.csv"
+    metrics_path = workspace / f"{METRICS_PREFIX}{module_key}.csv"
+    manifest_path = workspace / f"{RUN_MANIFEST_PREFIX}{module_key}.json"
+    existing_artifacts = [
+        path
+        for path in (output_dir, prediction_path, metrics_path, manifest_path)
+        if path.exists()
+    ]
+    if existing_artifacts and not overwrite:
+        raise FileExistsError(
+            f"ACT output already exists for module {module_key!r}: "
+            + ", ".join(str(path) for path in existing_artifacts)
+            + ". Enable explicit overwrite to rerun."
+        )
     if overwrite:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
         prediction_path.unlink(missing_ok=True)
         metrics_path.unlink(missing_ok=True)
+        manifest_path.unlink(missing_ok=True)
 
-    act_api = _import_act_api(cfg)
-    builder = _import_workspace_builder(cfg)
-    train_cell = _build_act_cell(cfg, act_api=act_api, builder=builder, module_spec=module_spec)
-    train_cell.prediction.update(_load_prior_predictions(cfg, before_module=module_key))
-
-    simulation_parameters = _build_simulation_parameters(cfg, act_api)
-    optimization_parameters = _build_optimization_parameters(cfg, act_api, module_spec, n_cpus=n_cpus)
-    target_file = str(_target_file_for_act(cfg))
-
-    with _pushd(workspace):
-        act_module = act_api["ACTModule"](
-            name=module_name,
-            cell=train_cell,
-            simulation_parameters=simulation_parameters,
-            optimization_parameters=optimization_parameters,
-            target_file=target_file,
+    validate_act_module_specs({module_key: module_spec})
+    prior_predictions = _load_prior_predictions(cfg, before_module=module_key)
+    config_hash = act_config_fingerprint(cfg)
+    source_hashes = act_source_fingerprints(cfg)
+    manifest = {
+        "version": 1,
+        "module": str(module_key),
+        "module_name": str(module_name),
+        "status": "running",
+        "started_at": time.time(),
+        "config_fingerprint": config_hash,
+        "config_file_fingerprint": source_hashes["config"],
+        "target_file_fingerprint": source_hashes["target"],
+        "prior_predictions": prior_predictions,
+        "prior_predictions_fingerprint": _mapping_fingerprint(prior_predictions),
+        "prediction_path": str(prediction_path),
+        "metrics_path": str(metrics_path),
+        "output_dir": str(output_dir),
+    }
+    _write_json_atomic(manifest_path, manifest)
+    fixed_path = workspace / FIXED_PREDICTIONS_NAME
+    _write_json_atomic(fixed_path, prior_predictions)
+    started = time.monotonic()
+    try:
+        act_api = _import_act_api(cfg)
+        builder = _import_workspace_builder(cfg)
+        train_cell = _build_act_cell(
+            cfg, act_api=act_api, builder=builder, module_spec=module_spec
         )
-        metrics = act_module.run()
+        train_cell.prediction.update(prior_predictions)
 
-    prediction = {str(k): float(v) for k, v in act_module.cell.prediction.items()}
-    _write_json(prediction_path, prediction)
-    metrics.to_csv(metrics_path, index=False)
+        simulation_parameters = _build_simulation_parameters(cfg, act_api)
+        optimization_parameters = _build_optimization_parameters(
+            cfg, act_api, module_spec, n_cpus=n_cpus
+        )
+        target_file = str(_target_file_for_act(cfg))
+        with _pushd(workspace):
+            act_module = act_api["ACTModule"](
+                name=module_name,
+                cell=train_cell,
+                simulation_parameters=simulation_parameters,
+                optimization_parameters=optimization_parameters,
+                target_file=target_file,
+            )
+            metrics = act_module.run()
+
+        full_prediction = {
+            str(k): float(v) for k, v in act_module.cell.prediction.items()
+        }
+        module_variables = {
+            str(item["variable_name"])
+            for item in module_spec.get("conductances", [])
+        }
+        prediction = {
+            name: value
+            for name, value in full_prediction.items()
+            if name in module_variables
+        }
+        missing_predictions = sorted(module_variables - set(prediction))
+        if missing_predictions:
+            raise RuntimeError(
+                "ACT did not return predictions for: " + ", ".join(missing_predictions)
+            )
+        _write_json_atomic(prediction_path, prediction)
+        metrics.to_csv(metrics_path, index=False)
+    except BaseException as exc:
+        manifest.update(
+            {
+                "status": "incomplete",
+                "finished_at": time.time(),
+                "runtime_seconds": time.monotonic() - started,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+        )
+        _write_json_atomic(manifest_path, manifest)
+        raise
+    finally:
+        fixed_path.unlink(missing_ok=True)
+
+    manifest.update(
+        {
+            "status": "complete",
+            "finished_at": time.time(),
+            "runtime_seconds": time.monotonic() - started,
+            "prediction_fingerprint": _mapping_fingerprint(prediction),
+        }
+    )
+    _write_json_atomic(manifest_path, manifest)
     return {
         "module": module_key,
         "module_name": module_name,
@@ -421,6 +753,9 @@ def run_act_active_module(
         "prediction_path": str(prediction_path),
         "metrics_path": str(metrics_path),
         "output_dir": str(output_dir),
+        "manifest_path": str(manifest_path),
+        "runtime_seconds": manifest["runtime_seconds"],
+        "config_fingerprint": config_hash,
     }
 
 
@@ -460,18 +795,29 @@ def evaluate_act_predictions(
     """Run ACT FI evaluation using predicted conductances without editing files."""
     cfg = load_act_active_config(config_or_workspace)
     workspace = Path(cfg["workspace"]).resolve()
+    (workspace / FIXED_PREDICTIONS_NAME).unlink(missing_ok=True)
     prediction = dict(predictions or collect_act_predictions(workspace))
     if not prediction:
         raise ValueError("No ACT predictions available for evaluation.")
 
     output_name = "act_prediction_eval"
     output_dir = workspace / "output" / output_name
-    if output_dir.exists():
-        if not overwrite:
-            raise FileExistsError(
-                f"Evaluation output already exists: {output_dir}. Use overwrite=True to rerun."
-            )
-        shutil.rmtree(output_dir)
+    fi_path = workspace / "evaluation_fi.csv"
+    manifest_path = workspace / EVALUATION_MANIFEST_NAME
+    existing_artifacts = [
+        path for path in (output_dir, fi_path, manifest_path) if path.exists()
+    ]
+    if existing_artifacts and not overwrite:
+        raise FileExistsError(
+            "ACT evaluation output already exists: "
+            + ", ".join(str(path) for path in existing_artifacts)
+            + ". Enable explicit overwrite to rerun."
+        )
+    if overwrite:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+        fi_path.unlink(missing_ok=True)
+        manifest_path.unlink(missing_ok=True)
 
     act_api = _import_act_api(cfg)
     builder = _import_workspace_builder(cfg)
@@ -511,13 +857,28 @@ def evaluate_act_predictions(
         }
         for amp, freq in zip(sim_cfg.get("ci_amps_pA", []), features["spike_frequency"].to_numpy())
     ]
-    fi_path = workspace / "evaluation_fi.csv"
     _write_rows_csv(fi_path, fi_rows)
+    _write_json_atomic(
+        manifest_path,
+        {
+            "version": 1,
+            "status": "complete",
+            "finished_at": time.time(),
+            "config_fingerprint": act_config_fingerprint(cfg),
+            "config_file_fingerprint": act_source_fingerprints(cfg)["config"],
+            "target_file_fingerprint": act_source_fingerprints(cfg)["target"],
+            "predictions_fingerprint": _mapping_fingerprint(prediction),
+            "prediction": prediction,
+            "fi_path": str(fi_path),
+            "output_dir": str(output_dir),
+        },
+    )
     return {
         "prediction": prediction,
         "fi_rows": fi_rows,
         "fi_path": str(fi_path),
         "output_dir": str(output_dir),
+        "manifest_path": str(manifest_path),
     }
 
 
@@ -600,7 +961,11 @@ def _prepare_target_file(
         source = _resolve_workspace_or_tune_path(workspace, cfg, nwb_path)
         target_path = workspace / TARGET_SF_NAME
         summary_path = workspace / "allen_nwb_fi_curve.csv"
-        stimulus_names = list(nwb_stimulus_names or target.get("stimulus_names") or DEFAULT_FI_STIMULUS_NAMES)
+        stimulus_names = list(
+            nwb_stimulus_names
+            or target.get("stimulus_names")
+            or DEFAULT_FI_STIMULUS_NAMES
+        )
         summary = write_allen_nwb_fi_target_csv(
             source,
             target_path,
@@ -733,6 +1098,32 @@ import sys
 REPO_ROOT = Path({str(repo_root)!r})
 TUNE_DIR = Path({str(tune_dir)!r})
 CELL_NAME = {str(cell_name)!r}
+FIXED_PREDICTIONS = Path(__file__).resolve().parent / {FIXED_PREDICTIONS_NAME!r}
+
+
+def _set_nested_value(obj, name, value):
+    parts = str(name).split(".")
+    target = obj
+    for part in parts[:-1]:
+        target = getattr(target, part)
+    setattr(target, parts[-1], float(value))
+
+
+def _apply_fixed_predictions(cell):
+    if not FIXED_PREDICTIONS.is_file():
+        return cell
+    values = json.loads(FIXED_PREDICTIONS.read_text(encoding="utf-8"))
+    soma = getattr(cell, "soma", None)
+    if soma is None:
+        raise AttributeError("ACT cell builder requires a soma section.")
+    sections = list(soma) if not callable(soma) else [soma]
+    if not sections:
+        raise AttributeError("ACT cell builder found an empty soma section list.")
+    for section in sections:
+        segment = section(0.5)
+        for name, value in values.items():
+            _set_nested_value(segment, name, value)
+    return cell
 
 
 def build_cell():
@@ -749,7 +1140,7 @@ def build_cell():
     old_cwd = Path.cwd()
     os.chdir(str(TUNE_DIR))
     try:
-        return load_cell(cell_config, base_dir=TUNE_DIR)
+        return _apply_fixed_predictions(load_cell(cell_config, base_dir=TUNE_DIR))
     finally:
         os.chdir(str(old_cwd))
 '''
@@ -931,6 +1322,47 @@ def _load_prior_predictions(
     return merged
 
 
+def _coerce_act_config(
+    config_or_mapping: str | Path | Mapping[str, Any],
+) -> dict[str, Any]:
+    if isinstance(config_or_mapping, Mapping):
+        cfg = json.loads(json.dumps(config_or_mapping))
+        workspace = Path(cfg.get("workspace") or ".").expanduser().resolve()
+        cfg["workspace"] = str(workspace)
+        return cfg
+    return load_act_active_config(config_or_mapping)
+
+
+def _target_point_count(cfg: Mapping[str, Any]) -> int:
+    target = cfg.get("target", {}) or {}
+    currents = target.get("fi_currents_pA") or cfg.get("simulation", {}).get(
+        "ci_amps_pA", []
+    )
+    if currents:
+        return len(currents)
+    try:
+        path = _target_file_for_act(cfg)
+        if str(target.get("mode", "")).lower() == "trace_npy" and path.is_file():
+            data = np.load(path, mmap_mode="r")
+            return int(data.shape[0]) if data.ndim else 0
+        if path.is_file():
+            return len(read_act_fi_target_csv(path))
+    except Exception:
+        return 0
+    return 0
+
+
+def _mapping_fingerprint(values: Mapping[str, Any]) -> str:
+    payload = json.dumps(values, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _file_fingerprint(path: Path) -> str:
+    if not path.is_file():
+        return "missing"
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def _write_rows_csv(path: str | Path, rows: Sequence[Mapping[str, Any]]) -> Path:
     path_obj = Path(path)
     path_obj.parent.mkdir(parents=True, exist_ok=True)
@@ -949,6 +1381,15 @@ def _write_json(path: str | Path, data: Mapping[str, Any]) -> Path:
     return path_obj
 
 
+def _write_json_atomic(path: str | Path, data: Mapping[str, Any]) -> Path:
+    path_obj = Path(path)
+    path_obj.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path_obj.with_name(path_obj.name + ".tmp")
+    temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(path_obj)
+    return path_obj
+
+
 def _first_present(row: Mapping[str, Any], names: Sequence[str]) -> str:
     lower_to_actual = {str(key).lower(): str(key) for key in row}
     for name in names:
@@ -964,7 +1405,7 @@ def _tuple_or_none(value: Any) -> Optional[tuple[Any, ...]]:
 
 
 def _float_or_none(value: Any) -> Optional[float]:
-    if value in (None, "", False):
+    if value is None or value == "" or isinstance(value, bool):
         return None
     return float(value)
 

@@ -1,66 +1,90 @@
 # Quickstart
 
-This is the shortest path to check a bundled tune from passive behavior through
-final simulation and produce a saved run for analysis.
+This is the shortest path from a bundled tune to a saved run.
 
 ## Prerequisites
-
-Install the environment first:
 
 ```bash
 conda env create -f environment.yml
 conda activate scp-py311
+python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune tuned --compile-modfiles
 ```
 
-Optional checks:
+Generated mechanism builds are ignored by Git.
 
-```bash
-python scripts/check_setup.py --steps 5 --cell PV --tune tuned --compile-modfiles
-python scripts/check_notebooks.py
-```
+## Compact Notebook: Recommended
 
-`--compile-modfiles` builds missing NEURON mechanisms for the selected tune.
-Generated `x86_64/` mechanism folders are ignored by Git.
+Open [`0_pipeline.ipynb`](../0_pipeline.ipynb), then choose **Run All** once.
+This only renders the interface; it does not load a model or run a simulation.
 
-## Option A: Compact Pipeline Notebook
+### Step 1 — Setup and Load
 
-1. Open `0_pipeline.ipynb`.
-2. Choose **Run All** once. This renders five independent panels but does not
-   load a model or start a simulation.
-3. In Step 1, select `PV` / `tuned` and click **Prepare and load**.
-4. Run the enabled Step 2 and Step 3 panels. Keep the optional BMTool Step 4
-   disabled for the first run.
-5. In Step 5, choose the run options and click **Run simulation**. The final
-   simulation runs in a fresh Python process and is always saved under a unique
-   `pipeline_...` name unless an output stem is supplied.
-6. Review the inline diagnostics or open `6_analysis.ipynb` for the full saved-run
-   analysis workflow.
+Select `PV` / `tuned` and click **Prepare and load**. Leave **Quiet load**
+enabled for the concise summary. The full captured stream remains available as
+`pipeline_ui.step1_load_log`.
 
-The compact notebook safely fills missing standard configs without replacing
-existing values. Set `adb_specimen_id` only when you want it to download and
-prepare an Allen/ADB model. Existing custom models must already have a registered
-loader; use `1_setup.ipynb` for custom-loader setup.
+The compact notebook loads already prepared model sources and safely fills
+missing standard configs without replacing existing values. Use
+[`1_setup.ipynb`](../1_setup.ipynb) or `scripts/step1_prepare.py` for a new
+Allen/ADB download or custom-loader setup.
 
-The `pipeline_settings` Python mapping initializes the widgets. Widget edits
-update that mapping, and rerunning the settings cell refreshes controls that are
-not locked. Step 1 model-selection fields lock after loading because changing
-the in-memory cell requires a kernel restart.
+### Step 2 — Passive Tuning
 
-## Option B: Detailed Notebooks
+Optionally click **Compute ACT proposal** to review suggested passive values;
+this does not modify the model. Then click **Run passive**. Target fields start
+from `target_config.json`, and timing controls are under **Show advanced
+options**.
 
-For the full preparation, optimization, export, and placement controls, use the
-numbered notebooks in order:
+### Step 3 — Active Tuning and FI Curve
+
+Click **Run active protocol** and **Run FI curve** independently. Timing,
+thresholds, and ionic-current display controls are under **Show advanced
+options**.
+
+ACT active tuning is experimental, review-only, and not release-blocking. It
+runs in an isolated, cancellable process and never applies predictions to model
+files. Use [`3_active.ipynb`](../3_active.ipynb) for its detailed workflow.
+
+### Step 4 — Synapse Tuning (Optional)
+
+Leave this step disabled for a first run. To use it, enable and click
+**Initialize BMTool**, then run **Single Event** or **Interactive Tuner** from
+their separate cards. Copy accepted values into the relevant synapse JSON.
+
+### Step 5 — Check Inputs, Simulate, and Plot
+
+1. In **Check Inputs**, choose synapse groups and preview plots, then click its
+   run button. The optional seed shown here is also used by simulation.
+2. In **Run Simulation**, choose trials, seed, mode, and optional output stem,
+   then click the run button. The model runs in a fresh process and is always
+   saved under a unique `pipeline_...` stem unless one is supplied.
+3. In **Plot Results**, choose panels and a saved trial, then click the plot
+   button. Use [`6_analysis.ipynb`](../6_analysis.ipynb) for comparisons,
+   metrics, detailed styling, and export.
+
+**Quiet preview** and **Quiet run** retain their complete subprocess streams in
+`pipeline_ui.input_preview_log` and `pipeline_ui.simulation_log`. Advanced
+widget changes are session-only overrides in `pipeline_settings`; they do not
+edit JSON files.
+
+Widget edits update `pipeline_settings`. Rerunning the settings cell pushes
+code edits back to unlocked controls. Model selection locks after Step 1.
+Changes to `cell_config.json`, morphology, fit/HOC, or MOD sources require a
+kernel restart; runtime, target, geometry, and synapse configs reload at the
+stage that uses them.
+
+## Detailed Notebooks
+
+Use the numbered path for full preparation, optimization, export, placement,
+simulation, and analysis controls:
 
 ```text
 1_setup.ipynb -> 2_passive.ipynb -> 3_active.ipynb -> 4_synapses.ipynb -> 5_simulate.ipynb -> 6_analysis.ipynb
 ```
 
-`7_tools.ipynb` is optional utility tooling.
+`7_tools.ipynb` contains optional utilities.
 
-To run only the detailed simulation notebook, open `5_simulate.ipynb` and set
-`force_save = True` when you want a saved result.
-
-## Option C: CLI
+## CLI
 
 Run and save one trial:
 
@@ -74,49 +98,34 @@ Run by cell/tune labels:
 python run_pipeline.py --cell SST --tune tuned --n-trials 1 --force-save --output-stem quickstart_sst
 ```
 
-Run a simple current-injection check instead of synapse-driven inputs:
+Run a current-injection check:
 
 ```bash
 python run_pipeline.py --tune-dir cells/PV/tunes/tuned --iclamp --force-save --output-stem pv_iclamp_check
 ```
 
-## Option D: Prepare a Raw ADB Tune
-
-Use Step 1 when creating or refreshing a tune directory:
+## Preparing a Raw ADB Tune
 
 ```bash
 python scripts/step1_prepare.py --cell PV --tune orig --specimen-id 484635029 --model-type perisomatic
-```
-
-For SST all-active:
-
-```bash
 python scripts/step1_prepare.py --cell SST --tune orig --specimen-id 485466109 --model-type "all active"
 ```
 
 ## Outputs
 
-`0_pipeline.ipynb` always saves its final fresh-process run. Other runs are saved
-when saving is enabled in `sim_config.json`, `force_save = True` in the detailed
-simulation notebook, or `--force-save` is passed to the CLI. Saved runs are
-written under:
+Saved runs are written under:
 
 ```text
 cells/<CELL>/tunes/<TUNE>/output_data/<RUN>/
 ```
 
-The compact notebook uses a unique timestamped `pipeline_...` folder. Other
-entry points use a timestamped `run_...` folder when no run name is specified.
-
-See `reference/outputs_layout.md` for file details.
+The compact notebook always saves its fresh-process run. Other entry points save
+when enabled in `sim_config.json`, `force_save = True`, or `--force-save` is
+used. See the [output layout](reference/outputs_layout.md) for file details.
 
 ## Next
 
-- `pipeline_overview.md`: understand the full workflow.
-- `guides/step_1_setup.md`: prepare model/tune directories.
-- `guides/step_2_passive.md`: passive-property tuning.
-- `guides/step_3_active.md`: active/channel tuning and ACT active targets.
-- `guides/step_4_synapses.md`: BMTool synapse tuning.
-- `guides/step_5_simulate.md`: simulation controls.
-- `guides/analysis.md`: Step 6 analysis workflow.
-- `advanced/cli_slurm.md`: batch and SLURM runs.
+- [Pipeline overview](pipeline_overview.md)
+- [Step guides](README.md#step-guides)
+- [CLI and SLURM](advanced/cli_slurm.md)
+- [Troubleshooting](troubleshooting.md)

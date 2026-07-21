@@ -24,10 +24,20 @@ modeling projects. Contributions should keep that user workflow clear.
 Before submitting a change, run the checks that apply to your edit:
 
 ```bash
+python -m unittest discover -s tests -v
 python scripts/check_notebooks.py
 python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune tuned --compile-modfiles
 python scripts/check_setup.py --steps 1 2 3 4 5 --cell SST --tune tuned --compile-modfiles
 python -m compileall -q modules scripts run_pipeline.py
+git diff --check
+```
+
+For compact-notebook changes, also execute an output copy of
+`0_pipeline.ipynb` through Run All and confirm the tracked notebook remains
+output-free. The real ACT optimization smoke test is opt-in:
+
+```bash
+SCP_RUN_ACT_INTEGRATION=1 python -m unittest tests.test_pipeline_act.PipelineACTTests.test_optional_tiny_real_act_smoke
 ```
 
 For simulation or analysis changes, also run at least one small Step 5 simulation

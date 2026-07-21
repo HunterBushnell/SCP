@@ -65,6 +65,13 @@ tune_name = "tuned"
 
 The selected tune should already satisfy the Step 1 contract.
 
+Notebook result summaries use four significant figures for readability. The
+underlying passive metrics and ACT proposal values retain full precision.
+The target comparison groups currents beneath each passive metric and reuses
+the plotted trace colors as subtle row tints and current markers. Spike
+frequency is retained in the result data but shown only as a warning when a
+negative-current sweep unexpectedly spikes.
+
 ### 2.2 Compile and Load Mechanisms
 
 Compile the configured `paths.modfiles` only when `.mod` sources exist and

@@ -101,6 +101,25 @@ def _keyword(call: ast.Call, name: str) -> ast.AST:
 
 
 class NotebookContractTests(unittest.TestCase):
+    def test_compact_pipeline_is_saved_clean_with_hidden_bootstrap(self) -> None:
+        notebook = json.loads(
+            (REPO_ROOT / "0_pipeline.ipynb").read_text(encoding="utf-8")
+        )
+        code_cells = [
+            cell for cell in notebook["cells"] if cell.get("cell_type") == "code"
+        ]
+        self.assertTrue(code_cells)
+        for cell in code_cells:
+            self.assertIsNone(cell.get("execution_count"))
+            self.assertEqual(cell.get("outputs"), [])
+
+        bootstrap = code_cells[0]
+        self.assertTrue(
+            bootstrap.get("metadata", {})
+            .get("jupyter", {})
+            .get("source_hidden")
+        )
+
     def test_compact_pipeline_uses_one_controller_and_five_step_panels(self) -> None:
         self.assertEqual(len(_calls("0_pipeline.ipynb", "PipelineNotebookUI")), 1)
         for panel_method in (
@@ -118,7 +137,10 @@ class NotebookContractTests(unittest.TestCase):
             "run_passive_stage",
             "run_active_stage",
             "prepare_interactive_synapse_tuner",
+            "preview_pipeline_inputs",
             "run_fresh_simulation",
+            "show_run_diagnostics",
+            "show_synapse_preview",
             "SingleEvent",
             "InteractiveTuner",
             "stp_frequency_response",
@@ -131,17 +153,64 @@ class NotebookContractTests(unittest.TestCase):
         expected_literals = {
             "cell_name": "PV",
             "tune_name": "tuned",
-            "adb_specimen_id": None,
+            "quiet_step1_output": True,
             "passive_amps_pA": [-50, -100],
+            "passive_target_overrides": {},
             "active_amps_pA": [150, 300],
-            "compute_act_passive_proposal": False,
+            "active_spike_threshold_mV": -20,
+            "active_include_currents": True,
+            "active_current_display_amp_pA": None,
+            "fi_protocol_overrides": {},
+            "fi_spike_threshold_mV": -20,
+            "act_active_module": None,
+            "act_n_cpus": None,
+            "act_workspace_override": None,
+            "act_overrides": {},
+            "act_overwrite_outputs": False,
             "enable_synapse_tuning": False,
             "n_trials": 1,
             "run_iclamp": False,
+            "quiet_input_preview_output": True,
+            "quiet_simulation_output": True,
+            "simulation_overrides": {},
+            "input_preview_groups": None,
+            "input_preview_plots": [
+                "weight_distribution",
+                "distance_distribution",
+                "weight_vs_distance",
+            ],
+            "input_preview_trial_idx": 0,
+            "input_preview_show_table": True,
+            "input_preview_histogram_density": True,
+            "input_preview_distance_bin_um": 25.0,
+            "input_preview_weight_bin": None,
+            "input_preview_plot_columns": 3,
+            "input_preview_plot_size": "compact",
+            "diagnostic_plots": [
+                "input_rate",
+                "membrane_voltage",
+                "output_rate",
+                "output_raster",
+            ],
+            "diagnostic_trial_idx": 0,
+            "diagnostic_window_mode": "stimulus",
+            "diagnostic_window_start_ms": None,
+            "diagnostic_window_stop_ms": None,
+            "diagnostic_window_padding_ms": 100.0,
+            "diagnostic_rate_bin_ms": None,
+            "diagnostic_smoothing_ms": None,
+            "diagnostic_raster_style": "dot",
+            "diagnostic_input_groups": None,
+            "diagnostic_show_stimulus": True,
+            "diagnostic_figure_size": "compact",
         }
         for key, expected in expected_literals.items():
             with self.subTest(setting=key):
                 self.assertEqual(ast.literal_eval(_dict_value(settings, key)), expected)
+        setting_names = {ast.literal_eval(key) for key in settings.keys}
+        self.assertNotIn("adb_specimen_id", setting_names)
+        self.assertNotIn("adb_model_type", setting_names)
+        self.assertNotIn("compute_act_passive_proposal", setting_names)
         self.assertEqual(
             ast.unparse(_dict_value(settings, "fi_amps_pA")),
             "list(range(0, 301, 50))",
@@ -154,6 +223,9 @@ class NotebookContractTests(unittest.TestCase):
             "".join(cell.get("source", [])) for cell in notebook["cells"]
         )
         self.assertIn("Run All does not start a model or simulation", all_source)
+        self.assertIn("Run selected module", all_source)
+        self.assertIn("Cancel", all_source)
+        self.assertIn("Review evaluation", all_source)
         self.assertNotIn("widgets.Accordion", all_source)
         self.assertNotIn("widgets.Tab", all_source)
 

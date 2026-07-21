@@ -5,6 +5,7 @@ Checks:
 - Code-cell Python syntax (`ast.parse`)
 - Duplicate literal keys in dict literals (silent Python override risk)
 - Hardcoded user-specific absolute paths in source cells
+- Output-free saved state for the compact release notebook
 
 Usage:
   python scripts/check_notebooks.py
@@ -163,6 +164,21 @@ def _check_notebook(path: Path) -> tuple[list[str], list[str]]:
     except Exception as exc:
         errors.append(f"{path}: invalid JSON ({exc})")
         return errors, warnings
+
+    if path.name == "0_pipeline.ipynb":
+        for cell_idx, cell in enumerate(nb.get("cells", [])):
+            if cell.get("cell_type") != "code":
+                continue
+            if cell.get("execution_count") is not None:
+                errors.append(
+                    f"{path}:cell{cell_idx}: compact release notebook must have "
+                    "null execution counts"
+                )
+            if cell.get("outputs"):
+                errors.append(
+                    f"{path}:cell{cell_idx}: compact release notebook must be "
+                    "saved without outputs"
+                )
 
     for cell_idx, source in _iter_code_cells(nb):
         cell_label = f"{path}:cell{cell_idx}"

@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
 
+import numpy as np
+
 from modules.model.geometry import cell_sections
 
 
@@ -142,9 +144,133 @@ def run_passive_protocol(
     return run_sim.looped_current_injection(cell, dict(sim_params), list(sim_amps))
 
 
+def passive_amplitude_colors(
+    sim_amps: Sequence[float],
+    *,
+    single_trace_color: Optional[str] = None,
+) -> dict[float, str]:
+    """Return deterministic colors shared by passive plots and result tables."""
+
+    from matplotlib import rcParams
+    from matplotlib.colors import to_hex
+
+    amplitudes = list(dict.fromkeys(float(value) for value in sim_amps))
+    if not amplitudes:
+        return {}
+    if len(amplitudes) == 1 and single_trace_color:
+        return {amplitudes[0]: to_hex(single_trace_color)}
+    cycle = list(rcParams["axes.prop_cycle"].by_key().get("color", ("#1f77b4",)))
+    return {
+        amp: to_hex(cycle[index % len(cycle)])
+        for index, amp in enumerate(amplitudes)
+    }
+
+
+def plot_passive_trace_check(
+    *,
+    looped_records: Mapping[str, Any],
+    sim_params: Mapping[str, Any],
+    sim_amps: Sequence[float],
+    cell_name: str,
+    tune_name: str,
+    xlim: Optional[tuple[Optional[float], Optional[float]]] = None,
+    ylim: Optional[tuple[Optional[float], Optional[float]]] = None,
+    single_trace_color: Optional[str] = None,
+    amplitude_colors: Optional[Mapping[float, str]] = None,
+) -> Any:
+    """Plot passive voltage traces using the colors shared with result tables."""
+
+    import matplotlib.pyplot as plt
+
+    amplitudes = [float(value) for value in sim_amps]
+    colors = dict(
+        amplitude_colors
+        or passive_amplitude_colors(
+            amplitudes,
+            single_trace_color=single_trace_color,
+        )
+    )
+    figure, axis = plt.subplots(figsize=(7, 4))
+    for amp in amplitudes:
+        axis.plot(
+            looped_records["T"][amp],
+            looped_records["V"][amp],
+            label=f"{amp:g} pA",
+            color=colors.get(amp),
+        )
+    stim_start = float(sim_params["stim_delay"])
+    stim_stop = stim_start + float(sim_params["stim_dur"])
+    axis.axvspan(stim_start, stim_stop, alpha=0.12, color="gray", label="stimulus")
+    axis.set_xlabel("Time (ms)")
+    axis.set_ylabel("Membrane voltage (mV)")
+    axis.set_title(f"{cell_name} {tune_name} passive check")
+    axis.grid(True, alpha=0.3)
+    axis.legend(loc="best")
+    if xlim is not None:
+        axis.set_xlim(*xlim)
+    if ylim is not None:
+        axis.set_ylim(*ylim)
+    figure.tight_layout()
+    return figure
+
+
+def _local_gettable_passive_metrics(
+    voltage_mv: Sequence[float],
+    *,
+    dt_ms: float,
+    stim_start_ms: float,
+    stim_end_ms: float,
+    amp_nA: float,
+) -> dict[str, float]:
+    """Return ACT-compatible passive trace metrics without importing ACT."""
+
+    voltage = np.asarray(voltage_mv, dtype=float)
+    dt = float(dt_ms)
+    if voltage.ndim != 1 or voltage.size < 3:
+        raise ValueError("Passive voltage traces must be one-dimensional.")
+    if dt <= 0:
+        raise ValueError("Passive protocol dt must be positive.")
+
+    rest_index = int(float(stim_start_ms) / dt) - 1
+    final_index = int(float(stim_end_ms) / dt) - 1
+    if rest_index < 0 or final_index >= voltage.size or final_index <= rest_index:
+        raise ValueError(
+            "Passive metric window falls outside the recorded voltage trace."
+        )
+    trough_index = rest_index + int(np.argmin(voltage[rest_index:]))
+
+    v_rest = voltage[rest_index]
+    v_trough = voltage[trough_index]
+    v_final = voltage[final_index]
+    tau1_threshold = v_rest - (v_rest - v_trough) * 0.632
+    tau1_index = int(np.argmax(voltage[rest_index:] < tau1_threshold))
+    tau1_ms = tau1_index * dt
+
+    tau2_threshold = v_trough - (v_trough - v_final) * 0.632
+    tau2_index = int(np.argmax(voltage[trough_index:] > tau2_threshold))
+    tau2_ms = tau2_index * dt
+    trough_delta = v_rest - v_trough
+    sag_delta = v_final - v_trough
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rin_mohm = np.divide(v_rest - v_final, -float(amp_nA))
+        tau_avg_ms = np.divide(
+            trough_delta * tau1_ms + sag_delta * tau2_ms,
+            trough_delta + sag_delta,
+        )
+        sag_ratio = np.divide(sag_delta, trough_delta)
+    return {
+        "R_in_rest_to_final": float(rin_mohm),
+        "tau_rest_to_trough": float(tau1_ms),
+        "tau_avg": float(tau_avg_ms),
+        "sag_ratio": float(sag_ratio),
+        "V_rest": float(v_rest),
+    }
+
+
 def passive_metric_rows(
     *,
-    act_passive_module: Any,
+    act_passive_module: Any = None,
     looped_records: Mapping[str, Any],
     sim_params: Mapping[str, Any],
     sim_amps: Iterable[float],
@@ -163,22 +289,34 @@ def passive_metric_rows(
             "spike_frequency_hz": float(looped_records["F"][amp]),
         }
         if amp_f < 0:
-            gpp = act_passive_module.compute_gpp(
-                looped_records["V"][amp],
-                dt,
-                stim_start,
-                stim_end,
-                amp_f / 1000.0,
-            )
-            for key in (
-                "R_in_rest_to_final",
-                "tau_rest_to_trough",
-                "tau_avg",
-                "sag_ratio",
-                "V_rest",
-            ):
-                if hasattr(gpp, key):
-                    row[key] = float(getattr(gpp, key))
+            if act_passive_module is None:
+                measured = _local_gettable_passive_metrics(
+                    looped_records["V"][amp],
+                    dt_ms=dt,
+                    stim_start_ms=stim_start,
+                    stim_end_ms=stim_end,
+                    amp_nA=amp_f / 1000.0,
+                )
+            else:
+                gpp = act_passive_module.compute_gpp(
+                    looped_records["V"][amp],
+                    dt,
+                    stim_start,
+                    stim_end,
+                    amp_f / 1000.0,
+                )
+                measured = {
+                    key: float(getattr(gpp, key))
+                    for key in (
+                        "R_in_rest_to_final",
+                        "tau_rest_to_trough",
+                        "tau_avg",
+                        "sag_ratio",
+                        "V_rest",
+                    )
+                    if hasattr(gpp, key)
+                }
+            row.update(measured)
         rows.append(row)
     return rows
 
@@ -198,7 +336,10 @@ def passive_proposal_changes(
                     "field": field,
                     "old": None,
                     "new": float(getattr(settable_passive_properties, field)),
-                    "note": "Computed by ACTPassiveModule.compute_spp; review before applying to model files.",
+                    "note": (
+                        "Computed by ACTPassiveModule.compute_spp; review before "
+                        "applying to model files."
+                    ),
                 }
             )
     return rows

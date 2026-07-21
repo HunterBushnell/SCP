@@ -1,197 +1,146 @@
 # Pipeline Overview
 
-SCP is organized as a notebook-first workflow with optional CLI/SLURM entry
-points for larger simulations.
+SCP is a config-driven, notebook-first workflow with optional CLI and SLURM
+entry points. [`0_pipeline.ipynb`](../0_pipeline.ipynb) is the recommended
+simple front door; the numbered notebooks expose the full workflow.
 
-## Compact Flow
+## Compact Lifecycle
 
-`0_pipeline.ipynb` is the simple front door for Steps 1–5. Run All renders five
-independent widget panels; it does not automatically load or simulate a model.
-The user then runs the enabled panels in order:
+**Run All** renders five independent widget panels. It does not load a model or
+start a simulation.
 
-1. safely fills missing standard configs and builds one shared tuning cell,
-2. runs passive checks and an optional review-only ACT passive proposal,
-3. runs active traces and an FI-curve comparison,
-4. optionally opens BMTool's `SingleEvent()` and `InteractiveTuner()`, and
-5. launches the final simulation in a fresh Python process, reloads the saved
-   manifest, and displays standard diagnostics.
+```text
+Step 1                  Steps 2–4                       Step 5
+prepare + build once -> reuse one in-kernel cell -> fresh preview/simulation
+       |                       |                           |
+       v                       v                           v
+ validated tune       passive / active / BMTool      saved run manifest
+```
 
-Each panel owns its controls, Run button, status, and output area. There is no
-global dashboard or accordion. The editable `pipeline_settings` mapping and
-visible widgets synchronize in both directions, while advanced protocol
-override dictionaries remain available in Python.
+1. **Setup and Load** fills missing standard configs, validates the tune,
+   compiles/loads mechanisms when needed, and constructs exactly one shared
+   tuning cell.
+2. **Passive Tuning** keeps the ACT proposal and passive protocol as separate,
+   review-only actions.
+3. **Active Tuning and FI Curve** keeps active sweeps, FI checks, and
+   experimental ACT active tuning independent.
+4. **Synapse Tuning** optionally initializes BMTool around the shared cell, then
+   exposes Single Event and Interactive Tuner separately.
+5. **Check Inputs, Simulate, and Plot** previews inputs and runs the final model
+   in fresh processes, loads the saved manifest, and plots compact diagnostics.
 
-Existing config values are preserved. Changes to runtime, target, geometry, and
-synapse JSON files are refreshed at their consuming stage. Changes to the cell
-loader, morphology, fit/HOC sources, or MOD sources require a kernel restart so
-the in-memory model cannot silently diverge from disk.
+Each card owns its controls, status, and output. There are no tabs, accordions,
+or global run button. Advanced options expand only within the relevant card.
+
+## Settings and Config Ownership
+
+`pipeline_settings` and the widgets synchronize in both directions. Rerunning
+the settings cell refreshes unlocked widgets; widget edits update the mapping.
+Model-selection fields lock after Step 1 because the model may only be built
+once per kernel.
+
+The compact UI has two kinds of values:
+
+- **File-backed config:** the durable source of truth under
+  `cell_configs/*.json` and `cell_configs/syn_groups/*.json`.
+- **Session-only override:** a widget or `pipeline_settings` value used for the
+  current notebook session. It does not rewrite JSON automatically.
+
+Missing standard configs are scaffolded in fill mode, preserving existing
+values and loader metadata. Runtime, target, geometry, and synapse files are
+reloaded by the stage that consumes them.
+
+## One-Cell and Restart Rules
+
+Steps 2–4 reuse the exact cell constructed in Step 1. Source fingerprints guard
+the in-memory model against silent changes.
+
+Restart the kernel after changing:
+
+- `cell_config.json` or loader-owned model artifacts,
+- morphology or fit/HOC sources,
+- MOD sources or their mechanism contract.
+
+A restart is not required for runtime, target, geometry, or synapse JSON edits;
+rerun the consuming action instead. ACT target or option edits require
+**Prepare ACT workspace** again.
+
+## Fresh-Process Boundary
+
+Input preview and final simulation intentionally avoid the shared tuning cell.
+They run through subprocess workers so current JSON files are reloaded and
+BMTool/current-clamp state cannot leak into the final run. Step 5 always saves a
+unique `pipeline_<timestamp>` result unless an explicit output stem is supplied;
+the explicit stem takes precedence over the configured stem.
+
+The optional seed is shared: it is displayed by **Check Inputs** and passed to
+the final simulation. Quiet modes capture full merged subprocess streams in:
+
+- `pipeline_ui.step1_load_log`
+- `pipeline_ui.input_preview_log`
+- `pipeline_ui.simulation_log`
+
+Visible outputs remain limited to SCP summaries, requested tables, and plots.
+
+## Tuning Boundaries
+
+Passive ACT values, active ACT predictions, and BMTool results are proposals.
+The compact notebook never applies them automatically to fit, HOC, JSON, or MOD
+files.
+
+ACT active tuning is experimental, review-only, and not release-blocking. Its
+optimization/evaluation workers are isolated and cancellable. The complete
+tune-local `act_workspace/` is generated, machine-specific state ignored by
+Git. Use [`3_active.ipynb`](../3_active.ipynb) for detailed ACT setup and
+inspection.
 
 ## Detailed Flow
 
-1. `1_setup.ipynb`: prepare a tune directory.
-2. `2_passive.ipynb`: tune/check passive cell properties.
-3. `3_active.ipynb`: tune/check active/channel properties.
-4. `4_synapses.ipynb`: define and tune synapse groups.
-5. `5_simulate.ipynb`: run the final simulation workflow.
-6. `6_analysis.ipynb`: analyze and compare saved runs.
-7. `7_tools.ipynb`: run optional utility scripts from a notebook.
+Use the numbered notebooks when a stage needs more control:
 
-Use the numbered flow when you need its extended setup, ACT active optimization,
-synapse placement/optimization/export, simulation, or analysis controls. Step 5
-is its main simulation destination; Step 6 is optional post-processing; Step 7
-is optional maintenance and export tooling.
+1. [`1_setup.ipynb`](../1_setup.ipynb): download/stage models, configure
+   loaders and targets, compile mechanisms, and validate.
+2. [`2_passive.ipynb`](../2_passive.ipynb): detailed passive targets,
+   proposals, protocols, and manual tuning checks.
+3. [`3_active.ipynb`](../3_active.ipynb): detailed active sweeps, FI targets,
+   and ACT workspace controls.
+4. [`4_synapses.ipynb`](../4_synapses.ipynb): BMTool setup, placement,
+   response, optimization, and exports.
+5. [`5_simulate.ipynb`](../5_simulate.ipynb): detailed simulation setup and
+   execution.
+6. [`6_analysis.ipynb`](../6_analysis.ipynb): saved-run analysis,
+   comparisons, metrics, styling, and exports.
+7. [`7_tools.ipynb`](../7_tools.ipynb): optional maintenance and conversion
+   tools.
 
-## Step 1 Setup
-
-Step 1 prepares the tune directory contract used by later steps:
-
-- model source files declared by the selected loader, such as an Allen Database
-  bundle or an existing HOC template,
-- optional tune-local `.mod` sources and compiled NEURON mechanisms,
-- `cell_configs/cell_config.json`,
-- `cell_configs/sim_config.json`,
-- `cell_configs/geometry.json`,
-- optional `cell_configs/syn_config.json` and `cell_configs/syn_groups/*.json`,
-- validation checks for files, cell loading, compiled mechanisms when sources
-  exist, and optional inputs.
-
-Notebook: `1_setup.ipynb`
-
-CLI equivalent:
-
-```bash
-python scripts/step1_prepare.py --cell PV --tune orig --specimen-id 484635029 --model-type perisomatic
-```
-
-See `guides/step_1_setup.md`.
-
-## Step 2 Passive Tuning
-
-Step 2 runs passive current-clamp diagnostics directly through SCP's normalized
-cell interface. Optional ACT helper functions can estimate passive membrane
-values from target measurements; model edits remain under user control. The
-core target-free workflow can run locally or in Colab without ACT.
-
-Passive targets can be entered directly in `target_config.json`, set in the
-notebook, or extracted from downloaded Allen/ADB ephys NWB negative-current
-sweeps.
-
-Notebook: `2_passive.ipynb`
-
-See `guides/step_2_passive.md`.
-
-## Step 3 Active Tuning
-
-Step 3 provides:
-
-- manual active current-step checks,
-- active-spiking metrics,
-- voltage/current diagnostic plots,
-- FI-curve checks,
-- optional ACT active-tuning workspace generation and CLI execution.
-
-ACT target data can be supplied as direct FI arrays, FI CSV, Allen/ADB ephys NWB
-files, or ACT-compatible trace `.npy` files. The exact file contracts are in
-`docs/reference/target_trace_formats.md`. The currently robust public paths
-include passive-target extraction in Step 2 and FI-target CSV generation in
-Step 3 from downloaded Allen/ADB NWB files.
-
-Notebook: `3_active.ipynb`
-
-See `guides/step_3_active.md`.
-
-## Step 4 Synapse Tuning
-
-Step 4 is a BMTool-based chemical synapse tuning workflow. It adapts SCP tune
-files into BMTool's SynapseTuner flow and prints copyable parameter blocks for
-`cell_configs/syn_groups/*.json`.
-
-Notebook: `4_synapses.ipynb`
-
-See `guides/step_4_synapses.md`.
-
-## Step 5 Simulation
-
-Step 5 loads the prepared tune and runs:
-
-- cell loading,
-- geometry definition,
-- optional input generation from synapse configs,
-- optional synapse-placement preview and attachment,
-- cell-only current injection when IClamp is enabled,
-- simulation,
-- saving and optional auto-plotting.
-
-Notebook: `5_simulate.ipynb`
-
-CLI:
-
-```bash
-python run_pipeline.py --tune-dir cells/PV/tunes/tuned --n-trials 1 --force-save
-```
-
-SLURM:
-
-```bash
-CELL=SST TUNE=tuned N_TRIALS=10 sbatch run_slurm.sh
-```
-
-See `guides/step_5_simulate.md` and `advanced/cli_slurm.md`.
-
-## Step 6 Analysis
-
-Step 6 analyzes saved Step 5 outputs. It includes:
-
-- a compact single-plot workflow,
-- advanced output and input plotting UIs,
-- extra analysis modes for metrics, config comparisons, input sampling,
-  synapse summaries, snapshot comparison, and table exports.
-
-Notebook: `6_analysis.ipynb`
-
-See `guides/analysis.md` for usage and `guides/step_6_analysis.md` for detailed
-preset/default-field references.
-
-## Local vs Colab
-
-The root notebooks, including `0_pipeline.ipynb`, are the current local and Colab
-entry points. Local notebooks assume the environment is installed. Colab
-notebooks can clone SCP and install runtime dependencies when needed.
-
-CLI/SLURM entry points are local/HPC-oriented and use the same config files as
-the notebooks.
-
-## Step 7 Extra Tools
-
-Step 7 wraps small utility scripts for notebook-first users:
-
-- restore saved run values into tune configs,
-- inspect and optionally restore archived loader-owned model artifacts,
-- export `spikes.npz` to CSV,
-- merge compatible run outputs,
-- clear `slurm_*` output folders.
-
-Notebook: `7_tools.ipynb`
-
-See `guides/step_7_tools.md`.
+See the [step guides](README.md#step-guides) for controls and limitations.
 
 ## Data Flow
 
 Inputs:
 
-- loader-owned model sources, such as `manifest.json` or a HOC template
-- optional configured tune-local MOD source directory
-- `cells/<CELL>/tunes/<TUNE>/cell_configs/`
-- optional `external_data/` sources
-- optional local Allen/ADB ephys `.nwb` files for Step 2 passive and Step 3 ACT targets
+- loader-owned model sources such as `manifest.json` or a HOC template,
+- optional tune-local MOD sources,
+- `cells/<CELL>/tunes/<TUNE>/cell_configs/`,
+- optional external target/input data.
 
-Outputs:
+Durable simulation outputs:
 
-- `cells/<CELL>/tunes/<TUNE>/output_data/<RUN>/`
-- `run_manifest.json`
-- sidecars such as `sim_cfg.json`, `syn_config.json`, `spikes.npz`, and `traces.npz`
-- loader/source provenance under `model_artifacts/` when result sidecars are saved
-- notebook-only diagnostics under `notebook_exports/`
-- ACT active-tuning artifacts under `act_workspace/`
+```text
+cells/<CELL>/tunes/<TUNE>/output_data/<RUN>/
+```
 
-See `reference/outputs_layout.md`.
+`run_manifest.json` indexes saved arrays, config sidecars, plots, and model
+provenance. Notebook diagnostics may use `notebook_exports/`; experimental ACT
+uses ignored `act_workspace/` state. See the [output layout](reference/outputs_layout.md).
+
+## CLI and SLURM
+
+The CLI and SLURM paths consume the same prepared tune configs:
+
+```bash
+python run_pipeline.py --tune-dir cells/PV/tunes/tuned --n-trials 1 --force-save
+CELL=SST TUNE=tuned N_TRIALS=10 sbatch run_slurm.sh
+```
+
+See [CLI and SLURM](advanced/cli_slurm.md).

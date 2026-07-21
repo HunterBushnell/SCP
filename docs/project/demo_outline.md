@@ -23,7 +23,8 @@ Key points:
 
 Show these top-level pieces:
 
-- `1_setup.ipynb` through `7_tools.ipynb`: numbered notebook workflow.
+- `0_pipeline.ipynb`: recommended compact, per-step UI for Steps 1–5.
+- `1_setup.ipynb` through `7_tools.ipynb`: detailed notebook workflow.
 - `cells/<CELL>/tunes/<TUNE>/`: self-contained model/tune directories.
 - `cell_configs/`: model, target, simulation, geometry, and synapse configs.
 - `modules/`: backend code used by notebooks, CLI, and SLURM entry points.
@@ -37,6 +38,11 @@ cells/PV/tunes/tuned/
 ```
 
 ## 3. Main Workflow
+
+For the main demo, open `0_pipeline.ipynb`, choose **Run All**, and show how
+each step has its own small card and output. Emphasize that Steps 2–4 reuse one
+loaded cell, while Check Inputs and Run Simulation use fresh processes so they
+reload current configs and avoid carrying BMTool state into the final run.
 
 ### Step 1: Setup
 
@@ -75,8 +81,10 @@ Purpose:
 
 Current caveat:
 
-- Step 3.4 ACT active auto-tuning is exposed, but deeper workflow validation is
-  still pending ACT-side review.
+- Both Step 3 notebooks expose review-only ACT execution. The compact path is
+  experimental and not release-blocking; it adds isolated/cancellable execution
+  and provenance checks, but model-specific scientific tuning quality still
+  needs ACT-side review.
 
 ### Step 4: Synapses
 
@@ -158,12 +166,15 @@ Important config files:
 
 Current status:
 
-- Main notebook workflow has been validated through Step 6 in Colab.
+- The detailed notebook workflow has been validated through Step 6 in Colab.
+- The compact notebook has release checks for output-free state and a Run-All
+  interface-render execution; its scientific actions remain explicitly
+  user-triggered.
 - PV/SST example simulation paths have been validated locally and in Colab.
 - CLI and SLURM simulation entry points have been checked on the current
   examples.
-- ACT active auto-tuning remains the major intentionally pending validation
-  item.
+- Model-specific ACT active tuning quality remains the major intentionally
+  pending validation item; the workflow machinery is covered separately.
 
 ## 6. Feedback To Request
 

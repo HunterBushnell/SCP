@@ -60,7 +60,7 @@ Step 3 optional ACT active tuning writes under:
 cells/<CELL>/tunes/<TUNE>/act_workspace/
 ```
 
-Typical small review/config files:
+Typical generated review/config files:
 
 - `cell_builder.py`
 - `act_active_config.json`
@@ -69,8 +69,9 @@ Typical small review/config files:
 - `metrics_<module>.csv`
 - `prediction_<module>.json`
 
-Heavy module/output folders under `act_workspace/` are generated artifacts and
-are ignored by Git.
+The complete `act_workspace/` directory is generated, machine-specific state and
+is ignored by Git. It may contain absolute paths and multiprocessing artifacts;
+keep it locally or archive selected review results outside the workspace.
 
 ## SLURM Array Runs
 
@@ -108,7 +109,6 @@ The repo ignores local/generated data such as:
 - `cells/**/*.nwb`
 - `cells/**/output_data/`
 - `cells/**/notebook_exports/`
-- `cells/**/act_workspace/module_*/`
-- `cells/**/act_workspace/output/`
+- `cells/**/act_workspace/`
 - `cells/**/x86_64/`
 - `cells/**/modfiles/x86_64/`

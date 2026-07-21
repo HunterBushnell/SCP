@@ -3,10 +3,10 @@
 The public numbered notebooks remain the detailed teaching interfaces.  This
 module provides the smaller, progressive workflow used by ``0_pipeline.ipynb``:
 
-* safely fill/validate a prepared tune (or explicitly requested ADB download),
+* safely fill/validate an already prepared tune,
 * construct one in-kernel cell for passive, active, and BMTool checks,
 * detect model-source edits that require a kernel restart, and
-* run the final Step 5 simulation in a clean Python process.
+* preview Step 5 inputs and run the final simulation in clean Python processes.
 """
 
 from __future__ import annotations
@@ -14,8 +14,11 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import pickle
 import subprocess
 import sys
+import tempfile
+from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -106,6 +109,37 @@ class PipelinePassiveResult:
 
 
 @dataclass
+class PipelinePassiveProposalResult:
+    """Review-only ACT passive proposal computed from current targets."""
+
+    resolution: Any
+    proposal_changes: list[dict[str, Any]]
+
+
+@dataclass
+class PipelineActiveProtocolResult:
+    """Active current-step traces and metrics from the shared cell."""
+
+    sim_params: dict[str, Any]
+    records: dict[str, Any]
+    metrics: list[dict[str, Any]]
+    figure: Any
+
+
+@dataclass
+class PipelineFIResult:
+    """FI sweep, configured-target comparison, and plot."""
+
+    sim_params: dict[str, Any]
+    records: dict[str, Any]
+    metrics: list[dict[str, Any]]
+    fi_rows: list[dict[str, float]]
+    target_reference: list[tuple[float, float]]
+    target_comparison: list[dict[str, Any]]
+    figure: Any
+
+
+@dataclass
 class PipelineActiveResult:
     active_sim_params: dict[str, Any]
     active_records: dict[str, Any]
@@ -125,6 +159,18 @@ class PipelineSimulationResult:
     output_stem: str
     manifest_path: Path
     results: dict[str, Any]
+    command: tuple[str, ...]
+    stdout: str
+
+
+@dataclass
+class PipelineInputPreviewResult:
+    """Preview-only input and synapse records produced in a fresh process."""
+
+    syn_state: dict[str, Any]
+    summary: dict[str, Any]
+    session_summary: dict[str, Any]
+    trial_idx: int
     command: tuple[str, ...]
     stdout: str
 
@@ -166,8 +212,6 @@ def _resolve_tune_path(
 
 def _select_setup_source(
     tune_dir: Path,
-    *,
-    adb_specimen_id: Optional[int],
 ) -> tuple[str, str, dict[str, Any]]:
     """Return ``(source_type, loader, existing_cell_config)`` for setup."""
 
@@ -181,7 +225,7 @@ def _select_setup_source(
             existing.get(key) not in (None, "")
             for key in ("cell_loader", "loader", "model_loader")
         )
-        if not has_explicit_loader and adb_specimen_id is None:
+        if not has_explicit_loader:
             paths = existing.get("paths", {}) or {}
             if not isinstance(paths, dict):
                 raise TypeError("cell_config.json paths must be an object/dict.")
@@ -195,15 +239,8 @@ def _select_setup_source(
                     "this custom model first, then return to 0_pipeline.ipynb."
                 )
         loader = get_cell_loader_name(existing)
-        if adb_specimen_id is not None and loader != "allen_manifest":
-            raise ValueError(
-                "adb_specimen_id can only be used with the allen_manifest loader. "
-                "Clear adb_specimen_id for this configured tune."
-            )
-        return ("adb" if adb_specimen_id is not None else "existing", loader, existing)
+        return "existing", loader, existing
 
-    if adb_specimen_id is not None:
-        return "adb", "allen_manifest", {}
     if (tune_dir / "manifest.json").is_file():
         return "existing", "allen_manifest", {}
     raise FileNotFoundError(
@@ -219,14 +256,12 @@ def prepare_pipeline_notebook(
     cell_name: Optional[str] = "PV",
     tune_name: Optional[str] = "tuned",
     tune_dir_override: Optional[str | Path] = None,
-    adb_specimen_id: Optional[int] = None,
-    adb_model_type: str = "perisomatic",
     recompile_modfiles: bool = False,
 ) -> PipelineNotebookState:
     """Fill, validate, and build the single cell shared by Steps 2--4.
 
-    Existing config values always win.  A network-backed ADB setup is attempted
-    only when ``adb_specimen_id`` is explicitly supplied.
+    Existing config values always win. New model acquisition and loader setup
+    belong in ``1_setup.ipynb``; this compact workflow only loads prepared tunes.
     """
 
     from modules.notebooks.helpers import ensure_scp_repo_on_syspath
@@ -240,10 +275,7 @@ def prepare_pipeline_notebook(
         tune_name=tune_name,
         tune_dir_override=tune_dir_override,
     )
-    source_type, loader_name, existing_config = _select_setup_source(
-        tune_dir,
-        adb_specimen_id=adb_specimen_id,
-    )
+    source_type, loader_name, existing_config = _select_setup_source(tune_dir)
     inferred_cell, inferred_tune = _infer_labels(tune_dir)
     resolved_cell = str(cell_name or existing_config.get("cell_name") or inferred_cell)
     resolved_tune = str(tune_name or existing_config.get("tune") or inferred_tune)
@@ -262,13 +294,11 @@ def prepare_pipeline_notebook(
         tune_dir=tune_dir,
         cell_name=resolved_cell,
         tune_name=resolved_tune,
-        specimen_id=adb_specimen_id,
-        model_type=str(adb_model_type),
         source_type=source_type,
         cell_loader=loader_name,
         soma_diam_multiplier=soma_multiplier,
         color=existing_color,
-        do_download=adb_specimen_id is not None,
+        do_download=False,
         force_download=False,
         do_compile_modfiles=True,
         recompile_modfiles=bool(recompile_modfiles),
@@ -411,18 +441,69 @@ def _protocol_params(
 
 
 def _display_rows(title: str, rows: Sequence[Mapping[str, Any]]) -> None:
-    if not rows:
-        print(f"{title}: none")
-        return
-    print(title + ":")
-    try:
-        import pandas as pd
-        from IPython.display import display
+    from modules.tuning import display_tuning_rows
 
-        display(pd.DataFrame(list(rows)))
-    except Exception:
-        for row in rows:
-            print(json.dumps(dict(row), indent=2, default=str))
+    display_tuning_rows(title, rows)
+
+
+def compute_passive_proposal(
+    state: PipelineNotebookState,
+    *,
+    manual_passive_targets: Optional[Mapping[str, Any]] = None,
+    passive_area_mode: str = "auto",
+    passive_area_scale: float = 1.0,
+) -> PipelinePassiveProposalResult:
+    """Compute and display an ACT passive proposal without running a protocol.
+
+    The proposal is review-only: this function never applies values to model
+    sources or mutates the shared in-kernel cell.
+    """
+
+    context = _refreshed_context(state)
+    from modules.tuning import (
+        passive_proposal_changes,
+        resolve_passive_tuning_inputs,
+    )
+
+    manual_targets = dict(manual_passive_targets or {})
+    manual_mode = (
+        "manual"
+        if manual_targets
+        and all(
+            manual_targets.get(field) is not None
+            for field in (
+                "target_rin_mohm",
+                "target_tau_ms",
+                "target_v_rest_mv",
+            )
+        )
+        else None
+    )
+    resolution = resolve_passive_tuning_inputs(
+        context=context,
+        cell=state.cell,
+        manual_passive_targets=manual_targets,
+        use_target_config=True,
+        target_source_mode=manual_mode,
+        compute_act_proposal=True,
+        passive_area_mode=passive_area_mode,
+        passive_area_scale=float(passive_area_scale),
+        extract_from_nwb=False,
+        apply_extracted_targets_to_config=False,
+    )
+    changes = passive_proposal_changes(
+        settable_passive_properties=resolution.settable_passive_properties,
+        target_file=(
+            str(resolution.fit_json_candidates[0])
+            if resolution.fit_json_candidates
+            else "manual_review"
+        ),
+    )
+    _display_rows("ACT passive proposal (review only; not applied)", changes)
+    return PipelinePassiveProposalResult(
+        resolution=resolution,
+        proposal_changes=changes,
+    )
 
 
 def run_passive_stage(
@@ -430,6 +511,7 @@ def run_passive_stage(
     *,
     amps_pA: Sequence[float] = (-50.0, -100.0),
     compute_act_proposal: bool = False,
+    manual_passive_targets: Optional[Mapping[str, Any]] = None,
     protocol_overrides: Optional[Mapping[str, Any]] = None,
     passive_area_mode: str = "auto",
     passive_area_scale: float = 1.0,
@@ -448,17 +530,37 @@ def run_passive_stage(
 
     from modules.tuning import (
         compare_passive_targets,
+        display_passive_analysis,
+        passive_amplitude_colors,
         passive_metric_rows,
         passive_proposal_changes,
+        plot_passive_trace_check,
         resolve_passive_tuning_inputs,
         run_passive_protocol,
+    )
+
+    manual_targets = dict(manual_passive_targets or {})
+    manual_mode = (
+        "manual"
+        if manual_targets
+        and all(
+            manual_targets.get(field) is not None
+            for field in (
+                "target_rin_mohm",
+                "target_tau_ms",
+                "target_v_rest_mv",
+            )
+        )
+        else None
     )
 
     try:
         resolution = resolve_passive_tuning_inputs(
             context=context,
             cell=state.cell,
+            manual_passive_targets=manual_targets,
             use_target_config=True,
+            target_source_mode=manual_mode,
             compute_act_proposal=bool(compute_act_proposal),
             passive_area_mode=passive_area_mode,
             passive_area_scale=float(passive_area_scale),
@@ -487,21 +589,12 @@ def run_passive_stage(
         sim_params=sim_params,
         sim_amps=amp_values,
     )
-    if resolution.act_passive_module is not None:
-        metrics = passive_metric_rows(
-            act_passive_module=resolution.act_passive_module,
-            looped_records=records,
-            sim_params=sim_params,
-            sim_amps=amp_values,
-        )
-    else:
-        metrics = [
-            {
-                "amp_pA": amp,
-                "spike_frequency_hz": float(records["F"][amp]),
-            }
-            for amp in amp_values
-        ]
+    metrics = passive_metric_rows(
+        act_passive_module=resolution.act_passive_module,
+        looped_records=records,
+        sim_params=sim_params,
+        sim_amps=amp_values,
+    )
     comparison = compare_passive_targets(metrics, resolution.passive_targets)
     proposal_changes = (
         passive_proposal_changes(
@@ -516,29 +609,34 @@ def run_passive_stage(
         else []
     )
 
+    single_trace_color = (
+        context.cell_config.get("color") if len(amp_values) == 1 else None
+    )
+    amplitude_colors = passive_amplitude_colors(
+        amp_values,
+        single_trace_color=single_trace_color,
+    )
+    fig = plot_passive_trace_check(
+        looped_records=records,
+        sim_params=sim_params,
+        sim_amps=amp_values,
+        cell_name=context.cell_name,
+        tune_name=context.tune_name,
+        single_trace_color=single_trace_color,
+        amplitude_colors=amplitude_colors,
+    )
+
     import matplotlib.pyplot as plt
 
-    fig, axis = plt.subplots(figsize=(7, 4))
-    color = context.cell_config.get("color") if len(amp_values) == 1 else None
-    for amp in amp_values:
-        kwargs = {"label": f"{amp:g} pA"}
-        if color is not None:
-            kwargs["color"] = color
-        axis.plot(records["T"][amp], records["V"][amp], **kwargs)
-    start = float(sim_params["stim_delay"])
-    stop = start + float(sim_params["stim_dur"])
-    axis.axvspan(start, stop, alpha=0.12, color="gray", label="stimulus")
-    axis.set_xlabel("Time (ms)")
-    axis.set_ylabel("Membrane voltage (mV)")
-    axis.set_title(f"{context.cell_name} {context.tune_name} passive check")
-    axis.grid(True, alpha=0.3)
-    axis.legend(loc="best")
-    fig.tight_layout()
     plt.show()
 
-    _display_rows("Passive metrics", metrics)
-    _display_rows("Passive target comparison", comparison)
-    _display_rows("ACT passive proposal (review only; not applied)", proposal_changes)
+    display_passive_analysis(
+        metrics,
+        comparison,
+        amplitude_colors=amplitude_colors,
+    )
+    if proposal_changes:
+        _display_rows("ACT passive proposal (review only; not applied)", proposal_changes)
     return PipelinePassiveResult(
         resolution=resolution,
         sim_params=sim_params,
@@ -550,37 +648,39 @@ def run_passive_stage(
     )
 
 
-def run_active_stage(
+def run_active_protocol_stage(
     state: PipelineNotebookState,
     *,
     active_amps_pA: Sequence[float] = (150.0, 300.0),
-    fi_amps_pA: Sequence[float] = tuple(range(0, 301, 50)),
     protocol_overrides: Optional[Mapping[str, Any]] = None,
     spike_threshold_mV: float = -20.0,
     include_currents: bool = True,
-) -> PipelineActiveResult:
-    """Run compact active sweeps and an FI curve against configured targets."""
+    current_amp_pA: Optional[float] = None,
+) -> PipelineActiveProtocolResult:
+    """Run and display only the compact active current-step protocol."""
 
     context = _refreshed_context(state)
     active_amps = [float(value) for value in active_amps_pA]
-    fi_amps = [float(value) for value in fi_amps_pA]
-    if not active_amps or not fi_amps:
-        raise ValueError("active_amps_pA and fi_amps_pA must both be non-empty.")
+    if not active_amps:
+        raise ValueError("active_amps_pA must contain at least one current step.")
+    selected_current_amp = (
+        active_amps[-1] if current_amp_pA is None else float(current_amp_pA)
+    )
+    if selected_current_amp not in active_amps:
+        raise ValueError(
+            "current_amp_pA must match one of the active_amps_pA values."
+        )
     active_params = _protocol_params(
         ACTIVE_PROTOCOL_DEFAULTS,
         sim_config=context.sim_config,
         overrides=protocol_overrides,
     )
-    fi_params = dict(active_params)
 
     from modules.tuning import (
+        active_amplitude_colors,
         active_metric_rows,
-        compare_fi_targets,
-        fi_reference_points_from_csv,
-        fi_rows_from_metrics,
+        display_active_analysis,
         plot_active_trace_check,
-        plot_fi_curve,
-        resolve_active_tuning_targets,
         run_active_protocol,
     )
 
@@ -595,6 +695,12 @@ def run_active_stage(
         sim_amps=active_amps,
         threshold_mv=float(spike_threshold_mV),
     )
+    amplitude_colors = active_amplitude_colors(
+        active_amps,
+        single_trace_color=(
+            context.cell_config.get("color") if len(active_amps) == 1 else None
+        ),
+    )
     active_figure = plot_active_trace_check(
         looped_records=active_records,
         sim_params=active_params,
@@ -602,7 +708,55 @@ def run_active_stage(
         cell_name=context.cell_name,
         tune_name=context.tune_name,
         include_currents=bool(include_currents),
+        current_amp=selected_current_amp,
         trace_color=context.cell_config.get("color"),
+        amplitude_colors=amplitude_colors,
+    )
+
+    import matplotlib.pyplot as plt
+
+    plt.show()
+    display_active_analysis(
+        active_metrics,
+        amplitude_colors=amplitude_colors,
+    )
+    return PipelineActiveProtocolResult(
+        sim_params=active_params,
+        records=active_records,
+        metrics=active_metrics,
+        figure=active_figure,
+    )
+
+
+def run_fi_curve_stage(
+    state: PipelineNotebookState,
+    *,
+    fi_amps_pA: Sequence[float] = tuple(range(0, 301, 50)),
+    protocol_overrides: Optional[Mapping[str, Any]] = None,
+    spike_threshold_mV: float = -20.0,
+) -> PipelineFIResult:
+    """Run and display only the FI sweep and configured-target comparison."""
+
+    context = _refreshed_context(state)
+    fi_amps = [float(value) for value in fi_amps_pA]
+    if not fi_amps:
+        raise ValueError("fi_amps_pA must contain at least one current step.")
+    fi_params = _protocol_params(
+        ACTIVE_PROTOCOL_DEFAULTS,
+        sim_config=context.sim_config,
+        overrides=protocol_overrides,
+    )
+
+    from modules.tuning import (
+        active_metric_rows,
+        compare_fi_targets,
+        display_fi_analysis,
+        fi_reference_points_from_csv,
+        fi_rows_from_metrics,
+        fi_series_colors,
+        plot_fi_curve,
+        resolve_active_tuning_targets,
+        run_active_protocol,
     )
 
     fi_records = run_active_protocol(
@@ -628,33 +782,77 @@ def run_active_stage(
     else:
         target_reference = target_resolution.fi_reference_points
     comparison = compare_fi_targets(fi_rows, target_reference)
+    series_colors = fi_series_colors(
+        model_color=context.cell_config.get("color"),
+    )
     fi_figure = plot_fi_curve(
         fi_rows=fi_rows,
         cell_name=context.cell_name,
         tune_name=context.tune_name,
         bio_reference=target_reference,
         show_bio_reference=bool(target_reference),
-        model_color=context.cell_config.get("color"),
+        model_color=series_colors["model"],
+        reference_color=series_colors["reference"],
     )
 
     import matplotlib.pyplot as plt
 
     plt.show()
-    _display_rows("Active metrics", active_metrics)
-    _display_rows("FI rows", fi_rows)
-    _display_rows("FI target comparison", comparison)
-    return PipelineActiveResult(
-        active_sim_params=active_params,
-        active_records=active_records,
-        active_metrics=active_metrics,
-        fi_sim_params=fi_params,
-        fi_records=fi_records,
-        fi_metrics=fi_metrics,
+    display_fi_analysis(
+        fi_rows,
+        comparison,
+        model_color=series_colors["model"],
+        reference_color=series_colors["reference"],
+    )
+    return PipelineFIResult(
+        sim_params=fi_params,
+        records=fi_records,
+        metrics=fi_metrics,
         fi_rows=fi_rows,
         target_reference=target_reference,
         target_comparison=comparison,
-        active_figure=active_figure,
-        fi_figure=fi_figure,
+        figure=fi_figure,
+    )
+
+
+def run_active_stage(
+    state: PipelineNotebookState,
+    *,
+    active_amps_pA: Sequence[float] = (150.0, 300.0),
+    fi_amps_pA: Sequence[float] = tuple(range(0, 301, 50)),
+    protocol_overrides: Optional[Mapping[str, Any]] = None,
+    spike_threshold_mV: float = -20.0,
+    include_currents: bool = True,
+    current_amp_pA: Optional[float] = None,
+) -> PipelineActiveResult:
+    """Run both Step 3 actions for code-based/backward-compatible use."""
+
+    active = run_active_protocol_stage(
+        state,
+        active_amps_pA=active_amps_pA,
+        protocol_overrides=protocol_overrides,
+        spike_threshold_mV=spike_threshold_mV,
+        include_currents=include_currents,
+        current_amp_pA=current_amp_pA,
+    )
+    fi = run_fi_curve_stage(
+        state,
+        fi_amps_pA=fi_amps_pA,
+        protocol_overrides=protocol_overrides,
+        spike_threshold_mV=spike_threshold_mV,
+    )
+    return PipelineActiveResult(
+        active_sim_params=active.sim_params,
+        active_records=active.records,
+        active_metrics=active.metrics,
+        fi_sim_params=fi.sim_params,
+        fi_records=fi.records,
+        fi_metrics=fi.metrics,
+        fi_rows=fi.fi_rows,
+        target_reference=fi.target_reference,
+        target_comparison=fi.target_comparison,
+        active_figure=active.figure,
+        fi_figure=fi.figure,
     )
 
 
@@ -727,6 +925,87 @@ def _unique_pipeline_stem() -> str:
     return datetime.now().strftime("pipeline_%Y%m%d_%H%M%S_%f")
 
 
+def preview_pipeline_inputs(
+    state: PipelineNotebookState,
+    *,
+    seed: Optional[int] = None,
+    trial_idx: int = 0,
+    stream_output: bool = True,
+) -> PipelineInputPreviewResult:
+    """Sample inputs and synapse placement safely in a fresh interpreter."""
+
+    state.assert_sources_unchanged()
+    trial = int(trial_idx)
+    if trial < 0:
+        raise ValueError("trial_idx must be non-negative.")
+
+    with tempfile.TemporaryDirectory(prefix="scp_pipeline_preview_") as temp_dir:
+        artifact = Path(temp_dir) / "input_preview.pkl"
+        command = [
+            sys.executable,
+            "-m",
+            "modules.notebooks.pipeline_preview_worker",
+            "--tune-dir",
+            str(state.tune_dir),
+            "--trial-idx",
+            str(trial),
+            "--output",
+            str(artifact),
+        ]
+        if seed is not None:
+            command.extend(("--seed", str(int(seed))))
+
+        env = dict(os.environ)
+        env["SCP_ROOT"] = str(state.repo_root)
+        env["PYTHONUNBUFFERED"] = "1"
+        if stream_output:
+            print("Checking inputs and synapse placement in a fresh process:")
+            print(" ", " ".join(command))
+        process = subprocess.Popen(
+            command,
+            cwd=str(state.repo_root),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        output_lines: list[str] = []
+        assert process.stdout is not None
+        try:
+            for line in process.stdout:
+                output_lines.append(line)
+                if stream_output:
+                    print(line, end="")
+        finally:
+            process.stdout.close()
+        return_code = process.wait()
+        stdout = "".join(output_lines)
+        if return_code != 0:
+            tail = "".join(output_lines[-30:])
+            raise RuntimeError(
+                "Fresh-process input preview failed with exit code "
+                f"{return_code}.\n{tail}"
+            )
+        if not artifact.is_file():
+            raise FileNotFoundError(
+                "Input preview completed without producing its preview artifact."
+            )
+        with artifact.open("rb") as handle:
+            payload = pickle.load(handle)
+
+    if not isinstance(payload, dict) or not isinstance(payload.get("syn_state"), dict):
+        raise TypeError("Input preview worker returned an invalid artifact.")
+    return PipelineInputPreviewResult(
+        syn_state=payload["syn_state"],
+        summary=dict(payload.get("summary", {}) or {}),
+        session_summary=dict(payload.get("session_summary", {}) or {}),
+        trial_idx=int(payload.get("trial_idx", trial)),
+        command=tuple(command),
+        stdout=stdout,
+    )
+
+
 def run_fresh_simulation(
     state: PipelineNotebookState,
     *,
@@ -734,6 +1013,8 @@ def run_fresh_simulation(
     seed: Optional[int] = None,
     iclamp: bool = False,
     output_stem: Optional[str] = None,
+    stream_output: bool = True,
+    sim_overrides: Optional[Mapping[str, Any]] = None,
 ) -> PipelineSimulationResult:
     """Run Step 5 in a fresh interpreter, force-save it, and load the result."""
 
@@ -745,6 +1026,21 @@ def run_fresh_simulation(
     if trials < 1:
         raise ValueError("n_trials must be at least 1.")
 
+    run_overrides = deepcopy(dict(sim_overrides or {}))
+    iclamp_overrides = run_overrides.get("iclamp")
+    if not isinstance(iclamp_overrides, dict):
+        iclamp_overrides = {}
+    iclamp_overrides["enabled"] = bool(iclamp)
+    run_overrides["iclamp"] = iclamp_overrides
+    try:
+        serialized_overrides = json.dumps(
+            run_overrides,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except (TypeError, ValueError) as exc:
+        raise TypeError("sim_overrides must be JSON serializable.") from exc
+
     command = [
         sys.executable,
         str(state.repo_root / "run_pipeline.py"),
@@ -755,6 +1051,8 @@ def run_fresh_simulation(
         "--force-save",
         "--output-stem",
         stem,
+        "--sim-overrides-json",
+        serialized_overrides,
     ]
     if seed is not None:
         command.extend(("--seed", str(int(seed))))
@@ -764,8 +1062,9 @@ def run_fresh_simulation(
     env = dict(os.environ)
     env["SCP_ROOT"] = str(state.repo_root)
     env["PYTHONUNBUFFERED"] = "1"
-    print("Running Step 5 in a fresh process:")
-    print(" ", " ".join(command))
+    if stream_output:
+        print("Running Step 5 in a fresh process:")
+        print(" ", " ".join(command))
     process = subprocess.Popen(
         command,
         cwd=str(state.repo_root),
@@ -780,7 +1079,8 @@ def run_fresh_simulation(
     try:
         for line in process.stdout:
             output_lines.append(line)
-            print(line, end="")
+            if stream_output:
+                print(line, end="")
     finally:
         process.stdout.close()
     return_code = process.wait()
@@ -808,7 +1108,8 @@ def run_fresh_simulation(
     from modules import run_sim
 
     results = run_sim.load_results(manifest_path)
-    print("Loaded fresh Step 5 result:", manifest_path)
+    if stream_output:
+        print("Loaded fresh Step 5 result:", manifest_path)
     return PipelineSimulationResult(
         output_stem=manifest_path.parent.name,
         manifest_path=manifest_path,
@@ -821,14 +1122,22 @@ def run_fresh_simulation(
 __all__ = [
     "ACTIVE_PROTOCOL_DEFAULTS",
     "PASSIVE_PROTOCOL_DEFAULTS",
+    "PipelineActiveProtocolResult",
     "PipelineActiveResult",
+    "PipelineFIResult",
+    "PipelineInputPreviewResult",
     "PipelineNotebookState",
+    "PipelinePassiveProposalResult",
     "PipelinePassiveResult",
     "PipelineSimulationResult",
     "RestartKernelRequired",
+    "compute_passive_proposal",
     "prepare_interactive_synapse_tuner",
     "prepare_pipeline_notebook",
+    "preview_pipeline_inputs",
     "run_active_stage",
+    "run_active_protocol_stage",
+    "run_fi_curve_stage",
     "run_fresh_simulation",
     "run_passive_stage",
 ]

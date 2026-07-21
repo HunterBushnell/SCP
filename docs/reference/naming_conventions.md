@@ -71,6 +71,9 @@ ACT active-tuning workspace:
 act_workspace/
 ```
 
+This complete directory is generated, machine-specific state and is ignored by
+Git.
+
 SLURM batch output:
 
 ```text

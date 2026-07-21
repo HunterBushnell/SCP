@@ -30,6 +30,13 @@ Step 4 is manual-first for config edits:
 
 Step 4 does not automatically overwrite synapse group configs.
 
+The compact `0_pipeline.ipynb` counterpart presents this stage as three
+independent bordered cards: **Initialize BMTool**, **Single Event**, and
+**Interactive Tuner**. Each action has its own output area. Enablement and
+connection selection live with initialization, leaving that card available for
+future compact overrides while the detailed notebook remains the full
+configuration-oriented workflow.
+
 ## Expected Inputs
 
 - a tune directory prepared by Step 1,

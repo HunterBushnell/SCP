@@ -5,10 +5,10 @@ tune directories from the same backend in notebooks, CLI runs, and SLURM jobs.
 
 Entry points:
 
-- Compact Steps 1–5 notebook: `../../0_pipeline.ipynb`
-- Notebook: `../../5_simulate.ipynb`
-- CLI: `../../run_pipeline.py`
-- SLURM: `../../run_slurm.sh`
+- Compact Steps 1–5 notebook: [`0_pipeline.ipynb`](../../0_pipeline.ipynb)
+- Detailed notebook: [`5_simulate.ipynb`](../../5_simulate.ipynb)
+- CLI: [`run_pipeline.py`](../../run_pipeline.py)
+- SLURM: [`run_slurm.sh`](../../run_slurm.sh)
 
 ## Scope
 
@@ -26,6 +26,31 @@ Step 5 can run:
 
 Step 5 does not tune cell or synapse parameters. It consumes the prepared tune
 state and produces simulation outputs.
+
+The compact `0_pipeline.ipynb` counterpart separates Step 5 into **Check
+Inputs**, **Run Simulation**, and **Plot Results** cards with independent output
+areas. The shared seed is displayed in Check Inputs and is also used by the
+simulation; trial count, mode, and output stem remain in the run card. Plot
+Results keeps its panel and saved-trial selectors visible. Run Simulation's
+collapsed advanced area reads its defaults from the selected tune's current
+`sim_config.json` and exposes timing/runtime conditions, randomness, the
+current-clamp protocol, saved-sample limits, automatic plots, output format, and
+detailed cell recording. Changes are session-only recursive overrides in
+`pipeline_settings["simulation_overrides"]`; the JSON file is not rewritten.
+Load/append, snapshot, arbitrary recording sites, and custom plot-preset paths
+remain in the detailed config workflow.
+
+Check Inputs reads the current expanded synapse-group configuration to populate
+its multi-select group control. Group and plot selection are surface controls.
+The weight distribution, distance distribution, and weight-versus-distance
+views render as subplots in a single compact row by default. Its advanced area
+contains preview trial, summary-table visibility, histogram normalization and
+bin widths, plots-per-row layout, and compact/standard sizing.
+
+The compact preview and simulation cards default to quiet subprocess output.
+Their complete merged streams remain inspectable through
+`pipeline_ui.input_preview_log` and `pipeline_ui.simulation_log`; clear the
+corresponding checkbox when live loader and subprocess output is needed.
 
 ## Expected Inputs
 
@@ -159,13 +184,23 @@ be manually saved in **5.6**.
 
 Display lightweight diagnostics for the just-finished run.
 
-Important controls:
+The compact pipeline exposes input-rate, input-raster, membrane-voltage,
+output-rate, and output-raster panel selection. Selected panels are stacked on a
+shared time axis. The saved-trial selector is populated from the loaded result.
+Its collapsed options provide:
 
-- `diagnostic_plot`: `"summary"`, `"standard"`, `"single_plot"`, or `None`.
-- `diagnostic_include_inputs`: include input summaries when available.
+- stimulus-centered, full-run, or manual x windows;
+- rate bin width and smoothing;
+- saved input-group selection;
+- dot/line raster style;
+- stimulus markers; and
+- compact or standard sizing.
+
+The compact numerical run summary is always printed. Current-clamp runs expose
+the membrane-voltage panel here; use Step 6 for specialized IClamp analysis.
 
 This is separate from Step 6 analysis. Use it for immediate sanity checks, not
-publication-quality analysis.
+comparisons, normalization, metrics, detailed styling, or publication export.
 
 ### 5.6 Optional Manual Save
 

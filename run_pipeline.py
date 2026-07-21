@@ -12,6 +12,7 @@ wrappers should all use the same backend in `modules.simulation`.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -20,7 +21,11 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-from modules.simulation import SimulationOptions, SimulationSession, normalize_tune_dir  # noqa: E402
+from modules.simulation import (  # noqa: E402
+    SimulationOptions,
+    SimulationSession,
+    normalize_tune_dir,
+)
 from modules.simulation.status import build_trial_callback  # noqa: E402
 
 
@@ -91,7 +96,19 @@ def parse_args() -> argparse.Namespace:
         "--output-stem",
         type=str,
         default=None,
-        help="Override sim_config['output'] stem; default assigns a timestamp if saving is enabled.",
+        help=(
+            "Override sim_config['output'] stem; default assigns a timestamp "
+            "if saving is enabled."
+        ),
+    )
+    p.add_argument(
+        "--sim-overrides-json",
+        type=str,
+        default=None,
+        help=(
+            "JSON object of temporary recursive sim_config overrides. Values "
+            "apply to this process only and do not edit sim_config.json."
+        ),
     )
     return p.parse_args()
 
@@ -112,12 +129,23 @@ def main() -> None:
     job_start = time.perf_counter()
     args = parse_args()
     tune_dir = _resolve_tune_dir(args)
+    sim_overrides = None
+    if args.sim_overrides_json not in (None, ""):
+        try:
+            sim_overrides = json.loads(args.sim_overrides_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "--sim-overrides-json must contain a valid JSON object."
+            ) from exc
+        if not isinstance(sim_overrides, dict):
+            raise TypeError("--sim-overrides-json must decode to a JSON object.")
 
     options = SimulationOptions(
         mode=args.mode,
         n_trials=args.n_trials,
         seed=args.seed,
         trial_offset=args.trial_offset,
+        sim_overrides=sim_overrides,
         iclamp=args.iclamp,
         snapshot=args.snapshot,
         force_save=args.force_save,

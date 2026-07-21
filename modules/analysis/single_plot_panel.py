@@ -61,7 +61,8 @@ def _resolve_effective_plot_window(
     stim_start, stim_stop = _resolve_stim_window(sim_cfg)
     if stim_start is None or stim_stop is None:
         warnings.append(
-            "Single-plot panel: auto plot window enabled but stim start/stop unavailable; using manual plot_window."
+            "Single-plot panel: auto plot window enabled but stim start/stop "
+            "unavailable; using manual plot_window."
         )
         return manual
 
@@ -140,7 +141,10 @@ def _resolve_groups(
     avail = [str(g) for g in available]
     if requested is None or len(requested) == 0:
         if avail:
-            warnings.append(f"{panel_name}: group list empty, auto-using all groups ({len(avail)}).")
+            warnings.append(
+                f"{panel_name}: group list empty, auto-using all groups "
+                f"({len(avail)})."
+            )
         return avail
     selected = [str(g) for g in requested if str(g) in avail]
     missing = [str(g) for g in requested if str(g) not in avail]
@@ -477,7 +481,10 @@ def load_single_plot_preset(
             else:
                 warnings.append(f"Single-plot preset defaults missing/invalid in {path}")
         else:
-            warnings.append(f"Single-plot preset JSON root must be object (got {type(payload).__name__})")
+            warnings.append(
+                "Single-plot preset JSON root must be object "
+                f"(got {type(payload).__name__})"
+            )
     except Exception as exc:
         warnings.append(f"Single-plot preset load failed ({path}): {exc}")
 
@@ -505,7 +512,10 @@ def plot_single_plot_panel_from_results(
     input_source: str = "auto",  # "saved" | "stats" | "auto"
     input_raster_style: str = "dot",  # "dot" | "line"
     input_raster_dot_size: float = 5.0,
+    include_input_rate: bool = True,
     include_input_raster: bool = True,
+    include_vm: bool = True,
+    include_output_rate: bool = True,
     include_output_raster: bool = False,
     output_raster_style: str = "dot",  # "dot" | "line"
     output_raster_dot_size: float = 5.0,
@@ -574,29 +584,38 @@ def plot_single_plot_panel_from_results(
             f"output_raster_dot_size={output_raster_dot_size!r} invalid; using 5.0."
         )
 
-    # Top input summary
-    try:
-        summary_top = _build_top_summary(
-            results,
-            top_input_mode=top_input_mode,
-            trial_idx=trial_idx,
-            groups=top_input_groups,
-            input_bin_ms=input_bin_ms,
-            input_smooth_ms=input_smooth_ms,
-            input_source=input_source,
-            warnings=warnings,
-        )
-    except Exception as exc:
-        summary_top = None
-        warnings.append(f"Top input panel: failed to build summary ({exc}).")
-
-    top_avail = list((summary_top or {}).get("groups", {}).keys())
-    used_groups_top = _resolve_groups(top_input_groups, top_avail, panel_name="Top input panel", warnings=warnings)
+    # Optional top input summary.
+    summary_top = None
+    used_groups_top: list[str] = []
     top_layout_mode = str(top_layout or "overlay").lower()
     if top_layout_mode not in ("overlay", "stacked"):
         warnings.append(f"top_layout={top_layout!r} invalid; using 'overlay'.")
         top_layout_mode = "overlay"
-    n_top_axes = 1 if top_layout_mode == "overlay" else max(1, len(used_groups_top))
+    n_top_axes = 0
+    if include_input_rate:
+        try:
+            summary_top = _build_top_summary(
+                results,
+                top_input_mode=top_input_mode,
+                trial_idx=trial_idx,
+                groups=top_input_groups,
+                input_bin_ms=input_bin_ms,
+                input_smooth_ms=input_smooth_ms,
+                input_source=input_source,
+                warnings=warnings,
+            )
+        except Exception as exc:
+            warnings.append(f"Top input panel: failed to build summary ({exc}).")
+        top_avail = list((summary_top or {}).get("groups", {}).keys())
+        used_groups_top = _resolve_groups(
+            top_input_groups,
+            top_avail,
+            panel_name="Top input panel",
+            warnings=warnings,
+        )
+        n_top_axes = (
+            1 if top_layout_mode == "overlay" else max(1, len(used_groups_top))
+        )
 
     # Raster payload for input spikes
     payload_raster = None
@@ -616,7 +635,15 @@ def plot_single_plot_panel_from_results(
         )
 
     # Panel layout
-    n_panels = n_top_axes + 2 + (1 if include_input_raster else 0) + (1 if include_output_raster else 0)
+    n_panels = (
+        n_top_axes
+        + int(bool(include_input_raster))
+        + int(bool(include_vm))
+        + int(bool(include_output_rate))
+        + int(bool(include_output_raster))
+    )
+    if n_panels < 1:
+        raise ValueError("At least one single-plot panel must be enabled.")
     if isinstance(panel_height_ratios, dict):
         top_h = float(panel_height_ratios.get("top", 1.0))
         in_r_h = float(panel_height_ratios.get("input_raster", 1.2))
@@ -626,7 +653,10 @@ def plot_single_plot_panel_from_results(
         ratios = [top_h] * n_top_axes
         if include_input_raster:
             ratios.append(in_r_h)
-        ratios.extend([vm_h, out_h])
+        if include_vm:
+            ratios.append(vm_h)
+        if include_output_rate:
+            ratios.append(out_h)
         if include_output_raster:
             ratios.append(out_r_h)
     elif isinstance(panel_height_ratios, (list, tuple)) and len(panel_height_ratios) == n_panels:
@@ -635,7 +665,10 @@ def plot_single_plot_panel_from_results(
         ratios = [1.0] * n_top_axes
         if include_input_raster:
             ratios.append(1.2)
-        ratios.extend([1.2, 1.3])
+        if include_vm:
+            ratios.append(1.2)
+        if include_output_rate:
+            ratios.append(1.3)
         if include_output_raster:
             ratios.append(1.0)
 
@@ -655,66 +688,110 @@ def plot_single_plot_panel_from_results(
 
     # Top panel(s)
     panel_idx = 0
-    if summary_top is None or not used_groups_top:
-        ax_top = axes[panel_idx]
-        ax_top.text(0.01, 0.5, "No input summary available", transform=ax_top.transAxes, va="center")
-        panel_idx += n_top_axes
-    else:
-        x_top = np.asarray(summary_top.get("t_ms") or [], dtype=float)
-        if x_top.size == 0:
-            axes[panel_idx].text(0.01, 0.5, "Input summary time axis empty", transform=axes[panel_idx].transAxes, va="center")
+    if include_input_rate:
+        if summary_top is None or not used_groups_top:
+            ax_top = axes[panel_idx]
+            ax_top.text(
+                0.01,
+                0.5,
+                "No input summary available",
+                transform=ax_top.transAxes,
+                va="center",
+            )
             panel_idx += n_top_axes
-        elif top_layout_mode == "overlay":
-            ax = axes[panel_idx]
-            panel_idx += 1
-            for i, g in enumerate(used_groups_top):
-                gdata = (summary_top.get("groups") or {}).get(g, {}) or {}
-                y = np.asarray(gdata.get("mean_rate", []), dtype=float)
-                if y.size != x_top.size:
-                    continue
-                col = group_colors.get(g, palette[i % len(palette)])
-                ax.plot(x_top, y, color=col, lw=1.8, label=g)
-                if top_fill_under:
-                    ax.fill_between(x_top, 0.0, y, color=col, alpha=float(top_fill_alpha), linewidth=0)
-            if show_input_legend and len(used_groups_top) > 1:
-                leg = ax.legend(frameon=False, loc="upper right")
-                # Keep legend from forcing subplot resizing in tight/compact figures.
-                try:
-                    leg.set_in_layout(False)
-                except Exception:
-                    pass
-            if show_y_axes and show_y_axis_titles:
-                ax.set_ylabel("Input\nHz/syn")
-            if show_panel_titles:
-                ax.set_title("Input rate")
         else:
-            for i, g in enumerate(used_groups_top):
+            x_top = np.asarray(summary_top.get("t_ms") or [], dtype=float)
+            if x_top.size == 0:
+                axes[panel_idx].text(
+                    0.01,
+                    0.5,
+                    "Input summary time axis empty",
+                    transform=axes[panel_idx].transAxes,
+                    va="center",
+                )
+                panel_idx += n_top_axes
+            elif top_layout_mode == "overlay":
                 ax = axes[panel_idx]
                 panel_idx += 1
-                gdata = (summary_top.get("groups") or {}).get(g, {}) or {}
-                y = np.asarray(gdata.get("mean_rate", []), dtype=float)
-                col = group_colors.get(g, palette[i % len(palette)])
-                if y.size == x_top.size:
-                    ax.plot(x_top, y, color=col, lw=1.8)
+                for i, g in enumerate(used_groups_top):
+                    gdata = (summary_top.get("groups") or {}).get(g, {}) or {}
+                    y = np.asarray(gdata.get("mean_rate", []), dtype=float)
+                    if y.size != x_top.size:
+                        continue
+                    col = group_colors.get(g, palette[i % len(palette)])
+                    ax.plot(x_top, y, color=col, lw=1.8, label=g)
                     if top_fill_under:
-                        ax.fill_between(x_top, 0.0, y, color=col, alpha=float(top_fill_alpha), linewidth=0)
-                txt = blended_transform_factory(ax.transAxes, ax.transAxes)
-                ax.text(-0.015, 0.5, g, color=col, ha="right", va="center", transform=txt, clip_on=False)
+                        ax.fill_between(
+                            x_top,
+                            0.0,
+                            y,
+                            color=col,
+                            alpha=float(top_fill_alpha),
+                            linewidth=0,
+                        )
+                if show_input_legend and len(used_groups_top) > 1:
+                    leg = ax.legend(frameon=False, loc="upper right")
+                    try:
+                        leg.set_in_layout(False)
+                    except Exception:
+                        pass
                 if show_y_axes and show_y_axis_titles:
-                    ax.set_ylabel("Hz/syn")
-                if show_panel_titles and i == 0:
+                    ax.set_ylabel("Input\nHz/syn")
+                if show_panel_titles:
                     ax.set_title("Input rate")
+            else:
+                for i, g in enumerate(used_groups_top):
+                    ax = axes[panel_idx]
+                    panel_idx += 1
+                    gdata = (summary_top.get("groups") or {}).get(g, {}) or {}
+                    y = np.asarray(gdata.get("mean_rate", []), dtype=float)
+                    col = group_colors.get(g, palette[i % len(palette)])
+                    if y.size == x_top.size:
+                        ax.plot(x_top, y, color=col, lw=1.8)
+                        if top_fill_under:
+                            ax.fill_between(
+                                x_top,
+                                0.0,
+                                y,
+                                color=col,
+                                alpha=float(top_fill_alpha),
+                                linewidth=0,
+                            )
+                    txt = blended_transform_factory(ax.transAxes, ax.transAxes)
+                    ax.text(
+                        -0.015,
+                        0.5,
+                        g,
+                        color=col,
+                        ha="right",
+                        va="center",
+                        transform=txt,
+                        clip_on=False,
+                    )
+                    if show_y_axes and show_y_axis_titles:
+                        ax.set_ylabel("Hz/syn")
+                    if show_panel_titles and i == 0:
+                        ax.set_title("Input rate")
 
     # Optional input raster panel
     if include_input_raster:
         ax_in_raster = axes[panel_idx]
         panel_idx += 1
         if payload_raster is None or not used_groups_raster:
-            ax_in_raster.text(0.01, 0.5, "No input raster payload", transform=ax_in_raster.transAxes, va="center")
+            ax_in_raster.text(
+                0.01,
+                0.5,
+                "No input raster payload",
+                transform=ax_in_raster.transAxes,
+                va="center",
+            )
         else:
             style = str(input_raster_style or "dot").lower()
             if style not in ("dot", "line"):
-                warnings.append(f"input_raster_style={input_raster_style!r} invalid; using 'dot'.")
+                warnings.append(
+                    f"input_raster_style={input_raster_style!r} invalid; "
+                    "using 'dot'."
+                )
                 style = "dot"
             y_cursor = 0
             group_mids: dict[str, float] = {}
@@ -762,84 +839,133 @@ def plot_single_plot_panel_from_results(
                     clip_on=False,
                 )
 
-    # Vm panel
-    ax_vm = axes[panel_idx]
-    panel_idx += 1
-    T_vm, V_vm = _resolve_vm_trace(results, trial_idx=trial_idx, warnings=warnings)
-    if T_vm is None or V_vm is None:
-        ax_vm.text(0.01, 0.5, "No Vm trace available", transform=ax_vm.transAxes, va="center")
-    else:
-        ax_vm.plot(T_vm, V_vm, color=vm_col, lw=1.2)
-    if show_y_axes and show_y_axis_titles:
-        ax_vm.set_ylabel("Vm (mV)")
-    if show_panel_titles:
-        ax_vm.set_title("Membrane voltage")
-
-    # Output rate panel
-    ax_out = axes[panel_idx]
-    panel_idx += 1
-    curve = _resolve_output_curve(
-        results,
-        source=output_curve_source,
-        recompute_bin_ms=output_recompute_bin_ms,
-        recompute_smooth_ms=output_recompute_smooth_ms,
-        recompute_smooth_mode=output_recompute_smooth_mode,
-        warnings=warnings,
-    )
-    if curve is None:
-        ax_out.text(0.01, 0.5, "No output curve available", transform=ax_out.transAxes, va="center")
-    else:
-        if str(output_mode or "raw").lower() != "raw":
-            curve = analysis.normalize_output_curve(
-                curve,
-                sim_cfg,
-                mode="normalized",
-                norm_mode=output_norm_kind,
-                baseline_ms=output_baseline_ms,
-                baseline_mode=output_baseline_mode,
-                baseline_center_ms=output_baseline_center_ms,
-                norm_window=output_norm_window,
+    # Optional Vm panel.
+    if include_vm:
+        ax_vm = axes[panel_idx]
+        panel_idx += 1
+        T_vm, V_vm = _resolve_vm_trace(
+            results, trial_idx=trial_idx, warnings=warnings
+        )
+        if T_vm is None or V_vm is None:
+            ax_vm.text(
+                0.01,
+                0.5,
+                "No Vm trace available",
+                transform=ax_vm.transAxes,
+                va="center",
             )
-        x_out = np.asarray(curve.get("t_ms", []) or [], dtype=float)
-        y_out = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
-        if x_out.size and y_out.size and x_out.size == y_out.size:
-            ax_out.plot(x_out, y_out, color=out_col, lw=1.8)
-            if output_fill_under:
-                ax_out.fill_between(x_out, 0.0, y_out, color=out_col, alpha=float(output_fill_alpha), linewidth=0)
-            if output_band_mode in ("std", "sem"):
-                lo, hi = _compute_output_band(
-                    results,
-                    curve,
-                    band_mode=str(output_band_mode),
-                    output_mode=output_mode,
-                    output_norm_kind=output_norm_kind,
-                    output_baseline_ms=output_baseline_ms,
-                    output_baseline_mode=output_baseline_mode,
-                    output_baseline_center_ms=output_baseline_center_ms,
-                    output_norm_window=output_norm_window,
-                    warnings=warnings,
-                )
-                if lo is not None and hi is not None:
-                    ax_out.fill_between(x_out, lo, hi, color=out_col, alpha=float(output_band_alpha), linewidth=0)
         else:
-            ax_out.text(0.01, 0.5, "Output curve is empty", transform=ax_out.transAxes, va="center")
+            ax_vm.plot(T_vm, V_vm, color=vm_col, lw=1.2)
+        if show_y_axes and show_y_axis_titles:
+            ax_vm.set_ylabel("Vm (mV)")
+        if show_panel_titles:
+            ax_vm.set_title("Membrane voltage")
 
-    if show_y_axes and show_y_axis_titles:
-        ylab = "Rate (Hz)" if str(output_mode or "raw").lower() == "raw" else "Rate (norm)"
-        ax_out.set_ylabel(ylab)
-    if show_panel_titles:
-        ax_out.set_title("Output average rate")
+    # Optional output-rate panel.
+    if include_output_rate:
+        ax_out = axes[panel_idx]
+        panel_idx += 1
+        curve = _resolve_output_curve(
+            results,
+            source=output_curve_source,
+            recompute_bin_ms=output_recompute_bin_ms,
+            recompute_smooth_ms=output_recompute_smooth_ms,
+            recompute_smooth_mode=output_recompute_smooth_mode,
+            warnings=warnings,
+        )
+        if curve is None:
+            ax_out.text(
+                0.01,
+                0.5,
+                "No output curve available",
+                transform=ax_out.transAxes,
+                va="center",
+            )
+        else:
+            if str(output_mode or "raw").lower() != "raw":
+                curve = analysis.normalize_output_curve(
+                    curve,
+                    sim_cfg,
+                    mode="normalized",
+                    norm_mode=output_norm_kind,
+                    baseline_ms=output_baseline_ms,
+                    baseline_mode=output_baseline_mode,
+                    baseline_center_ms=output_baseline_center_ms,
+                    norm_window=output_norm_window,
+                )
+            x_out = np.asarray(curve.get("t_ms", []) or [], dtype=float)
+            y_out = np.asarray(curve.get("rate_hz", []) or [], dtype=float)
+            if x_out.size and y_out.size and x_out.size == y_out.size:
+                ax_out.plot(x_out, y_out, color=out_col, lw=1.8)
+                if output_fill_under:
+                    ax_out.fill_between(
+                        x_out,
+                        0.0,
+                        y_out,
+                        color=out_col,
+                        alpha=float(output_fill_alpha),
+                        linewidth=0,
+                    )
+                if output_band_mode in ("std", "sem"):
+                    lo, hi = _compute_output_band(
+                        results,
+                        curve,
+                        band_mode=str(output_band_mode),
+                        output_mode=output_mode,
+                        output_norm_kind=output_norm_kind,
+                        output_baseline_ms=output_baseline_ms,
+                        output_baseline_mode=output_baseline_mode,
+                        output_baseline_center_ms=output_baseline_center_ms,
+                        output_norm_window=output_norm_window,
+                        warnings=warnings,
+                    )
+                    if lo is not None and hi is not None:
+                        ax_out.fill_between(
+                            x_out,
+                            lo,
+                            hi,
+                            color=out_col,
+                            alpha=float(output_band_alpha),
+                            linewidth=0,
+                        )
+            else:
+                ax_out.text(
+                    0.01,
+                    0.5,
+                    "Output curve is empty",
+                    transform=ax_out.transAxes,
+                    va="center",
+                )
+
+        if show_y_axes and show_y_axis_titles:
+            ylab = (
+                "Rate (Hz)"
+                if str(output_mode or "raw").lower() == "raw"
+                else "Rate (norm)"
+            )
+            ax_out.set_ylabel(ylab)
+        if show_panel_titles:
+            ax_out.set_title("Output average rate")
 
     # Optional output raster panel
     if include_output_raster:
         ax_out_r = axes[panel_idx]
         style = str(output_raster_style or "dot").lower()
         if style not in ("dot", "line"):
-            warnings.append(f"output_raster_style={output_raster_style!r} invalid; using 'dot'.")
+            warnings.append(
+                f"output_raster_style={output_raster_style!r} invalid; "
+                "using 'dot'."
+            )
             style = "dot"
         trials = _coerce_trials(results.get("spikes"))
         if not trials:
-            ax_out_r.text(0.01, 0.5, "No output spikes available", transform=ax_out_r.transAxes, va="center")
+            ax_out_r.text(
+                0.01,
+                0.5,
+                "No output spikes available",
+                transform=ax_out_r.transAxes,
+                va="center",
+            )
         else:
             for i, tr in enumerate(trials):
                 y = i + 1
@@ -887,7 +1013,10 @@ def plot_single_plot_panel_from_results(
             for ax in axes:
                 ax.set_xlim(x0, x1)
         except Exception:
-            warnings.append(f"plot_window={effective_plot_window!r} is invalid; expected (xmin, xmax).")
+            warnings.append(
+                f"plot_window={effective_plot_window!r} is invalid; "
+                "expected (xmin, xmax)."
+            )
 
     if show_stim_lines:
         stim_start, stim_stop = _resolve_stim_window(sim_cfg)
@@ -923,6 +1052,13 @@ def plot_single_plot_panel_from_results(
         "exported_paths": [str(p) for p in exported_paths],
         "used_groups_top": used_groups_top,
         "used_groups_raster": used_groups_raster,
+        "included_panels": {
+            "input_rate": bool(include_input_rate),
+            "input_raster": bool(include_input_raster),
+            "membrane_voltage": bool(include_vm),
+            "output_rate": bool(include_output_rate),
+            "output_raster": bool(include_output_raster),
+        },
     }
 
 
@@ -1041,7 +1177,11 @@ def run_single_plot_from_selection(
     if requested_paths:
         existing_after = [p for p in requested_paths if p.exists()]
     else:
-        existing_after = [Path(p) for p in (panel_result.get("requested_export_paths") or []) if Path(p).exists()]
+        existing_after = [
+            Path(p)
+            for p in (panel_result.get("requested_export_paths") or [])
+            if Path(p).exists()
+        ]
 
     preview = choose_preview_export_path(exported_paths or existing_after)
     merged_warnings = warnings + list(panel_result.get("warnings") or [])
@@ -1092,7 +1232,11 @@ def display_single_plot_result(
                 print("  " + str(p))
 
     preview_raw = result.get("preview_path", None)
-    preview = Path(preview_raw) if preview_raw not in (None, "") else choose_preview_export_path(exported or existing)
+    preview = (
+        Path(preview_raw)
+        if preview_raw not in (None, "")
+        else choose_preview_export_path(exported or existing)
+    )
     fig = result.get("fig", None)
     if preview is None:
         if fig is not None:

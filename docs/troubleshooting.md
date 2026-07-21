@@ -17,6 +17,20 @@ Run notebook portability checks:
 python scripts/check_notebooks.py
 ```
 
+## Compact Notebook Action Fails
+
+- Step 1 prevents a second model-construction attempt after a failed load.
+  Restart the kernel, correct the reported setup/config issue, and rerun from
+  the top.
+- If a source fingerprint warning names `cell_config.json`, morphology,
+  fit/HOC, or MOD files, restart the kernel. For target, simulation, geometry,
+  synapse, or ACT config edits, rerun the action that consumes the file instead.
+- Quiet modes keep complete details in `pipeline_ui.step1_load_log`,
+  `pipeline_ui.input_preview_log`, and `pipeline_ui.simulation_log`. Inspect the
+  relevant string or disable its quiet checkbox before retrying.
+- If **Plot Results** is disabled, complete **Run Simulation** successfully
+  first; plotting always uses the latest loaded saved manifest.
+
 ## Missing Modfiles or NEURON Errors
 
 - A model using only built-in NEURON mechanisms needs no `modfiles/` directory
@@ -92,6 +106,21 @@ For `trace_npy` targets, `traces.active.file` must point to an ACT-compatible
 `.npy` array with shape `(n_trials, n_timepoints, n_columns)`, voltage in mV in
 column 0, and injected current in nA in column 1. See
 `docs/reference/target_trace_formats.md`.
+
+In `0_pipeline.ipynb`, click **Prepare ACT workspace** after changing
+`target_config.json`, the ACT config, or any ACT option. Existing or partial
+module output is intentionally protected; enable the explicit overwrite option
+before rerunning that selection. If a run is cancelled, its process group is
+terminated and its retained manifest is marked incomplete. Rerunning an earlier
+module can make later predictions stale because the later module was trained
+against the earlier proposal.
+
+If compact preparation reports that ACT is unavailable locally, install or
+clone ACT and set `ACT_ROOT`/`SCP_ACT_PATH`, then prepare again. Colab retains
+the existing automatic ACT clone behavior. Non-PV/SST cells need a complete
+`act_workspace/act_active_config.json` prepared and validated in
+`3_active.ipynb`; registered non-Allen loaders are accepted experimentally only
+after fresh-process cell construction succeeds.
 
 ## Missing Configs
 

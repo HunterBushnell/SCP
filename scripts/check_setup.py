@@ -176,7 +176,10 @@ def _check_python_packages(r: Reporter) -> None:
         try:
             importlib.import_module(import_name)
         except Exception:
-            r.warn(f"Optional package not available: {import_name} (needed for some interactive widgets)")
+            r.warn(
+                f"Optional package not available: {import_name} "
+                "(needed for some interactive widgets)"
+            )
             continue
 
         ver = _pkg_version(dist_name)
@@ -233,8 +236,22 @@ def _check_external_dependencies(
         else:
             r.ok(f"ACT repo found: {act_path}")
 
-        # Step 2 uses ACT passive helpers. Step 3 active checks can be expanded
-        # when that notebook is refactored.
+        for import_name, install_name in (
+            ("sklearn", "scikit-learn"),
+            ("timeout_decorator", "timeout-decorator"),
+        ):
+            try:
+                importlib.import_module(import_name)
+            except Exception as exc:
+                r.fail(
+                    f"ACT dependency {install_name} is unavailable ({exc}). "
+                    "Update the SCP environment from environment.yml."
+                )
+            else:
+                r.ok(f"ACT dependency available: {install_name}")
+
+        # Step 2 uses ACT passive helpers; Step 3 additionally probes the full
+        # optimizer imports during compact workspace preparation.
         if steps.intersection({"2", "3"}) and act_path is not None:
             passive_path = act_path / "act" / "passive.py"
             if passive_path.is_file():
@@ -289,7 +306,10 @@ def _compile_modfiles_if_requested(
         r.ok("No configured modfiles directory; model uses available NEURON mechanisms")
         return True
     if not mod_dir.is_dir():
-        r.ok("No configured MOD source directory; model may use built-in NEURON mechanisms only")
+        r.ok(
+            "No configured MOD source directory; model may use built-in "
+            "NEURON mechanisms only"
+        )
         return True
     if not any(mod_dir.glob("*.mod")):
         r.ok(f"No .mod sources in {mod_dir}; compilation is not required")
@@ -297,7 +317,10 @@ def _compile_modfiles_if_requested(
 
     nrnivmodl = find_nrnivmodl()
     if not nrnivmodl:
-        r.fail("nrnivmodl not found on PATH or next to the active Python executable; cannot compile modfiles")
+        r.fail(
+            "nrnivmodl not found on PATH or next to the active Python "
+            "executable; cannot compile modfiles"
+        )
         return False
 
     r.ok(f"Compiling modfiles with {nrnivmodl} in {mod_dir}")
@@ -479,13 +502,28 @@ def _parse_steps(raw_steps: Iterable[str]) -> set[str]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Check SCP environment + local workspace readiness")
-    ap.add_argument("--repo-root", default=None, help="Path to SCP repo root (auto-detected by default)")
-    ap.add_argument("--steps", nargs="*", default=["1", "2", "3", "4", "5"], help="Pipeline steps to validate, e.g. --steps 1 2 3 4 5")
+    ap = argparse.ArgumentParser(
+        description="Check SCP environment + local workspace readiness"
+    )
+    ap.add_argument(
+        "--repo-root",
+        default=None,
+        help="Path to SCP repo root (auto-detected by default)",
+    )
+    ap.add_argument(
+        "--steps",
+        nargs="*",
+        default=["1", "2", "3", "4", "5"],
+        help="Pipeline steps to validate, e.g. --steps 1 2 3 4 5",
+    )
     ap.add_argument("--cell", default="PV", help="Cell name for tune checks (default: PV)")
     ap.add_argument("--tune", default="tuned", help="Tune directory name (default: tuned)")
     ap.add_argument("--tune-dir", default=None, help="Explicit tune directory path")
-    ap.add_argument("--skip-tune-check", action="store_true", help="Skip tune/config/modfile checks")
+    ap.add_argument(
+        "--skip-tune-check",
+        action="store_true",
+        help="Skip tune/config/modfile checks",
+    )
     ap.add_argument(
         "--compile-modfiles",
         action="store_true",

@@ -5,6 +5,8 @@ import shutil
 import tempfile
 import unittest
 import uuid
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -14,13 +16,18 @@ import numpy as np
 
 matplotlib.use("Agg")
 
+from modules.notebooks.synapse_preview import show_synapse_preview
 from modules.notebooks.pipeline_workflow import (
     RestartKernelRequired,
     _model_source_fingerprint,
     _select_setup_source,
+    compute_passive_proposal,
     prepare_interactive_synapse_tuner,
     prepare_pipeline_notebook,
+    preview_pipeline_inputs,
+    run_active_protocol_stage,
     run_active_stage,
+    run_fi_curve_stage,
     run_fresh_simulation,
     run_passive_stage,
 )
@@ -143,15 +150,12 @@ class PipelineNotebookWorkflowTests(unittest.TestCase):
             tune = Path(tmp) / "raw"
             tune.mkdir()
             (tune / "manifest.json").write_text("{}\n", encoding="utf-8")
-            source, loader, config = _select_setup_source(
-                tune,
-                adb_specimen_id=None,
-            )
+            source, loader, config = _select_setup_source(tune)
             self.assertEqual((source, loader, config), ("existing", "allen_manifest", {}))
 
             (tune / "manifest.json").unlink()
             with self.assertRaisesRegex(FileNotFoundError, "1_setup.ipynb"):
-                _select_setup_source(tune, adb_specimen_id=None)
+                _select_setup_source(tune)
 
             (tune / "cell_configs").mkdir()
             _write_json(
@@ -159,18 +163,13 @@ class PipelineNotebookWorkflowTests(unittest.TestCase):
                 {"cell_name": "unregistered_custom", "paths": {}},
             )
             with self.assertRaisesRegex(FileNotFoundError, "1_setup.ipynb"):
-                _select_setup_source(tune, adb_specimen_id=None)
+                _select_setup_source(tune)
 
-            shutil.rmtree(tune / "cell_configs")
-            source, loader, config = _select_setup_source(
-                tune,
-                adb_specimen_id=123,
-            )
-            self.assertEqual((source, loader, config), ("adb", "allen_manifest", {}))
-
-    def test_explicit_adb_setup_requests_download_without_forcing_cache(self) -> None:
+    def test_compact_setup_never_downloads_model_sources(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tune = Path(tmp) / "cells" / "PV" / "tunes" / "tuned"
+            tune.mkdir(parents=True)
+            (tune / "manifest.json").write_text("{}\n", encoding="utf-8")
             fake_context = SimpleNamespace(
                 cell_name="PV",
                 tune_name="tuned",
@@ -206,15 +205,16 @@ class PipelineNotebookWorkflowTests(unittest.TestCase):
                     cell_name="PV",
                     tune_name="tuned",
                     tune_dir_override=tune,
-                    adb_specimen_id=484635029,
                 )
 
             kwargs = prepare.call_args.kwargs
-            self.assertEqual(kwargs["source_type"], "adb")
-            self.assertTrue(kwargs["do_download"])
+            self.assertEqual(kwargs["source_type"], "existing")
+            self.assertFalse(kwargs["do_download"])
             self.assertFalse(kwargs["force_download"])
             self.assertEqual(kwargs["config_mode"], "fill")
             self.assertFalse(kwargs["do_validate"])
+            self.assertNotIn("specimen_id", kwargs)
+            self.assertNotIn("model_type", kwargs)
 
     def test_source_fingerprint_ignores_runtime_configs_and_detects_hoc_edits(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -338,21 +338,97 @@ class PipelineNotebookWorkflowTests(unittest.TestCase):
                 mock.patch(
                     "modules.tuning.resolve_passive_tuning_inputs",
                     return_value=resolution,
-                ),
+                ) as resolve_targets,
                 mock.patch(
                     "modules.tuning.run_passive_protocol",
                     return_value=records,
                 ) as run_protocol,
             ):
-                result = run_passive_stage(
+                result = compute_passive_proposal(
                     state,
-                    amps_pA=[amp],
-                    compute_act_proposal=True,
+                    manual_passive_targets={
+                        "target_rin_mohm": 100.0,
+                        "target_tau_ms": 10.0,
+                        "target_v_rest_mv": -70.0,
+                    },
                 )
 
             self.assertEqual(len(result.proposal_changes), 3)
-            self.assertIs(run_protocol.call_args.kwargs["cell"], state.cell)
+            self.assertEqual(
+                resolve_targets.call_args.kwargs["target_source_mode"], "manual"
+            )
+            run_protocol.assert_not_called()
             self.assertEqual(before, (hoc_path.read_bytes(), cell_config_path.read_bytes()))
+
+    def test_passive_protocol_measures_targets_without_printing_proposal_section(self) -> None:
+        dt_ms = 0.1
+        time_ms = np.arange(0.0, 1500.0 + dt_ms, dt_ms)
+        elapsed_ms = np.clip(time_ms - 300.0, 0.0, 990.0)
+        voltage_mv = -70.0 - 5.0 * (1.0 - np.exp(-elapsed_ms / 10.0))
+        records = {
+            "T": {-100.0: time_ms},
+            "V": {-100.0: voltage_mv},
+            "F": {-100.0: 0.0},
+        }
+        context = SimpleNamespace(
+            sim_config={},
+            cell_config={},
+            cell_name="synthetic",
+            tune_name="tuned",
+        )
+        resolution = SimpleNamespace(
+            act_passive_module=None,
+            passive_targets={
+                "target_rin_mohm": 50.0,
+                "target_tau_ms": 10.0,
+                "target_v_rest_mv": -70.0,
+            },
+            settable_passive_properties=None,
+            fit_json_candidates=[],
+        )
+        state = SimpleNamespace(cell=object())
+
+        with (
+            mock.patch(
+                "modules.notebooks.pipeline_workflow._refreshed_context",
+                return_value=context,
+            ),
+            mock.patch(
+                "modules.tuning.resolve_passive_tuning_inputs",
+                return_value=resolution,
+            ),
+            mock.patch(
+                "modules.tuning.run_passive_protocol",
+                return_value=records,
+            ),
+            mock.patch(
+                "modules.notebooks.pipeline_workflow._display_rows"
+            ) as proposal_display,
+            mock.patch(
+                "modules.tuning.display_passive_analysis"
+            ) as passive_display,
+            mock.patch("matplotlib.pyplot.show"),
+        ):
+            result = run_passive_stage(
+                state,
+                amps_pA=[-100.0],
+                protocol_overrides={"h_dt": dt_ms},
+            )
+
+        metric = result.metrics[0]
+        self.assertAlmostEqual(metric["R_in_rest_to_final"], 50.0, places=2)
+        self.assertAlmostEqual(metric["tau_avg"], 10.0, delta=0.2)
+        self.assertAlmostEqual(metric["V_rest"], -70.0, places=6)
+        self.assertTrue(result.target_comparison)
+        self.assertTrue(
+            all(row["measured_value"] is not None for row in result.target_comparison)
+        )
+        passive_display.assert_called_once_with(
+            result.metrics,
+            result.target_comparison,
+            amplitude_colors={-100.0: mock.ANY},
+        )
+        proposal_display.assert_not_called()
 
     def test_active_stage_reuses_shared_cell_for_traces_and_fi(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -390,21 +466,82 @@ class PipelineNotebookWorkflowTests(unittest.TestCase):
                 mock.patch(
                     "modules.tuning.plot_active_trace_check",
                     return_value=object(),
-                ),
+                ) as plot_active,
                 mock.patch(
                     "modules.tuning.plot_fi_curve",
                     return_value=object(),
                 ),
+                mock.patch(
+                    "modules.tuning.display_active_analysis",
+                ) as display_active,
+                mock.patch(
+                    "modules.tuning.display_fi_analysis",
+                ) as display_fi,
             ):
-                run_active_stage(
+                active_result = run_active_protocol_stage(
                     state,
                     active_amps_pA=[150],
+                    current_amp_pA=150,
+                )
+                fi_result = run_fi_curve_stage(
+                    state,
                     fi_amps_pA=[0],
                 )
 
             self.assertEqual(run_protocol.call_count, 2)
+            self.assertEqual(active_result.metrics[0]["amp_pA"], 150.0)
+            self.assertEqual(
+                plot_active.call_args.kwargs["current_amp"],
+                150.0,
+            )
+            self.assertEqual(fi_result.fi_rows[0]["amp_pA"], 0.0)
             for call in run_protocol.call_args_list:
                 self.assertIs(call.kwargs["cell"], state.cell)
+            display_active.assert_called_once()
+            active_colors = display_active.call_args.kwargs["amplitude_colors"]
+            self.assertIn(150.0, active_colors)
+            display_fi.assert_called_once()
+            self.assertEqual(
+                display_fi.call_args.args[0],
+                [{"amp_pA": 0.0, "spike_frequency_hz": 0.0}],
+            )
+
+    def test_combined_active_stage_keeps_the_code_api(self) -> None:
+        active = SimpleNamespace(
+            sim_params={"h_dt": 0.1},
+            records={"active": True},
+            metrics=[{"amp_pA": 150.0}],
+            figure=object(),
+        )
+        fi = SimpleNamespace(
+            sim_params={"h_dt": 0.1},
+            records={"fi": True},
+            metrics=[{"amp_pA": 0.0}],
+            fi_rows=[{"amp_pA": 0.0, "spike_frequency_hz": 0.0}],
+            target_reference=[(0.0, 0.0)],
+            target_comparison=[],
+            figure=object(),
+        )
+        with (
+            mock.patch(
+                "modules.notebooks.pipeline_workflow.run_active_protocol_stage",
+                return_value=active,
+            ) as active_stage,
+            mock.patch(
+                "modules.notebooks.pipeline_workflow.run_fi_curve_stage",
+                return_value=fi,
+            ) as fi_stage,
+        ):
+            result = run_active_stage(
+                object(),
+                active_amps_pA=[150],
+                fi_amps_pA=[0],
+            )
+
+        active_stage.assert_called_once()
+        fi_stage.assert_called_once()
+        self.assertIs(result.active_records, active.records)
+        self.assertIs(result.fi_records, fi.records)
 
     def test_synapse_tuner_reuses_shared_cell(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -440,17 +577,108 @@ class PipelineNotebookWorkflowTests(unittest.TestCase):
             sim_config["output_stem"] = "configured_stem_should_not_win"
             _write_json(sim_path, sim_config)
 
-            result = run_fresh_simulation(
-                state,
-                n_trials=1,
-                iclamp=True,
-                output_stem="explicit_pipeline_stem",
-            )
+            visible_output = StringIO()
+            with redirect_stdout(visible_output):
+                result = run_fresh_simulation(
+                    state,
+                    n_trials=1,
+                    iclamp=True,
+                    output_stem="explicit_pipeline_stem",
+                    stream_output=False,
+                    sim_overrides={
+                        "tstop": 70.0,
+                        "stim_start_ms": 10.0,
+                        "stim_duration_ms": 20.0,
+                        "iclamp": {
+                            "amp_nA": 0.08,
+                            "delay_ms": 10.0,
+                            "dur_ms": 20.0,
+                            "tstop_ms": 70.0,
+                        },
+                    },
+                )
 
             self.assertEqual(result.output_stem, "explicit_pipeline_stem")
             self.assertTrue(result.manifest_path.is_file())
             self.assertEqual(result.results["mode"], "iclamp")
+            self.assertEqual(result.results["sim_cfg"]["tstop"], 70.0)
+            self.assertEqual(result.results["meta"]["amp_nA"], 0.08)
+            self.assertIn("--sim-overrides-json", result.command)
             self.assertIn("T", result.results["traces"])
+            self.assertIn("IClamp results saved", result.stdout)
+            self.assertNotIn("IClamp results saved", visible_output.getvalue())
+
+    def test_input_preview_runs_fresh_and_returns_preview_only_records(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tune = _copy_unique_hoc_tune(Path(tmp))
+            state = prepare_pipeline_notebook(
+                repo_root=REPO_ROOT,
+                cell_name="synthetic",
+                tune_name="tuned",
+                tune_dir_override=tune,
+            )
+            _write_json(
+                tune / "cell_configs" / "syn_config.json",
+                {
+                    "preview_exc": {
+                        "state": True,
+                        "syns": {
+                            "type": "Exp2Syn",
+                            "N_syn": 3,
+                            "segs": "all",
+                            "dist_func": {"kind": "uniform", "params": {"c": 1.0}},
+                            "params": {"wt_mean": 1.0, "wt_std": 0.0},
+                        },
+                        "input_blocks": [
+                            {
+                                "name": "background",
+                                "start_ms": 0.0,
+                                "stop_ms": 80.0,
+                                "mode": "homogeneous_poisson",
+                                "rate_hz": 5.0,
+                            }
+                        ],
+                    }
+                },
+            )
+
+            visible_output = StringIO()
+            with redirect_stdout(visible_output):
+                result = preview_pipeline_inputs(
+                    state,
+                    seed=23,
+                    trial_idx=0,
+                    stream_output=False,
+                )
+
+            self.assertTrue(result.syn_state["preview_only"])
+            self.assertTrue(result.syn_state["records"])
+            self.assertGreater(result.summary["total_n_syn"], 0)
+            self.assertIn("pipeline_preview_worker", " ".join(result.command))
+            self.assertIn("fresh process", result.stdout)
+            self.assertNotIn("fresh process", visible_output.getvalue())
+            import matplotlib.pyplot as plt
+
+            plt.close("all")
+            with mock.patch("matplotlib.pyplot.show"):
+                displayed = show_synapse_preview(
+                    result.syn_state,
+                    show_table=False,
+                    show_plots=True,
+                    plot_kinds=[
+                        "weight_distribution",
+                        "distance_distribution",
+                        "weight_vs_distance",
+                    ],
+                    plot_columns=3,
+                    figsize=(3.0, 2.5),
+                )
+            self.assertIs(displayed, result.syn_state)
+            figure = plt.gcf()
+            self.assertEqual(len(figure.axes), 3)
+            self.assertEqual(tuple(figure.get_size_inches()), (9.0, 2.5))
+
+            plt.close("all")
 
 
 if __name__ == "__main__":

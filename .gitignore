@@ -19,11 +19,7 @@ cells/**/output_data/**/logs/*
 cells/**/notebook_exports/
 cells/**/tuning_exports/
 cells/**/*.nwb
-cells/**/act_workspace/module_*/
-cells/**/act_workspace/output/
-cells/**/act_workspace/x86_64/
-cells/**/act_workspace/*.npy
-cells/**/act_workspace/*.pickle
+cells/**/act_workspace/
 external_data/*.pkl
 external_data/*.pickle
 external_data/*.npy

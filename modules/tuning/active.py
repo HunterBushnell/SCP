@@ -42,6 +42,43 @@ DEFAULT_BIO_FI_REFERENCE: dict[str, list[tuple[float, float]]] = {
 }
 
 
+def active_amplitude_colors(
+    sim_amps: Sequence[float],
+    *,
+    single_trace_color: Optional[str] = None,
+) -> dict[float, str]:
+    """Return stable current-step colors shared by Step 3 plots and tables."""
+    from matplotlib import pyplot as plt
+    from matplotlib.colors import to_hex
+
+    amplitudes = [float(value) for value in sim_amps]
+    if len(amplitudes) == 1 and single_trace_color:
+        return {amplitudes[0]: to_hex(single_trace_color)}
+    cycle = plt.rcParams["axes.prop_cycle"].by_key().get("color", ["C0"])
+    return {
+        amp: to_hex(cycle[index % len(cycle)])
+        for index, amp in enumerate(amplitudes)
+    }
+
+
+def fi_series_colors(
+    *,
+    model_color: Optional[str] = None,
+    reference_color: Optional[str] = None,
+) -> dict[str, str]:
+    """Return the model/reference colors shared by the FI plot and table."""
+    from matplotlib.colors import to_hex
+
+    resolved_model = model_color or "C0"
+    resolved_reference = reference_color or (
+        "0.35" if _is_black_color(resolved_model) else "black"
+    )
+    return {
+        "model": to_hex(resolved_model),
+        "reference": to_hex(resolved_reference),
+    }
+
+
 def run_active_protocol(
     *,
     cell: Any,
@@ -192,6 +229,7 @@ def plot_active_trace_check(
     current_ylim: Optional[tuple[Optional[float], Optional[float]]] = None,
     max_auto_currents: int = 8,
     trace_color: Optional[str] = None,
+    amplitude_colors: Optional[Mapping[float, str]] = None,
 ) -> Any:
     """Plot active voltage traces plus optional current traces."""
     import matplotlib.pyplot as plt
@@ -216,12 +254,24 @@ def plot_active_trace_check(
     else:
         voltage_axis, current_axis = axes
 
-    use_single_trace_color = trace_color if len(sim_amps) == 1 else None
+    colors = (
+        {float(amp): str(color) for amp, color in amplitude_colors.items()}
+        if amplitude_colors is not None
+        else active_amplitude_colors(
+            sim_amps,
+            single_trace_color=trace_color,
+        )
+    )
     for amp_value in sim_amps:
-        plot_kwargs = {"label": f"{float(amp_value):g} pA"}
-        if use_single_trace_color is not None:
-            plot_kwargs["color"] = use_single_trace_color
-        voltage_axis.plot(looped_records["T"][amp_value], looped_records["V"][amp_value], **plot_kwargs)
+        plot_kwargs = {
+            "label": f"{float(amp_value):g} pA",
+            "color": colors.get(float(amp_value)),
+        }
+        voltage_axis.plot(
+            looped_records["T"][amp_value],
+            looped_records["V"][amp_value],
+            **plot_kwargs,
+        )
     _shade_stimulus(voltage_axis, sim_params)
     voltage_axis.set_xlabel("Time (ms)")
     voltage_axis.set_ylabel("Vm (mV)")
@@ -266,15 +316,17 @@ def plot_fi_curve(
 
     amp_values = [float(row["amp_pA"]) for row in fi_rows]
     frequency_values = [float(row["spike_frequency_hz"]) for row in fi_rows]
-    resolved_model_color = model_color or "C0"
-    resolved_reference_color = reference_color or ("0.35" if _is_black_color(resolved_model_color) else "black")
+    colors = fi_series_colors(
+        model_color=model_color,
+        reference_color=reference_color,
+    )
 
     fig, axis = plt.subplots(figsize=(6, 3.5))
     axis.plot(
         amp_values,
         frequency_values,
         marker="o",
-        color=resolved_model_color,
+        color=colors["model"],
         label=f"{cell_name} model",
     )
     if show_bio_reference and bio_reference:
@@ -285,7 +337,7 @@ def plot_fi_curve(
             bio_freqs,
             marker="o",
             linestyle="--",
-            color=resolved_reference_color,
+            color=colors["reference"],
             label=f"{cell_name} reference",
         )
 

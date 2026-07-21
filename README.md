@@ -13,31 +13,34 @@ HOC templates through the same cell-scoped pipeline machinery.
 2. Optional setup check:
    - `python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune tuned --compile-modfiles`
 3. Run an example:
-   - Simple notebook: open `0_pipeline.ipynb`, choose Run All to render its panels, then click Steps 1–5 in order.
-   - Detailed simulation notebook: open `5_simulate.ipynb`, setting `force_save = True` if you want a saved run.
+   - Simple notebook: open [`0_pipeline.ipynb`](0_pipeline.ipynb), choose
+     **Run All** to render its panels, then click Steps 1–5 in order.
+   - Detailed simulation notebook: open [`5_simulate.ipynb`](5_simulate.ipynb),
+     setting `force_save = True` if you want a saved run.
    - CLI: `python run_pipeline.py --tune-dir cells/PV/tunes/tuned --n-trials 1 --force-save`
 4. Analyze saved runs:
    - open `6_analysis.ipynb` after a run has been saved under `output_data/`.
 
-See `docs/quickstart.md` for the shortest runnable path and
-`docs/installation.md` for local/Colab setup.
+See the [quickstart](docs/quickstart.md) for the shortest runnable path and the
+[installation guide](docs/installation.md) for local/Colab setup.
 
 ## Pipeline
 
-- `0_pipeline.ipynb`: compact Steps 1–5 workflow and the recommended first
-  notebook. It can safely fill missing standard configs, optionally prepare an
-  Allen/ADB model, run passive and active checks, opt into the core BMTool
-  interactions, and launch a clean final simulation with inline diagnostics.
-  Each step has its own small widget panel and output area.
-- `1_setup.ipynb`: set up a tune directory with model files, optional compiled
+- [`0_pipeline.ipynb`](0_pipeline.ipynb): recommended compact Steps 1–5 front
+  door. **Run All** only renders independent per-step cards; users explicitly
+  load, tune/check, optionally initialize BMTool, preview inputs, simulate in a
+  fresh process, and plot the saved result. Quiet modes retain full logs, and
+  advanced widget values are session-only unless copied into JSON. ACT active
+  tuning is experimental, review-only, and not release-blocking.
+- [`1_setup.ipynb`](1_setup.ipynb): set up a tune directory with model files, optional compiled
   mechanisms when custom `.mod` sources exist, config templates, and validation.
-- `2_passive.ipynb`: passive-parameter tuning workflow.
-- `3_active.ipynb`: active-parameter tuning workflow, including optional ACT
+- [`2_passive.ipynb`](2_passive.ipynb): passive-parameter tuning workflow.
+- [`3_active.ipynb`](3_active.ipynb): active-parameter tuning workflow, including optional ACT
   active-tuning workspace support.
-- `4_synapses.ipynb`: BMTool-based synapse setup/tuning workflow.
-- `5_simulate.ipynb`: primary simulation entry point for local or Colab use.
-- `6_analysis.ipynb`: saved-output analysis and comparison workflow.
-- `7_tools.ipynb`: optional notebook wrappers for small utility scripts.
+- [`4_synapses.ipynb`](4_synapses.ipynb): BMTool-based synapse setup/tuning workflow.
+- [`5_simulate.ipynb`](5_simulate.ipynb): detailed simulation workflow.
+- [`6_analysis.ipynb`](6_analysis.ipynb): saved-output analysis and comparison workflow.
+- [`7_tools.ipynb`](7_tools.ipynb): optional notebook wrappers for small utility scripts.
 
 Use `0_pipeline.ipynb` for the shortest end-to-end route. Use the numbered
 notebooks when you need the full setup, optimization, export, placement, or
@@ -90,22 +93,16 @@ configs have been prepared.
 
 ## Documentation
 
-- `docs/README.md`: documentation index.
-- `docs/quickstart.md`: fastest path to run and save an example.
-- `docs/installation.md`: environment, external tools, and Colab setup.
-- `docs/pipeline_overview.md`: step-by-step workflow map.
-- `docs/guides/step_1_setup.md`: Step 1 setup notebook/CLI guide.
-- `docs/guides/step_2_passive.md`: Step 2 passive-tuning guide.
-- `docs/guides/step_3_active.md`: Step 3 active-tuning guide.
-- `docs/guides/step_4_synapses.md`: Step 4 synapse-tuning guide.
-- `docs/guides/step_5_simulate.md`: Step 5 simulation guide.
-- `docs/guides/analysis.md`: Step 6 analysis guide.
-- `docs/guides/step_7_tools.md`: Step 7 utility-notebook guide.
-- `docs/reference/configs_reference.md`: current config schema.
-- `docs/reference/model_loaders.md`: canonical cell interface and loader contracts.
-- `docs/reference/outputs_layout.md`: saved-output structure.
-- `docs/advanced/cli_slurm.md`: CLI and SLURM usage.
-- `docs/troubleshooting.md`: common issues.
+- [Documentation index](docs/README.md)
+- [Quickstart](docs/quickstart.md)
+- [Installation](docs/installation.md)
+- [Pipeline overview](docs/pipeline_overview.md)
+- [Step guides](docs/guides/steps_1-4_overview.md)
+- [Configuration reference](docs/reference/configs_reference.md)
+- [Model-loader reference](docs/reference/model_loaders.md)
+- [Output layout](docs/reference/outputs_layout.md)
+- [CLI and SLURM](docs/advanced/cli_slurm.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
 Contracts in `contracts/` are developer/design references, not the primary user
 documentation.

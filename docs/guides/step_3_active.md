@@ -27,6 +27,24 @@ ACT active tuning is integrated as an optional helper, not a mandatory path. The
 notebook can prepare ACT inputs, run ACT modules, collect predictions, and
 evaluate temporary predictions without overwriting model files.
 
+The compact `0_pipeline.ipynb` counterpart presents Step 3 as three bordered
+cards: active protocol, FI curve, and ACT active tuning. The first two actions
+have independent outputs and collapsed advanced timing/spike controls. The
+active card also lets you select which configured amplitude supplies the
+recorded ionic-current traces, defaulting to the last sweep. Active
+measurement rows reuse their trace colors, while FI model/target table colors
+reuse the plotted series. The compact ACT card provides a guided review-only
+path, labeled experimental, review-only, and not release-blocking: prepare,
+run/cancel, review proposals and metrics, evaluate in a fresh FI
+process, and review the standard FI display. Its **Show ACT options** toggle
+reveals the less common target, conductance, adapter, simulation, optimizer,
+filtering, workspace, and overwrite controls. This detailed notebook remains
+the code-oriented path for full ACT setup and inspection.
+
+Printed ACT output and active/FI result tables use four significant figures for
+readability. The underlying metrics, predictions, and saved data retain full
+precision.
+
 Manual current sweeps and FI diagnostics run without ACT or biological targets.
 A missing target config is equivalent to `target_source.mode = "none"`.
 
@@ -68,9 +86,27 @@ The ACT workspace can contain:
 - `prediction_<module>.json`: ACT conductance predictions,
 - `module_<name>/`: ACT training/evaluation arrays and outputs,
 - `output/`: optional temporary FI evaluation outputs.
+- `run_manifest_<module>.json`: config/target and dependency provenance for a
+  module run, including incomplete state after a failed/cancelled run.
+- `evaluation_manifest.json`: config and merged-prediction provenance for the
+  temporary FI evaluation.
 
-Heavy ACT outputs are ignored by `.gitignore`; small config/target/prediction
-files can be reviewed and tracked if desired.
+The complete tune-local `act_workspace/` is generated machine-specific state and
+is ignored by Git. Review or copy results elsewhere when they need to be kept;
+do not treat the workspace as a release artifact.
+
+In the compact notebook, automatic configuration is limited to curated PV/SST
+presets. Other registered loaders can reuse an existing complete config and are
+labeled experimental after fresh-process loader validation. Unconfigured custom
+cells are directed to this detailed notebook. The compact UI does not generate
+raw `trace_npy` targets, although an existing complete trace configuration can
+be reused.
+
+Maintainers can run the opt-in reduced one-CPU integration smoke test with:
+
+```bash
+SCP_RUN_ACT_INTEGRATION=1 python -m unittest tests.test_pipeline_act.PipelineACTTests.test_optional_tiny_real_act_smoke
+```
 
 ## Manual Editing Boundary
 

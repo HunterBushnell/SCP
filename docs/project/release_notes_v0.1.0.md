@@ -6,6 +6,12 @@ and analyzing NEURON/BMTK-compatible single-cell models.
 
 ## Highlights
 
+- Recommended `0_pipeline.ipynb` front door with five independent, button-driven
+  panels. Run All renders the interface without loading or simulating a model.
+- Per-step compact UI with one shared tuning-cell lifecycle for Steps 2–4 and
+  fresh-process input preview and final simulation in Step 5.
+- Config-backed advanced controls, two-way Python/widget settings sync, quiet
+  output with inspectable logs, and a clean saved-run diagnostics handoff.
 - Notebook workflow for Steps 1–7:
   - setup and cell/config preparation,
   - passive property review/tuning,
@@ -40,9 +46,10 @@ ignored by Git.
 - The core notebook workflow and PV/SST example simulation paths have been
   validated. The main notebook workflow has also been validated through Step 6
   in Google Colab.
-- ACT active tuning is exposed as an integration path, but model-specific tuning
-  performance depends on ACT and the selected biological targets. Step 3.4 ACT
-  active auto-tuning remains pending deeper ACT workflow validation.
+- ACT active tuning is experimental, review-only, and not release-blocking.
+  Model-specific tuning performance depends on ACT and the selected biological
+  targets. The compact workflow adds isolated execution and provenance checks,
+  while scientific validation remains deferred.
 - Step 7 utility tools load in Colab, but individual utilities are tested as
   needed.
 - Additional ADB-target tuned examples may be added after further tuning and

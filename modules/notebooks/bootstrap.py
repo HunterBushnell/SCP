@@ -148,6 +148,8 @@ def _ensure_colab_py312_dependencies() -> None:
         "seaborn",
         "statsmodels",
         "scikit-image",
+        "scikit-learn",
+        "timeout-decorator",
         "sqlalchemy",
         "boto3",
         "ndx-events",
@@ -206,6 +208,8 @@ def ensure_notebook_dependencies(
             "allensdk",
         ):
             ensure_python_package(import_name)
+    ensure_python_package("sklearn", "scikit-learn")
+    ensure_python_package("timeout_decorator", "timeout-decorator")
 
     if include_system_deps:
         subprocess.check_call(["apt-get", "update"])

@@ -41,7 +41,10 @@ export SCP_BMTOOL_PATH=/path/to/bmtool
 
 ACT is optional for Step 2 target-derived proposals and Step 3 optimization.
 Core passive sweeps and manual active/FI checks run without ACT. BMTool is
-optional and used only when Step 4 synapse tuning is requested.
+optional and used only when Step 4 synapse tuning is requested. SCP's environment
+includes ACT's Python-side `scikit-learn` and `timeout-decorator` dependencies;
+after adding ACT to an older environment, update from `environment.yml` before
+using the compact optimizer controls.
 
 ## Validate the Workspace
 
