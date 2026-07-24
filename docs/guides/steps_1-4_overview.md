@@ -17,9 +17,11 @@ individual step guides for full instructions.
   but its manual active sweep/FI checks can run without ACT.
 - Step 4 uses BMTool for chemical synapse tuning through a small SCP adapter.
 
-Install these next to SCP at `../mods/ACT` and `../mods/bmtool`, or set
-`SCP_ACT_PATH` / `SCP_BMTOOL_PATH`. The public notebooks can also clone these
-repos automatically in Colab when needed.
+SCP checks for these next to the repository at `../mods/ACT` and
+`../mods/bmtool`, or at `SCP_ACT_PATH` / `SCP_BMTOOL_PATH`. If a tool is
+missing, the first action that actually needs it clones a fresh checkout
+automatically, both locally and in Colab. Notebook bootstrap and the core
+model-neutral protocols leave these optional repositories untouched.
 
 ## Expected Step 1 Contract
 

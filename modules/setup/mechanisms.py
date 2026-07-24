@@ -184,9 +184,14 @@ def compile_modfiles(
     recompile: bool = False,
     load_dll: bool = True,
     allow_missing: bool = False,
+    compile_missing: bool = True,
     cell_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Compile modfiles (nrnivmodl) and optionally load the produced DLL."""
+    """Ensure a mechanism DLL exists and optionally load it.
+
+    ``compile_missing=False`` supports config-only Step 1 reruns: SCP may load
+    an already-built library, but it will never invoke ``nrnivmodl``.
+    """
     tune_dir = Path(tune_dir).expanduser().resolve()
     mod_dir = resolve_modfiles_dir(tune_dir, cell_config)
     if mod_dir is None:
@@ -211,6 +216,13 @@ def compile_modfiles(
     dll = find_compiled_mechanism_dll(tune_dir, cell_config=cell_config)
     compiled_now = False
     if dll is None:
+        if not compile_missing:
+            raise FileNotFoundError(
+                "Compiled mechanism library was not found under "
+                f"{compiled_dir}, and mechanism compilation is disabled. "
+                "Run Step 1 without --no-compile (or compile this tune's "
+                "configured paths.modfiles directory first)."
+            )
         nrnivmodl = find_nrnivmodl()
         if nrnivmodl is None:
             raise FileNotFoundError(

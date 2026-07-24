@@ -67,7 +67,6 @@ def resolve_active_tuning_targets(
     target_config = load_target_config(context.tune_dir)
     nwb_options = active_nwb_options_from_config(target_config)
     source_mode = target_source_mode_from_config(target_config, default="none")
-    resolved_mode = _resolve_target_mode(target_mode, target_config, source_mode)
     detected_nwb_files = sorted(Path(context.tune_dir).glob("*_ephys.nwb"))
 
     config_currents, config_freqs = fi_curve_from_config(target_config)
@@ -90,6 +89,16 @@ def resolve_active_tuning_targets(
         tune_dir=context.tune_dir,
         detected_nwb_files=detected_nwb_files,
     )
+    resolved_mode = _resolve_target_mode(target_mode, target_config, source_mode)
+    if target_mode in (None, ""):
+        file_source_missing = (
+            source_mode == "traces" and resolved_trace_npy is None
+        ) or (source_mode == "allen_nwb" and resolved_nwb is None)
+        if file_source_missing:
+            if resolved_fi_csv is not None:
+                resolved_mode = "fi_csv"
+            elif currents and freqs:
+                resolved_mode = "fi_arrays"
 
     resolution = ActiveTargetResolution(
         target_config=target_config,

@@ -35,6 +35,7 @@ analysis controls.
 - [Reproducibility](reference/reproducibility.md)
 - [Glossary](reference/glossary.md)
 - [Naming conventions](reference/naming_conventions.md)
+- [Third-party and model-asset notices](../THIRD_PARTY_NOTICES.md)
 
 ## Recipes and Advanced Interfaces
 
@@ -49,6 +50,7 @@ analysis controls.
 
 - [Roadmap](project/roadmap.md)
 - [Demo outline](project/demo_outline.md)
+- [v0.2.0 release notes](project/release_notes_v0.2.0.md)
 - [v0.1.0 release notes](project/release_notes_v0.1.0.md)
 - [Design contracts](../contracts/README.md)
 - [Setup checker](../scripts/check_setup.py)

@@ -214,7 +214,7 @@ def plot_passive_trace_check(
     return figure
 
 
-def _local_gettable_passive_metrics(
+def compute_passive_trace_metrics(
     voltage_mv: Sequence[float],
     *,
     dt_ms: float,
@@ -268,6 +268,43 @@ def _local_gettable_passive_metrics(
     }
 
 
+def normalize_act_passive_metrics(
+    gpp: Any,
+    *,
+    fallback: Mapping[str, float],
+) -> dict[str, float]:
+    """Normalize passive result fields across supported ACT revisions.
+
+    Older ACT revisions expose ``R_in``, ``tau1``, and ``tau2``; newer ones
+    expose SCP's more specific resistance/tau names.  SCP's target contract
+    uses resting-to-final resistance and a weighted average tau, so values
+    absent from an ACT revision come from the equivalent local calculation
+    instead of requiring changes to the external checkout.
+    """
+
+    aliases = {
+        "R_in_rest_to_final": ("R_in_rest_to_final",),
+        "tau_rest_to_trough": ("tau_rest_to_trough", "tau1"),
+        "tau_avg": ("tau_avg",),
+        "sag_ratio": ("sag_ratio",),
+        "V_rest": ("V_rest",),
+    }
+    normalized: dict[str, float] = {}
+    for output_name, source_names in aliases.items():
+        value = next(
+            (
+                getattr(gpp, source_name)
+                for source_name in source_names
+                if hasattr(gpp, source_name)
+                and getattr(gpp, source_name) is not None
+            ),
+            fallback.get(output_name),
+        )
+        if value is not None:
+            normalized[output_name] = float(value)
+    return normalized
+
+
 def passive_metric_rows(
     *,
     act_passive_module: Any = None,
@@ -289,14 +326,15 @@ def passive_metric_rows(
             "spike_frequency_hz": float(looped_records["F"][amp]),
         }
         if amp_f < 0:
+            local_metrics = compute_passive_trace_metrics(
+                looped_records["V"][amp],
+                dt_ms=dt,
+                stim_start_ms=stim_start,
+                stim_end_ms=stim_end,
+                amp_nA=amp_f / 1000.0,
+            )
             if act_passive_module is None:
-                measured = _local_gettable_passive_metrics(
-                    looped_records["V"][amp],
-                    dt_ms=dt,
-                    stim_start_ms=stim_start,
-                    stim_end_ms=stim_end,
-                    amp_nA=amp_f / 1000.0,
-                )
+                measured = local_metrics
             else:
                 gpp = act_passive_module.compute_gpp(
                     looped_records["V"][amp],
@@ -305,17 +343,10 @@ def passive_metric_rows(
                     stim_end,
                     amp_f / 1000.0,
                 )
-                measured = {
-                    key: float(getattr(gpp, key))
-                    for key in (
-                        "R_in_rest_to_final",
-                        "tau_rest_to_trough",
-                        "tau_avg",
-                        "sag_ratio",
-                        "V_rest",
-                    )
-                    if hasattr(gpp, key)
-                }
+                measured = normalize_act_passive_metrics(
+                    gpp,
+                    fallback=local_metrics,
+                )
             row.update(measured)
         rows.append(row)
     return rows

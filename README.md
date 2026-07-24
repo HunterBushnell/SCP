@@ -1,9 +1,11 @@
 # Single Cell Pipeline (SCP)
 
 SCP is a notebook-first workflow for preparing, tuning, simulating, and analyzing
-single-cell NEURON models. The current examples focus on PV and SST cells. A
-registered loader interface supports both Allen manifest bundles and object-owned
-HOC templates through the same cell-scoped pipeline machinery.
+single-cell NEURON models. The tuned PV cell remains the primary example and
+public notebook default. A registered loader interface supports both Allen
+manifest bundles and object-owned HOC templates through the same cell-scoped
+pipeline machinery; bundled examples also include PN, SST, EUSmn, HYPO, and
+PGN cells.
 
 ## Quick Start
 
@@ -48,6 +50,13 @@ analysis controls. Its Python settings mapping and widgets stay synchronized,
 so common choices can be made either way. Step 5 remains the detailed simulation
 destination; Step 6 is optional post-processing.
 
+ACT and BMTool remain optional. SCP checks for or installs a fresh external
+checkout only when an ACT proposal/optimization or BMTool initialization is
+actually requested, locally or in Colab; normal setup, protocol, and simulation
+actions do not download them. See the
+[installation guide](docs/installation.md#external-repositories) for paths and
+opt-out controls.
+
 ## Optional Notebooks
 
 - `extra_notebooks/act_segmentation.ipynb`: optional ACT-style channel
@@ -56,24 +65,56 @@ destination; Step 6 is optional post-processing.
 
 ## Examples
 
-Bundled example tune directories:
+The primary worked example is:
 
-- `cells/PV/tunes/orig`: raw ADB perisomatic PV setup example.
-- `cells/PV/tunes/tuned`: tuned PV simulation example.
-- `cells/SST/tunes/orig`: raw ADB all-active SST setup example.
-- `cells/SST/tunes/tuned`: tuned SST simulation example.
+- `cells/PV/tunes/tuned`: tuned Allen-manifest PV simulation example and the
+  default selected by public notebooks and CLI checks.
 
-Each tune uses a `cell_configs/` directory containing:
+Allen-manifest example families:
+
+- `cells/PV/`: perisomatic PV example.
+- `cells/SST/`: all-active SST example.
+- `cells/PN/`: all-active projection-neuron example.
+
+These families use `orig`, `tuned`, and prepared `tuned_adb` tune directories.
+The `tuned_adb` variants are scaffolds for tune-local Allen/ADB target data;
+downloaded NWB files are not tracked.
+
+Object-owned HOC-template example families:
+
+- [`cells/EUSmn/`](cells/EUSmn/README.md): single-compartment EUS
+  motor-neuron example derived from the LUT PUD starting template.
+- [`cells/HYPO/`](cells/HYPO/README.md): single-compartment sympathetic
+  preganglionic-neuron example.
+- [`cells/PGN/`](cells/PGN/README.md): single-compartment parasympathetic
+  preganglionic-neuron example.
+
+Each HOC family contains an `orig` source tune and a manually tuned derivative.
+They demonstrate the generic loader and manual SCP workflow; their inclusion is
+not an independent biological-validation claim.
+
+Each tune uses a `cell_configs/` directory. Core and optional files include:
 
 - `cell_config.json`: cell identity, loader, paths, and tuning metadata.
 - `sim_config.json`: simulation timing, saving, plotting, recording, and run options.
 - `target_config.json`: optional passive, FI, and trace targets used by tuning notebooks.
 - `geometry.json`: segment grouping/distance settings.
-- `syn_config.json`: list of enabled synapse-group config files.
-- `syn_groups/*.json`: synapse groups and explicit `input_blocks`.
+- `syn_config.json`: optional list of enabled synapse-group config files.
+- `syn_groups/*.json`: optional synapse groups and explicit `input_blocks`.
 
-Saved example outputs are not required to use the repo. Generate fresh outputs
-with Step 5 when you want to use Step 6 analysis.
+Cell-only/IClamp tunes do not require synapse configuration.
+
+Curated PV and SST saved outputs support analysis demonstrations but are not
+required to use the repo. Generate fresh outputs with Step 5 when you want to
+use Step 6 analysis.
+
+## Licensing
+
+SCP-authored source code and documentation are available under the root
+[MIT license](LICENSE). Bundled model, morphology, and mechanism assets may
+have different terms or unresolved upstream licensing; see
+[Third-Party and Model-Asset Notices](THIRD_PARTY_NOTICES.md). The root MIT
+license does not relicense the assets identified there.
 
 ## Local and Colab Use
 
@@ -103,6 +144,7 @@ configs have been prepared.
 - [Output layout](docs/reference/outputs_layout.md)
 - [CLI and SLURM](docs/advanced/cli_slurm.md)
 - [Troubleshooting](docs/troubleshooting.md)
+- [v0.2.0 release notes](docs/project/release_notes_v0.2.0.md)
 
 Contracts in `contracts/` are developer/design references, not the primary user
 documentation.

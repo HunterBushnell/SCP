@@ -33,6 +33,11 @@ python scripts/step1_prepare.py \
   --config-mode fill
 ```
 
+`--no-compile` skips `nrnivmodl` but still loads an existing tune-local
+mechanism library so validation is safe. If no compiled library exists, run
+once without `--no-compile`; use `--no-validate --no-load-dll` only when you
+intentionally want a config-only refresh without constructing the cell.
+
 For an existing HOC-template model, select `--cell-loader hoc_template` and
 provide `--hoc-template-file`, `--hoc-template-name`, optional constructor and
 section-map JSON, plus explicit `--v-init-mv` and `--celsius-c` conditions. See
@@ -47,6 +52,7 @@ Useful Step 1 flags:
 - `--hoc-constructor-args`, `--hoc-section-map`
 - `--v-init-mv`, `--celsius-c`
 - `--target-source-mode none|manual|traces|allen_nwb`
+- `--include-manual-with-file-source`
 - `--no-download`
 - `--force-download`
 - `--no-compile`

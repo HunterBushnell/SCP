@@ -4,8 +4,10 @@
 Checks:
 - Code-cell Python syntax (`ast.parse`)
 - Duplicate literal keys in dict literals (silent Python override risk)
-- Hardcoded user-specific absolute paths in source cells
-- Output-free saved state for the compact release notebook
+- Hardcoded user-specific absolute paths in saved notebook content
+- Output-free saved state for every public release notebook
+- Saved traceback/interrupt residue
+- The public SCP kernelspec
 
 Usage:
   python scripts/check_notebooks.py
@@ -40,6 +42,17 @@ FORBIDDEN_SOURCE_PATTERNS = [
     "/Users/",
     "C:\\Users\\",
 ]
+
+FORBIDDEN_OUTPUT_PATTERNS = [
+    *FORBIDDEN_SOURCE_PATTERNS,
+    "Traceback (most recent call last)",
+    "KeyboardInterrupt",
+]
+
+EXPECTED_KERNELSPEC = {
+    "display_name": "scp-py311",
+    "name": "scp-py311",
+}
 
 
 def _is_repo_root(path: Path) -> bool:
@@ -126,6 +139,24 @@ def _iter_code_cells(nb: dict) -> Iterable[tuple[int, str]]:
         yield idx, source
 
 
+def _cell_source(cell: dict) -> str:
+    source = cell.get("source", [])
+    if isinstance(source, list):
+        return "".join(str(part) for part in source)
+    return str(source)
+
+
+def _iter_strings(value: object) -> Iterable[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for child in value.values():
+            yield from _iter_strings(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _iter_strings(child)
+
+
 def _sanitize_ipython_source(source: str) -> str:
     lines = source.splitlines()
 
@@ -165,29 +196,44 @@ def _check_notebook(path: Path) -> tuple[list[str], list[str]]:
         errors.append(f"{path}: invalid JSON ({exc})")
         return errors, warnings
 
-    if path.name == "0_pipeline.ipynb":
-        for cell_idx, cell in enumerate(nb.get("cells", [])):
-            if cell.get("cell_type") != "code":
-                continue
-            if cell.get("execution_count") is not None:
-                errors.append(
-                    f"{path}:cell{cell_idx}: compact release notebook must have "
-                    "null execution counts"
-                )
-            if cell.get("outputs"):
-                errors.append(
-                    f"{path}:cell{cell_idx}: compact release notebook must be "
-                    "saved without outputs"
-                )
+    kernelspec = nb.get("metadata", {}).get("kernelspec", {})
+    for field, expected in EXPECTED_KERNELSPEC.items():
+        actual = kernelspec.get(field)
+        if actual != expected:
+            errors.append(
+                f"{path}: kernelspec {field} must be {expected!r}, got {actual!r}"
+            )
 
-    for cell_idx, source in _iter_code_cells(nb):
+    for cell_idx, cell in enumerate(nb.get("cells", [])):
         cell_label = f"{path}:cell{cell_idx}"
-
+        source = _cell_source(cell)
         for pattern in FORBIDDEN_SOURCE_PATTERNS:
             if pattern in source:
                 errors.append(
                     f"{cell_label}: hardcoded user path detected: {pattern!r}"
                 )
+
+        if cell.get("cell_type") != "code":
+            continue
+        if cell.get("execution_count") is not None:
+            errors.append(
+                f"{cell_label}: release notebook must have null execution counts"
+            )
+
+        outputs = cell.get("outputs") or []
+        if outputs:
+            errors.append(
+                f"{cell_label}: release notebook must be saved without outputs"
+            )
+            output_text = "\n".join(_iter_strings(outputs))
+            for pattern in FORBIDDEN_OUTPUT_PATTERNS:
+                if pattern in output_text:
+                    errors.append(
+                        f"{cell_label}: saved output residue detected: {pattern!r}"
+                    )
+
+    for cell_idx, source in _iter_code_cells(nb):
+        cell_label = f"{path}:cell{cell_idx}"
 
         try:
             tree = ast.parse(source)

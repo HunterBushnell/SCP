@@ -1,0 +1,21 @@
+{
+  "cell_name": "EUSmn",
+  "tune": "orig",
+  "color": "dodgerblue",
+  "cell_loader": "hoc_template",
+  "paths": {
+    "hoc_template": "model/PUD_TEMPLATE.hoc",
+    "modfiles": "modfiles"
+  },
+  "hoc_template": {
+    "template_name": "PUD",
+    "constructor_args": [],
+    "section_map": {
+      "soma": "somatic",
+      "dend": "basal",
+      "apic": "apical",
+      "axon": "axonal",
+      "all": "all"
+    }
+  }
+}

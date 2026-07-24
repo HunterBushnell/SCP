@@ -108,13 +108,12 @@ def resolve_passive_tuning_inputs(
         tune_dir=context.tune_dir,
     )
 
-    if resolved_source_mode == "traces":
-        act_passive_module = import_act_passive_module(repo_root=context.repo_root)
-        if resolved_trace_path is None:
+    if resolved_source_mode == "traces" and resolved_trace_path is not None:
+        if not resolved_trace_path.is_file():
             raise FileNotFoundError(
-                "No generic passive trace file selected. Set target_config.traces.passive.file "
-                "or set trace_path explicitly."
+                f"Configured passive trace file does not exist: {resolved_trace_path}"
             )
+        act_passive_module = import_act_passive_module(repo_root=context.repo_root)
         export_dir = Path(nwb_export_dir or (context.tune_dir / "notebook_exports" / "step2_passive"))
         export_dir.mkdir(parents=True, exist_ok=True)
         passive_trace_summary = write_passive_trace_target_csv(
@@ -144,13 +143,19 @@ def resolve_passive_tuning_inputs(
                 notes=f"Passive targets extracted from {Path(resolved_trace_path).name}",
             )
             config_passive_targets = passive_targets_from_config(target_config)
-    elif extract_from_nwb or resolved_source_mode == "allen_nwb":
-        act_passive_module = import_act_passive_module(repo_root=context.repo_root)
+    elif extract_from_nwb or (
+        resolved_source_mode == "allen_nwb" and resolved_nwb_path is not None
+    ):
         if resolved_nwb_path is None:
             raise FileNotFoundError(
                 "No NWB file selected. Set target_config.allen_nwb.file, "
                 "place one *_ephys.nwb in the tune folder, or set nwb_path explicitly."
             )
+        if not resolved_nwb_path.is_file():
+            raise FileNotFoundError(
+                f"Configured Allen NWB target file does not exist: {resolved_nwb_path}"
+            )
+        act_passive_module = import_act_passive_module(repo_root=context.repo_root)
         export_dir = Path(nwb_export_dir or (context.tune_dir / "notebook_exports" / "step2_passive"))
         export_dir.mkdir(parents=True, exist_ok=True)
         nwb_passive_summary = write_allen_nwb_passive_target_csv(
@@ -316,17 +321,12 @@ def _resolve_passive_target(
     manual_passive_targets: Optional[Mapping[str, Any]],
     config_passive_targets: Mapping[str, Any],
     use_target_config: bool,
-) -> float:
+) -> Optional[float]:
     if manual_passive_targets and manual_passive_targets.get(field) is not None:
         return float(manual_passive_targets[field])
     if use_target_config and config_passive_targets.get(field) is not None:
         return float(config_passive_targets[field])
-    raise ValueError(
-        "Missing passive targets. Provide manual.passive.v_rest_mV, "
-        "manual.passive.rin_MOhm, and manual.passive.tau_ms in target_config.json; "
-        "set manual_passive_targets in the notebook; or set target_source.mode to "
-        "'traces'/'allen_nwb'."
-    )
+    return None
 
 
 def _resolve_nwb_path(

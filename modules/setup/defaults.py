@@ -201,76 +201,97 @@ def default_geometry_config(*, cell_name: str) -> Dict[str, Any]:
     }
 
 
-def default_target_config() -> Dict[str, Any]:
-    """Return the optional biological/experimental target template."""
-    return {
+def default_target_config(
+    *,
+    mode: str = "manual",
+    include_manual_with_file_source: bool = False,
+) -> Dict[str, Any]:
+    """Return a sparse biological/experimental target template for one mode."""
+    source_mode = str(mode or "manual").strip().lower()
+    valid_modes = {"none", "manual", "traces", "allen_nwb"}
+    if source_mode not in valid_modes:
+        raise ValueError(
+            "target source mode must be one of " + ", ".join(sorted(valid_modes))
+        )
+
+    config: Dict[str, Any] = {
         "schema_version": 1,
         "target_source": {
-            "mode": "manual",
+            "mode": source_mode,
             "description": "",
         },
-        "manual": {
-            "passive": {
-                "v_rest_mV": None,
-                "rin_MOhm": None,
-                "tau_ms": None,
-            },
-            "fi_curve": {
-                "currents_pA": [],
-                "rates_Hz": [],
-                "csv": None,
-            },
-        },
-        "traces": {
-            "format": "csv",
-            "passive": {
-                "file": None,
-                "time_column": "time_ms",
-                "voltage_column": "voltage_mV",
-                "current_column": "current_pA",
-                "sweep_column": None,
-                "stim_start_ms": None,
-                "stim_stop_ms": None,
-                "current_pA": None,
-                "dt_ms": None,
-                "end_margin_ms": 10.0,
-                "reducer": "median",
-                "tau_field": "tau_avg_ms",
-            },
-            "active": {
-                "file": None,
-                "format": "npy",
-                "stim_start_ms": None,
-                "stim_stop_ms": None,
-                "dt_ms": None,
-                "spike_threshold_mV": -20.0,
-                "refractory_ms": 1.0,
-            },
-        },
-        "allen_nwb": {
-            "file": None,
-            "sweep_ids": [],
-            "passive": {
-                "stimulus_names": ["Long Square"],
-                "sweep_ids": None,
-                "min_current_pA": None,
-                "max_current_pA": -1.0,
-                "end_margin_ms": 10.0,
-                "reducer": "median",
-                "tau_field": "tau_avg_ms",
-            },
-            "active": {
-                "stimulus_names": ["Long Square"],
-                "min_current_pA": 0.0,
-                "max_current_pA": None,
-                "include_negative_currents": False,
-                "average_repeats": True,
-                "spike_threshold_mV": -20.0,
-                "refractory_ms": 1.0,
-            },
-        },
-        "notes": "",
     }
+    manual = {
+        "passive": {
+            "v_rest_mV": None,
+            "rin_MOhm": None,
+            "tau_ms": None,
+        },
+        "fi_curve": {
+            "currents_pA": [],
+            "rates_Hz": [],
+            "csv": None,
+        },
+    }
+    traces = {
+        "format": "csv",
+        "passive": {
+            "file": None,
+            "time_column": "time_ms",
+            "voltage_column": "voltage_mV",
+            "current_column": "current_pA",
+            "sweep_column": None,
+            "stim_start_ms": None,
+            "stim_stop_ms": None,
+            "current_pA": None,
+            "dt_ms": None,
+            "end_margin_ms": 10.0,
+            "reducer": "median",
+            "tau_field": "tau_avg_ms",
+        },
+        "active": {
+            "file": None,
+            "format": "npy",
+            "stim_start_ms": None,
+            "stim_stop_ms": None,
+            "dt_ms": None,
+            "spike_threshold_mV": -20.0,
+            "refractory_ms": 1.0,
+        },
+    }
+    allen_nwb = {
+        "file": None,
+        "sweep_ids": [],
+        "passive": {
+            "stimulus_names": ["Long Square"],
+            "sweep_ids": None,
+            "min_current_pA": None,
+            "max_current_pA": -1.0,
+            "end_margin_ms": 10.0,
+            "reducer": "median",
+            "tau_field": "tau_avg_ms",
+        },
+        "active": {
+            "stimulus_names": ["Long Square"],
+            "min_current_pA": 0.0,
+            "max_current_pA": None,
+            "include_negative_currents": False,
+            "average_repeats": True,
+            "spike_threshold_mV": -20.0,
+            "refractory_ms": 1.0,
+        },
+    }
+
+    if source_mode == "manual" or (
+        source_mode in {"traces", "allen_nwb"} and include_manual_with_file_source
+    ):
+        config["manual"] = manual
+    if source_mode == "traces":
+        config["traces"] = traces
+    elif source_mode == "allen_nwb":
+        config["allen_nwb"] = allen_nwb
+    config["notes"] = ""
+    return config
 
 
 def default_synapse_weight_params(*, weight_style: str = "distributed") -> Dict[str, Any]:

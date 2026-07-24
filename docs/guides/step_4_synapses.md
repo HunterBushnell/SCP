@@ -45,7 +45,8 @@ configuration-oriented workflow.
 - `cell_configs/cell_config.json`,
 - optional `cell_configs/synapse_tuning_config.json`; Step 4 creates a neutral
   four-entry starting catalog when it is missing,
-- BMTool available at `../mods/bmtool` or through `SCP_BMTOOL_PATH`,
+- BMTool available at `../mods/bmtool` or through `SCP_BMTOOL_PATH`; the
+  initialization action installs a missing checkout automatically,
 - a NEURON synapse point process supplied either by built-in mechanisms or the tune's compiled sources,
 - optional existing `cell_configs/syn_groups/*.json` files to receive tuned
   parameters.
@@ -415,8 +416,9 @@ public notebooks.
 Local use:
 
 - install SCP's environment,
-- clone BMTool to `../mods/bmtool` or set `SCP_BMTOOL_PATH`,
 - open `4_synapses.ipynb`.
+- click/run BMTool initialization; SCP reuses a configured checkout or clones
+  a missing one to `../mods/bmtool`.
 
 Colab use:
 
@@ -427,16 +429,18 @@ Colab use:
 
 BMTool resolution order:
 
-1. `SCP_BMTOOL_PATH`, `BMTOOL_PATH`, or `BMTOOL_ROOT`,
+1. `SCP_BMTOOL_PATH`, `SCP_BMTOOL_DIR`, `BMTOOL_PATH`, or `BMTOOL_ROOT`,
 2. `../mods/bmtool` relative to SCP,
 3. common local `mods/bmtool` locations,
-4. automatic clone in Colab when enabled.
+4. action-triggered automatic clone locally or in Colab.
 
 ## Troubleshooting
 
 ### BMTool Not Found
 
-Clone BMTool next to SCP:
+Initialization normally clones BMTool when it is missing. If that fails, check
+Git/network access and confirm `../mods/bmtool` is absent or empty. You can
+also clone BMTool next to SCP manually:
 
 ```bash
 mkdir -p ../mods
@@ -448,6 +452,8 @@ Or set:
 ```bash
 export SCP_BMTOOL_PATH=/path/to/bmtool
 ```
+
+Set `SCP_AUTO_CLONE_BMTOOL=0` to opt out of automatic installation.
 
 ### Mechanism Already Loaded
 

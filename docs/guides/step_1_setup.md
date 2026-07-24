@@ -47,8 +47,10 @@ Before running Step 1, decide:
 
 - `cell_name`: display/model label, such as `PV`, `SST`, or `PN`.
 - `tune_name`: tune folder name, usually `orig` for raw setup or `tuned` for the working model.
-- `source_type`: `adb` to download Allen Database files, or `existing` for staged local files.
-- `cell_loader`: `allen_manifest` (default) or `hoc_template`.
+- Whether the model is already staged under the tune or must be downloaded from
+  the Allen Database.
+- For a new Allen download or an ambiguous/custom staged layout, the values in
+  the notebook's single `MODEL_SOURCE_OVERRIDES` block.
 - `CONFIG_MODE`: `fill`, `overwrite`, or `skip` for generated configs.
 - Target source mode: `none`, `manual`, `traces`, or `allen_nwb` for Step 2-3 targets.
 - Synapse scaffolding: create `input_blocks_template.json`, create an empty `syn_config.json`, or skip synapse configs.
@@ -66,15 +68,18 @@ Use `overwrite` only when intentionally resetting generated configs.
 Open `1_setup.ipynb` and run the phases in order:
 
 1. Select tune directory.
-2. Set up model source files.
+2. Resolve the staged model source automatically, or provide a source override
+   for an Allen download or custom layout.
 3. Compile/load mechanisms.
 4. Scaffold base configs.
-5. Scaffold target config for manual targets, user traces, or Allen/ADB NWB data.
-6. Optionally scaffold synapse configs.
-7. Validate setup.
-8. Review expected paths.
-9. Optionally create the `tuned` working copy.
-10. Optionally continue to segmentation/segregation.
+5. Edit tune-specific display/geometry compatibility and runtime-condition
+   values in the generated JSON files.
+6. Scaffold target config for manual targets, user traces, or Allen/ADB NWB data.
+7. Optionally scaffold synapse configs.
+8. Validate setup.
+9. Review expected paths.
+10. Optionally create the `tuned` working copy.
+11. Optionally continue to segmentation/segregation.
 
 The notebook runs locally or in Colab. In a fresh Colab session it can clone the
 repo and install dependencies using the same environment variables as Step 5.
@@ -95,6 +100,19 @@ The `orig` tunes are raw setup references. The `tuned` tunes are the working
 models used after copying, optional segmentation, and Steps 2-4 tuning.
 
 ## Cell Source Types
+
+Section 1.2 uses this precedence:
+
+1. Reuse an existing `cell_configs/cell_config.json` as the tune's source of
+   truth.
+2. Otherwise, discover exactly one staged `manifest.json`.
+3. Otherwise, discover exactly one `begintemplate` declaration in a staged HOC
+   file.
+
+A standard tune-local `modfiles/` directory is detected with the HOC source.
+Leave `MODEL_SOURCE_OVERRIDES = None` for these common cases. Use the override
+only for a new Allen download, multiple candidate sources, a nonstandard path,
+constructor arguments, or a noncanonical HOC section map.
 
 ### `source_type = "adb"`
 
@@ -125,24 +143,16 @@ FI targets. Step 1 itself downloads the biophysical model bundle through
 AllenSDK using `specimen_id` and `model_type`; the ephys `.nwb` file is a
 separate manual download.
 
-Examples:
+For a new Allen download, put the setup inputs in the one optional block in
+section 1.2:
 
 ```python
-source_type = "adb"
-specimen_id = 484635029
-model_type = "perisomatic"
-```
-
-```python
-source_type = "adb"
-specimen_id = 485466109
-model_type = "all active"
-```
-
-```python
-source_type = "adb"
-specimen_id = 382982932
-model_type = "perisomatic"
+MODEL_SOURCE_OVERRIDES = {
+    "source_type": "adb",
+    "cell_loader": "allen_manifest",
+    "specimen_id": 484635029,
+    "model_type": "perisomatic",
+}
 ```
 
 ADB model types can differ structurally. Perisomatic and all-active bundles may
@@ -162,6 +172,25 @@ scaffold configs, or validate.
 Source acquisition and construction are separate: `existing` never downloads
 or rewrites native model sources. See `../reference/model_loaders.md` for the
 generic HOC configuration and canonical section contract.
+
+For a simple staged HOC model, no section 1.2 edit is needed. If discovery is
+ambiguous or the template needs constructor arguments or custom section names,
+use the same JSON-shaped blocks accepted by `cell_config.json`:
+
+```python
+MODEL_SOURCE_OVERRIDES = {
+    "cell_loader": "hoc_template",
+    "paths": {
+        "hoc_template": "model/CellTemplate.hoc",
+        "modfiles": "modfiles",
+    },
+    "hoc_template": {
+        "template_name": "CellTemplate",
+        "constructor_args": [1.0],
+        "section_map": {"soma": "body", "all": "all_sections"},
+    },
+}
+```
 
 ## Mechanisms
 
@@ -202,9 +231,24 @@ Base config scaffolding creates or updates:
 
 Generated defaults include:
 
-- `cell_config.json`: cell label, tune name, loader-owned paths/options, and display metadata. Allen tunes may also contain the optional `soma_diam_multiplier`; HOC geometry is not rescaled.
+- `cell_config.json`: cell label, tune name, loader-owned paths/options, and
+  display metadata. New files receive a neutral/default plot color. Allen tunes
+  also receive `soma_diam_multiplier: 1.0`; HOC geometry is not rescaled.
 - `sim_config.json`: simulation timing, explicit HOC runtime conditions, trial/save settings, plotting, IClamp, recording, randomness, and snapshot defaults.
 - `geometry.json`: soma-origin distance reference and proximal/distal thresholds.
+
+The notebook intentionally does not hold cell-specific color, Allen diameter
+multiplier, initialization voltage, or temperature values. After section 1.4,
+edit the generated tune-local files directly:
+
+- `cell_config.json`: set `color`; for an Allen tune, change
+  `tuning.soma_diam_multiplier` only when needed.
+- `sim_config.json`: set `conditions.v_init_mV` and `conditions.celsius_C`.
+
+Fresh notebook scaffolds leave both runtime-condition values as `null` so they
+cannot silently imply a scientific choice. A new HOC tune must set finite values
+before section 1.7. In the normal `fill` mode, rerunning section 1.4 preserves
+these edited values. `overwrite` intentionally resets the generated files.
 
 See `../reference/configs_reference.md` for every generated field.
 
@@ -215,16 +259,28 @@ Target config scaffolding creates or updates:
 - `target_config.json`
 
 This file tells Steps 2-3 what biological or experimental target data to use.
-Step 1 only writes target paths/options. Step 2 computes passive targets, and
-Step 3 computes or loads active/FI targets.
+In the notebook, select only the source mode. Step 1 generates a blank,
+mode-specific template; then edit the generated tune-local JSON with that
+cell's values or paths. This keeps cell-specific target data out of the setup
+notebook.
 
 Source modes:
 
 - `none`: no target data; use Steps 2–3 for intrinsic traces and FI diagnostics.
-- `manual`: enter `manual.passive` values and `manual.fi_curve` points directly,
-  or point `manual.fi_curve.csv` to a summarized FI CSV.
+- `manual`: fill `manual.passive` values and `manual.fi_curve` points directly
+  in the generated config, or point `manual.fi_curve.csv` to a summarized FI CSV.
 - `traces`: point to user-provided passive or active trace files.
 - `allen_nwb`: point to an Allen/ADB electrophysiology `.nwb` file.
+
+`manual` is the blank-template default for both Allen and non-Allen loaders.
+For `traces` or `allen_nwb`, set `INCLUDE_MANUAL_WITH_FILE_SOURCE = True` if
+the generated template should also contain a blank manual block. File-backed
+data remains authoritative while that mode is selected; switch the mode to
+`manual` to use manually entered values instead.
+
+New files and `CONFIG_MODE = "overwrite"` contain only the blocks relevant to
+the selected mode. The normal `fill` mode preserves all existing blocks and
+values, so rerunning Step 1 does not erase target work.
 
 See `../reference/target_trace_formats.md` for passive trace, active trace, and
 FI CSV target data requirements.
@@ -251,6 +307,8 @@ to the working tune.
 CLI equivalent:
 
 - `--no-target-config`
+- `--target-source-mode none|manual|traces|allen_nwb`
+- `--include-manual-with-file-source`
 
 ## Synapse Configs
 
@@ -379,6 +437,11 @@ python scripts/step1_prepare.py \
   --no-compile \
   --config-mode fill
 ```
+
+This skips `nrnivmodl` while loading the tune's existing compiled mechanism
+library for validation. If the library has not been built yet, omit
+`--no-compile`. To edit configs without constructing the cell, combine
+`--no-compile --no-load-dll --no-validate`.
 
 ### Prepare an Existing HOC Template
 

@@ -12,6 +12,26 @@ from modules.notebooks.bootstrap import finish_step5_notebook_setup
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+PUBLIC_NOTEBOOKS = (
+    "0_pipeline.ipynb",
+    "1_setup.ipynb",
+    "2_passive.ipynb",
+    "3_active.ipynb",
+    "4_synapses.ipynb",
+    "5_simulate.ipynb",
+    "6_analysis.ipynb",
+    "7_tools.ipynb",
+    "extra_notebooks/act_segmentation.ipynb",
+)
+
+FORBIDDEN_RELEASE_CONTENT = (
+    "/home/",
+    "/Users/",
+    "C:\\Users\\",
+    "Traceback (most recent call last)",
+    "KeyboardInterrupt",
+)
+
 
 def _code_cells(notebook_name: str) -> list[str]:
     notebook_path = REPO_ROOT / notebook_name
@@ -34,7 +54,7 @@ def _parsed_cells(notebook_name: str) -> Iterable[tuple[int, str, ast.Module]]:
         yield cell_index, source, tree
 
 
-def _assigned_dict(notebook_name: str, variable_name: str) -> tuple[str, ast.Dict]:
+def _assigned_value(notebook_name: str, variable_name: str) -> tuple[str, ast.AST]:
     for _, source, tree in _parsed_cells(notebook_name):
         for node in ast.walk(tree):
             if not isinstance(node, (ast.Assign, ast.AnnAssign)):
@@ -45,10 +65,20 @@ def _assigned_dict(notebook_name: str, variable_name: str) -> tuple[str, ast.Dic
                 for target in targets
             ):
                 continue
-            if not isinstance(node.value, ast.Dict):
-                raise AssertionError(f"{variable_name} must be assigned a dict literal")
             return source, node.value
     raise AssertionError(f"No assignment to {variable_name!r} found in {notebook_name}")
+
+
+def _assigned_dict(notebook_name: str, variable_name: str) -> tuple[str, ast.Dict]:
+    source, value = _assigned_value(notebook_name, variable_name)
+    if not isinstance(value, ast.Dict):
+        raise AssertionError(f"{variable_name} must be assigned a dict literal")
+    return source, value
+
+
+def _assigned_literal(notebook_name: str, variable_name: str) -> object:
+    _, value = _assigned_value(notebook_name, variable_name)
+    return ast.literal_eval(value)
 
 
 def _dict_value(mapping: ast.Dict, key_name: str) -> ast.AST:
@@ -101,7 +131,31 @@ def _keyword(call: ast.Call, name: str) -> ast.AST:
 
 
 class NotebookContractTests(unittest.TestCase):
-    def test_compact_pipeline_is_saved_clean_with_hidden_bootstrap(self) -> None:
+    def test_public_notebooks_are_saved_clean_and_portable(self) -> None:
+        for notebook_name in PUBLIC_NOTEBOOKS:
+            with self.subTest(notebook_name=notebook_name):
+                notebook = json.loads(
+                    (REPO_ROOT / notebook_name).read_text(encoding="utf-8")
+                )
+                kernelspec = notebook.get("metadata", {}).get("kernelspec", {})
+                self.assertEqual(kernelspec.get("display_name"), "scp-py311")
+                self.assertEqual(kernelspec.get("name"), "scp-py311")
+
+                serialized = json.dumps(notebook, ensure_ascii=False)
+                for forbidden in FORBIDDEN_RELEASE_CONTENT:
+                    self.assertNotIn(forbidden, serialized)
+
+                code_cells = [
+                    cell
+                    for cell in notebook.get("cells", [])
+                    if cell.get("cell_type") == "code"
+                ]
+                self.assertTrue(code_cells)
+                for cell in code_cells:
+                    self.assertIsNone(cell.get("execution_count"))
+                    self.assertEqual(cell.get("outputs"), [])
+
+    def test_compact_pipeline_has_hidden_bootstrap(self) -> None:
         notebook = json.loads(
             (REPO_ROOT / "0_pipeline.ipynb").read_text(encoding="utf-8")
         )
@@ -229,6 +283,73 @@ class NotebookContractTests(unittest.TestCase):
         self.assertNotIn("widgets.Accordion", all_source)
         self.assertNotIn("widgets.Tab", all_source)
 
+    def test_numbered_notebooks_use_pv_release_defaults(self) -> None:
+        expected_cell_tunes = {
+            "1_setup.ipynb": ("PV", "orig"),
+            "2_passive.ipynb": ("PV", "tuned"),
+            "3_active.ipynb": ("PV", "tuned"),
+            "4_synapses.ipynb": ("PV", "tuned"),
+            "5_simulate.ipynb": ("PV", "tuned"),
+        }
+        for notebook_name, (expected_cell, expected_tune) in expected_cell_tunes.items():
+            with self.subTest(notebook_name=notebook_name):
+                self.assertEqual(
+                    _assigned_literal(notebook_name, "cell_name"),
+                    expected_cell,
+                )
+                self.assertEqual(
+                    _assigned_literal(notebook_name, "tune_name"),
+                    expected_tune,
+                )
+
+        self.assertEqual(_assigned_literal("6_analysis.ipynb", "cell_name"), "PV")
+        self.assertEqual(_assigned_literal("6_analysis.ipynb", "model_dir"), "tuned")
+
+        tools_source = "\n".join(_code_cells("7_tools.ipynb"))
+        self.assertIn("cells/PV/tunes/tuned", tools_source)
+        self.assertNotIn("cells/SST/tunes/tuned", tools_source)
+
+    def test_detailed_protocol_notebooks_use_pv_release_protocols(self) -> None:
+        self.assertFalse(
+            _assigned_literal("2_passive.ipynb", "COMPUTE_ACT_PASSIVE_PROPOSAL")
+        )
+        _, passive_params = _assigned_dict("2_passive.ipynb", "sim_params")
+        self.assertEqual(ast.literal_eval(_dict_value(passive_params, "stim_delay")), 300)
+        self.assertEqual(ast.literal_eval(_dict_value(passive_params, "stim_dur")), 1000)
+        self.assertEqual(ast.literal_eval(_dict_value(passive_params, "h_tstop")), 1500.0)
+        self.assertEqual(
+            _assigned_literal("2_passive.ipynb", "sim_amps"),
+            [-50, -100],
+        )
+
+        _, active_params = _assigned_dict("3_active.ipynb", "active_sim_params")
+        _, fi_params = _assigned_dict("3_active.ipynb", "fi_sim_params")
+        for params in (active_params, fi_params):
+            self.assertEqual(ast.literal_eval(_dict_value(params, "stim_delay")), 200)
+            self.assertEqual(ast.literal_eval(_dict_value(params, "stim_dur")), 1000)
+            self.assertEqual(ast.literal_eval(_dict_value(params, "h_tstop")), 1500)
+        self.assertEqual(
+            _assigned_literal("3_active.ipynb", "active_sim_amps"),
+            [150, 300],
+        )
+        self.assertEqual(
+            _assigned_literal("3_active.ipynb", "FI_AMP_RANGE"),
+            (0, 300, 50),
+        )
+        self.assertIsNone(_assigned_literal("3_active.ipynb", "PLOT_XLIM"))
+        self.assertIsNone(_assigned_literal("3_active.ipynb", "CURRENT_YLIM"))
+
+    def test_step1_synapse_scaffolding_is_allen_only_by_default(self) -> None:
+        _, value = _assigned_value("1_setup.ipynb", "DO_SETUP_SYNAPSE_CONFIGS")
+        self.assertIsInstance(value, ast.Compare)
+        self.assertIsInstance(value.left, ast.Name)
+        self.assertEqual(value.left.id, "cell_loader")
+        self.assertEqual(len(value.ops), 1)
+        self.assertIsInstance(value.ops[0], ast.Eq)
+        self.assertEqual(len(value.comparators), 1)
+        self.assertIsInstance(value.comparators[0], ast.Constant)
+        self.assertEqual(value.comparators[0].value, "allen_manifest")
+
     def test_step2_and_step3_construct_one_cell_per_kernel(self) -> None:
         for notebook_name in ("2_passive.ipynb", "3_active.ipynb"):
             with self.subTest(notebook_name=notebook_name):
@@ -287,14 +408,49 @@ class NotebookContractTests(unittest.TestCase):
         self.assertIsInstance(_dict_value(config_mapping, "paths"), ast.Call)
 
         setup_source = "\n".join(_code_cells("1_setup.ipynb"))
-        self.assertIn("HOC_CONSTRUCTOR_ARGS = None", setup_source)
-        self.assertIn("HOC_SECTION_MAP = None", setup_source)
-        self.assertIn("if HOC_TEMPLATE_FILE not in (None, \"\"):", setup_source)
-        self.assertIn("if HOC_CONSTRUCTOR_ARGS is not None:", setup_source)
-        self.assertNotIn(
-            'loader_paths = {"hoc_template": HOC_TEMPLATE_FILE, "modfiles": HOC_MODFILES_DIR}',
-            setup_source,
+        self.assertIn("MODEL_SOURCE_OVERRIDES = None", setup_source)
+        self.assertEqual(len(_calls("1_setup.ipynb", "resolve_step1_model_setup")), 1)
+        for removed_cell_specific_setting in (
+            "HOC_TEMPLATE_FILE",
+            "HOC_TEMPLATE_NAME",
+            "HOC_CONSTRUCTOR_ARGS",
+            "HOC_SECTION_MAP",
+            "soma_diam_multiplier",
+            "cell_color",
+            "v_init_mV",
+            "celsius_C",
+        ):
+            self.assertNotIn(removed_cell_specific_setting, setup_source)
+
+        base_calls = _calls("1_setup.ipynb", "prepare_base_configs")
+        self.assertEqual(len(base_calls), 1)
+        passed_keywords = {keyword.arg for keyword in base_calls[0][1].keywords}
+        self.assertTrue(
+            {"soma_diam_multiplier", "color", "v_init_mV", "celsius_C"}.isdisjoint(
+                passed_keywords
+            )
         )
+
+    def test_step1_generates_generic_mode_specific_target_templates(self) -> None:
+        setup_source = "\n".join(_code_cells("1_setup.ipynb"))
+        self.assertIn('TARGET_SOURCE_MODE = "manual"', setup_source)
+        self.assertIn("INCLUDE_MANUAL_WITH_FILE_SOURCE = False", setup_source)
+        for old_notebook_value in (
+            "MANUAL_PASSIVE_TARGETS",
+            "MANUAL_FI_CURRENTS_PA",
+            "PASSIVE_TRACE_FILE",
+            "ACTIVE_TRACE_NPY_FILE",
+            "ALLEN_NWB_FILE",
+            "TARGET_DESCRIPTION",
+            "TARGET_NOTES",
+        ):
+            self.assertNotIn(old_notebook_value, setup_source)
+
+        calls = _calls("1_setup.ipynb", "prepare_target_config")
+        self.assertEqual(len(calls), 1)
+        manual_toggle = _keyword(calls[0][1], "include_manual_with_file_source")
+        self.assertIsInstance(manual_toggle, ast.Name)
+        self.assertEqual(manual_toggle.id, "INCLUDE_MANUAL_WITH_FILE_SOURCE")
 
     def test_step5_uses_session_config_and_disables_unconditional_input_checks(self) -> None:
         setup_calls = _calls("5_simulate.ipynb", "finish_step5_notebook_setup")

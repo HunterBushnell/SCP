@@ -110,16 +110,27 @@ def update_passive_targets_in_config(
     target_source: Optional[str] = None,
     notes: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Update only the passive target block in `target_config.json`."""
-    config = ensure_target_config_shape(load_target_config(tune_dir))
+    """Update the passive target block without expanding unrelated source blocks."""
+    config = load_target_config(tune_dir)
     config.setdefault("schema_version", 1)
-    if target_source is not None:
-        source = config.setdefault("target_source", {"mode": "manual", "description": ""})
-        if isinstance(source, dict):
+    source = config.get("target_source")
+    if not isinstance(source, dict):
+        source = {
+            "mode": str(target_source or "manual"),
+            "description": "",
+        }
+        config["target_source"] = source
+    else:
+        source.setdefault("mode", "manual")
+        source.setdefault("description", "")
+        if target_source is not None:
             source["mode"] = str(target_source)
-        else:
-            config["target_source"] = {"mode": str(target_source), "description": ""}
-    config.setdefault("manual", _copy_default(DEFAULT_MANUAL_BLOCK))
+    if not isinstance(config.get("manual"), dict):
+        config["manual"] = _copy_default(DEFAULT_MANUAL_BLOCK)
+    else:
+        config["manual"].setdefault(
+            "fi_curve", _copy_default(DEFAULT_MANUAL_BLOCK["fi_curve"])
+        )
     config["manual"]["passive"] = {
         "v_rest_mV": _optional_float(passive_targets.get("v_rest_mV")),
         "rin_MOhm": _optional_float(passive_targets.get("rin_MOhm")),

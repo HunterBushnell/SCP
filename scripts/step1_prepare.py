@@ -24,9 +24,8 @@ if str(REPO_ROOT) not in sys.path:
 
 from modules.setup.adb import list_ADB_models
 from modules.loaders import get_cell_loader_name
+from modules.setup.mechanisms import load_tune_cell_config
 from modules.setup.step1_prepare import (
-    guess_cell_color,
-    guess_soma_multiplier,
     guess_specimen_from_cell,
     prepare_tune,
 )
@@ -175,7 +174,12 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--force-download", action="store_true", help="Force cache_data even if target has files")
     ap.add_argument("--cache-stimulus", action="store_true", help="Allow large NWB stimulus cache")
 
-    ap.add_argument("--no-compile", dest="do_compile", action="store_false", help="Skip nrnivmodl compile")
+    ap.add_argument(
+        "--no-compile",
+        dest="do_compile",
+        action="store_false",
+        help="Skip nrnivmodl; load an existing compiled library when one is configured",
+    )
     ap.add_argument(
         "--recompile-modfiles",
         action="store_true",
@@ -218,7 +222,12 @@ def parse_args() -> argparse.Namespace:
         "--target-source-mode",
         choices=["none", "manual", "traces", "allen_nwb"],
         default=None,
-        help="Target source to scaffold. Defaults to manual for Allen and none for other loaders.",
+        help="Blank target template to scaffold. Defaults to manual for every loader.",
+    )
+    ap.add_argument(
+        "--include-manual-with-file-source",
+        action="store_true",
+        help="Also include a blank manual block in traces or allen_nwb templates.",
     )
     ap.add_argument(
         "--no-synapse-configs",
@@ -305,14 +314,6 @@ def main() -> None:
             args.hoc_section_map,
         )
     )
-    cell_loader = get_cell_loader_name(
-        {"cell_loader": args.cell_loader or ("hoc_template" if hoc_options_used else "allen_manifest")}
-    )
-    source_type = args.source_type or ("adb" if cell_loader == "allen_manifest" else "existing")
-    if hoc_options_used and cell_loader != "hoc_template":
-        raise ValueError("--hoc-* options require --cell-loader hoc_template.")
-    if source_type == "adb" and cell_loader != "allen_manifest":
-        raise ValueError("--source-type adb can only be used with --cell-loader allen_manifest.")
 
     if args.tune_dir:
         tune_dir = Path(args.tune_dir).expanduser().resolve()
@@ -325,6 +326,24 @@ def main() -> None:
         cell_name = args.cell
         tune_name = args.tune or _default_tune_for_model_type(args.model_type)
         tune_dir = (REPO_ROOT / "cells" / cell_name / args.tunes_dir / tune_name).resolve()
+
+    stored_cell_config = load_tune_cell_config(tune_dir)
+    if args.cell_loader not in (None, ""):
+        loader_hint = args.cell_loader
+    elif hoc_options_used:
+        loader_hint = "hoc_template"
+    elif stored_cell_config is not None:
+        loader_hint = get_cell_loader_name(stored_cell_config)
+    else:
+        loader_hint = "allen_manifest"
+    cell_loader = get_cell_loader_name({"cell_loader": loader_hint})
+    source_type = args.source_type or (
+        "adb" if cell_loader == "allen_manifest" else "existing"
+    )
+    if hoc_options_used and cell_loader != "hoc_template":
+        raise ValueError("--hoc-* options require --cell-loader hoc_template.")
+    if source_type == "adb" and cell_loader != "allen_manifest":
+        raise ValueError("--source-type adb can only be used with --cell-loader allen_manifest.")
 
     specimen_id = args.specimen_id
     if specimen_id is None and source_type == "adb":
@@ -342,10 +361,7 @@ def main() -> None:
             return
 
     soma_mult = args.soma_diam_multiplier
-    if soma_mult is None and cell_loader == "allen_manifest":
-        soma_mult = guess_soma_multiplier(cell_name)
-
-    color = args.color if args.color is not None else guess_cell_color(cell_name)
+    color = args.color
     synapse_template_kinds = _parse_synapse_templates(args.synapse_templates)
     loader_paths = _parse_json_value(
         args.loader_paths_json,
@@ -410,6 +426,7 @@ def main() -> None:
         v_init_mV=args.v_init_mv,
         celsius_C=args.celsius_c,
         target_source_mode=args.target_source_mode,
+        include_manual_with_file_source=bool(args.include_manual_with_file_source),
         synapse_template_kinds=synapse_template_kinds,
         synapse_weight_style=args.synapse_weight_style,
         do_validate=bool(args.do_validate),

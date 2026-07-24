@@ -10,6 +10,10 @@ from typing import Any, Mapping, Optional, Sequence
 import numpy as np
 
 from .allen_nwb import aggregate_passive_sweeps
+from .passive import (
+    compute_passive_trace_metrics,
+    normalize_act_passive_metrics,
+)
 
 
 def write_passive_trace_target_csv(
@@ -122,6 +126,17 @@ def extract_passive_trace_sweeps(
             float(metric_stop_ms),
             float(resolved_current) / 1000.0,
         )
+        local_metrics = compute_passive_trace_metrics(
+            voltage_mV,
+            dt_ms=float(resolved_dt_ms),
+            stim_start_ms=float(resolved_start),
+            stim_end_ms=float(metric_stop_ms),
+            amp_nA=float(resolved_current) / 1000.0,
+        )
+        passive_metrics = normalize_act_passive_metrics(
+            gpp,
+            fallback=local_metrics,
+        )
         row = {
             "sweep": index,
             "source_sweep": trace.get("sweep", index),
@@ -139,8 +154,8 @@ def extract_passive_trace_sweeps(
             ("sag_ratio", "sag_ratio"),
             ("V_rest", "v_rest_mV"),
         ):
-            if hasattr(gpp, attr):
-                row[out_name] = float(getattr(gpp, attr))
+            if attr in passive_metrics:
+                row[out_name] = passive_metrics[attr]
         rows.append(row)
 
     if not rows:

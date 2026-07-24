@@ -18,6 +18,8 @@ Key points:
   backend modules.
 - Uses tune-local JSON configs so models, targets, synapses, simulations, and
   analysis options are reproducible and easy to inspect.
+- Uses the same cell-scoped pipeline for Allen-manifest bundles and
+  object-owned HOC templates.
 
 ## 2. Repo Layout
 
@@ -37,6 +39,19 @@ Recommended example to show:
 cells/PV/tunes/tuned/
 ```
 
+PV remains the primary/default example. To demonstrate loader portability,
+also show one of the single-compartment HOC-template examples:
+
+```text
+cells/EUSmn/tunes/tuned/
+cells/HYPO/tunes/tuned/
+cells/PGN/tunes/tuned/
+```
+
+Their HOC and MOD sources have explicit source lineage and are not relicensed
+by SCP's MIT license. See `THIRD_PARTY_NOTICES.md` and each tune's
+`SOURCE_PROVENANCE.json`.
+
 ## 3. Main Workflow
 
 For the main demo, open `0_pipeline.ipynb`, choose **Run All**, and show how
@@ -49,17 +64,20 @@ reload current configs and avoid carrying BMTool state into the final run.
 Purpose:
 
 - Download or stage a cell model.
+- Reuse an existing loader config or discover one unambiguous staged Allen
+  manifest/HOC template.
 - Compile mechanisms.
 - Generate config templates.
-- Set up target data mode.
+- Generate a sparse target template for manual values, user traces, Allen NWB
+  data, or targetless characterization.
 - Validate the tune folder.
 
 Point out:
 
 - `orig` is the raw/original tune.
 - `tuned` is the working tune used through later steps.
-- `tuned_adb` is prepared for Allen/ADB NWB-based targets, but NWB files are not
-  tracked in Git.
+- In the Allen examples, `tuned_adb` is prepared for Allen/ADB NWB-based
+  targets, but NWB files are not tracked in Git.
 
 ### Step 2: Passive Tuning
 
@@ -161,6 +179,8 @@ Important config files:
 - `syn_config.json` and `syn_groups/*.json`: enabled synapse groups and input
   blocks.
 - `geometry.json`: section grouping and distance settings.
+- `SOURCE_PROVENANCE.json`: source and current-artifact hashes for public
+  HOC-template tunes.
 
 ## 5. Validated Scope
 
@@ -171,6 +191,10 @@ Current status:
   interface-render execution; its scientific actions remain explicitly
   user-triggered.
 - PV/SST example simulation paths have been validated locally and in Colab.
+- The EUSmn, HYPO, and PGN bundles exercise setup, cell construction,
+  current-injection, and loader-aware analysis without an Allen manifest. They
+  are reproducible manual-tuning examples rather than independent biological
+  validation.
 - CLI and SLURM simulation entry points have been checked on the current
   examples.
 - Model-specific ACT active tuning quality remains the major intentionally
@@ -189,6 +213,7 @@ Ask reviewers to focus on:
 
 ## 7. Suggested Closing
 
-SCP is currently a public-preview candidate for `v0.1.0`. The core workflow is
-usable, but lab feedback should guide final polish before creating a formal
-GitHub release/tag.
+SCP `v0.2.0` keeps PV as the primary example while demonstrating that the same
+core workflow supports Allen-manifest and object-owned HOC-template cells. The
+project remains a public preview; model-specific scientific tuning and optional
+ACT/BMTool workflows should still be reviewed for each new use case.

@@ -1,0 +1,96 @@
+{
+  "schema_version": 2,
+  "cell_name": "EUSmn",
+  "tune": "orig",
+  "model_relationship": "exact_copy",
+  "source_repository": {
+    "name": "LUT",
+    "remote": "https://github.com/HunterBushnell/LUT.git",
+    "commit": "f9739d8aa7f94eac67fcaa67e8e04e26787dee0f"
+  },
+  "rights": {
+    "redistribution_status": "redistributed_with_permission",
+    "scp_mit_scope": "excluded_from_scp_mit",
+    "upstream_license": "no upstream license asserted"
+  },
+  "compiled_outputs_included": false,
+  "files": [
+    {
+      "source_path": "biophys_components/hoc_templates/PUD_TEMPLATE.hoc",
+      "source_sha256": "1c438db2e803e0c040088724b66577085cf430f78c0a81ae8cb140bf97d94114",
+      "destination_path": "model/PUD_TEMPLATE.hoc",
+      "current_sha256": "1c438db2e803e0c040088724b66577085cf430f78c0a81ae8cb140bf97d94114",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "biophys_components/mechanisms/modfiles/cadyn.mod",
+      "source_sha256": "2fa63d34ff74a6891ac2a5fb8bf9f9775fa234122d66ebb8a56e10ca73a859e9",
+      "destination_path": "modfiles/cadyn.mod",
+      "current_sha256": "2fa63d34ff74a6891ac2a5fb8bf9f9775fa234122d66ebb8a56e10ca73a859e9",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "biophys_components/mechanisms/modfiles/leak.mod",
+      "source_sha256": "6b2fa34ae39b67d20452cb82aaa2e69e77e2318b0f0d84f62390a57f3e8268c9",
+      "destination_path": "modfiles/leak.mod",
+      "current_sha256": "6b2fa34ae39b67d20452cb82aaa2e69e77e2318b0f0d84f62390a57f3e8268c9",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "biophys_components/mechanisms/modfiles/h.mod",
+      "source_sha256": "b12e5665c191df83ab8df6f9893f58a866d53be18e8ad2a8439c3712abce2ac4",
+      "destination_path": "modfiles/h.mod",
+      "current_sha256": "b12e5665c191df83ab8df6f9893f58a866d53be18e8ad2a8439c3712abce2ac4",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "biophys_components/mechanisms/modfiles/na3.mod",
+      "source_sha256": "f867647409b54d08f1b8d8859a517b252872fa70e87e69f82d38fb4489c7ac22",
+      "destination_path": "modfiles/na3.mod",
+      "current_sha256": "f867647409b54d08f1b8d8859a517b252872fa70e87e69f82d38fb4489c7ac22",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "biophys_components/mechanisms/modfiles/Nap.mod",
+      "source_sha256": "cb583c4039331a6c32f7333848c88d373f5900c01aef011cf46c8fdbdf68f120",
+      "destination_path": "modfiles/Nap.mod",
+      "current_sha256": "cb583c4039331a6c32f7333848c88d373f5900c01aef011cf46c8fdbdf68f120",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "biophys_components/mechanisms/modfiles/kdrca1.mod",
+      "source_sha256": "037e7e05ec6c470918948384c3a7df687f101c29260e2e18f4ee1b6380f13ae0",
+      "destination_path": "modfiles/kdrca1.mod",
+      "current_sha256": "037e7e05ec6c470918948384c3a7df687f101c29260e2e18f4ee1b6380f13ae0",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "biophys_components/mechanisms/modfiles/capool.mod",
+      "source_sha256": "6cf96f79fba681537ed55b52e52f02578efeae59b181b41add6f443659f423c7",
+      "destination_path": "modfiles/capool.mod",
+      "current_sha256": "6cf96f79fba681537ed55b52e52f02578efeae59b181b41add6f443659f423c7",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "biophys_components/mechanisms/modfiles/sahp.mod",
+      "source_sha256": "1843b2a78dbc979ef78ee01705eef767ef52bfa8d2841bddf311349803679300",
+      "destination_path": "modfiles/sahp.mod",
+      "current_sha256": "1843b2a78dbc979ef78ee01705eef767ef52bfa8d2841bddf311349803679300",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "biophys_components/mechanisms/modfiles/Im.mod",
+      "source_sha256": "dc355bcb794c47c1b369c294da1ec31b77945f9c9eda9b8e1c430c9aa761e1b3",
+      "destination_path": "modfiles/Im.mod",
+      "current_sha256": "dc355bcb794c47c1b369c294da1ec31b77945f9c9eda9b8e1c430c9aa761e1b3",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "biophys_components/mechanisms/modfiles/kaprox.mod",
+      "source_sha256": "1531a72bfd88fd0617b77fae9fdcce110768c66e1848e0970dcd1796cb79620f",
+      "destination_path": "modfiles/kaprox.mod",
+      "current_sha256": "1531a72bfd88fd0617b77fae9fdcce110768c66e1848e0970dcd1796cb79620f",
+      "relationship": "exact_copy"
+    }
+  ]
+}

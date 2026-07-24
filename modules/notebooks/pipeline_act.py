@@ -547,10 +547,16 @@ def _friendly_act_probe_error(exc: Exception) -> str:
             "ACT was found, but timeout-decorator is missing. Update the SCP "
             "environment from environment.yml and restart the kernel."
         )
-    if "ACT repo not found" in message:
+    if (
+        "ACT repo not found" in message
+        or "Could not clone ACT" in message
+        or "SCP_ACT_DIR exists" in message
+    ):
         return (
             message
-            + " Locally, clone ACT or set SCP_ACT_PATH; Colab can auto-clone during preparation."
+            + " SCP attempts this installation when an ACT action is requested. "
+            "Check Git/network access, move an invalid target aside, or set "
+            "SCP_ACT_PATH to a valid checkout."
         )
     return message
 

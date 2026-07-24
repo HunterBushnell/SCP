@@ -1,0 +1,21 @@
+{
+  "cell_name": "HYPO",
+  "tune": "orig",
+  "color": "red",
+  "cell_loader": "hoc_template",
+  "paths": {
+    "hoc_template": "model/HYPO_TEMPLATE.hoc",
+    "modfiles": "modfiles"
+  },
+  "hoc_template": {
+    "template_name": "HYPO",
+    "constructor_args": [],
+    "section_map": {
+      "soma": "somatic",
+      "dend": "basal",
+      "apic": "apical",
+      "axon": "axonal",
+      "all": "all"
+    }
+  }
+}

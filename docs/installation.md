@@ -7,7 +7,7 @@ git clone <SCP_REPO_URL>
 cd SCP
 conda env create -f environment.yml
 conda activate scp-py311
-python -m ipykernel install --user --name scp-py311 --display-name "Python (SCP)"
+python -m ipykernel install --user --name scp-py311 --display-name "scp-py311"
 ```
 
 ## Optional venv Setup
@@ -24,20 +24,36 @@ python -m ipykernel install --user --name scp-venv --display-name "Python (SCP v
 
 ## External Repositories
 
-Steps 2-4 can optionally use external tuning tools:
+ACT and BMTool are optional. You do not need either one for the core SCP
+workflow. When an ACT proposal/optimization or BMTool tuner action is first
+requested, SCP checks configured and common locations and, if necessary,
+clones a fresh checkout to the sibling `mods/` directory:
 
-```bash
-mkdir -p ../mods
-git clone https://github.com/V-Marco/ACT.git ../mods/ACT
-git clone https://github.com/cyneuro/bmtool.git ../mods/bmtool
+```text
+<SCP parent>/
+├── SCP/
+└── mods/
+    ├── ACT/
+    └── bmtool/
 ```
 
-If stored elsewhere:
+Notebook bootstrap and ordinary passive/active/FI/simulation actions do not
+download these tools. This keeps them optional while making the first
+tool-specific action work the same way locally and in Colab.
+
+To reuse checkouts stored elsewhere:
 
 ```bash
 export SCP_ACT_PATH=/path/to/ACT
 export SCP_BMTOOL_PATH=/path/to/bmtool
 ```
+
+To choose installation destinations, use `SCP_ACT_DIR` and
+`SCP_BMTOOL_DIR`. Set `SCP_AUTO_CLONE_ACT=0` or
+`SCP_AUTO_CLONE_BMTOOL=0` to require manual provisioning. Repository URLs and
+branches can be overridden with `SCP_ACT_REPO_URL` /
+`SCP_ACT_REPO_BRANCH` and `SCP_BMTOOL_REPO_URL` /
+`SCP_BMTOOL_REPO_BRANCH`.
 
 ACT is optional for Step 2 target-derived proposals and Step 3 optimization.
 Core passive sweeps and manual active/FI checks run without ACT. BMTool is
@@ -45,6 +61,10 @@ optional and used only when Step 4 synapse tuning is requested. SCP's environmen
 includes ACT's Python-side `scikit-learn` and `timeout-decorator` dependencies;
 after adding ACT to an older environment, update from `environment.yml` before
 using the compact optimizer controls.
+
+SCP imports these repositories as read-only dependencies. Generated ACT
+workspaces and all SCP adapters remain inside the selected tune/SCP checkout;
+SCP does not patch files in ACT or BMTool.
 
 ## Validate the Workspace
 
@@ -95,7 +115,8 @@ Useful environment overrides:
 - `SCP_REPO_DIR`
 - `SCP_GIT_TOKEN`, `SCP_GITHUB_TOKEN`, or `GITHUB_TOKEN`
 - `SCP_ACT_REPO_URL`, `SCP_ACT_REPO_BRANCH`, `SCP_ACT_DIR`, `SCP_ACT_PATH`
-- `SCP_BMTOOL_PATH`
+- `SCP_BMTOOL_REPO_URL`, `SCP_BMTOOL_REPO_BRANCH`,
+  `SCP_BMTOOL_DIR`, `SCP_BMTOOL_PATH`
 
 For private repositories, store a GitHub token in Colab secrets and set
 `SCP_GIT_TOKEN` before running the notebook bootstrap cell.

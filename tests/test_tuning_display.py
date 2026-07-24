@@ -128,6 +128,8 @@ class TuningDisplayTests(unittest.TestCase):
         self.assertIn('rowspan="2"', rendered)
         self.assertIn(colors[-50.0], rendered)
         self.assertIn(colors[-100.0], rendered)
+        self.assertIn("color: #1f2328 !important;", rendered)
+        self.assertIn("background-color: #eef2f6;", rendered)
         self.assertNotIn("spike_frequency", rendered)
         self.assertEqual(summary["unexpected_spikes"], [])
         self.assertFalse(

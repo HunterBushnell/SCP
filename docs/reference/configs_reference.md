@@ -44,6 +44,11 @@ Generated fields:
   setting. It defaults to `1.0` for Allen and is not added or applied to HOC
   templates.
 
+`cell_config.json` is the tune-local source of truth for `color` and the Allen
+diameter multiplier. The Step 1 notebook does not carry per-cell copies of
+these values. Normal `fill` reruns preserve edits made in the JSON; `overwrite`
+resets the file to generated defaults.
+
 Example:
 
 ```json
@@ -105,21 +110,27 @@ The target config is organized by **source mode**:
 - `traces`: user-provided trace files following the SCP trace contract.
 - `allen_nwb`: Allen/ADB electrophysiology `.nwb` files.
 
-Generated fields:
+Every generated template contains:
 
 - `schema_version`: target-config schema version.
 - `target_source.mode`: one of `none`, `manual`, `traces`, or `allen_nwb`.
 - `target_source.description`: optional human-readable target-source note.
-- `manual.passive`: direct Step 2 targets: `v_rest_mV`, `rin_MOhm`, `tau_ms`.
-- `manual.fi_curve`: direct Step 3 FI targets: `currents_pA`, `rates_Hz`, or `csv`.
-- `traces.passive`: generic passive trace file contract for Step 2 extraction.
-- `traces.active`: ACT-compatible active trace target file contract for Step 3.
-- `allen_nwb.file`: tune-local or absolute Allen/ADB NWB file path.
-- `allen_nwb.passive`: Step 2 NWB passive sweep/filter settings.
-- `allen_nwb.active`: Step 3 NWB FI sweep/filter settings.
 - `notes`: free-form target notes.
 
-Example:
+It then contains only the selected mode's data block:
+
+- `manual`: `manual.passive` and `manual.fi_curve`.
+- `traces`: `traces.passive` and `traces.active`.
+- `allen_nwb`: `allen_nwb.file`, `allen_nwb.passive`, and `allen_nwb.active`.
+- `none`: no source-data block.
+
+Trace and NWB templates may optionally include a blank `manual` block. Existing
+full-schema v1 configs remain supported. `fill` preserves inactive blocks in
+an existing file; only new generation or `overwrite` prunes them.
+Manual values never replace data extracted from a configured file, but they can
+fill a missing passive or active side of a file-backed template.
+
+Blank manual example:
 
 ```json
 {
@@ -140,54 +151,6 @@ Example:
       "csv": null
     }
   },
-  "traces": {
-    "format": "csv",
-    "passive": {
-      "file": null,
-      "time_column": "time_ms",
-      "voltage_column": "voltage_mV",
-      "current_column": "current_pA",
-      "sweep_column": null,
-      "stim_start_ms": null,
-      "stim_stop_ms": null,
-      "current_pA": null,
-      "dt_ms": null,
-      "end_margin_ms": 10.0,
-      "reducer": "median",
-      "tau_field": "tau_avg_ms"
-    },
-    "active": {
-      "file": null,
-      "format": "npy",
-      "stim_start_ms": null,
-      "stim_stop_ms": null,
-      "dt_ms": null,
-      "spike_threshold_mV": -20.0,
-      "refractory_ms": 1.0
-    }
-  },
-  "allen_nwb": {
-    "file": null,
-    "sweep_ids": [],
-    "passive": {
-      "stimulus_names": ["Long Square"],
-      "sweep_ids": null,
-      "min_current_pA": null,
-      "max_current_pA": -1.0,
-      "end_margin_ms": 10.0,
-      "reducer": "median",
-      "tau_field": "tau_avg_ms"
-    },
-    "active": {
-      "stimulus_names": ["Long Square"],
-      "min_current_pA": 0.0,
-      "max_current_pA": null,
-      "include_negative_currents": false,
-      "average_repeats": true,
-      "spike_threshold_mV": -20.0,
-      "refractory_ms": 1.0
-    }
-  },
   "notes": ""
 }
 ```
@@ -197,6 +160,12 @@ calculates targets from `allen_nwb.passive` depending on `target_source.mode`.
 Step 3 uses `manual.fi_curve`, `traces.active`, or `allen_nwb.active` the same
 way. Manual FI CSV is still considered manual mode because it provides already
 summarized FI values rather than raw traces.
+
+When the setup API is called without an explicit mode, a supplied trace path
+selects `traces`, a supplied NWB path selects `allen_nwb`, and no supplied file
+path selects `manual`. Supplying both file families is an error. The Step 1
+notebook instead asks for the desired blank-template mode directly, because
+cell-specific paths are entered in the generated config.
 
 Detailed passive trace, active trace, and FI CSV file requirements are in
 `docs/reference/target_trace_formats.md`.
@@ -224,6 +193,11 @@ Both values are required and must be finite for new `hoc_template` tunes. SCP
 applies them before every passive, active/FI, and Step 5 protocol or trial.
 Legacy Allen tunes without this block retain their existing loader/runtime
 fallbacks.
+
+The Step 1 notebook creates new condition fields with `null` placeholders and
+expects the user to edit this tune-local file before validating a new HOC tune.
+Normal `fill` reruns preserve the values. The setup API and CLI may still supply
+explicit values programmatically.
 
 ### Timing
 

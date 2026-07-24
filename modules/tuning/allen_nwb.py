@@ -15,6 +15,11 @@ import csv
 
 import numpy as np
 
+from .passive import (
+    compute_passive_trace_metrics,
+    normalize_act_passive_metrics,
+)
+
 
 DEFAULT_FI_STIMULUS_NAMES = ("Long Square",)
 DEFAULT_PASSIVE_STIMULUS_NAMES = ("Long Square",)
@@ -210,6 +215,17 @@ def extract_allen_nwb_passive_sweeps(
                 metric_stop_ms,
                 amp_pA / 1000.0,
             )
+            local_metrics = compute_passive_trace_metrics(
+                voltage_mV,
+                dt_ms=dt_ms,
+                stim_start_ms=stim_start_ms,
+                stim_end_ms=metric_stop_ms,
+                amp_nA=amp_pA / 1000.0,
+            )
+            passive_metrics = normalize_act_passive_metrics(
+                gpp,
+                fallback=local_metrics,
+            )
             row = {
                 "sweep": sweep,
                 "stimulus_name": stimulus_name,
@@ -227,8 +243,8 @@ def extract_allen_nwb_passive_sweeps(
                 ("sag_ratio", "sag_ratio"),
                 ("V_rest", "v_rest_mV"),
             ):
-                if hasattr(gpp, attr):
-                    row[out_name] = float(getattr(gpp, attr))
+                if attr in passive_metrics:
+                    row[out_name] = passive_metrics[attr]
             rows.append(row)
     if not rows:
         raise ValueError(

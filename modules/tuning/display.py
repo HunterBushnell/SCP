@@ -10,6 +10,9 @@ from typing import Any
 
 
 DEFAULT_DISPLAY_SIGNIFICANT_DIGITS = 4
+_TABLE_TEXT_COLOR = "#1f2328"
+_TABLE_HEADER_BACKGROUND = "#eef2f6"
+_TABLE_BORDER_COLOR = "#d0d7de"
 
 _PASSIVE_METRIC_LABELS = {
     "v_rest_mV": "Resting voltage (mV)",
@@ -519,8 +522,23 @@ def _style_amplitude_frame(
         .apply_index(_current_index_style, axis=0, level=amplitude_index_level)
         .set_table_styles(
             [
-                {"selector": "th", "props": [("text-align", "left")]},
-                {"selector": "td", "props": [("text-align", "right")]},
+                {
+                    "selector": "th",
+                    "props": [
+                        ("text-align", "left"),
+                        ("color", f"{_TABLE_TEXT_COLOR} !important"),
+                        ("background-color", _TABLE_HEADER_BACKGROUND),
+                        ("border-bottom", f"1px solid {_TABLE_BORDER_COLOR}"),
+                    ],
+                },
+                {
+                    "selector": "td",
+                    "props": [
+                        ("text-align", "right"),
+                        ("color", f"{_TABLE_TEXT_COLOR} !important"),
+                        ("border-bottom", f"1px solid {_TABLE_BORDER_COLOR}"),
+                    ],
+                },
             ]
         )
     )

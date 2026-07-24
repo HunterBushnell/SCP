@@ -34,6 +34,8 @@ Optionally click **Compute ACT proposal** to review suggested passive values;
 this does not modify the model. Then click **Run passive**. Target fields start
 from `target_config.json`, and timing controls are under **Show advanced
 options**.
+That ACT-specific action resolves or installs ACT on demand; ordinary passive
+checks do not require it.
 
 ### Step 3 — Active Tuning and FI Curve
 
@@ -50,6 +52,8 @@ files. Use [`3_active.ipynb`](../3_active.ipynb) for its detailed workflow.
 Leave this step disabled for a first run. To use it, enable and click
 **Initialize BMTool**, then run **Single Event** or **Interactive Tuner** from
 their separate cards. Copy accepted values into the relevant synapse JSON.
+Initialization reuses a configured BMTool checkout or installs a fresh one on
+demand.
 
 ### Step 5 — Check Inputs, Simulate, and Plot
 

@@ -26,6 +26,9 @@ Step 3 is manual-first for model edits:
 ACT active tuning is integrated as an optional helper, not a mandatory path. The
 notebook can prepare ACT inputs, run ACT modules, collect predictions, and
 evaluate temporary predictions without overwriting model files.
+The first ACT preparation/run action resolves a configured checkout or
+automatically clones a fresh one to `../mods/ACT`, both locally and in Colab.
+Set `SCP_AUTO_CLONE_ACT=0` when manual provisioning is required.
 
 The compact `0_pipeline.ipynb` counterpart presents Step 3 as three bordered
 cards: active protocol, FI curve, and ACT active tuning. The first two actions
@@ -181,6 +184,12 @@ modes:
 - `traces`: use `traces.active.file` as an ACT-compatible `.npy` trace target.
 - `allen_nwb`: extract FI targets from an Allen/ADB `.nwb` file using
   `allen_nwb.active`.
+
+Blank templates and file modes with no active-side file remain usable for core
+active/FI characterization. A complete target is required only when optional
+ACT tuning is requested. A manual block included alongside a file-backed mode
+does not override a configured file. It can supply the missing active side when
+the selected file-backed template has no active target path.
 
 For exact passive trace, active trace, and FI CSV file requirements, see
 `docs/reference/target_trace_formats.md`.

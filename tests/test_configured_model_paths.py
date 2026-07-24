@@ -15,8 +15,8 @@ from modules.notebooks.bootstrap import (
     finish_step5_notebook_setup,
 )
 from modules.setup.fit_json import coerce_fit_genome_values_to_numeric, find_fit_json
-from modules.setup.mechanisms import resolve_modfiles_dir
-from modules.setup.step1_prepare import prepare_mechanisms
+from modules.setup.mechanisms import compile_modfiles, resolve_modfiles_dir
+from modules.setup.step1_prepare import prepare_mechanisms, prepare_tune
 from modules.simulation.result_paths import _copy_fit_json_sidecar, _find_fit_json_path
 from modules.simulation.snapshots import _collect_mechanism_info
 from modules.tuning.act_active import _build_act_cell
@@ -49,6 +49,40 @@ class ConfiguredModPathTests(unittest.TestCase):
                 step1_cli.main()
 
             kwargs = prepare.call_args.kwargs
+            self.assertEqual(kwargs["loader_paths"], {})
+            self.assertEqual(kwargs["loader_config"], {})
+
+    def test_step1_cli_preserves_stored_hoc_loader_when_unspecified(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tune = Path(tmp)
+            _write_json(
+                tune / "cell_configs" / "cell_config.json",
+                {
+                    "cell_loader": "hoc_template",
+                    "paths": {
+                        "hoc_template": "model/Cell.hoc",
+                        "modfiles": "modfiles",
+                    },
+                    "hoc_template": {"template_name": "Cell"},
+                },
+            )
+            argv = [
+                "step1_prepare.py",
+                "--tune-dir",
+                str(tune),
+                "--source-type",
+                "existing",
+            ]
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.object(step1_cli, "prepare_tune", return_value={}) as prepare,
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                step1_cli.main()
+
+            kwargs = prepare.call_args.kwargs
+            self.assertEqual(kwargs["cell_loader"], "hoc_template")
+            self.assertEqual(kwargs["source_type"], "existing")
             self.assertEqual(kwargs["loader_paths"], {})
             self.assertEqual(kwargs["loader_config"], {})
 
@@ -95,6 +129,77 @@ class ConfiguredModPathTests(unittest.TestCase):
             compile_result = result["compile_modfiles"]
             self.assertEqual(compile_result["status"], "skipped")
             self.assertEqual(compile_result["modfiles_dir"], str(configured.resolve()))
+
+    def test_no_compile_loads_an_existing_configured_library(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tune = Path(tmp)
+            mod_dir = tune / "native" / "mechanisms"
+            dll = mod_dir / "x86_64" / ".libs" / "libnrnmech.so"
+            dll.parent.mkdir(parents=True)
+            dll.write_bytes(b"synthetic-library")
+            (mod_dir / "Synthetic.mod").write_text("NEURON {}\n", encoding="utf-8")
+            config = {"paths": {"modfiles": "native/mechanisms"}}
+
+            with mock.patch(
+                "modules.setup.mechanisms.load_compiled_mechanism_library",
+                return_value={
+                    "loaded": True,
+                    "dll_preloaded": False,
+                    "dll_sha256": "synthetic-sha",
+                },
+            ) as load_library:
+                result = prepare_mechanisms(
+                    tune_dir=tune,
+                    do_compile_modfiles=False,
+                    load_compiled_dll=True,
+                    allow_missing_modfiles=False,
+                    cell_config=config,
+                )
+
+            load_library.assert_called_once_with(dll.resolve())
+            summary = result["compile_modfiles"]
+            self.assertEqual(summary["status"], "ok")
+            self.assertFalse(summary["compiled_now"])
+            self.assertTrue(summary["loaded"])
+
+    def test_no_compile_reports_a_missing_library_without_invoking_nrnivmodl(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tune = Path(tmp)
+            mod_dir = tune / "modfiles"
+            mod_dir.mkdir()
+            (mod_dir / "Synthetic.mod").write_text("NEURON {}\n", encoding="utf-8")
+
+            with (
+                mock.patch("modules.setup.mechanisms.find_nrnivmodl") as find_nrnivmodl,
+                self.assertRaisesRegex(FileNotFoundError, "compilation is disabled"),
+            ):
+                compile_modfiles(
+                    tune,
+                    load_dll=True,
+                    compile_missing=False,
+                )
+            find_nrnivmodl.assert_not_called()
+
+    def test_validation_rejects_custom_mods_when_dll_loading_is_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tune = Path(tmp)
+            mod_dir = tune / "modfiles"
+            mod_dir.mkdir(parents=True)
+            (mod_dir / "Synthetic.mod").write_text("NEURON {}\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "--no-load-dll"):
+                prepare_tune(
+                    tune_dir=tune,
+                    cell_name="synthetic",
+                    tune_name="orig",
+                    source_type="existing",
+                    cell_loader="hoc_template",
+                    do_download=False,
+                    do_compile_modfiles=False,
+                    load_compiled_dll=False,
+                    do_scaffold_configs=False,
+                    do_validate=True,
+                )
 
     def test_step5_bootstrap_compiles_in_configured_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

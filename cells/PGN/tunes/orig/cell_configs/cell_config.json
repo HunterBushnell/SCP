@@ -1,0 +1,21 @@
+{
+  "cell_name": "PGN",
+  "tune": "orig",
+  "color": "limegreen",
+  "cell_loader": "hoc_template",
+  "paths": {
+    "hoc_template": "model/PGN_TEMPLATE.hoc",
+    "modfiles": "modfiles"
+  },
+  "hoc_template": {
+    "template_name": "PGN",
+    "constructor_args": [],
+    "section_map": {
+      "soma": "somatic",
+      "dend": "basal",
+      "apic": "apical",
+      "axon": "axonal",
+      "all": "all"
+    }
+  }
+}

@@ -115,9 +115,11 @@ terminated and its retained manifest is marked incomplete. Rerunning an earlier
 module can make later predictions stale because the later module was trained
 against the earlier proposal.
 
-If compact preparation reports that ACT is unavailable locally, install or
-clone ACT and set `ACT_ROOT`/`SCP_ACT_PATH`, then prepare again. Colab retains
-the existing automatic ACT clone behavior. Non-PV/SST cells need a complete
+If compact preparation cannot install or import ACT, inspect the concise error
+for Git/network access, an invalid non-empty `SCP_ACT_DIR`, or missing Python
+dependencies. SCP attempts a fresh clone when the ACT action is requested,
+both locally and in Colab. You can instead set `ACT_ROOT`/`SCP_ACT_PATH` and
+prepare again. Non-PV/SST cells need a complete
 `act_workspace/act_active_config.json` prepared and validated in
 `3_active.ipynb`; registered non-Allen loaders are accepted experimentally only
 after fresh-process cell construction succeeds.
@@ -208,7 +210,13 @@ Step 6 reads saved Step 5 output folders. If no runs appear:
 
 ## ACT or BMTool Not Found
 
-Some tuning steps use external tools:
+ACT and BMTool are optional and are resolved only when their corresponding
+buttons/code paths are used. On the first ACT proposal/optimization or BMTool
+tuner action, SCP normally clones a missing checkout into `../mods/ACT` or
+`../mods/bmtool`. A failure here usually means Git/network access is unavailable
+or the destination already contains unrelated files.
+
+To provision them manually:
 
 ```bash
 mkdir -p ../mods
@@ -226,3 +234,17 @@ export SCP_BMTOOL_PATH=/path/to/bmtool
 ACT is optional for Step 2 target-derived proposals and Step 3 ACT active
 tuning. Core passive sweeps and manual active/FI checks run without ACT.
 BMTool is needed only when Step 4 synapse tuning is requested.
+
+Useful controls:
+
+```bash
+export SCP_ACT_DIR=/path/for/new/ACT
+export SCP_BMTOOL_DIR=/path/for/new/bmtool
+export SCP_AUTO_CLONE_ACT=0
+export SCP_AUTO_CLONE_BMTOOL=0
+```
+
+The final two variables disable automatic installation. If ACT is found but
+reports missing `scikit-learn` or `timeout-decorator`, update the SCP Conda
+environment from `environment.yml`; cloning ACT does not modify the active
+Python environment.

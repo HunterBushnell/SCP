@@ -16,6 +16,20 @@ cell = load_cell(cell_config, base_dir=tune_dir)
 Pass the tune directory explicitly. Current-directory path resolution exists
 only for older callers.
 
+## Step 1 Source Discovery
+
+The Step 1 notebook keeps common source selection out of per-cell notebook
+state. It first reuses an existing `cell_configs/cell_config.json`. For a fresh
+staged tune, it then accepts exactly one `manifest.json` or exactly one HOC
+`begintemplate` declaration and records the discovered relative path in the
+generated config. A standard tune-local `modfiles/` directory is detected for
+HOC models.
+
+Set the notebook's `MODEL_SOURCE_OVERRIDES` block only for a new Allen download,
+multiple candidate files/templates, nonstandard paths, HOC constructor
+arguments, or explicit section mappings. Ambiguity is reported instead of
+silently selecting a source.
+
 ## Canonical Cell Interface
 
 Every loader returns a `LoadedCell` with:
@@ -100,6 +114,11 @@ HOC tunes must define explicit runtime conditions in `sim_config.json`:
 SCP validates and applies these values after construction and before each Step
 2, Step 3, or Step 5 protocol/trial. Legacy Allen tunes without the block keep
 their loader/runtime fallback behavior.
+
+Bundled object-owned examples are available under `cells/EUSmn/`,
+`cells/HYPO/`, and `cells/PGN/`. Each includes an `orig` baseline and a
+manually edited `tuned` copy. PV remains the recommended first example for the
+complete public workflow.
 
 ## Optional Mechanisms, Targets, and External Tools
 

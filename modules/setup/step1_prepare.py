@@ -17,7 +17,11 @@ from .fit_json import (
     coerce_fit_genome_values_to_numeric,
     sort_genome_by_section,
 )
-from .mechanisms import compile_modfiles, load_tune_cell_config
+from .mechanisms import (
+    compile_modfiles,
+    load_tune_cell_config,
+    resolve_modfiles_dir,
+)
 from .scaffold import scaffold_base_configs, scaffold_synapse_configs
 from .target_config import prepare_target_config as _prepare_target_config
 
@@ -98,8 +102,22 @@ def prepare_mechanisms(
             cell_config=cell_config,
         )
         actions["compile_modfiles"] = compile_info
+    elif load_compiled_dll:
+        # ``--no-compile`` suppresses nrnivmodl, but an existing library still
+        # has to be loaded before validating or constructing a custom-MOD cell.
+        actions["compile_modfiles"] = compile_modfiles(
+            tune_dir,
+            recompile=False,
+            load_dll=True,
+            allow_missing=allow_missing_modfiles,
+            compile_missing=False,
+            cell_config=cell_config,
+        )
     else:
-        actions["compile_modfiles"] = {"status": "skipped"}
+        actions["compile_modfiles"] = {
+            "status": "skipped",
+            "reason": "mechanism compilation and DLL loading are disabled",
+        }
 
     return actions
 
@@ -123,18 +141,13 @@ def prepare_base_configs(
 ) -> Dict[str, Any]:
     """Phase 3: scaffold first-level cell, geometry, and simulation configs."""
     loader_name = get_cell_loader_name({"cell_loader": cell_loader or "allen_manifest"})
-    soma_mult = (
-        resolve_soma_multiplier(cell_name, soma_diam_multiplier)
-        if loader_name == "allen_manifest"
-        else None
-    )
     return scaffold_base_configs(
         tune_dir=tune_dir,
         cell_name=cell_name,
         tune_name=tune_name,
         specimen_id=specimen_id,
         model_type=model_type,
-        soma_diam_multiplier=soma_mult,
+        soma_diam_multiplier=soma_diam_multiplier,
         color=color,
         config_mode=config_mode,
         sync_cell_metadata=sync_cell_metadata,
@@ -150,13 +163,14 @@ def prepare_target_config(
     *,
     tune_dir: Path,
     config_mode: str = "fill",
-    target_source_mode: Optional[str] = "manual",
+    target_source_mode: Optional[str] = None,
     target_description: Optional[str] = None,
     manual_passive: Optional[Dict[str, Any]] = None,
     manual_fi_curve: Optional[Dict[str, Any]] = None,
     passive_trace: Optional[Dict[str, Any]] = None,
     active_trace: Optional[Dict[str, Any]] = None,
     allen_nwb: Optional[Dict[str, Any]] = None,
+    include_manual_with_file_source: bool = False,
     notes: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Phase 4: scaffold optional passive/FI/trace target config."""
@@ -170,6 +184,7 @@ def prepare_target_config(
         passive_trace=passive_trace,
         active_trace=active_trace,
         allen_nwb=allen_nwb,
+        include_manual_with_file_source=include_manual_with_file_source,
         notes=notes,
     )
 
@@ -306,6 +321,7 @@ def prepare_tune(
     v_init_mV: Optional[float] = None,
     celsius_C: Optional[float] = None,
     target_source_mode: Optional[str] = None,
+    include_manual_with_file_source: bool = False,
     synapse_template_kinds: Optional[list[str]] = None,
     synapse_weight_style: str = "distributed",
     do_validate: bool = True,
@@ -328,15 +344,12 @@ def prepare_tune(
     if source_type == "adb" and loader_name != "allen_manifest":
         raise ValueError("source_type='adb' is only valid with cell_loader='allen_manifest'.")
     soma_mult = (
-        resolve_soma_multiplier(cell_name, soma_diam_multiplier)
-        if loader_name == "allen_manifest"
+        float(soma_diam_multiplier)
+        if loader_name == "allen_manifest" and soma_diam_multiplier is not None
         else None
     )
     if allow_missing_modfiles is None:
         allow_missing_modfiles = True
-    resolved_target_source_mode = target_source_mode
-    if resolved_target_source_mode is None:
-        resolved_target_source_mode = "manual" if loader_name == "allen_manifest" else "none"
     if do_base_configs is None:
         do_base_configs = bool(do_scaffold_configs)
     if do_target_config is None:
@@ -388,6 +401,21 @@ def prepare_tune(
         cell_config=mechanism_cell_config,
     )
 
+    mechanism_info = summary["actions"]["mechanisms"]["compile_modfiles"]
+    if do_validate and not load_compiled_dll:
+        mod_dir = resolve_modfiles_dir(tune_dir, mechanism_cell_config)
+        has_custom_mod_sources = bool(
+            mod_dir is not None
+            and mod_dir.is_dir()
+            and next(mod_dir.glob("*.mod"), None) is not None
+        )
+        if has_custom_mod_sources:
+            raise ValueError(
+                "Step 1 cannot safely validate cell loading while compiled "
+                "mechanism DLL loading is disabled. Remove --no-load-dll, or "
+                "also use --no-validate for a config-only rerun."
+            )
+
     if do_base_configs:
         summary["actions"]["base_configs"] = {
             "status": "ok",
@@ -417,7 +445,8 @@ def prepare_tune(
             "file": prepare_target_config(
                 tune_dir=tune_dir,
                 config_mode=config_mode,
-                target_source_mode=resolved_target_source_mode,
+                target_source_mode=target_source_mode,
+                include_manual_with_file_source=include_manual_with_file_source,
             ),
         }
     else:
@@ -443,7 +472,7 @@ def prepare_tune(
                 tune_dir=tune_dir,
                 cell_name=cell_name,
                 soma_diam_multiplier=soma_mult,
-                validate_modfiles=do_compile_modfiles,
+                validate_modfiles=mechanism_info.get("status") == "ok",
                 validate_load_cell=True,
                 validate_inputs_cfg=validate_inputs_cfg,
                 validate_synapses=bool(do_synapse_configs),

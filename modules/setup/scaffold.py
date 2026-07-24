@@ -110,8 +110,10 @@ def scaffold_base_configs(
             tuning = cell_cfg_data.setdefault("tuning", {})
             if not isinstance(tuning, dict):
                 raise TypeError("cell_config.json tuning must be an object when provided.")
-            multiplier = 1.0 if soma_diam_multiplier is None else float(soma_diam_multiplier)
-            tuning["soma_diam_multiplier"] = multiplier
+            if soma_diam_multiplier is not None:
+                tuning["soma_diam_multiplier"] = float(soma_diam_multiplier)
+            else:
+                tuning.setdefault("soma_diam_multiplier", 1.0)
         if cell_cfg_data != before_sync:
             _write_json(cell_cfg_path, cell_cfg_data)
             if status == "unchanged":
@@ -257,15 +259,10 @@ def scaffold_common_configs(
         celsius_C=celsius_C,
     )
     if include_target_config:
-        resolved_loader = get_cell_loader_name(
-            {"cell_loader": cell_loader or "allen_manifest"}
-        )
         statuses["target_config"] = prepare_target_config(
             tune_dir=tune_dir,
             config_mode=config_mode,
-            target_source_mode=(
-                "manual" if resolved_loader == "allen_manifest" else "none"
-            ),
+            target_source_mode=None,
         )
     if include_synapses:
         statuses.update(

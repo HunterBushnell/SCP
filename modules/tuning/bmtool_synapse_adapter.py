@@ -9,9 +9,6 @@ the BMTool tuning workflow mostly unchanged.
 from __future__ import annotations
 
 import json
-import os
-import subprocess
-import sys
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,15 +17,42 @@ from typing import Any, Dict, Iterable, Optional, Sequence
 from modules.model.geometry import cell_sections
 from modules.notebooks.helpers import (
     build_synapse_test_cell,
-    ensure_external_repo_on_syspath,
     ensure_scp_repo_on_syspath,
     resolve_cell_config_for_notebook,
 )
 from modules.setup.mechanisms import compile_modfiles, resolve_modfiles_dir
+from modules.tuning.external_repos import (
+    ExternalRepoSpec,
+    ensure_external_repo_checkout,
+)
 
 
 BMTOOL_REPO_URL = "https://github.com/cyneuro/bmtool.git"
-BMTOOL_ENV_VARS = ("SCP_BMTOOL_PATH", "BMTOOL_PATH", "BMTOOL_ROOT")
+BMTOOL_ENV_VARS = (
+    "SCP_BMTOOL_PATH",
+    "SCP_BMTOOL_DIR",
+    "BMTOOL_PATH",
+    "BMTOOL_ROOT",
+)
+_BMTOOL_SPEC = ExternalRepoSpec(
+    display_name="BMTool",
+    directory_name="bmtool",
+    package_name="bmtool",
+    marker_rel=Path("bmtool") / "synapses.py",
+    repo_url=BMTOOL_REPO_URL,
+    path_env_vars=BMTOOL_ENV_VARS,
+    target_dir_env="SCP_BMTOOL_DIR",
+    repo_url_env="SCP_BMTOOL_REPO_URL",
+    repo_branch_env="SCP_BMTOOL_REPO_BRANCH",
+    auto_clone_env="SCP_AUTO_CLONE_BMTOOL",
+    canonical_path_env="SCP_BMTOOL_PATH",
+    token_env_vars=(
+        "SCP_BMTOOL_GIT_TOKEN",
+        "SCP_GIT_TOKEN",
+        "SCP_GITHUB_TOKEN",
+        "GITHUB_TOKEN",
+    ),
+)
 
 
 @dataclass
@@ -67,70 +91,25 @@ def _bmtool_cell_facade(cell: Any) -> _BMToolCellFacade:
     return _BMToolCellFacade(source=cell, soma=soma, all=all_sections)
 
 
-def _env_flag(name: str, default: bool) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    return raw.strip() not in {"0", "false", "False", "no", "No", "off", "Off"}
-
-
-def _in_colab() -> bool:
-    return "COLAB_RELEASE_TAG" in os.environ
-
-
-def _looks_like_bmtool_repo(path: Path) -> bool:
-    return (path / "bmtool" / "synapses.py").is_file()
-
-
 def ensure_bmtool_on_syspath(
     *,
     repo_root: Optional[Path] = None,
     auto_clone: Optional[bool] = None,
-    repo_url: str = BMTOOL_REPO_URL,
+    repo_url: Optional[str] = None,
     target_dir: Optional[Path] = None,
     prepend: bool = True,
 ) -> Path:
-    """Resolve BMTool and add it to ``sys.path``.
-
-    Resolution follows the same local conventions as the rest of SCP:
-    environment variables first, then common ``../mods/bmtool`` locations.
-    In Colab, BMTool is cloned automatically unless ``SCP_AUTO_CLONE_BMTOOL=0``.
-    """
+    """Resolve or action-install BMTool and add it to ``sys.path``."""
 
     root = ensure_scp_repo_on_syspath(repo_root)
-    if auto_clone is None:
-        auto_clone = _env_flag("SCP_AUTO_CLONE_BMTOOL", default=_in_colab())
-
-    try:
-        return ensure_external_repo_on_syspath(
-            repo_name="bmtool",
-            marker_rel=Path("bmtool") / "synapses.py",
-            env_vars=BMTOOL_ENV_VARS,
-            repo_root=root,
-            prepend=prepend,
-        )
-    except FileNotFoundError:
-        if not auto_clone:
-            raise
-
-    destination = Path(target_dir) if target_dir else root.parent / "mods" / "bmtool"
-    destination = destination.expanduser().resolve()
-    destination.parent.mkdir(parents=True, exist_ok=True)
-
-    if not _looks_like_bmtool_repo(destination):
-        clone_cmd = ["git", "clone", "--depth", "1", repo_url, str(destination)]
-        subprocess.check_call(clone_cmd)
-
-    if not _looks_like_bmtool_repo(destination):
-        raise FileNotFoundError(f"BMTool clone did not contain bmtool/synapses.py: {destination}")
-
-    path_str = str(destination)
-    if path_str not in sys.path:
-        if prepend:
-            sys.path.insert(0, path_str)
-        else:
-            sys.path.append(path_str)
-    return destination
+    return ensure_external_repo_checkout(
+        _BMTOOL_SPEC,
+        repo_root=root,
+        auto_clone=auto_clone,
+        prepend=prepend,
+        target_dir=target_dir,
+        repo_url=repo_url,
+    )
 
 
 def import_bmtool_synapse_api(*, repo_root: Optional[Path] = None):

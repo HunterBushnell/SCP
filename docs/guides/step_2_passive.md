@@ -45,10 +45,15 @@ use the fit JSON referenced by its manifest.
 use. The notebook can:
 
 - add the SCP checkout to `sys.path`,
-- locate or clone ACT only when ACT-dependent work is selected,
+- locate or automatically clone a fresh ACT checkout only when ACT-dependent
+  work is selected (locally or in Colab),
 - compile mechanisms through `nrnivmodl`,
 - load the selected tune,
 - run the passive protocol.
+
+The normal passive protocol does not need ACT. **Compute ACT proposal** is the
+action that triggers ACT resolution/installation when the selected target mode
+does not already require ACT-based extraction.
 
 The root `2_passive.ipynb` is the workflow to use for local and Colab runs.
 
@@ -90,7 +95,7 @@ Step 2 resolves passive targets from `cell_configs/target_config.json` using
 `target_source.mode`:
 
 - `none` or a missing target config: run passive traces without target/ACT proposals.
-- `manual`: read direct values from `manual.passive`.
+- `manual`: read any direct values present in `manual.passive`.
 - `traces`: calculate passive values from a user-provided trace file using
   `traces.passive`.
 - `allen_nwb`: calculate passive values from an Allen/ADB `.nwb` file using
@@ -110,6 +115,12 @@ is not `None`. Set `COMPUTE_ACT_PASSIVE_PROPOSAL = True` to explicitly request
 the ACT proposal calculation; it requires all three passive targets, either
 directly or from extraction. Reading or comparing manual targets alone does not
 import ACT. Targetless trace checks do not use hidden example defaults.
+
+Blank and partially completed manual templates are valid: missing target values
+remain `None`, and Step 2 can still run characterization sweeps. Likewise, a
+blank `traces` or `allen_nwb` template does not import ACT or block core Step 2
+work. Once a file path is configured it must exist; a missing configured file
+raises an actionable error.
 
 Generic trace mode expects either CSV or NPY traces. The recommended CSV
 contract is:
@@ -206,8 +217,10 @@ Step 2 does not create a pipeline run under `output_data/`.
 
 ## Troubleshooting
 
-- **ACT not found**: this matters only for ACT-based estimates. Install ACT at
-  `../mods/ACT`, set `SCP_ACT_PATH`, or let the Colab bootstrap clone it.
+- **ACT installation fails**: this matters only for ACT-based estimates. The
+  ACT action normally installs a missing checkout locally or in Colab. Check
+  Git/network access and `SCP_ACT_DIR`, or set `SCP_ACT_PATH` to an existing
+  checkout.
 - **`nrnivmodl` not found**: activate the project environment, then rerun the
   compile/load cell.
 - **Values do not change the trace**: confirm the fit/config file was saved,
