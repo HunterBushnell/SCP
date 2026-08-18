@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 
 from .analysis import (
     group_colors_from_results,
+    plot_dir_for_run,
     resolve_scp_root_for_results,
     save_figure,
     summarize_inputs_from_results,
@@ -45,7 +46,10 @@ def save_default_plots(
     overwrite: bool = False,
 ) -> Dict[str, Path]:
     """
-    Save a small set of default plots into <run_dir>/plots.
+    Save a small set of default plots into the canonical plots directory.
+
+    Wrapped batch runs store data in ``<batch_dir>/results`` and plots in
+    ``<batch_dir>/plots``. Ordinary runs keep plots in ``<run_dir>/plots``.
 
     plot_mode:
       - "default": standard output/input/synapse plots
@@ -56,7 +60,7 @@ def save_default_plots(
     from . import plotting  # local import to avoid circular deps
 
     run_dir = Path(run_dir)
-    plot_dir = run_dir / "plots"
+    plot_dir = plot_dir_for_run(run_dir)
     plot_dir.mkdir(parents=True, exist_ok=True)
 
     saved: Dict[str, Path] = {}

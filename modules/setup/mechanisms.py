@@ -210,8 +210,23 @@ def compile_modfiles(
         raise FileNotFoundError(f"No .mod source files found in {mod_dir}")
 
     compiled_dir = mod_dir / "x86_64"
-    if recompile and compiled_dir.exists():
-        shutil.rmtree(compiled_dir)
+    if recompile:
+        existing_dll = find_compiled_mechanism_dll(
+            tune_dir,
+            cell_config=cell_config,
+        )
+        if (
+            existing_dll is not None
+            and existing_dll.resolve() in _LOADED_MECHANISM_DLLS
+        ):
+            raise RuntimeError(
+                "Cannot recompile a mechanism library that is already loaded in "
+                f"this Python/Jupyter process: {existing_dll.resolve()}. Restart "
+                "the process, enable recompilation before preparing the model, "
+                "and rerun this step."
+            )
+        if compiled_dir.exists():
+            shutil.rmtree(compiled_dir)
 
     dll = find_compiled_mechanism_dll(tune_dir, cell_config=cell_config)
     compiled_now = False

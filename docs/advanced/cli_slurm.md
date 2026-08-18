@@ -127,7 +127,10 @@ Common environment variables:
 Notes:
 
 - `run_slurm.sh` resolves the configured MOD source directory and auto-builds it
-  when `.mod` files exist; built-in-only models skip compilation.
+  when `.mod` files exist and the compiled library is missing; built-in-only
+  models skip compilation. It does not force-recompile an existing library.
+  After changing `.mod` sources, rebuild once through Step 1 before submitting
+  a job, rather than rebuilding concurrently in array tasks.
 - Per-task array outputs go under `output_data/<batch>/parts/` before merge.
 - Logs are copied into the run folder when possible.
 - The pipeline resolves configs from `cell_configs/`.

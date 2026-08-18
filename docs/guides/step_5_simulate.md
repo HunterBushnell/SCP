@@ -98,7 +98,8 @@ Local use:
 
 - install the SCP environment,
 - launch Jupyter from the repo or set `SCP_ROOT`,
-- ensure custom mechanisms are compiled when the model has `.mod` sources.
+- ensure `nrnivmodl` is available when the model has custom `.mod` sources;
+  section 5.2 automatically compiles a missing library.
 
 Colab use:
 
@@ -147,11 +148,17 @@ editing `sim_config.json`.
 
 ### 5.2 Prepare Simulation Session
 
-This cell compiles mechanisms when needed, loads configs, builds the cell,
-constructs geometry groups, and prepares the simulation session.
+This cell compiles a missing mechanism library on both local and Colab runtimes,
+loads configs, builds the cell, constructs geometry groups, and prepares the
+simulation session.
 
-There are no normal user options here. If this cell fails, return to Step 1
-validation or inspect the selected tune directory.
+- `RECOMPILE_MODFILES = False` reuses an existing library and compiles only
+  when one is missing.
+- Set `RECOMPILE_MODFILES = True` after editing `.mod` sources to request a
+  clean rebuild. If the tune's library was already loaded, restart the kernel
+  first, enable the toggle, and then rerun section 5.2.
+- Built-in-only models and tunes with disabled, absent, or empty configured MOD
+  source directories skip compilation safely.
 
 ### 5.3 Optional Synapse-Placement Preview
 
@@ -391,6 +398,8 @@ See `../advanced/cli_slurm.md`.
 - Rerun Step 1 validation.
 - Confirm `cell_configs/cell_config.json` points to the correct loader/files.
 - Confirm custom mechanisms are compiled and loadable when `.mod` sources exist.
+- After changing `.mod` sources, restart the kernel and rerun section 5.2 with
+  `RECOMPILE_MODFILES = True`.
 - For HOC templates, confirm both explicit runtime conditions are present.
 
 ### No Synapses Are Attached
