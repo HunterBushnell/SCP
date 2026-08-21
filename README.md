@@ -12,6 +12,7 @@ PGN cells.
 1. Install the environment:
    - `conda env create -f environment.yml`
    - `conda activate scp-py311`
+   - 'CELL=SST TUNE=tuned_peri TOTAL_TRIALS=100 sbatch --array=0-9 run_slurm.sh'
 2. Optional setup check:
    - `python scripts/check_setup.py --steps 1 2 3 4 5 --cell PV --tune tuned --compile-modfiles`
 3. Run an example:

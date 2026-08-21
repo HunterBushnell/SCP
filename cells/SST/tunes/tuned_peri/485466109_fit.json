@@ -60,37 +60,37 @@
     {
       "section": "soma", 
       "name": "gbar_Nap", 
-      "value": 0.002, 
+      "value": 0.0013, 
       "mechanism": "Nap"
     },
     {
       "section": "soma", 
       "name": "gbar_NaTa", 
-      "value": 0.35, 
+      "value": 0.1, 
       "mechanism": "NaTa"
     }, 
     {
       "section": "soma", 
       "name": "gbar_Kd", 
-      "value": 0.1, 
+      "value": 0.015, 
       "mechanism": "Kd"
     },
     {
       "section": "soma", 
       "name": "gbar_Kv2like", 
-      "value": 0.01, 
+      "value": 0.00, 
       "mechanism": "Kv2like"
     }, 
     {
       "section": "soma", 
       "name": "gbar_Kv3_1", 
-      "value": 0.7, 
+      "value": 0, 
       "mechanism": "Kv3_1"
     }, 
     {
       "section": "soma", 
       "name": "gbar_K_T", 
-      "value": 0.05, 
+      "value": 0.00, 
       "mechanism": "K_T"
     }, 
     {
@@ -102,13 +102,13 @@
     {
       "section": "soma", 
       "name": "gbar_SK", 
-      "value": 0.00001, 
+      "value": 0.00002, 
       "mechanism": "SK"
     }, 
     {
       "section": "soma", 
       "name": "gbar_Ca_HVA", 
-      "value": 0.004, 
+      "value": 0.001, 
       "mechanism": "Ca_HVA"
     }, 
     {
@@ -147,7 +147,7 @@
     {
       "section": "axon", 
       "name": "gbar_K_T", 
-      "value": 0.0004, 
+      "value": 0.37, 
       "mechanism": "K_T"
     }, 
     {
@@ -165,7 +165,7 @@
     {
       "section": "axon", 
       "name": "gbar_Kv3_1", 
-      "value": 0.12, 
+      "value": 0, 
       "mechanism": "Kv3_1"
     }, 
     {
@@ -210,7 +210,7 @@
     {
       "section": "dend", 
       "name": "gbar_Kv3_1", 
-      "value": 0.5, 
+      "value": 0, 
       "mechanism": "Kv3_1"
     }, 
     {
