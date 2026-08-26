@@ -21,7 +21,7 @@
     {"path": "external_data/pyrFiringRateAvg.csv@290;color=k;linestyle=--;label=PN_bio", "enabled": true},
     {"path": "external_data/SSTFiringRateAvg.csv@300;color=magenta;linestyle=--;label=SST_bio", "enabled": false},
     {"path": "external_data/PVFiringRateAvg.csv@300;color=blue;linestyle=--;label=PV_bio", "enabled": false},
-    {"path": "cells/SST/tunes/tuned/output_data/base_tuned_100trials;color=m;linestyle=--;label=SST_base", "enabled": true}
+    {"path": "cells/SST/tunes/tuned/output_data/base_tuned_100trials;color=m;linestyle=--;label=SST_base", "enabled": false}
   ],
   "compare_list_dir_paths": [
   "external_data"

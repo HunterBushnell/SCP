@@ -8,7 +8,7 @@
     "top_fill_under": false,
     "top_fill_alpha": 0.28,
 
-    "include_input_raster": false,
+    "include_input_raster": true,
     "raster_input_groups": [],
     "input_bin_ms": 5.0,
     "input_smooth_ms": 25.0,
@@ -57,7 +57,7 @@
 
     "export_path": "single_plot",
     "export_formats": ["svg", "png"],
-    "export_overwrite": false,
+    "export_overwrite": true,
     "dpi": 300
   }
 }
