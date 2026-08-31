@@ -22,9 +22,14 @@ referenced by these fields:
 - `input_plot_preset_path` -> `analysis_presets/input_plotting.json`
 - `output_metrics_preset_path` -> `analysis_presets/output_metrics.json`
 - `extra_preset_path` -> `analysis_presets/extra_analysis.json`
+- `compare_preset_path` -> `analysis_presets/paper_compare.json`
 
 Other presets, such as `analysis_presets/single_plot.json`, are used by specific
 notebook sections or when explicitly selected.
+
+`compare_preset_enabled` controls whether the configured Paper Compare preset
+is active. Its `defaults` override the general Output UI settings while active,
+and its enabled `entries` replace the normal comparison selection.
 
 ## Main UI Builders
 

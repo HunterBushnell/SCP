@@ -15,6 +15,7 @@ _SUBMODULES = {
     "analysis_ui",
     "auto_plots",
     "bio_curve",
+    "output_metrics",
     "single_plot_panel",
     "ui",
 }

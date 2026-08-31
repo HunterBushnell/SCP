@@ -30,7 +30,7 @@
     "output_plot_data_format": "trace_rows",
     "output_plot_data_auto_save": false,
 
-    "output_curve_mode": "normalized",
+    "output_curve_mode": "raw",
     "output_curve_plot_mode": "rate",
     "output_norm_mode": "peak",
     "output_norm_window": "stim",

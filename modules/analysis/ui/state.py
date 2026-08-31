@@ -8,6 +8,21 @@ from typing import Any, Dict, Tuple
 from .. import analysis
 from ._engine import _parse_compare_list_paths, resolve_compare, resolve_single
 
+
+def active_compare_preset_path(g: Dict[str, Any]) -> Any:
+    """Return the configured compare preset only when its mode is enabled.
+
+    ``compare_preset_enabled`` separates availability from activation. When the
+    flag is absent, preserve the historical behavior where providing a path
+    activates the preset.
+    """
+    path = g.get("compare_preset_path")
+    enabled = g.get("compare_preset_enabled")
+    if enabled is None:
+        enabled = bool(path)
+    return path if bool(enabled) and path else None
+
+
 def sync_common_from_globals(g: Dict[str, Any]) -> None:
     if g.get("save_plots_cb") is not None:
         g["save_plots"] = bool(g["save_plots_cb"].value)
@@ -78,7 +93,7 @@ def get_selection_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "run_b_path": comp_b,
         "compare_list": compare_list,
         "compare_list_paths": compare_list_paths,
-        "compare_preset_path": g.get("compare_preset_path"),
+        "compare_preset_path": active_compare_preset_path(g),
     }
 
 
@@ -116,6 +131,9 @@ def output_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "output_rebound_window_ms": g.get("output_rebound_window_ms"),
         "output_auc_window": g.get("output_auc_window"),
         "output_t50_mode": g.get("output_t50_mode", "absolute"),
+        "output_rise_metric_enabled": g.get("output_rise_metric_enabled", True),
+        "output_rise_percent_range": g.get("output_rise_percent_range", [10.0, 90.0]),
+        "output_show_rise_points": g.get("output_show_rise_points", True),
         "output_show_metric_points": g.get("output_show_metric_points"),
         "output_metric_label_points": g.get("output_metric_label_points"),
         "output_metric_marker_size": g.get("output_metric_marker_size"),
@@ -125,6 +143,17 @@ def output_opts_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
         "output_metric_window_alpha": g.get("output_metric_window_alpha"),
         "output_shade_alpha": g.get("output_shade_alpha"),
         "output_metrics_std_mode": g.get("output_metrics_std_mode", "std"),
+        "output_metrics_bin_ms": g.get("output_metrics_bin_ms"),
+        "output_metrics_smooth_ms": g.get("output_metrics_smooth_ms"),
+        "output_metrics_smooth_mode": g.get("output_metrics_smooth_mode"),
+        "output_metrics_curve_mode": g.get("output_metrics_curve_mode"),
+        "output_metrics_norm_mode": g.get("output_metrics_norm_mode"),
+        "output_metrics_norm_window": g.get("output_metrics_norm_window"),
+        "output_metrics_save_formats": g.get("output_metrics_save_formats"),
+        "output_metrics_important_keys": g.get("output_metrics_important_keys"),
+        "output_stim_spike_metrics_enabled": g.get("output_stim_spike_metrics_enabled", True),
+        "output_first_spike_metric_enabled": g.get("output_first_spike_metric_enabled", True),
+        "output_isi_metrics_enabled": g.get("output_isi_metrics_enabled", True),
         "auto_plot_window_from_stim": bool(g.get("auto_plot_window_from_stim", False)),
         "plot_window_adjustment_ms": g.get("plot_window_adjustment_ms"),
         "save_overwrite": bool(g.get("save_overwrite", False)),

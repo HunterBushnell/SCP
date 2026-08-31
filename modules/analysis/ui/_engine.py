@@ -16,7 +16,7 @@ import textwrap
 from modules import run_sim
 from modules.input_generation import inputs
 from modules.input_generation import sampling as input_sampling
-from .. import analysis, plotting
+from .. import analysis, output_metrics as output_metrics_core, plotting
 
 HELP_SELECTION = textwrap.dedent(
     """
@@ -64,7 +64,8 @@ HELP_OUTPUTS = textwrap.dedent(
     Compare
     - Layout: side-by-side, stacked, or overlay when multiple runs/curves are selected.
     - Band: optional sem/std shading where the selected plot supports repeated trials.
-    - Use compare preset: loads entries/options from compare_preset_path when configured.
+    - Preset JSON: repository-relative or absolute path to a compare preset.
+    - Use paper compare preset: makes that preset's entries and settings authoritative.
 
     Export
     - Save path: optional output path; blank uses a default plots/analysis location.
@@ -123,6 +124,7 @@ HELP_EXTRA = textwrap.dedent(
     - Trial points and point jitter can be toggled for cleaner panels.
     - Matrix shape is controlled by columns + panel size; legend can be toggled/relocated.
     - Table metrics can reuse the same metric selection as the distribution plot.
+    - Rise metrics use the configured low/high baseline-to-peak thresholds (10-90% by default).
     - Compare configs: restore-style config compare across selected runs (sim/cell/geom/syn/syn_groups/fit).
     - Input sampling: synthesize input curves from synapse configs.
     - Synapse plots: summarize and plot saved synapse weights/distances from Step 5 outputs.
@@ -1021,16 +1023,23 @@ def _plot_metric_points(
     label_prefix: Optional[str] = None,
     show_labels: bool = False,
     size: float = 36.0,
+    show_rise_points: bool = True,
 ) -> None:
     if ax is None or not metrics:
         return
     entries = [
         ("peak_time_ms", "peak_value", "o", "Peak"),
-        ("tpeak10_time_ms", "tpeak10_value", "s", "Tpeak10"),
         ("drop_time_ms", "drop_value", "v", "+100ms"),
         ("t50_time_ms", "t50_value", "D", "T50"),
         ("rebound_time_ms", "rebound_value", "^", "+300ms"),
     ]
+    if show_rise_points:
+        start_pct = _format_metric_value(metrics.get("rise_start_pct"))
+        stop_pct = _format_metric_value(metrics.get("rise_stop_pct"))
+        entries[1:1] = [
+            ("rise_start_time_ms", "rise_start_value", "_", f"Rise {start_pct}%"),
+            ("rise_stop_time_ms", "rise_stop_value", "_", f"Rise {stop_pct}%"),
+        ]
     any_label = False
     for t_key, y_key, marker, label in entries:
         t_val = metrics.get(t_key)
@@ -1042,17 +1051,17 @@ def _plot_metric_points(
             lab = f"{label_prefix} {label}" if label_prefix else label
             lab = _legend_safe_label(lab)
             any_label = True
-        ax.scatter(
-            [t_val],
-            [y_val],
-            s=size,
-            marker=marker,
-            color=color,
-            edgecolor="k",
-            linewidth=0.6,
-            zorder=5,
-            label=lab,
-        )
+        scatter_kwargs: Dict[str, Any] = {
+            "s": size,
+            "marker": marker,
+            "color": color,
+            "linewidth": 1.2 if marker == "_" else 0.6,
+            "zorder": 5,
+            "label": lab,
+        }
+        if marker != "_":
+            scatter_kwargs["edgecolor"] = "k"
+        ax.scatter([t_val], [y_val], **scatter_kwargs)
     if show_labels and any_label:
         ax.legend()
 
@@ -1161,7 +1170,11 @@ def _scale_metrics_for_plot(metrics: Optional[Dict[str, Any]], scale: Any) -> Op
     for key in (
         "peak_value",
         "peak_rate_hz",
-        "tpeak10_value",
+        "rise_start_value",
+        "rise_stop_value",
+        "rise_start_rate_hz",
+        "rise_stop_rate_hz",
+        "rise_delta_rate_hz",
         "drop_value",
         "t50_value",
         "rebound_value",
@@ -1241,6 +1254,8 @@ def _compute_output_metrics(
         baseline_center_ms=_pick("baseline_center_ms", "output_baseline_center_ms", None),
         stim_start_ms=_pick("stim_start_ms", "output_stim_start_ms", None),
         stim_stop_ms=_pick("stim_stop_ms", "output_stim_stop_ms", None),
+        rise_percent_range=_pick("rise_percent_range", "output_rise_percent_range", (10.0, 90.0)),
+        rise_metric_enabled=bool(_pick("rise_metric_enabled", "output_rise_metric_enabled", True)),
     )
 
 
@@ -1256,6 +1271,8 @@ def _output_metric_overrides(opts: Dict[str, Any]) -> Dict[str, Any]:
         "rebound_window_ms": opts.get("output_rebound_window_ms", 300.0),
         "auc_window": opts.get("output_auc_window", "stim"),
         "t50_mode": opts.get("output_t50_mode", "absolute"),
+        "rise_percent_range": opts.get("output_rise_percent_range", (10.0, 90.0)),
+        "rise_metric_enabled": bool(opts.get("output_rise_metric_enabled", True)),
     }
 
 
@@ -1348,49 +1365,23 @@ def _compute_output_trial_metrics(
 ) -> list[Dict[str, Any]]:
     if not isinstance(results, dict):
         return []
-    trial_spikes = _extract_spike_trials(results)
-    if not trial_spikes:
-        return []
-
-    trial_metrics: list[Dict[str, Any]] = []
-    for spikes_trial in trial_spikes:
-        sim_cfg_norm = _sim_cfg_with_output_stim_overrides(sim_cfg or {}, opts)
-        sim_cfg_metrics = _sim_cfg_with_shifted_stim(sim_cfg_norm, shift_ms)
-        trial_results: Dict[str, Any] = {
-            "mode": "single",
-            "spikes": spikes_trial,
-            "sim_cfg": sim_cfg_norm,
-        }
-        traces = results.get("traces")
-        if traces is not None:
-            trial_results["traces"] = traces
-
-        trial_curve = analysis.compute_output_curve_from_results(
-            trial_results,
-            bin_ms=opts.get("output_bin_ms"),
-            smooth_ms=_curve_smooth_ms(opts),
-            smooth_mode=opts.get("output_smooth_mode", "causal"),
-        )
-        if not trial_curve:
-            continue
-        trial_curve = analysis.normalize_output_curve(
-            trial_curve,
-            sim_cfg_norm,
-            mode=opts.get("output_curve_mode", "raw"),
-            norm_mode=opts.get("output_norm_mode", "avg"),
-            baseline_ms=opts.get("output_metric_window_ms", 100.0),
-            baseline_mode=opts.get("output_metric_mode", "point"),
-            baseline_center_ms=opts.get("output_baseline_center_ms"),
-            norm_window=opts.get("output_norm_window", "stim"),
-        )
-        if shift_ms is not None:
-            t_ms = np.asarray(trial_curve.get("t_ms", []) or [], dtype=float)
-            if t_ms.size:
-                trial_curve = dict(trial_curve)
-                trial_curve["t_ms"] = (t_ms + float(shift_ms)).tolist()
-
-        trial_metrics.append(_compute_output_metrics(trial_curve, sim_cfg_metrics, opts, **metric_overrides))
-    return trial_metrics
+    settings = dict(opts)
+    override_keys = {
+        "peak_window_ms": "output_peak_window_ms",
+        "drop_window_ms": "output_drop_window_ms",
+        "rebound_window_ms": "output_rebound_window_ms",
+        "auc_window": "output_auc_window",
+        "t50_mode": "output_t50_mode",
+        "rise_percent_range": "output_rise_percent_range",
+        "rise_metric_enabled": "output_rise_metric_enabled",
+    }
+    for key, value in metric_overrides.items():
+        settings[override_keys.get(key, key)] = value
+    return output_metrics_core.compute_trial_output_metrics(
+        results,
+        settings,
+        shift_ms=shift_ms,
+    )
 
 
 def _coerce_metric_numeric(value: Any) -> Optional[float]:
@@ -1479,6 +1470,25 @@ def _compute_output_metrics_with_spread(
     shift_ms: Optional[float] = None,
     **overrides: Any,
 ) -> Dict[str, Any]:
+    if isinstance(results, dict):
+        settings = dict(opts)
+        override_keys = {
+            "peak_window_ms": "output_peak_window_ms",
+            "drop_window_ms": "output_drop_window_ms",
+            "rebound_window_ms": "output_rebound_window_ms",
+            "auc_window": "output_auc_window",
+            "t50_mode": "output_t50_mode",
+            "rise_percent_range": "output_rise_percent_range",
+            "rise_metric_enabled": "output_rise_metric_enabled",
+        }
+        for key, value in overrides.items():
+            settings[override_keys.get(key, key)] = value
+        return output_metrics_core.compute_output_metrics_from_results(
+            results,
+            settings,
+            curve=None,
+            shift_ms=shift_ms,
+        )
     sim_cfg_metrics = _sim_cfg_with_shifted_stim(sim_cfg or {}, shift_ms)
     metrics = _compute_output_metrics(curve, sim_cfg_metrics, opts, **overrides)
     return _attach_output_metric_spread(
@@ -1945,27 +1955,12 @@ def _load_compare_preset_defaults(path_val: Any, base_dir: Optional[Path]) -> Di
     return defaults if isinstance(defaults, dict) else {}
 
 
-def _is_missing_default(value: Any) -> bool:
-    if value is None:
-        return True
-    if isinstance(value, str) and not value.strip():
-        return True
-    if isinstance(value, (list, tuple)):
-        if not value:
-            return True
-        return all(v is None or (isinstance(v, str) and not v.strip()) for v in value)
-    return False
-
-
 def _merge_preset_defaults(opts: Dict[str, Any], defaults: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply enabled compare-preset settings over general UI/default values."""
     if not defaults:
         return opts
     merged = dict(opts)
-    for key, val in defaults.items():
-        if val is None:
-            continue
-        if _is_missing_default(merged.get(key)):
-            merged[key] = val
+    merged.update(defaults)
     return merged
 
 
@@ -2373,6 +2368,7 @@ def run_output_plots(
                                 label_prefix=label,
                                 show_labels=bool(opts.get("output_metric_label_points", False)),
                                 size=float(opts.get("output_metric_marker_size", 36.0)),
+                                show_rise_points=bool(opts.get("output_show_rise_points", True)),
                             )
                             if opts.get("output_metric_window_markers", False):
                                 _plot_metric_window_markers(ax_rate, metrics_plot, color=col, **_metric_window_kwargs(opts))
@@ -2440,6 +2436,7 @@ def run_output_plots(
                             label_prefix=label,
                             show_labels=bool(opts.get("output_metric_label_points", False)),
                             size=float(opts.get("output_metric_marker_size", 36.0)),
+                            show_rise_points=bool(opts.get("output_show_rise_points", True)),
                         )
                         if opts.get("output_metric_window_markers", False):
                             _plot_metric_window_markers(ax_i, metrics_plot, color=col, **_metric_window_kwargs(opts))
@@ -2495,6 +2492,7 @@ def run_output_plots(
                             label_prefix=label,
                             show_labels=bool(opts.get("output_metric_label_points", False)),
                             size=float(opts.get("output_metric_marker_size", 36.0)),
+                            show_rise_points=bool(opts.get("output_show_rise_points", True)),
                         )
                         if opts.get("output_metric_window_markers", False):
                             _plot_metric_window_markers(ax, metrics_plot, color=col, **_metric_window_kwargs(opts))
@@ -2685,6 +2683,7 @@ def run_output_plots(
                             label_prefix=label_a,
                             show_labels=bool(opts.get("output_metric_label_points", False)),
                             size=float(opts.get("output_metric_marker_size", 36.0)),
+                            show_rise_points=bool(opts.get("output_show_rise_points", True)),
                         )
                         if opts.get("output_metric_window_markers", False):
                             _plot_metric_window_markers(ax, metrics_a_plot, color=color_a, **_metric_window_kwargs(opts))
@@ -2696,6 +2695,7 @@ def run_output_plots(
                             label_prefix=label_b,
                             show_labels=bool(opts.get("output_metric_label_points", False)),
                             size=float(opts.get("output_metric_marker_size", 36.0)),
+                            show_rise_points=bool(opts.get("output_show_rise_points", True)),
                         )
                         if opts.get("output_metric_window_markers", False):
                             _plot_metric_window_markers(ax, metrics_b_plot, color=color_b, **_metric_window_kwargs(opts))
@@ -2710,6 +2710,7 @@ def run_output_plots(
                             label_prefix=label_a,
                             show_labels=bool(opts.get("output_metric_label_points", False)),
                             size=float(opts.get("output_metric_marker_size", 36.0)),
+                            show_rise_points=bool(opts.get("output_show_rise_points", True)),
                         )
                         if opts.get("output_metric_window_markers", False):
                             _plot_metric_window_markers(axes[0], metrics_a_plot, color=color_a, **_metric_window_kwargs(opts))
@@ -2723,6 +2724,7 @@ def run_output_plots(
                             label_prefix=label_b,
                             show_labels=bool(opts.get("output_metric_label_points", False)),
                             size=float(opts.get("output_metric_marker_size", 36.0)),
+                            show_rise_points=bool(opts.get("output_show_rise_points", True)),
                         )
                         if opts.get("output_metric_window_markers", False):
                             _plot_metric_window_markers(axes[1], metrics_b_plot, color=color_b, **_metric_window_kwargs(opts))
@@ -2844,6 +2846,7 @@ def run_output_plots(
                         label_prefix=label_a,
                         show_labels=bool(opts.get("output_metric_label_points", False)),
                         size=float(opts.get("output_metric_marker_size", 36.0)),
+                        show_rise_points=bool(opts.get("output_show_rise_points", True)),
                     )
                     if opts.get("output_metric_window_markers", False):
                         _plot_metric_window_markers(ax_rate, metrics_a_plot, color=color_a, **_metric_window_kwargs(opts))
@@ -2854,6 +2857,7 @@ def run_output_plots(
                         label_prefix=label_b,
                         show_labels=bool(opts.get("output_metric_label_points", False)),
                         size=float(opts.get("output_metric_marker_size", 36.0)),
+                        show_rise_points=bool(opts.get("output_show_rise_points", True)),
                     )
                     if opts.get("output_metric_window_markers", False):
                         _plot_metric_window_markers(ax_rate, metrics_b_plot, color=color_b, **_metric_window_kwargs(opts))
@@ -2888,6 +2892,7 @@ def run_output_plots(
                             label_prefix=opts.get("output_scatter_label", "External curve"),
                             show_labels=bool(opts.get("output_metric_label_points", False)),
                             size=float(opts.get("output_metric_marker_size", 36.0)),
+                            show_rise_points=bool(opts.get("output_show_rise_points", True)),
                         )
                         if opts.get("output_metric_window_markers", False):
                             _plot_metric_window_markers(
@@ -3035,6 +3040,7 @@ def run_output_plots(
                         label_prefix=analysis.run_label(run_dir),
                         show_labels=bool(opts.get("output_metric_label_points", False)),
                         size=float(opts.get("output_metric_marker_size", 36.0)),
+                        show_rise_points=bool(opts.get("output_show_rise_points", True)),
                     )
                     if opts.get("output_metric_window_markers", False):
                         _plot_metric_window_markers(ax_rate, metrics_plot, color=color_out, **_metric_window_kwargs(opts))
@@ -3059,6 +3065,7 @@ def run_output_plots(
                         label_prefix="Bio",
                         show_labels=bool(opts.get("output_metric_label_points", False)),
                         size=float(opts.get("output_metric_marker_size", 36.0)),
+                        show_rise_points=bool(opts.get("output_show_rise_points", True)),
                     )
                     if opts.get("output_metric_window_markers", False):
                         _plot_metric_window_markers(ax_rate, bio_metrics_plot, color="k", **_metric_window_kwargs(opts))
@@ -3173,6 +3180,7 @@ def run_output_plots(
                     label_prefix=analysis.run_label(run_dir),
                     show_labels=bool(opts.get("output_metric_label_points", False)),
                     size=float(opts.get("output_metric_marker_size", 36.0)),
+                    show_rise_points=bool(opts.get("output_show_rise_points", True)),
                 )
                 if opts.get("output_metric_window_markers", False):
                     _plot_metric_window_markers(ax_rate, metrics_single_plot, color=line_color, **_metric_window_kwargs(opts))
@@ -3206,6 +3214,7 @@ def run_output_plots(
                         label_prefix=opts.get("output_scatter_label", "External curve"),
                         show_labels=bool(opts.get("output_metric_label_points", False)),
                         size=float(opts.get("output_metric_marker_size", 36.0)),
+                        show_rise_points=bool(opts.get("output_show_rise_points", True)),
                     )
                     if opts.get("output_metric_window_markers", False):
                         _plot_metric_window_markers(
@@ -3592,11 +3601,13 @@ def run_output_metrics(
         results=res,
         **metric_overrides,
     )
-    _save_json(
-        metrics,
-        analysis.analysis_dir_for_run(run_dir) / "output_metrics.json",
-        enabled=save_analysis,
-    )
+    if save_analysis:
+        output_metrics_core.save_output_metrics_artifacts(
+            metrics,
+            run_dir,
+            opts,
+            overwrite=True,
+        )
     return metrics
 
 
@@ -3607,6 +3618,8 @@ _OUTPUT_METRIC_DIST_FIELDS = [
     "point_kind",
     "trial_index",
     "value",
+    "rise_start_pct",
+    "rise_stop_pct",
 ]
 
 
@@ -3836,6 +3849,9 @@ def _output_metric_distribution_rows(
     for metric_key in metric_keys:
         for label, entry in by_label.items():
             source = str(entry.get("source") or "run")
+            summary = entry.get("summary") or {}
+            rise_start_pct = summary.get("rise_start_pct")
+            rise_stop_pct = summary.get("rise_stop_pct")
             trials = _metric_values_from_trials(entry.get("trials") or [], metric_key)
             for idx, val in enumerate(trials):
                 rows.append({
@@ -3845,8 +3861,10 @@ def _output_metric_distribution_rows(
                     "point_kind": "trial",
                     "trial_index": idx,
                     "value": val,
+                    "rise_start_pct": rise_start_pct,
+                    "rise_stop_pct": rise_stop_pct,
                 })
-            mean_val = _coerce_metric_numeric((entry.get("summary") or {}).get(metric_key))
+            mean_val = _coerce_metric_numeric(summary.get(metric_key))
             if mean_val is not None:
                 rows.append({
                     "metric": metric_key,
@@ -3855,6 +3873,8 @@ def _output_metric_distribution_rows(
                     "point_kind": "mean",
                     "trial_index": "",
                     "value": mean_val,
+                    "rise_start_pct": rise_start_pct,
+                    "rise_stop_pct": rise_stop_pct,
                 })
     return rows
 
@@ -4054,7 +4074,10 @@ def _plot_output_metric_distributions(
                 )
         ax.set_xticks(list(range(1, len(labels) + 1)))
         ax.set_xticklabels(labels, rotation=20, ha="right")
-        ax.set_title(metric_key)
+        label_metrics = None
+        if labels:
+            label_metrics = (by_label.get(labels[0]) or {}).get("summary") or {}
+        ax.set_title(_format_metric_key(metric_key, label_metrics).replace("**", ""))
         ax.grid(axis="y", alpha=0.25)
         if not has_data:
             ax.text(0.5, 0.5, "No data", transform=ax.transAxes, ha="center", va="center", color="0.45")
@@ -4196,10 +4219,19 @@ def show_md(text: str) -> None:
 
 _HIGHLIGHT_METRICS = {
     "peak_latency_ms",
-    "tpeak10_ms",
+    "rise_start_time_ms",
+    "rise_start_latency_ms",
+    "rise_stop_time_ms",
+    "rise_stop_latency_ms",
+    "rise_time_ms",
+    "rise_start_rate_hz",
+    "rise_stop_rate_hz",
+    "rise_delta_rate_hz",
     "drop_pct",
     "t50_ms",
     "rebound_pct",
+    "auc_raw_hz_s",
+    "auc_normalized_s",
     "auc",
     "baseline_mean",
     "peak_rate_hz_raw",
@@ -4207,16 +4239,21 @@ _HIGHLIGHT_METRICS = {
 }
 
 
-def _format_metric_key(key: str) -> str:
-    if key == "t50_ms":
-        label = "T50"
-    elif key == "tpeak10_ms":
-        label = "Tpeak10"
-    else:
-        label = key
-    if key in _HIGHLIGHT_METRICS:
-        return f"**{label}**"
-    return label
+def _rise_percent_label(data: Optional[Dict[str, Any]]) -> str:
+    data = data or {}
+    start = _format_metric_value(data.get("rise_start_pct")) or "start"
+    stop = _format_metric_value(data.get("rise_stop_pct")) or "stop"
+    return f"{start}-{stop}%"
+
+
+def _rise_endpoint_label(data: Optional[Dict[str, Any]], endpoint: str) -> str:
+    data = data or {}
+    value = _format_metric_value(data.get(f"rise_{endpoint}_pct"))
+    return f"{value}%" if value else endpoint
+
+
+def _format_metric_key(key: str, data: Optional[Dict[str, Any]] = None) -> str:
+    return output_metrics_core.format_metric_key(key, data)
 
 
 def _format_metric_value(val: Any) -> str:
@@ -4259,33 +4296,9 @@ def _filter_metrics_for_display(data: Dict[str, Any]) -> Dict[str, Any]:
     return filtered
 
 
-_OUTPUT_METRIC_VALUE_ORDER = [
-    "output_metrics_n_trials",
-    "baseline_mean",
-    "peak_rate_hz_raw",
-    "peak_value_raw",
-    "peak_rate_hz",
-    "peak_value",
-    "peak_latency_ms",
-    "tpeak10_ms",
-    "drop_value",
-    "drop_pct",
-    "t50_ms",
-    "rebound_value",
-    "rebound_pct",
-    "auc",
-]
+_OUTPUT_METRIC_VALUE_ORDER = list(output_metrics_core.OUTPUT_METRIC_VALUE_ORDER)
 
-_OUTPUT_METRIC_PLOT_DEFAULT_KEYS = [
-    "baseline_mean",
-    "peak_rate_hz_raw",
-    "peak_latency_ms",
-    "tpeak10_ms",
-    "drop_pct",
-    "t50_ms",
-    "rebound_pct",
-    "auc",
-]
+_OUTPUT_METRIC_PLOT_DEFAULT_KEYS = list(output_metrics_core.OUTPUT_METRIC_PLOT_DEFAULT_KEYS)
 
 
 def _format_metric_cell(data: Dict[str, Any], key: str) -> str:
@@ -4332,7 +4345,7 @@ def format_kv_table(
         if selected:
             keys = selected
     for key in keys:
-        lines.append(f"| {_format_metric_key(key)} | {_format_metric_cell(data, key)} |")
+        lines.append(f"| {_format_metric_key(key, data)} | {_format_metric_cell(data, key)} |")
     return "\n".join(lines)
 
 
@@ -4433,73 +4446,22 @@ def format_kv_table_columns(
             if highlight_best and best_by_metric.get(key) == label:
                 cell = f"**{cell}**"
             row.append(cell)
-        lines.append("| " + _format_metric_key(key) + " | " + " | ".join(row) + " |")
+        label_data = filtered[labels[0]] if labels else None
+        lines.append("| " + _format_metric_key(key, label_data) + " | " + " | ".join(row) + " |")
     return "\n".join(lines)
 
 
-_OUTPUT_PARAM_KEYS = {
-    "peak_window_ms",
-    "drop_window_ms",
-    "rebound_window_ms",
-    "auc_window",
-    "auc_window_start_ms",
-    "auc_window_stop_ms",
-    "auc_units",
-    "pdp_mode",
-    "pdp_window_ms",
-    "t50_mode",
-    "stim_start_ms",
-    "stim_stop_ms",
-    "baseline_ms",
-    "baseline_mode",
-    "baseline_center_ms",
-    "baseline_time_ms",
-    "baseline_window_start_ms",
-    "baseline_window_stop_ms",
-    "peak_time_ms",
-    "tpeak10_time_ms",
-    "drop_time_ms",
-    "t50_time_ms",
-    "rebound_time_ms",
-    "tpeak10_value",
-    "t50_value",
-    "drop_center_ms",
-    "drop_window_start_ms",
-    "drop_window_stop_ms",
-    "rebound_center_ms",
-    "rebound_window_start_ms",
-    "rebound_window_stop_ms",
-    "norm_mode",
-    "norm_window",
-    "norm_scale",
-    "avg_norm_scale",
-    "output_metrics_std_mode",
-}
+_OUTPUT_PARAM_KEYS = set(output_metrics_core.OUTPUT_PARAM_KEYS)
 
 
 def split_output_metrics(metrics: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[str, Any]]:
-    params: Dict[str, Any] = {}
-    values: Dict[str, Any] = {}
-    for key, val in metrics.items():
-        if key in _OUTPUT_PARAM_KEYS:
-            params[key] = val
-            if key == "output_metrics_std_mode":
-                values[key] = val
-        else:
-            values[key] = val
-    return params, values
+    return output_metrics_core.split_output_metrics(metrics)
 
 
 def split_output_metrics_columns(
     data_by_label: Dict[str, Dict[str, Any]],
 ) -> tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
-    params_by_label: Dict[str, Dict[str, Any]] = {}
-    values_by_label: Dict[str, Dict[str, Any]] = {}
-    for label, metrics in data_by_label.items():
-        params, values = split_output_metrics(metrics)
-        params_by_label[label] = params
-        values_by_label[label] = values
-    return params_by_label, values_by_label
+    return output_metrics_core.split_output_metrics_columns(data_by_label)
 
 
 def format_output_metrics_tables(
@@ -4509,13 +4471,12 @@ def format_output_metrics_tables(
     show_params: bool = True,
     metric_keys: Optional[list[str]] = None,
 ) -> str:
-    params, values = split_output_metrics(metrics)
-    parts = []
-    if values:
-        parts.append(format_kv_table(values, title=title, order=_OUTPUT_METRIC_VALUE_ORDER, metric_keys=metric_keys))
-    if show_params and params:
-        parts.append(format_kv_table(params, title=f"{title} (params)"))
-    return "\n\n".join(parts)
+    return output_metrics_core.format_output_metrics_tables(
+        metrics,
+        title=title,
+        show_params=show_params,
+        metric_keys=metric_keys,
+    )
 
 
 def format_output_metrics_tables_columns(
@@ -4528,20 +4489,12 @@ def format_output_metrics_tables_columns(
     highlight_best: bool = False,
     metric_keys: Optional[list[str]] = None,
 ) -> str:
-    params_by_label, values_by_label = split_output_metrics_columns(data_by_label)
-    parts = []
-    if any(values_by_label.values()):
-        parts.append(
-            format_kv_table_columns(
-                values_by_label,
-                title=title,
-                reference_label=reference_label,
-                show_deltas=show_deltas,
-                highlight_best=highlight_best,
-                order=_OUTPUT_METRIC_VALUE_ORDER,
-                metric_keys=metric_keys,
-            )
-        )
-    if show_params and any(params_by_label.values()):
-        parts.append(format_kv_table_columns(params_by_label, title=f"{title} (params)"))
-    return "\n\n".join(parts)
+    return output_metrics_core.format_output_metrics_tables_columns(
+        data_by_label,
+        title=title,
+        show_params=show_params,
+        reference_label=reference_label,
+        show_deltas=show_deltas,
+        highlight_best=highlight_best,
+        metric_keys=metric_keys,
+    )

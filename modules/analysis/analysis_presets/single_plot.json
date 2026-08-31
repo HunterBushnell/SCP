@@ -33,9 +33,9 @@
     "output_norm_window": "stim",
 
     "output_fill_under": true,
-    "output_fill_alpha": 0.28,
-    "output_band_mode": null,
-    "output_band_alpha": 0.20,
+    "output_fill_alpha": 0.25,
+    "output_band_mode":  null,
+    "output_band_alpha": 0.25,
 
     "plot_window": [null, null],
     "auto_plot_window_from_stim": true,

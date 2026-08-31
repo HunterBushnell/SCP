@@ -98,6 +98,9 @@ Notebook options:
 - `single_plot_top_input_groups`: input groups shown in the top input-rate panel
 - `single_plot_raster_input_groups`: input groups shown in the raster panel
 - `single_plot_display_options`: notebook display size only
+- `single_plot_show_metrics`: print the compact important-metrics table for the same run
+- `single_plot_metrics_prefer_saved`: reuse a complete saved metric dataset when present
+- `single_plot_metrics_save`: save newly calculated metric artifacts
 
 JSON defaults:
 
@@ -213,18 +216,27 @@ Primary file: `modules/analysis/analysis_presets/extra_analysis.json`.
 
 ## Output Metrics
 
-Output metrics are computed from the output rate curve.
+Output metrics combine curve-derived PSTH measurements with raw-spike,
+per-trial measurements. The PSTH peak describes response probability and
+temporal alignment across trials; it is not a within-trial instantaneous rate.
 
 Default table/plot metrics:
 
+- `stim_spike_count`, `stim_mean_rate_hz`
+- `stim_response_fraction`, `stim_repetitive_fraction`
+- `first_spike_latency_ms`
+- `first_to_second_isi_ms`, `initial_pair_rate_hz`
 - `baseline_mean`
-- `peak_rate_hz_raw`
+- `peak_rate_hz_raw` (displayed as peak PSTH rate)
 - `peak_latency_ms`
-- `tpeak10_ms`
+- `rise_start_time_ms`, `rise_start_rate_hz`
+- `rise_stop_time_ms`, `rise_stop_rate_hz`
+- `rise_time_ms`, `rise_delta_rate_hz`
 - `drop_pct`
 - `t50_ms`
 - `rebound_pct`
-- `auc`
+- `auc_raw_hz_s`
+- `auc_normalized_s`
 
 Metric definition options:
 
@@ -236,6 +248,31 @@ Metric definition options:
 - `output_rebound_window_ms`
 - `output_auc_window`: `stim`, `full`, or custom `[start_ms, stop_ms]`
 - `output_t50_mode`: `absolute` or `relative`
+- `output_rise_metric_enabled`: calculate and record the rise metric
+- `output_rise_percent_range`: low/high percentages, default `[10.0, 90.0]`;
+  values must satisfy `0 <= low < high <= 100`
+- `output_stim_spike_metrics_enabled`
+- `output_first_spike_metric_enabled`
+- `output_isi_metrics_enabled`
+
+Raw-spike metrics are calculated independently in each stimulus window before
+trials are summarized. First-spike values use trials with at least one spike;
+ISI values use trials with at least two. The saved metrics include contributing
+trial counts, response fractions, means, medians, and the configured STD/SEM.
+
+Raw and normalized AUC are always calculated from the same binned, smoothed
+curve and AUC window, independent of the plotted curve mode. Normalization uses
+`output_metrics_norm_mode` and `output_metrics_norm_window`; the saved metrics
+also record the normalization scale. The generic `auc` value remains the AUC
+of `output_metrics_curve_mode` for callers that explicitly select one curve.
+
+The rise metric uses the first upward crossing of each configured threshold
+between stimulus onset and the detected peak. Threshold rates are measured from
+the baseline-to-peak difference, and crossing times are linearly interpolated
+between curve samples. The output records the absolute time, stimulus-relative
+latency, and rate at both crossings, plus the time and rate differences. A curve
+that is already above a threshold at stimulus onset uses stimulus onset as that
+threshold's first crossing.
 
 Metric display options:
 
@@ -244,8 +281,10 @@ Metric display options:
 - `output_metrics_ref_label`
 - `output_metrics_show_delta`
 - `output_metrics_highlight_best`
+- `output_metrics_important_keys`: compact table/Markdown subset
 - `output_metrics_plot_keys`
 - `output_metrics_plot_style`: `box` or `bar`
+- `output_show_rise_points`: show/hide the two horizontal rise-threshold markers
 
 Primary file: `modules/analysis/analysis_presets/output_metrics.json`.
 
@@ -262,13 +301,21 @@ Global save options live in `modules/analysis/analysis_defaults.json`.
 When save toggles are enabled, Step 6 can write:
 
 - figures into run/compare plot directories
-- `output_metrics.json`
+- `output_metrics.json` (complete metric dataset)
+- `output_metrics.csv` (complete spreadsheet-friendly table)
+- `output_metrics_important.md` (user-selected compact table)
 - `output_metrics_compare.json`
 - `output_metrics_list.json`
 - `config_compare_report.json`
 - `synapse_summary.json`
 - recording summary JSON files
 - plotted-data CSV exports from Outputs/Inputs
+
+Step 5 can generate the same three single-run metric artifacts immediately
+after result saving with `save_output_metrics: true`. The optional
+`save_output_metrics_preset`, `save_output_metrics_formats`, and
+`save_output_metrics_overwrite` simulation settings control that hook; it is
+independent of automatic plot saving.
 
 Plotted-data CSV export formats:
 
@@ -287,9 +334,14 @@ Default preset paths are configured in `modules/analysis/analysis_defaults.json`
 - `output_metrics_preset_path`
 - `extra_preset_path`
 - `compare_preset_path`
+- `compare_preset_enabled`
 
-Compare presets are optional. Set `compare_preset_path` to a preset JSON file
-when you want to load a predefined set of comparison curves and plot options.
+The bundled `analysis_presets/paper_compare.json` is an editable, detailed
+comparison definition. In the Output Plots Compare section, set or confirm its
+path and enable **Use paper compare preset**. Enabled entries replace the normal
+comparison selection, and preset defaults override general Output UI settings
+for that operation. Disabled entries remain editable examples without being
+loaded or checked for existence.
 
 ## Quick Recipes
 

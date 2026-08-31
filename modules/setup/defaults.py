@@ -135,6 +135,10 @@ def default_sim_config(
         "save_plots_mode": "single_plot",
         "save_plots_single_plot_preset": "modules/analysis/analysis_presets/single_plot.json",
         "save_plots_overwrite": False,
+        "save_output_metrics": False,
+        "save_output_metrics_preset": "modules/analysis/analysis_presets/output_metrics.json",
+        "save_output_metrics_formats": ["json", "csv", "md"],
+        "save_output_metrics_overwrite": True,
         "randomness_mode": "random",
         "seed": None,
         "iclamp": {

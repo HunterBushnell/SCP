@@ -15,13 +15,22 @@
   "output_metrics_preset_path": "modules/analysis/analysis_presets/output_metrics.json",
   "extra_preset_path": "modules/analysis/analysis_presets/extra_analysis.json",
 
-  "compare_preset_path": null,
+  "single_plot_show_metrics": true,
+  "single_plot_metrics_prefer_saved": true,
+  "single_plot_metrics_save": false,
+
+  "compare_preset_path": "modules/analysis/analysis_presets/paper_compare.json",
+  "compare_preset_enabled": false,
   "compare_list_paths_enabled": true,
   "compare_list_paths": [
     {"path": "external_data/pyrFiringRateAvg.csv@290;color=k;linestyle=--;label=PN_bio", "enabled": true},
     {"path": "external_data/SSTFiringRateAvg.csv@300;color=magenta;linestyle=--;label=SST_bio", "enabled": false},
     {"path": "external_data/PVFiringRateAvg.csv@300;color=blue;linestyle=--;label=PV_bio", "enabled": false},
-    {"path": "cells/SST/tunes/tuned/output_data/base_tuned_100trials;color=m;linestyle=--;label=SST_base", "enabled": true}
+
+    {"path": "cells/PV_paper/tunes/seg_tuned/output_data/PV4.0_base;color=royalblue;linestyle=--;label=PV_base", "enabled": true},
+    {"path": "cells/PV_paper/tunes/seg_tuned/output_data/PV4.0_tuned;color=blue;linestyle=--;label=PV_tuned", "enabled": true},
+    {"path": "cells/SST_paper/tunes/seg_tuned/output_data/SST4.0_base", "enabled": false},
+    {"path": "cells/SST_paper/tunes/seg_tuned/output_data/SST4.0_tuned", "enabled": false}
   ],
   "compare_list_dir_paths": [
   "external_data"

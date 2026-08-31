@@ -96,8 +96,8 @@
     },
     "run_single_event": true,
     "run_train_input": true,
-    "train_frequency": 50,
-    "train_delay": 250,
+    "train_frequency": 10,
+    "train_delay": 500,
     "init_guess": "random",
     "method": "SLSQP"
   }

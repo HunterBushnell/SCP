@@ -266,8 +266,10 @@ class GenericWorkflowTests(unittest.TestCase):
             self.assertEqual(hoc_path.read_bytes(), original_hoc)
             self.assertEqual(mod_source.read_bytes(), original_mod)
             self.assertTrue(any("Recompile" in warning for warning in applied.warnings))
-            self.assertTrue(list(hoc_path.parent.glob("ScopedCell.hoc.bak_*")))
-            self.assertTrue(list(mod_source.parent.glob("Synthetic.mod.bak_*")))
+            self.assertIsNotNone(applied.backup_dir)
+            self.assertEqual(applied.backup_dir.parent, tune / "restore_backups")
+            self.assertTrue((applied.backup_dir / "model" / "ScopedCell.hoc").is_file())
+            self.assertTrue((applied.backup_dir / "modfiles" / "Synthetic.mod").is_file())
 
     def test_runtime_conditions_recording_and_empty_synapse_target(self) -> None:
         config = _read_json(FIXTURE_TUNE / "cell_configs" / "cell_config.json")

@@ -1,6 +1,6 @@
 {
   "vip_inh": {
-    "state": false,
+    "state": true,
     "color": "#9467bd",
     "syns": {
       "type": "GABA_A",

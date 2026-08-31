@@ -817,7 +817,29 @@ def compute_output_metrics(
     baseline_center_ms: Optional[float] = None,
     stim_start_ms: Optional[float] = None,
     stim_stop_ms: Optional[float] = None,
+    rise_percent_range: Any = (10.0, 90.0),
+    rise_metric_enabled: bool = True,
 ) -> Dict[str, Any]:
+    if rise_percent_range is None:
+        rise_percent_range = (10.0, 90.0)
+    if isinstance(rise_percent_range, str):
+        range_text = rise_percent_range.strip().strip("[]()")
+        separator = "," if "," in range_text else (":" if ":" in range_text else None)
+        if separator is None:
+            raise ValueError("rise_percent_range must contain two percentages")
+        rise_percent_range = tuple(part.strip() for part in range_text.split(separator, 1))
+    if not isinstance(rise_percent_range, (list, tuple, np.ndarray)) or len(rise_percent_range) != 2:
+        raise ValueError("rise_percent_range must contain exactly two percentages")
+    try:
+        rise_start_pct = float(rise_percent_range[0])
+        rise_stop_pct = float(rise_percent_range[1])
+    except (TypeError, ValueError) as exc:
+        raise ValueError("rise_percent_range percentages must be numeric") from exc
+    if not (np.isfinite(rise_start_pct) and np.isfinite(rise_stop_pct)):
+        raise ValueError("rise_percent_range percentages must be finite")
+    if rise_start_pct < 0.0 or rise_stop_pct > 100.0 or rise_start_pct >= rise_stop_pct:
+        raise ValueError("rise_percent_range must satisfy 0 <= start < stop <= 100")
+
     auc_window_mode = "stim"
     auc_window_start: Optional[float] = None
     auc_window_stop: Optional[float] = None
@@ -877,9 +899,19 @@ def compute_output_metrics(
         "peak_value": None,
         "peak_rate_hz": None,
         "peak_latency_ms": None,
-        "tpeak10_ms": None,
-        "tpeak10_time_ms": None,
-        "tpeak10_value": None,
+        "rise_metric_enabled": bool(rise_metric_enabled),
+        "rise_start_pct": rise_start_pct,
+        "rise_stop_pct": rise_stop_pct,
+        "rise_start_time_ms": None,
+        "rise_stop_time_ms": None,
+        "rise_start_latency_ms": None,
+        "rise_stop_latency_ms": None,
+        "rise_time_ms": None,
+        "rise_start_rate_hz": None,
+        "rise_stop_rate_hz": None,
+        "rise_delta_rate_hz": None,
+        "rise_start_value": None,
+        "rise_stop_value": None,
         "drop_time_ms": None,
         "drop_value": None,
         "drop_pct": None,
@@ -989,29 +1021,6 @@ def compute_output_metrics(
     metrics["peak_rate_hz"] = peak_val
     metrics["peak_latency_ms"] = peak_time - float(stim_start)
 
-    if peak_val > 0:
-        # Rising-phase latency: first sampled point between stim start and peak
-        # that reaches 10% of the detected peak amplitude.
-        tpeak10_target = 0.1 * peak_val
-        rise_mask = _select_window_mask(t_ms, float(stim_start), peak_time)
-        if rise_mask.any():
-            rise_indices = np.flatnonzero(rise_mask)
-            rise_vals = rate[rise_indices]
-            reached_idx = np.flatnonzero(rise_vals >= tpeak10_target)
-            if reached_idx.size:
-                tpeak10_pos = None
-                for rel_idx in reached_idx:
-                    cand_pos = int(rise_indices[int(rel_idx)])
-                    if cand_pos <= 0 or float(rate[cand_pos]) >= float(rate[cand_pos - 1]):
-                        tpeak10_pos = cand_pos
-                        break
-                if tpeak10_pos is None:
-                    tpeak10_pos = int(rise_indices[int(reached_idx[0])])
-                tpeak10_time_abs = float(t_ms[tpeak10_pos])
-                metrics["tpeak10_time_ms"] = tpeak10_time_abs
-                metrics["tpeak10_value"] = float(rate[tpeak10_pos])
-                metrics["tpeak10_ms"] = float(tpeak10_time_abs - float(stim_start))
-
     rate_bs = np.asarray(curve.get("rate_hz_baseline_sub") or [], dtype=float)
     raw_rate = None
     baseline_for_raw = baseline_mean_curve if baseline_mean_curve is not None else baseline_mean
@@ -1026,6 +1035,60 @@ def compute_output_metrics(
         peak_raw_val = float(raw_rate[peak_raw_pos])
         metrics["peak_value_raw"] = peak_raw_val
         metrics["peak_rate_hz_raw"] = peak_raw_val
+
+    if bool(rise_metric_enabled):
+        rise_rate = raw_rate if raw_rate is not None and raw_rate.size == rate.size else rate
+        rise_baseline = baseline_for_raw if raw_rate is not None else baseline_mean
+        if rise_baseline is not None:
+            rise_peak = float(rise_rate[peak_pos])
+            rise_amplitude = rise_peak - float(rise_baseline)
+            if rise_amplitude > 0.0:
+                start_target = float(rise_baseline) + (rise_start_pct / 100.0) * rise_amplitude
+                stop_target = float(rise_baseline) + (rise_stop_pct / 100.0) * rise_amplitude
+
+                def _first_upward_crossing(target: float) -> Optional[float]:
+                    start_time = float(stim_start)
+                    stop_time = peak_time
+                    if stop_time < start_time:
+                        return None
+
+                    start_value = float(
+                        np.interp(start_time, t_ms, rise_rate, left=rise_rate[0], right=rise_rate[-1])
+                    )
+                    if start_value >= target:
+                        return start_time
+
+                    prior_time = start_time
+                    prior_value = start_value
+                    search_positions = np.flatnonzero((t_ms > start_time) & (t_ms <= stop_time))
+                    for position in search_positions:
+                        current_time = float(t_ms[position])
+                        current_value = float(rise_rate[position])
+                        if prior_value < target <= current_value:
+                            value_delta = current_value - prior_value
+                            if value_delta <= 0.0 or current_time <= prior_time:
+                                return current_time
+                            fraction = (target - prior_value) / value_delta
+                            return prior_time + fraction * (current_time - prior_time)
+                        prior_time = current_time
+                        prior_value = current_value
+                    return None
+
+                rise_start_time = _first_upward_crossing(start_target)
+                rise_stop_time = _first_upward_crossing(stop_target)
+                if rise_start_time is not None:
+                    metrics["rise_start_time_ms"] = rise_start_time
+                    metrics["rise_start_latency_ms"] = rise_start_time - float(stim_start)
+                    metrics["rise_start_rate_hz"] = start_target
+                    metrics["rise_start_value"] = float(np.interp(rise_start_time, t_ms, rate))
+                if rise_stop_time is not None:
+                    metrics["rise_stop_time_ms"] = rise_stop_time
+                    metrics["rise_stop_latency_ms"] = rise_stop_time - float(stim_start)
+                    metrics["rise_stop_rate_hz"] = stop_target
+                    metrics["rise_stop_value"] = float(np.interp(rise_stop_time, t_ms, rate))
+                if rise_start_time is not None and rise_stop_time is not None:
+                    metrics["rise_time_ms"] = rise_stop_time - rise_start_time
+                    metrics["rise_delta_rate_hz"] = stop_target - start_target
 
     drop_target = peak_time + float(drop_window_ms)
     if pdp_mode_val == "window" and pdp_window_val > 0:
@@ -2589,6 +2652,7 @@ def run_snapshot(results: Dict[str, Any], *, label: Optional[str] = None) -> Dic
         "input_stats_bin_ms": sim_cfg.get("input_stats_bin_ms"),
         "save_syn_records_sidecar": sim_cfg.get("save_syn_records_sidecar"),
         "save_plots": sim_cfg.get("save_plots"),
+        "save_output_metrics": sim_cfg.get("save_output_metrics"),
         "randomness_base_seed_used": randomness.get("base_seed_used"),
         "randomness_trials_setting": randomness.get("trials_setting"),
         "mechanism_dll": mech_info.get("dll_path"),
@@ -3282,6 +3346,7 @@ def format_snapshot_table(
         ("input_stats_bin_ms", snapshot.get("input_stats_bin_ms")),
         ("save_syn_records_sidecar", snapshot.get("save_syn_records_sidecar")),
         ("save_plots", snapshot.get("save_plots")),
+        ("save_output_metrics", snapshot.get("save_output_metrics")),
         ("randomness_base_seed_used", snapshot.get("randomness_base_seed_used")),
         ("randomness_trials_setting", snapshot.get("randomness_trials_setting")),
         ("syn_groups", _format_list(snapshot.get("syn_groups", []), max_items=max_groups)),
@@ -3333,6 +3398,7 @@ def format_snapshot_diff(
         "input_stats_bin_ms",
         "save_syn_records_sidecar",
         "save_plots",
+        "save_output_metrics",
         "randomness_base_seed_used",
         "randomness_trials_setting",
         "mechanism_dll",
@@ -3408,6 +3474,7 @@ def format_snapshot_compare(
         "input_stats_bin_ms",
         "save_syn_records_sidecar",
         "save_plots",
+        "save_output_metrics",
         "randomness_base_seed_used",
         "randomness_trials_setting",
         "mechanism_dll",

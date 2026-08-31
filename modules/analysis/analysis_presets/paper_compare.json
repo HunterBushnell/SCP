@@ -1,0 +1,106 @@
+{
+  "title": "paper_compare",
+  "defaults": {
+    "plot_outputs": false,
+    "plot_output_curve": true,
+    "plot_spike_stats": false,
+    "plot_raster": false,
+    "save_overwrite": false,
+
+    "auto_plot_window_from_stim": false,
+    "plot_window": [200, 900],
+    "y_window": [-0.1, 1.1],
+    "output_plot_window_zero_origin": false,
+
+    "compare_output_layout": "overlay",
+    "output_compare_figsize": [10.0, 4.0],
+    "multi_plot_type": "line",
+    "multi_shade_mode": null,
+    "multi_norm_fr": null,
+
+    "output_curve_mode": "normalized",
+    "output_curve_plot_mode": "rate",
+    "output_norm_mode": "peak",
+    "output_norm_window": "stim",
+    "output_baseline_center_ms": 100.0,
+    "output_metric_mode": "window",
+    "output_metric_window_ms": 0.0,
+    "output_metric_window_markers": false,
+    "output_show_metric_points": false,
+    "output_bin_ms": 1.0,
+    "win_size": 25.0,
+    "output_smooth_mode": "center",
+    "output_stim_start_ms": 300.0,
+    "output_stim_stop_ms": 800.0,
+
+    "output_linewidth": 2.0,
+    "output_stim_linewidth": 2.0,
+    "output_metric_linewidth": 1.0,
+    "output_shade_alpha": 0.25
+  },
+  "entries": [
+    {
+      "path": "external_data/pyrFiringRateAvg.csv",
+      "label": "PN bio",
+      "enabled": false,
+      "shift_ms": 290,
+      "scale": 1,
+      "color": "red",
+      "linestyle": "--"
+    },
+    {
+      "path": "external_data/PVFiringRateAvg.csv",
+      "label": "PV bio",
+      "enabled": false,
+      "shift_ms": 500,
+      "scale": 1,
+      "color": "blue",
+      "linestyle": "--"
+    },
+    {
+      "path": "external_data/SSTFiringRateAvg.csv",
+      "label": "SST bio",
+      "enabled": false,
+      "shift_ms": 500,
+      "scale": 1,
+      "color": "magenta",
+      "linestyle": "--"
+    },
+    {
+      "path": "cells/PV/tunes/tuned_ampa/output_data/PV5.0_base",
+      "label": "PV base",
+      "enabled": false,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "royalblue",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/PV/tunes/tuned_ampa/output_data/PV5.0.3_tuned",
+      "label": "PV tuned",
+      "enabled": true,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "navy",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/tuned_ampa/output_data/SST5_base",
+      "label": "SST base",
+      "enabled": false,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "magenta",
+      "linestyle": "-"
+    },
+    {
+      "path": "cells/SST/tunes/tuned_ampa/output_data/SST5_tuned",
+      "label": "SST tuned",
+      "enabled": true,
+      "shift_ms": 0,
+      "scale": 1,
+      "color": "darkmagenta",
+      "linestyle": "-"
+    }
+  ]
+}
