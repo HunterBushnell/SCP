@@ -110,7 +110,7 @@
 
       "name": "gbar_Ih",
 
-      "value": 0.0001,
+      "value": 0.00015,
 
       "mechanism": "Ih"
 
@@ -266,7 +266,7 @@
 
       "name": "g_pas",
 
-      "value": 0.0000517,
+      "value": 0.0000617,
 
       "mechanism": ""
 
@@ -278,7 +278,7 @@
 
       "name": "g_pas",
 
-      "value": 0.0000517,
+      "value": 0.0000617,
 
       "mechanism": ""
 
@@ -398,7 +398,7 @@
 
       "name": "g_pas",
 
-      "value": 0.0000517,
+      "value": 0.0000617,
 
       "mechanism": ""
 
