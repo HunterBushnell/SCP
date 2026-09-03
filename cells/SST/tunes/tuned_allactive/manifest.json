@@ -3,9 +3,9 @@
     {
       "model_file": [
         "manifest.json",
-        "485466109_fit.json"
+        "496538951_fit.json"
       ],
-      "model_type": "Biophysical - perisomatic"
+      "model_type": "Biophysical - all active"
     }
   ],
   "runs": [

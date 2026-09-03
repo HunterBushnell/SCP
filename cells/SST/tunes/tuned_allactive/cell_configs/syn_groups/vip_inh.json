@@ -1,6 +1,6 @@
 {
   "vip_inh": {
-    "state": null,
+    "state": true,
     "color": "#9467bd",
     "syns": {
       "type": "GABA_A",
@@ -13,7 +13,7 @@
         }
       },
       "params": {
-        "wt_mean": 5.5,
+        "wt_mean": 7.0,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,

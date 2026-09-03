@@ -15,7 +15,7 @@
         }
       },
       "params": {
-        "wt_mean": 0.5,
+        "wt_mean": 0.1,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,
@@ -31,7 +31,7 @@
         "stop_ms": 1000.0,
         "mode": "precomputed",
         "source": {
-          "path": "cells/PV/tunes/tuned_ampa/output_data/PV5.0_base/results/spikes.npz",
+          "path": "cells/PV/tunes/tuned/output_data/PV4.0_base_1000/results/spikes.npz",
           "selection": "sample",
           "crop_start_ms": 0.0,
           "crop_stop_ms": 1000.0,
