@@ -1,46 +1,40 @@
 {
-  "pn_exc": {
+  "vip_inh": {
     "state": true,
+    "color": "#9467bd",
     "syns": {
-      "type": "AMPA_NMDA_STP",
-      "N_syn": 713,
-      "segs": "all",
+      "type": "GABA_A",
+      "N_syn": 95,
+      "segs": "proximal",
       "dist_func": {
-        "kind": "linear",
+        "kind": "uniform",
         "params": {
-          "m": -0.015,
-          "b": 4.25
+          "c": 2.0
         }
       },
       "params": {
-        "wt_mean": 0.5,
+        "wt_mean": 7.0,
         "wt_std": 0.33,
         "initW": 1.0,
-        "gmax_AMPA": 0.001,
-        "gmax_NMDA": 0.001,
-        "tau_r_AMPA": 0.2,
-        "tau_d_AMPA": 1.7,
-        "Use": 0.8,
-        "Dep": 100.0,
-        "Fac": 0.0,
-        "NMDA_ratio": 0.0
+        "gmax": 0.001,
+        "tau_r_GABAA": 0.5,
+        "tau_d_GABAA": 5.5
       }
     },
-    "color": "#1f77b4",
     "input_blocks": [
       {
         "name": "pre_baseline",
         "role": "baseline",
         "start_ms": 0.0,
-        "stop_ms": 290.0,
+        "stop_ms": 320.0,
         "mode": "homogeneous_poisson",
         "rate_hz": 2.3
       },
       {
         "name": "stimulus",
         "role": "stimulus",
-        "start_ms": 290.0,
-        "stop_ms": 840.0,
+        "start_ms": 320.0,
+        "stop_ms": 870.0,
         "mode": "inhomogeneous_poisson",
         "source": {
           "path": "external_data/pyrFiringRateAvg.csv",
@@ -54,7 +48,7 @@
       {
         "name": "post_baseline",
         "role": "baseline",
-        "start_ms": 840.0,
+        "start_ms": 870.0,
         "stop_ms": 1000.0,
         "mode": "homogeneous_poisson",
         "rate_hz": 2.3

@@ -1,32 +1,31 @@
 {
   "pn_exc": {
     "state": true,
+    "color": "#1f77b4",
     "syns": {
       "type": "AMPA_NMDA_STP",
-      "N_syn": 713,
+      "N_syn": 435,
       "segs": "all",
       "dist_func": {
-        "kind": "linear",
+        "kind": "uniform",
         "params": {
-          "m": -0.015,
-          "b": 4.25
+          "c": 2.0
         }
       },
       "params": {
-        "wt_mean": 0.5,
+        "wt_mean": 0.3,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax_AMPA": 0.001,
         "gmax_NMDA": 0.001,
-        "tau_r_AMPA": 0.2,
-        "tau_d_AMPA": 1.7,
-        "Use": 0.8,
-        "Dep": 100.0,
-        "Fac": 0.0,
-        "NMDA_ratio": 0.0
+        "tau_r_AMPA": 4,
+        "tau_d_AMPA": 5,
+        "Use": 0.4,
+        "Dep": 0,
+        "Fac": 70,
+        "NMDA_ratio": 1.5
       }
     },
-    "color": "#1f77b4",
     "input_blocks": [
       {
         "name": "pre_baseline",
@@ -34,7 +33,7 @@
         "start_ms": 0.0,
         "stop_ms": 290.0,
         "mode": "homogeneous_poisson",
-        "rate_hz": 2.3
+        "rate_hz": 2.321332255
       },
       {
         "name": "stimulus",
@@ -57,7 +56,7 @@
         "start_ms": 840.0,
         "stop_ms": 1000.0,
         "mode": "homogeneous_poisson",
-        "rate_hz": 2.3
+        "rate_hz": 2.321332255
       }
     ]
   }

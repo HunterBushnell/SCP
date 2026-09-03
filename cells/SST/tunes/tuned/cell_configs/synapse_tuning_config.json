@@ -29,11 +29,11 @@
       },
       "spec_syn_param": {
         "initW": 0.25,
-        "tau_r_AMPA": 4.0,
-        "tau_d_AMPA": 5.0,
-        "Use": 0.4,
+        "tau_r_AMPA": 0.2,
+        "tau_d_AMPA": 1.7,
+        "Use": 0.75,
         "Dep": 0.0,
-        "Fac": 70.0,
+        "Fac": 200.0,
         "NMDA_ratio": 1.5
       }
     },
@@ -116,8 +116,8 @@
     },
     "run_single_event": true,
     "run_train_input": true,
-    "train_frequency": 10,
-    "train_delay": 500,
+    "train_frequency": 50,
+    "train_delay": 250,
     "init_guess": "random",
     "method": "SLSQP"
   }

@@ -29,8 +29,8 @@
       },
       "spec_syn_param": {
         "initW": 1.5,
-        "tau_r_AMPA": 0.2,
-        "tau_d_AMPA": 1.7,
+        "tau_r_AMPA": 3.5,
+        "tau_d_AMPA": 4.0,
         "Use": 0.8,
         "Dep": 100.0,
         "Fac": 0.0,
@@ -96,8 +96,8 @@
     },
     "run_single_event": true,
     "run_train_input": true,
-    "train_frequency": 50,
-    "train_delay": 250,
+    "train_frequency": 10,
+    "train_delay": 500,
     "init_guess": "random",
     "method": "SLSQP"
   }

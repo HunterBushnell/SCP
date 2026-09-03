@@ -1,5 +1,5 @@
 {
-  "default_connection": "Dep2PV",
+  "default_connection": "Fac2SST",
   "current_name": "i",
   "slider_vars": null,
   "other_vars_to_record": null,
@@ -18,27 +18,27 @@
     "celsius": 20
   },
   "connections": {
-    "Dep2PV": {
-      "description": "Excitatory depressing AMPA/NMDA/STP example used for PV-like cells.",
+    "Fac2SST": {
+      "description": "Excitatory AMPA/NMDA/STP example used for SST-like cells.",
       "spec_settings": {
         "post_cell": "SCP_Cell",
-        "vclamp_amp": -71.0,
+        "vclamp_amp": -65.0,
         "sec_x": 0.5,
         "sec_id": 0,
         "level_of_detail": "AMPA_NMDA_STP"
       },
       "spec_syn_param": {
-        "initW": 1.5,
-        "tau_r_AMPA": 0.2,
-        "tau_d_AMPA": 1.7,
-        "Use": 0.8,
-        "Dep": 100.0,
-        "Fac": 0.0,
-        "NMDA_ratio": 0.0
+        "initW": 0.25,
+        "tau_r_AMPA": 4.0,
+        "tau_d_AMPA": 5.0,
+        "Use": 0.4,
+        "Dep": 0.0,
+        "Fac": 70.0,
+        "NMDA_ratio": 1.5
       }
     },
-    "Inh2PV": {
-      "description": "Inhibitory GABA_A example with the same defaults as Inh2SST.",
+    "Inh2SST": {
+      "description": "Inhibitory GABA_A example.",
       "spec_settings": {
         "post_cell": "SCP_Cell",
         "vclamp_amp": -65.0,
@@ -52,6 +52,26 @@
         "tau_d_GABAA": 5.5,
         "e_GABAA": -75.0,
         "gmax": 0.001
+      }
+    },
+    "PV2SST": {
+      "description": "Inhibitory GABA_A/STP example.",
+      "spec_settings": {
+        "post_cell": "SCP_Cell",
+        "vclamp_amp": -65.0,
+        "sec_x": 0.5,
+        "sec_id": 0,
+        "level_of_detail": "GABA_A_STP"
+      },
+      "spec_syn_param": {
+        "initW": 5.0,
+        "tau_r_GABAA": 0.5,
+        "tau_d_GABAA": 5.5,
+        "e_GABAA": -75.0,
+        "gmax": 0.001,
+        "Use": 1.0,
+        "Dep": 250.0,
+        "Fac": 0.0
       }
     }
   },
@@ -96,8 +116,8 @@
     },
     "run_single_event": true,
     "run_train_input": true,
-    "train_frequency": 50,
-    "train_delay": 250,
+    "train_frequency": 10,
+    "train_delay": 500,
     "init_guess": "random",
     "method": "SLSQP"
   }

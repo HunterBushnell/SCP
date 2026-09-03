@@ -1,12 +1,12 @@
 {
-  "cell_name": "PV",
-  "tune": "tuned_ampa",
-  "color": "blue",
+  "cell_name": "SST",
+  "tune": "tuned",
+  "color": "magenta",
   "cell_loader": "allen_manifest",
   "paths": {
     "manifest": "manifest.json"
   },
   "tuning": {
-    "soma_diam_multiplier": 6.0
+    "soma_diam_multiplier": 10
   }
 }
