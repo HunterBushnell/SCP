@@ -110,7 +110,7 @@
 
       "name": "gbar_Ih",
 
-      "value": 0.00015,
+      "value": 0.0001,
 
       "mechanism": "Ih"
 
@@ -146,7 +146,7 @@
 
       "name": "gbar_Kd",
 
-      "value": 0.015,
+      "value": 0.018,
 
       "mechanism": "Kd"
 
@@ -158,7 +158,7 @@
 
       "name": "gbar_Kv2like",
 
-      "value": 0.0008,
+      "value": 0.00018,
 
       "mechanism": "Kv2like"
 
@@ -182,7 +182,7 @@
 
       "name": "gbar_K_T",
 
-      "value": 0.00,
+      "value": 0.0001,
 
       "mechanism": "K_T"
 
@@ -194,7 +194,7 @@
 
       "name": "gbar_Im_v2",
 
-      "value": 0.0001,
+      "value": 0.00005,
 
       "mechanism": "Im_v2"
 
@@ -218,7 +218,7 @@
 
       "name": "gbar_Ca_HVA",
 
-      "value": 0.003,
+      "value": 0.0025,
 
       "mechanism": "Ca_HVA"
 
@@ -230,7 +230,7 @@
 
       "name": "gbar_Ca_LVA",
 
-      "value": 0.003,
+      "value": 0.001,
 
       "mechanism": "Ca_LVA"
 
@@ -266,7 +266,7 @@
 
       "name": "g_pas",
 
-      "value": 0.0000617,
+      "value": 0.0000567,
 
       "mechanism": ""
 
@@ -278,9 +278,21 @@
 
       "name": "g_pas",
 
-      "value": 0.0000617,
+      "value": 0.0000567,
 
       "mechanism": ""
+
+    },
+
+    {
+
+      "section": "axon",
+
+      "name": "gbar_NaTa",
+
+      "value": 0.1,
+
+      "mechanism": "NaTa"
 
     },
 
@@ -398,7 +410,7 @@
 
       "name": "g_pas",
 
-      "value": 0.0000617,
+      "value": 0.0000567,
 
       "mechanism": ""
 

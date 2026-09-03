@@ -14,7 +14,7 @@
         }
       },
       "params": {
-        "wt_mean": 0.8,
+        "wt_mean": 0.9,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax_AMPA": 0.001,
@@ -36,7 +36,7 @@
         "start_ms": 0.0,
         "stop_ms": 1000.0,
         "mode": "homogeneous_poisson",
-        "rate_hz": 0.01
+        "rate_hz": 0.001
       }
     ]
   }
