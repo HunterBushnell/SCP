@@ -18,6 +18,7 @@ cells/**/output_data/*
 cells/**/output_data/**/logs/*
 cells/**/notebook_exports/
 cells/**/tuning_exports/
+cells/**/restore_backups/
 cells/**/*.nwb
 cells/**/act_workspace/
 external_data/*.pkl

@@ -248,6 +248,12 @@ class Step5UI(PipelineUIComponent):
             indent=False,
             layout=w.Layout(width="190px"),
         )
+        sim_save_output_metrics = w.Checkbox(
+            value=bool(sim_cfg.get("save_output_metrics", False)),
+            description="Save output metrics",
+            indent=False,
+            layout=w.Layout(width="190px"),
+        )
         save_cfg = sim_cfg.get("save")
         if not isinstance(save_cfg, Mapping):
             save_cfg = {}
@@ -349,7 +355,12 @@ class Step5UI(PipelineUIComponent):
                     layout=w.Layout(flex_flow="row wrap"),
                 ),
                 w.HBox(
-                    [sim_plots_profile, sim_save_plots_mode, sim_save_plots_overwrite],
+                    [
+                        sim_plots_profile,
+                        sim_save_plots_mode,
+                        sim_save_plots_overwrite,
+                        sim_save_output_metrics,
+                    ],
                     layout=w.Layout(flex_flow="row wrap"),
                 ),
                 w.HBox(
@@ -688,6 +699,7 @@ class Step5UI(PipelineUIComponent):
                 "sim_plots_profile": sim_plots_profile,
                 "sim_save_plots_mode": sim_save_plots_mode,
                 "sim_save_plots_overwrite": sim_save_plots_overwrite,
+                "sim_save_output_metrics": sim_save_output_metrics,
                 "sim_output_format": sim_output_format,
                 "sim_save_full_results": sim_full_results,
                 "sim_cell_recording_enabled": sim_cell_recording,
@@ -779,6 +791,7 @@ class Step5UI(PipelineUIComponent):
             "sim_plots_profile",
             "sim_save_plots_mode",
             "sim_save_plots_overwrite",
+            "sim_save_output_metrics",
             "sim_output_format",
             "sim_save_full_results",
             "sim_cell_recording_enabled",
@@ -1020,6 +1033,7 @@ class Step5UI(PipelineUIComponent):
             "plots_profile": "basic",
             "save_plots_mode": "single_plot",
             "save_plots_overwrite": False,
+            "save_output_metrics": False,
             "save": {"format": "pkl", "full_results": False},
             "iclamp": {
                 "enabled": False,
@@ -1127,6 +1141,7 @@ class Step5UI(PipelineUIComponent):
             "sim_iclamp_record_currents": ("iclamp", "record_currents"),
             "sim_save_input_stats": ("save_input_stats",),
             "sim_save_plots_overwrite": ("save_plots_overwrite",),
+            "sim_save_output_metrics": ("save_output_metrics",),
             "sim_cell_recording_enabled": ("cell_recording", "enabled"),
             "sim_record_ion_currents": (
                 "cell_recording",
@@ -1272,6 +1287,9 @@ class Step5UI(PipelineUIComponent):
             ),
             "sim_save_plots_overwrite": bool(
                 sim_cfg.get("save_plots_overwrite", False)
+            ),
+            "sim_save_output_metrics": bool(
+                sim_cfg.get("save_output_metrics", False)
             ),
             "sim_output_format": (
                 save_cfg.get("format", sim_cfg.get("output_format", "pkl"))

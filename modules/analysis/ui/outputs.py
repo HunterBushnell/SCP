@@ -256,13 +256,30 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
     outputs_shade_dd = widgets.Dropdown(options=["none", "sem", "std"], value="none" if shade_val is None else shade_val, description="Band")
     outputs_compare_layout_dd = widgets.Dropdown(options=["side-by-side", "stacked", "overlay"], value=g.get("compare_output_layout"), description="Layout")
 
-    preset_path_default = g.get("compare_preset_path") or ""
+    preset_path_default = str(g.get("compare_preset_path") or "")
+    preset_enabled_default = g.get("compare_preset_enabled")
+    if preset_enabled_default is None:
+        preset_enabled_default = bool(preset_path_default.strip())
+    compare_preset_path_txt = widgets.Text(
+        value=preset_path_default,
+        description="Preset JSON",
+        layout=widgets.Layout(width="80%"),
+    )
     compare_preset_cb = widgets.Checkbox(
-        value=bool(g.get("compare_preset_path")),
-        description="Use compare preset",
+        value=bool(preset_enabled_default and preset_path_default.strip()),
+        description="Use paper compare preset",
         disabled=not bool(str(preset_path_default).strip()),
         indent=False,
     )
+
+    def _sync_compare_preset_ui(*_):
+        have_path = bool(str(compare_preset_path_txt.value or "").strip())
+        compare_preset_cb.disabled = not have_path
+        if not have_path:
+            compare_preset_cb.value = False
+
+    compare_preset_path_txt.observe(_sync_compare_preset_ui, names="value")
+    _sync_compare_preset_ui()
 
     outputs_btn = widgets.Button(description="Run output plots")
     outputs_btn.layout = widgets.Layout(width="160px", flex="0 0 auto")
@@ -317,7 +334,10 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
 
     def _on_outputs(_):
         sync_common_from_globals(g)
-        g["compare_preset_path"] = preset_path_default if compare_preset_cb.value else None
+        g["compare_preset_path"] = str(compare_preset_path_txt.value or "").strip() or None
+        g["compare_preset_enabled"] = bool(
+            compare_preset_cb.value and g["compare_preset_path"]
+        )
         g["plot_outputs"] = bool(outputs_full_cb.value)
         g["plot_output_curve"] = bool(output_curve_cb.value)
         g["plot_spike_stats"] = bool(output_spike_stats_cb.value)
@@ -370,6 +390,8 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
 
     g["out_outputs"] = out_outputs
     g["_on_outputs"] = _on_outputs
+    g["compare_preset_path_txt"] = compare_preset_path_txt
+    g["compare_preset_cb"] = compare_preset_cb
 
     run_section = widgets.VBox([
         widgets.HTML("<b>Generate</b>"),
@@ -389,6 +411,7 @@ def build_outputs_ui(g: Dict[str, Any]) -> None:
     compare_section = widgets.VBox([
         widgets.HTML("<b>Comparison</b>"),
         widgets.HBox([outputs_compare_layout_dd, outputs_shade_dd, compare_preset_cb]),
+        widgets.HBox([compare_preset_path_txt]),
     ])
     export_section = widgets.VBox([
         widgets.HTML("<b>Export current plotted data or figure</b>"),

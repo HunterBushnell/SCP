@@ -1,0 +1,43 @@
+{
+  "bg_exc": {
+    "state": true,
+    "color": "#2ca02c",
+    "syns": {
+      "type": "AMPA_NMDA_STP",
+      "N_syn": null,
+      "segs": "all",
+      "dist_func": {
+        "kind": "uniform",
+        "params": {
+          "c": 2.0,
+          "multi": 0.8
+        }
+      },
+      "params": {
+        "wt_mean": 0.8,
+        "wt_std": 0.33,
+        "initW": 1.0,
+        "gmax_AMPA": 0.001,
+        "gmax_NMDA": 0.001,
+        "tau_r_AMPA": 0.2,
+        "tau_d_AMPA": 1.7,
+        "tau_r_NMDA": 0.29,
+        "tau_d_NMDA": 43,
+        "Use": 0.75,
+        "Dep": 0,
+        "Fac": 200,
+        "NMDA_ratio": 1.5
+      }
+    },
+    "input_blocks": [
+      {
+        "name": "background",
+        "role": "background",
+        "start_ms": 0.0,
+        "stop_ms": 1000.0,
+        "mode": "homogeneous_poisson",
+        "rate_hz": 0.01
+      }
+    ]
+  }
+}

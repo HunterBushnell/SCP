@@ -55,10 +55,12 @@ class PipelineNotebookUIStep5Tests(unittest.TestCase):
 
         ui.controls["sim_dt_ms"].value = 0.05
         ui.controls["sim_plots_profile"].value = "inputs"
+        ui.controls["sim_save_output_metrics"].value = True
         self.assertEqual(settings["simulation_overrides"]["dt"], 0.05)
         self.assertTrue(settings["simulation_overrides"]["save_plots"])
         self.assertTrue(settings["simulation_overrides"]["save_plots_inputs"])
         self.assertFalse(settings["simulation_overrides"]["save_plots_synapses"])
+        self.assertTrue(settings["simulation_overrides"]["save_output_metrics"])
 
         settings["simulation_overrides"] = {
             "tstop": 900.0,
@@ -120,6 +122,7 @@ class PipelineNotebookUIStep5Tests(unittest.TestCase):
                 ui.controls["sim_tstop_ms"].value = 900.0
                 ui.controls["sim_iclamp_amp_nA"].value = 0.35
                 ui.controls["sim_plots_profile"].value = "inputs"
+                ui.controls["sim_save_output_metrics"].value = True
                 ui.controls["sim_cell_recording_enabled"].value = True
                 ui.controls["sim_record_ion_currents"].value = True
                 ui.controls["output_stem"].value = "widget_run"
@@ -174,6 +177,7 @@ class PipelineNotebookUIStep5Tests(unittest.TestCase):
             self.assertEqual(kwargs["sim_overrides"]["iclamp"]["amp_nA"], 0.35)
             self.assertEqual(kwargs["sim_overrides"]["plots_profile"], "inputs")
             self.assertTrue(kwargs["sim_overrides"]["save_plots_inputs"])
+            self.assertTrue(kwargs["sim_overrides"]["save_output_metrics"])
             self.assertTrue(
                 kwargs["sim_overrides"]["cell_recording"]["enabled"]
             )

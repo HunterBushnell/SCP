@@ -1,0 +1,124 @@
+{
+  "default_connection": "Fac2SST",
+  "current_name": "i",
+  "slider_vars": null,
+  "other_vars_to_record": null,
+  "general_settings": {
+    "vclamp": true,
+    "rise_interval": [
+      0.1,
+      0.9
+    ],
+    "tstart": 500.0,
+    "tdur": 100.0,
+    "threshold": -15.0,
+    "delay": 1.3,
+    "weight": 1.0,
+    "dt": 0.025,
+    "celsius": 20
+  },
+  "connections": {
+    "Fac2SST": {
+      "description": "Excitatory AMPA/NMDA/STP example used for SST-like cells.",
+      "spec_settings": {
+        "post_cell": "SCP_Cell",
+        "vclamp_amp": -65.0,
+        "sec_x": 0.5,
+        "sec_id": 0,
+        "level_of_detail": "AMPA_NMDA_STP"
+      },
+      "spec_syn_param": {
+        "initW": 0.25,
+        "tau_r_AMPA": 0.2,
+        "tau_d_AMPA": 1.7,
+        "Use": 0.75,
+        "Dep": 0.0,
+        "Fac": 200.0,
+        "NMDA_ratio": 1.5
+      }
+    },
+    "Inh2SST": {
+      "description": "Inhibitory GABA_A example.",
+      "spec_settings": {
+        "post_cell": "SCP_Cell",
+        "vclamp_amp": -65.0,
+        "sec_x": 0.5,
+        "sec_id": 0,
+        "level_of_detail": "GABA_A"
+      },
+      "spec_syn_param": {
+        "initW": 0.1,
+        "tau_r_GABAA": 0.5,
+        "tau_d_GABAA": 5.5,
+        "e_GABAA": -75.0,
+        "gmax": 0.001
+      }
+    },
+    "PV2SST": {
+      "description": "Inhibitory GABA_A/STP example.",
+      "spec_settings": {
+        "post_cell": "SCP_Cell",
+        "vclamp_amp": -65.0,
+        "sec_x": 0.5,
+        "sec_id": 0,
+        "level_of_detail": "GABA_A_STP"
+      },
+      "spec_syn_param": {
+        "initW": 5.0,
+        "tau_r_GABAA": 0.5,
+        "tau_d_GABAA": 5.5,
+        "e_GABAA": -75.0,
+        "gmax": 0.001,
+        "Use": 1.0,
+        "Dep": 250.0,
+        "Fac": 0.0
+      }
+    }
+  },
+  "optimizer": {
+    "enabled": false,
+    "param_bounds": {
+      "Dep": [
+        0.0,
+        200.0
+      ],
+      "Fac": [
+        0.0,
+        400.0
+      ],
+      "Use": [
+        0.1,
+        1.0
+      ],
+      "tau_r_AMPA": [
+        0.1,
+        4.0
+      ],
+      "tau_d_AMPA": [
+        1.0,
+        20.0
+      ]
+    },
+    "target_metrics": {
+      "induction": -0.75,
+      "ppr": 0.8,
+      "recovery": 0.0,
+      "max_amplitude": 25.0,
+      "rise_time": 2.0,
+      "decay_time": 9.0
+    },
+    "cost_weights": {
+      "induction": 1.0,
+      "ppr": 3.0,
+      "recovery": 1.0,
+      "rise_time": 1.0,
+      "decay_time": 1.0
+    },
+    "run_single_event": true,
+    "run_train_input": true,
+    "train_frequency": 50,
+    "train_delay": 250,
+    "init_guess": "random",
+    "method": "SLSQP"
+  }
+}

@@ -26,6 +26,7 @@ APPLY_CHOICES = (
 
 
 _GROUP_FILE_KEYS = ("group_files",)
+_RESTORE_BACKUP_DIRNAME = "restore_backups"
 
 
 @dataclass
@@ -55,6 +56,7 @@ class RestoreReport:
     file_reports: List[FileReport] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
+    backup_dir: Optional[Path] = None
 
     @property
     def changed_files(self) -> int:
@@ -75,11 +77,44 @@ def _write_json(path: Path, payload: Any) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _backup_file(path: Path) -> Path:
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    backup = path.with_name(f"{path.name}.bak_{stamp}")
-    shutil.copy2(path, backup)
-    return backup
+@dataclass
+class _RestoreBackupSet:
+    """Collect every backup from one restore invocation in one directory tree."""
+
+    target_tune: Path
+    directory: Optional[Path] = None
+
+    def _create_directory(self) -> Path:
+        backup_root = self.target_tune.resolve() / _RESTORE_BACKUP_DIRNAME
+        backup_root.mkdir(parents=True, exist_ok=True)
+
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        candidate = backup_root / stamp
+        suffix = 1
+        while True:
+            try:
+                candidate.mkdir()
+                return candidate
+            except FileExistsError:
+                candidate = backup_root / f"{stamp}_{suffix:03d}"
+                suffix += 1
+
+    def backup_file(self, path: Path) -> Path:
+        tune_root = self.target_tune.resolve()
+        source_path = path.resolve()
+        if source_path == tune_root or not _path_is_within(source_path, tune_root):
+            raise ValueError(f"Refusing to back up a file outside target tune: {path}")
+
+        relative_path = source_path.relative_to(tune_root)
+        if relative_path.parts[0] == _RESTORE_BACKUP_DIRNAME:
+            raise ValueError(f"Refusing to back up an existing restore backup set: {path}")
+
+        if self.directory is None:
+            self.directory = self._create_directory()
+        backup_path = self.directory / relative_path
+        backup_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, backup_path)
+        return backup_path
 
 
 def _looks_like_identifier(key: str) -> bool:
@@ -534,7 +569,7 @@ def _apply_single_json_file(
     kind: str,
     report: RestoreReport,
     adapt_for_sim: bool = False,
-    backup: bool = True,
+    backup_set: Optional[_RestoreBackupSet] = None,
 ) -> None:
     if source_payload is None:
         report.file_reports.append(
@@ -583,8 +618,8 @@ def _apply_single_json_file(
     )
 
     if not dry_run:
-        if backup:
-            file_report.backup_path = _backup_file(target_path)
+        if backup_set is not None:
+            file_report.backup_path = backup_set.backup_file(target_path)
         _write_json(target_path, new_payload)
 
     report.file_reports.append(file_report)
@@ -663,7 +698,7 @@ def _apply_syn_group_updates(
     syn_groups_selector: str,
     dry_run: bool,
     report: RestoreReport,
-    backup: bool = True,
+    backup_set: Optional[_RestoreBackupSet] = None,
 ) -> None:
     config_root = target_tune / "cell_configs"
     syn_cfg_path = config_root / "syn_config.json"
@@ -781,8 +816,8 @@ def _apply_syn_group_updates(
             changes=changes,
         )
         if not dry_run:
-            if backup:
-                file_report.backup_path = _backup_file(file_path)
+            if backup_set is not None:
+                file_report.backup_path = backup_set.backup_file(file_path)
             _write_json(file_path, file_payloads[file_path])
         report.file_reports.append(file_report)
 
@@ -802,7 +837,7 @@ def _apply_model_artifacts(
     artifact_manifest_path: Optional[Path],
     dry_run: bool,
     report: RestoreReport,
-    backup: bool = True,
+    backup_set: Optional[_RestoreBackupSet] = None,
 ) -> None:
     """Restore archived native model sources without writing outside a tune."""
     if not isinstance(artifact_manifest, dict) or artifact_manifest_path is None:
@@ -937,8 +972,8 @@ def _apply_model_artifacts(
         )
         if not dry_run:
             target_path.parent.mkdir(parents=True, exist_ok=True)
-            if target_exists and backup:
-                file_report.backup_path = _backup_file(target_path)
+            if target_exists and backup_set is not None:
+                file_report.backup_path = backup_set.backup_file(target_path)
             shutil.copy2(source_path, target_path)
         report.file_reports.append(file_report)
         if kind == "mechanism_source" or target_path.suffix.lower() == ".mod":
@@ -1003,6 +1038,11 @@ def restore_run_state(
         return report
 
     config_root = target_tune / "cell_configs"
+    backup_set = (
+        _RestoreBackupSet(target_tune=target_tune)
+        if backup and not dry_run
+        else None
+    )
     source_tune_path = source_payloads.get("source_tune")
     if source_tune_path is not None and Path(source_tune_path) != target_tune:
         report.warnings.append(
@@ -1017,7 +1057,7 @@ def restore_run_state(
             kind="sim_config",
             report=report,
             adapt_for_sim=True,
-            backup=backup,
+            backup_set=backup_set,
         )
 
     if "cell_config" in apply_set:
@@ -1027,7 +1067,7 @@ def restore_run_state(
             dry_run=dry_run,
             kind="cell_config",
             report=report,
-            backup=backup,
+            backup_set=backup_set,
         )
 
     if "geometry" in apply_set:
@@ -1037,7 +1077,7 @@ def restore_run_state(
             dry_run=dry_run,
             kind="geometry",
             report=report,
-            backup=backup,
+            backup_set=backup_set,
         )
 
     if "syn_config" in apply_set:
@@ -1047,7 +1087,7 @@ def restore_run_state(
             dry_run=dry_run,
             kind="syn_config",
             report=report,
-            backup=backup,
+            backup_set=backup_set,
         )
 
     if "syn_groups" in apply_set:
@@ -1064,7 +1104,7 @@ def restore_run_state(
             syn_groups_selector=syn_groups,
             dry_run=dry_run,
             report=report,
-            backup=backup,
+            backup_set=backup_set,
         )
 
     if "fit_json" in apply_set:
@@ -1078,7 +1118,7 @@ def restore_run_state(
             dry_run=dry_run,
             kind="fit_json",
             report=report,
-            backup=backup,
+            backup_set=backup_set,
         )
 
     if "fit_json" in apply_set and source_payloads.get("fit_json") is None:
@@ -1096,8 +1136,11 @@ def restore_run_state(
             artifact_manifest_path=source_payloads.get("model_artifacts_path"),
             dry_run=dry_run,
             report=report,
-            backup=backup,
+            backup_set=backup_set,
         )
+
+    if backup_set is not None:
+        report.backup_dir = backup_set.directory
 
     _ = manifest_files  # keeps explicit that source comes from manifest sidecars
     return report
@@ -1117,6 +1160,10 @@ def print_report(report: RestoreReport) -> None:
     for error in report.errors:
         print(f"[error] {error}")
     if report.warnings or report.errors:
+        print("")
+
+    if report.backup_dir is not None:
+        print(f"[restore_run_state] Restore backup set: {report.backup_dir}")
         print("")
 
     for item in report.file_reports:
@@ -1189,7 +1236,10 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p.add_argument(
         "--no-backup",
         action="store_true",
-        help="Do not create .bak_<timestamp> backups before writing.",
+        help=(
+            "Do not save replaced files under "
+            "<target tune>/restore_backups/<timestamp>/ before writing."
+        ),
     )
     return p.parse_args(argv)
 

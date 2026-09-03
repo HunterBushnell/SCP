@@ -40,6 +40,12 @@ loads preset files referenced by these keys:
 - `output_metrics_preset_path`
 - `extra_preset_path`
 
+Paper Compare is configured separately because it is applied only when its
+Output UI checkbox is enabled:
+
+- `compare_preset_path`
+- `compare_preset_enabled`
+
 Preset values update the notebook globals. Notebook cells can then override the
 most common options for that interactive session.
 
@@ -60,10 +66,17 @@ Important fields:
 - `auto_run_inputs`: automatically build Input UI
 - `auto_plot_window_from_stim`: crop plots around detected stimulus windows
 - `plot_window_adjustment_ms`: padding for auto-windowed plots
+- `compare_preset_path`: editable Paper Compare JSON path
+- `compare_preset_enabled`: initial Paper Compare checkbox state
 - `compare_list_paths_enabled`: include external compare paths by default
 - `compare_list_paths`: external CSV curves and style metadata
 - `compare_list_dir_paths`: folders scanned for compare curves
 - `extra_mode`: default Extra Analysis mode
+
+When Paper Compare is enabled, its enabled `entries` replace the ordinary
+comparison selection and its `defaults` override general Output UI values for
+that plot operation. The bundled preset points to the preserved paper runs
+under `cells/PV_paper` and `cells/SST_paper` plus the PN biological curve.
 
 ### `single_plot.json`
 
@@ -140,7 +153,9 @@ Important fields:
 
 ### `output_metrics.json`
 
-Output metric definitions and display defaults.
+Output metric calculation, persistence, and display defaults. Curve processing
+for saved metrics is defined here so simulation-time saving and Step 6 use the
+same binning, smoothing, normalization, and metric definitions.
 
 Important fields:
 
@@ -151,8 +166,21 @@ Important fields:
 - `output_drop_window_ms`
 - `output_rebound_window_ms`
 - `output_auc_window`
+- `output_metrics_norm_mode`
+- `output_metrics_norm_window`
 - `output_t50_mode`
+- `output_rise_metric_enabled`
+- `output_rise_percent_range`
+- `output_stim_spike_metrics_enabled`
+- `output_first_spike_metric_enabled`
+- `output_isi_metrics_enabled`
+- `output_metrics_bin_ms`
+- `output_metrics_smooth_ms`
+- `output_metrics_smooth_mode`
+- `output_metrics_important_keys`
+- `output_metrics_save_formats`
 - `output_show_metric_points`
+- `output_show_rise_points`
 - `output_metric_label_points`
 - `output_metrics_show_params`
 - `output_metrics_std_mode`
@@ -204,8 +232,15 @@ Important fields:
 
 ### Output metrics
 
-Computes metrics from output-rate curves. Works for selected single runs,
-compare lists, and compatible external curves.
+Computes curve/PSTH metrics plus per-trial stimulus spike-count, first-spike,
+and ISI metrics. The complete single-run dataset is saved as
+`analysis/output_metrics.json` and `analysis/output_metrics.csv`; the explicit
+`output_metrics_important_keys` subset is saved and displayed as
+`analysis/output_metrics_important.md`. Compatible external curves retain the
+curve-derived metrics but cannot provide raw-spike metrics.
+
+The 6.2 Single Plot cell can reuse the saved complete dataset or calculate it
+when missing, then print the compact important subset beneath the figure.
 
 ### Compare configs
 

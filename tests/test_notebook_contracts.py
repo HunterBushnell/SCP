@@ -459,7 +459,7 @@ class NotebookContractTests(unittest.TestCase):
         self.assertIsInstance(check_inputs, ast.Constant)
         self.assertIs(check_inputs.value, False)
 
-        mechanism_calls = _calls("5_simulate.ipynb", "ensure_modfiles")
+        mechanism_calls = _calls("5_simulate.ipynb", "compile_modfiles")
         self.assertEqual(len(mechanism_calls), 1)
         configured_cell = _keyword(mechanism_calls[0][1], "cell_config")
         self.assertIsInstance(configured_cell, ast.Attribute)
@@ -467,9 +467,25 @@ class NotebookContractTests(unittest.TestCase):
         self.assertIsInstance(configured_cell.value, ast.Name)
         self.assertEqual(configured_cell.value.id, "session")
 
-        compile_value = _keyword(mechanism_calls[0][1], "compile_modfiles")
-        self.assertIsInstance(compile_value, ast.Name)
-        self.assertEqual(compile_value.id, "IN_COLAB")
+        recompile_value = _keyword(mechanism_calls[0][1], "recompile")
+        self.assertIsInstance(recompile_value, ast.Name)
+        self.assertEqual(recompile_value.id, "RECOMPILE_MODFILES")
+        self.assertIs(
+            _assigned_literal("5_simulate.ipynb", "RECOMPILE_MODFILES"),
+            False,
+        )
+
+        compile_missing = _keyword(mechanism_calls[0][1], "compile_missing")
+        self.assertIsInstance(compile_missing, ast.Constant)
+        self.assertIs(compile_missing.value, True)
+
+        load_value = _keyword(mechanism_calls[0][1], "load_dll")
+        self.assertIsInstance(load_value, ast.Constant)
+        self.assertIs(load_value.value, False)
+
+        allow_missing = _keyword(mechanism_calls[0][1], "allow_missing")
+        self.assertIsInstance(allow_missing, ast.Constant)
+        self.assertIs(allow_missing.value, True)
 
         signature = inspect.signature(finish_step5_notebook_setup)
         self.assertIs(signature.parameters["check_external_inputs"].default, False)

@@ -70,7 +70,24 @@ Common controls:
 - `syn_groups`: `all` or a comma-separated subset.
 - `allow_source_fallback`: allow fallback reads from source tune files when run
   sidecars are missing.
-- `backup`: write timestamped backups before applying changes.
+- `backup`: before applying changes, save every replaced file in one timestamped
+  restore backup set under `<target tune>/restore_backups/`.
+
+Each write run creates one self-contained backup set while preserving paths
+relative to the tune. For example:
+
+```text
+cells/PV/tunes/tuned/restore_backups/
+  20260825_174233_359258/
+    cell_configs/
+      cell_config.json
+      syn_groups/
+        bg_exc.json
+        pn_exc.json
+```
+
+Later restore runs create new timestamped folders alongside the earlier backup sets.
+Dry runs and write runs with no changed files do not create an empty backup folder.
 
 CLI equivalent:
 

@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "target_source": {
+    "mode": "manual",
+    "description": "custom"
+  },
+  "manual": {
+    "passive": {
+      "v_rest_mV": -71.25,
+      "rin_MOhm": 98.9,
+      "tau_ms": 5.9
+    },
+    "fi_curve": {
+      "currents_pA": [
+        0,
+        25,
+        50,
+        75,
+        100,
+        125,
+        150,
+        175,
+        200,
+        225,
+        250,
+        275,
+        300
+      ],
+      "rates_Hz": [
+        0,
+        0,
+        0,
+        0.1,
+        3.3,
+        6.2,
+        12.9,
+        19.7,
+        27.9,
+        35.2,
+        44.8,
+        55.5,
+        57.4
+      ],
+      "csv": null
+    }
+  },
+  "notes": "",
+  "traces": {
+    "format": "csv",
+    "passive": {
+      "file": null,
+      "time_column": "time_ms",
+      "voltage_column": "voltage_mV",
+      "current_column": "current_pA",
+      "sweep_column": null,
+      "stim_start_ms": null,
+      "stim_stop_ms": null,
+      "current_pA": null,
+      "dt_ms": null,
+      "end_margin_ms": 10.0,
+      "reducer": "median",
+      "tau_field": "tau_avg_ms"
+    },
+    "active": {
+      "file": null,
+      "format": "npy",
+      "stim_start_ms": null,
+      "stim_stop_ms": null,
+      "dt_ms": null,
+      "spike_threshold_mV": -20.0,
+      "refractory_ms": 1.0
+    }
+  },
+  "allen_nwb": {
+    "file": null,
+    "sweep_ids": [],
+    "passive": {
+      "stimulus_names": [
+        "Long Square"
+      ],
+      "sweep_ids": null,
+      "min_current_pA": null,
+      "max_current_pA": -1.0,
+      "end_margin_ms": 10.0,
+      "reducer": "median",
+      "tau_field": "tau_avg_ms"
+    },
+    "active": {
+      "stimulus_names": [
+        "Long Square"
+      ],
+      "min_current_pA": 0.0,
+      "max_current_pA": null,
+      "include_negative_currents": false,
+      "average_repeats": true,
+      "spike_threshold_mV": -20.0,
+      "refractory_ms": 1.0
+    }
+  }
+}

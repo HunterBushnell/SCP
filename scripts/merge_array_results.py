@@ -394,7 +394,12 @@ def main() -> None:
     output_stem = args.output_stem
     if not output_stem:
         output_stem = f"slurm_merged_{args.job_id or 'merged'}"
+    # Per-task runs created through SimulationSession carry both the canonical
+    # ``output`` key and its legacy ``output_stem`` alias. Keep both aliases in
+    # sync for the merged run; otherwise result saving gives the stale task
+    # alias (for example, ``slurm_123_0``) precedence over ``results``.
     merged["sim_cfg"]["output"] = output_stem
+    merged["sim_cfg"]["output_stem"] = output_stem
 
     saved = run_sim.save_results(merged, base_dir=output_dir)
     print(f"Merged {len(paths)} result(s) into {saved}")

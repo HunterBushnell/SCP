@@ -36,8 +36,10 @@ python scripts/check_notebooks.py
 - A model using only built-in NEURON mechanisms needs no `modfiles/` directory
   or compiled library. Confirm `cell_config.json` omits `paths.modfiles` or sets
   it to `null`.
-- If the selected tune declares custom `.mod` sources, prepare or refresh it
-  with `1_setup.ipynb`, or build the configured source directory manually:
+- If the selected tune declares custom `.mod` sources, detailed Step 5 compiles
+  a missing library automatically. To refresh an existing build, restart the
+  kernel and set `RECOMPILE_MODFILES = True` in Step 1, 2, 3, 4, or detailed
+  Step 5. You can also build the configured source directory manually:
 
 ```bash
 cd <configured_modfiles_dir>

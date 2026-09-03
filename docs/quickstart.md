@@ -74,8 +74,9 @@ edit JSON files.
 Widget edits update `pipeline_settings`. Rerunning the settings cell pushes
 code edits back to unlocked controls. Model selection locks after Step 1.
 Changes to `cell_config.json`, morphology, fit/HOC, or MOD sources require a
-kernel restart; runtime, target, geometry, and synapse configs reload at the
-stage that uses them.
+kernel restart. After changing MOD sources, request recompilation during Step 1
+preparation (or in detailed Step 5); runtime, target, geometry, and synapse
+configs reload at the stage that uses them.
 
 ## Detailed Notebooks
 

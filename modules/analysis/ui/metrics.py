@@ -27,6 +27,8 @@ def run_output_metrics_from_globals(g: Dict[str, Any]) -> Optional[Dict[str, Any
         "output_auc_window": g.get("output_auc_window"),
         "output_metric_mode": g.get("output_metric_mode"),
         "output_metric_window_ms": g.get("output_metric_window_ms"),
+        "output_rise_metric_enabled": g.get("output_rise_metric_enabled", True),
+        "output_rise_percent_range": g.get("output_rise_percent_range", [10.0, 90.0]),
     })
     return run_output_metrics(
         sel,
@@ -45,6 +47,8 @@ def run_output_metric_distributions_from_globals(g: Dict[str, Any]) -> Optional[
         "output_auc_window": g.get("output_auc_window"),
         "output_metric_mode": g.get("output_metric_mode"),
         "output_metric_window_ms": g.get("output_metric_window_ms"),
+        "output_rise_metric_enabled": g.get("output_rise_metric_enabled", True),
+        "output_rise_percent_range": g.get("output_rise_percent_range", [10.0, 90.0]),
     })
     ncols_raw = _safe_float(g.get("output_metrics_plot_ncols", 0))
     ncols_val = int(ncols_raw) if ncols_raw is not None else 0

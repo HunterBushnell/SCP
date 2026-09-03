@@ -224,6 +224,17 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         rows=min(8, max(6, len(metric_plot_options))),
         layout=widgets.Layout(width="96%"),
     )
+    metrics_important_default = list(g.get("output_metrics_important_keys") or [])
+    metrics_important_default = [k for k in metrics_important_default if k in metric_plot_options]
+    if not metrics_important_default:
+        metrics_important_default = list(metrics_plot_default)
+    metrics_important_sel = widgets.SelectMultiple(
+        options=metric_plot_options,
+        value=tuple(metrics_important_default),
+        description="Important",
+        rows=min(8, max(6, len(metric_plot_options))),
+        layout=widgets.Layout(width="96%"),
+    )
     metrics_plot_btn = widgets.Button(description="Plot metric dist")
     metrics_plot_btn.layout = widgets.Layout(width="150px", flex="0 0 auto")
     metrics_plot_style_val = _coerce_output_metric_plot_style(g.get("output_metrics_plot_style", "box"))
@@ -337,6 +348,9 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
             metrics_plot_show_legend_cb,
             metrics_plot_legend_loc_txt,
         ]),
+        widgets.HTML("<b>Important metrics shown in compact tables</b>"),
+        metrics_important_sel,
+        widgets.HTML("<b>Metrics used by distribution plots</b>"),
         metrics_plot_sel,
         metrics_plot_data_path_txt,
     ])
@@ -624,6 +638,7 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         g["output_metrics_show_delta"] = metrics_show_delta_cb.value
         g["output_metrics_highlight_best"] = metrics_highlight_cb.value
         g["output_metrics_use_plot_keys_for_tables"] = bool(metrics_use_plot_keys_cb.value)
+        g["output_metrics_important_keys"] = list(metrics_important_sel.value)
         g["output_metrics_plot_keys"] = list(metrics_plot_sel.value)
         g["output_metrics_plot_style"] = metrics_plot_style_dd.value
         g["output_metrics_plot_show_points"] = bool(metrics_plot_show_points_cb.value)
@@ -701,7 +716,7 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
                     table_metric_keys = (
                         list(g.get("output_metrics_plot_keys") or [])
                         if bool(g.get("output_metrics_use_plot_keys_for_tables", True))
-                        else None
+                        else list(g.get("output_metrics_important_keys") or [])
                     )
                     if isinstance(metrics, dict) and all(isinstance(v, dict) for v in metrics.values()):
                         show_md(

@@ -274,6 +274,31 @@ def save_results(
         except Exception as exc:
             print(f"save_plots failed: {exc}")
 
+    # Optional: calculate and save the complete Step 6 output-metric dataset.
+    # This is independent of plot saving and remains non-fatal for completed runs.
+    if sim_cfg.get("save_output_metrics", False):
+        try:
+            from modules.analysis import output_metrics
+
+            saved_metrics = output_metrics.save_output_metrics_from_results(
+                results,
+                run_dir,
+                preset_path=sim_cfg.get("save_output_metrics_preset", None),
+                formats=sim_cfg.get("save_output_metrics_formats", None),
+                overwrite=bool(sim_cfg.get("save_output_metrics_overwrite", True)),
+            )
+            metric_files = {}
+            for name, path in saved_metrics.items():
+                path = Path(path)
+                try:
+                    metric_files[name] = str(path.relative_to(run_dir))
+                except ValueError:
+                    metric_files[name] = str(path)
+            if metric_files:
+                manifest["files"]["output_metrics"] = metric_files
+        except Exception as exc:
+            print(f"save_output_metrics failed: {exc}")
+
     _write_json(run_dir / "run_manifest.json", manifest)
 
     append_to = sim_cfg.get("append_to")

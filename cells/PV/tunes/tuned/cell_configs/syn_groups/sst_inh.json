@@ -1,6 +1,6 @@
 {
   "sst_inh": {
-    "state": false,
+    "state": true,
     "color": "#ff7f0e",
     "syns": {
       "type": "GABA_A",
@@ -31,7 +31,7 @@
         "stop_ms": 1000.0,
         "mode": "precomputed",
         "source": {
-          "path": "path/to/sst_precomputed_spikes.npz",
+          "path": "cells/SST/tunes/tuned/output_data/SST4.0_tuned_1000/results/spikes.npz",
           "selection": "sample",
           "crop_start_ms": 0.0,
           "crop_stop_ms": 1000.0,
