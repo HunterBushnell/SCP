@@ -210,7 +210,7 @@ class NotebookContractTests(unittest.TestCase):
             "quiet_step1_output": True,
             "passive_amps_pA": [-50, -100],
             "passive_target_overrides": {},
-            "active_amps_pA": [150, 300],
+            "active_amps_pA": [200],
             "active_spike_threshold_mV": -20,
             "active_include_currents": True,
             "active_current_display_amp_pA": None,
@@ -330,7 +330,7 @@ class NotebookContractTests(unittest.TestCase):
             self.assertEqual(ast.literal_eval(_dict_value(params, "h_tstop")), 1500)
         self.assertEqual(
             _assigned_literal("3_active.ipynb", "active_sim_amps"),
-            [150, 300],
+            [200],
         )
         self.assertEqual(
             _assigned_literal("3_active.ipynb", "FI_AMP_RANGE"),
@@ -408,7 +408,8 @@ class NotebookContractTests(unittest.TestCase):
         self.assertIsInstance(_dict_value(config_mapping, "paths"), ast.Call)
 
         setup_source = "\n".join(_code_cells("1_setup.ipynb"))
-        self.assertIn("MODEL_SOURCE_OVERRIDES = None", setup_source)
+        self.assertIn('"specimen_id": "484635029"', setup_source)
+        self.assertIn('"model_type": "perisomatic"', setup_source)
         self.assertEqual(len(_calls("1_setup.ipynb", "resolve_step1_model_setup")), 1)
         for removed_cell_specific_setting in (
             "HOC_TEMPLATE_FILE",

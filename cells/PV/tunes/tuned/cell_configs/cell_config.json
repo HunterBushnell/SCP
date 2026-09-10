@@ -1,6 +1,6 @@
 {
   "cell_name": "PV",
-  "tune": "tuned_ampa",
+  "tune": "tuned",
   "color": "blue",
   "cell_loader": "allen_manifest",
   "paths": {

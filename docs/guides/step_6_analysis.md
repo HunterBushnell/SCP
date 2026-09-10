@@ -75,8 +75,9 @@ Important fields:
 
 When Paper Compare is enabled, its enabled `entries` replace the ordinary
 comparison selection and its `defaults` override general Output UI values for
-that plot operation. The bundled preset points to the preserved paper runs
-under `cells/PV_paper` and `cells/SST_paper` plus the PN biological curve.
+that plot operation. The bundled preset points to the curated PV/SST example
+runs under `cells/PV/tunes/tuned/output_data/` and
+`cells/SST/tunes/tuned/output_data/`, plus optional biological reference curves.
 
 ### `single_plot.json`
 

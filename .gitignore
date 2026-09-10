@@ -6,21 +6,37 @@ archive/
 # example outputs tracked.
 cells/**/output_data/*
 !cells/SST/tunes/tuned/output_data/
-!cells/SST/tunes/tuned/output_data/base_tune_100trials/
-!cells/SST/tunes/tuned/output_data/base_tune_100trials/**
-!cells/SST/tunes/tuned/output_data/notebook_single_trial/
-!cells/SST/tunes/tuned/output_data/notebook_single_trial/**
+!cells/SST/tunes/tuned/output_data/SST5_base/
+!cells/SST/tunes/tuned/output_data/SST5_base/**
+!cells/SST/tunes/tuned/output_data/SST5_tuned/
+!cells/SST/tunes/tuned/output_data/SST5_tuned/**
+
 !cells/PV/tunes/tuned/output_data/
-!cells/PV/tunes/tuned/output_data/base_tune_100trials/
-!cells/PV/tunes/tuned/output_data/base_tune_100trials/**
-!cells/PV/tunes/tuned/output_data/notebook_single_trial/
-!cells/PV/tunes/tuned/output_data/notebook_single_trial/**
+!cells/PV/tunes/tuned/output_data/PV5_base/
+!cells/PV/tunes/tuned/output_data/PV5_base/**
+!cells/PV/tunes/tuned/output_data/PV5_tuned/
+!cells/PV/tunes/tuned/output_data/PV5_tuned/**
+
+# Large per-trial input-stat sidecars are regenerated locally and omitted from
+# public example outputs.
+cells/**/output_data/**/input_stats.json
+
 cells/**/output_data/**/logs/*
 cells/**/notebook_exports/
 cells/**/tuning_exports/
 cells/**/restore_backups/
 cells/**/*.nwb
 cells/**/act_workspace/
+
+# Local exploratory tune variants; keep curated public examples in `tuned`.
+cells/SST/tunes/tuned_allactive_newampa/
+cells/SST/tunes/tuned_allactive_oldampa/
+cells/SST/tunes/tuned_ampa_tune5.0_dantune2/
+cells/SST/tunes/tuned_peri_dantune1/
+
+# Local scratch morphology/browser exports.
+cells/*/tunes*.svg
+cells/*/tunes/*.svg
 external_data/*.pkl
 external_data/*.pickle
 external_data/*.npy

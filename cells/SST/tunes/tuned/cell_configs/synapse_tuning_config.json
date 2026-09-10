@@ -31,9 +31,9 @@
         "initW": 0.25,
         "tau_r_AMPA": 0.2,
         "tau_d_AMPA": 1.7,
-        "Use": 0.75,
+        "Use": 0.4,
         "Dep": 0.0,
-        "Fac": 200.0,
+        "Fac": 70.0,
         "NMDA_ratio": 1.5
       }
     },

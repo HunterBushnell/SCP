@@ -1,0 +1,168 @@
+{
+  "format_version": 1,
+  "loader": "allen_manifest",
+  "tune": "tuned",
+  "artifacts": [
+    {
+      "kind": "manifest",
+      "source_path": "manifest.json",
+      "archive_path": "files/manifest.json",
+      "sha256": "e19a39a6592e41ac99a7a6a3c551b586913bed8d684a514766994bae7549f0a6",
+      "restorable": true,
+      "target_relative_path": "manifest.json"
+    },
+    {
+      "kind": "model_file",
+      "source_path": "485466109_fit.json",
+      "archive_path": "files/485466109_fit.json",
+      "sha256": "a49987c2d78f9b4d22b4cbd1d2db125d784b36c94c504fe4f2c7e11fb6b0d3bd",
+      "restorable": true,
+      "target_relative_path": "485466109_fit.json"
+    },
+    {
+      "kind": "morphology",
+      "source_path": "Sst-IRES-Cre_Ai14-202729.03.02.01_496079506_m.swc",
+      "archive_path": "files/Sst-IRES-Cre_Ai14-202729.03.02.01_496079506_m.swc",
+      "sha256": "0a75bfb21598e259c6e5890664df4a9c44ae91840795a09d2a1715f98524bdb9",
+      "restorable": true,
+      "target_relative_path": "Sst-IRES-Cre_Ai14-202729.03.02.01_496079506_m.swc"
+    },
+    {
+      "kind": "marker",
+      "source_path": "Sst-IRES-Cre_Ai14-202729.03.02.01_496079506_marker_m.swc",
+      "archive_path": "files/Sst-IRES-Cre_Ai14-202729.03.02.01_496079506_marker_m.swc",
+      "sha256": "2840d6bb9d9724f6f7a2446d6e42a16ef2787495a60dbe2c302eef838a67085f",
+      "restorable": true,
+      "target_relative_path": "Sst-IRES-Cre_Ai14-202729.03.02.01_496079506_marker_m.swc"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/AMPA_NMDA_STP.mod",
+      "archive_path": "files/modfiles/AMPA_NMDA_STP.mod",
+      "sha256": "3ae44e94c1e1a21fd0275ef5243756ca334afc448ea496e903471d9a2a365cec",
+      "restorable": true,
+      "target_relative_path": "modfiles/AMPA_NMDA_STP.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/CaDynamics.mod",
+      "archive_path": "files/modfiles/CaDynamics.mod",
+      "sha256": "f012def9758f7d0244b81c54291edea6597c15fad99b9f7b5725b121a3567f16",
+      "restorable": true,
+      "target_relative_path": "modfiles/CaDynamics.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Ca_HVA.mod",
+      "archive_path": "files/modfiles/Ca_HVA.mod",
+      "sha256": "dfee6e2b91231caf05c7193995fe6f8c4b0612bb1ca7014979981cd872ae181f",
+      "restorable": true,
+      "target_relative_path": "modfiles/Ca_HVA.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Ca_LVA.mod",
+      "archive_path": "files/modfiles/Ca_LVA.mod",
+      "sha256": "3bbf434c6c5ed979dc6cc7ff1c687de69d1c138fa368d452d7eb993eb5ff40a9",
+      "restorable": true,
+      "target_relative_path": "modfiles/Ca_LVA.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/GABA_A.mod",
+      "archive_path": "files/modfiles/GABA_A.mod",
+      "sha256": "58ede1a5c4991c12e126e7de90916e65f771b963e4856349476000184b0dfc93",
+      "restorable": true,
+      "target_relative_path": "modfiles/GABA_A.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/GABA_A_STP.mod",
+      "archive_path": "files/modfiles/GABA_A_STP.mod",
+      "sha256": "9a1d76c405a12aa7acb2b51ddc4d217e63ad814af8796037f6b9699329cfe525",
+      "restorable": true,
+      "target_relative_path": "modfiles/GABA_A_STP.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Ih.mod",
+      "archive_path": "files/modfiles/Ih.mod",
+      "sha256": "c49a43208cdc6ff6143a8c20e5a379997f63aec4a45c464c27cd55221d798bcd",
+      "restorable": true,
+      "target_relative_path": "modfiles/Ih.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Im_v2.mod",
+      "archive_path": "files/modfiles/Im_v2.mod",
+      "sha256": "1819806d02bf1431df292f61019debb98f4f6be0997e5e42c6395aa9a9f13099",
+      "restorable": true,
+      "target_relative_path": "modfiles/Im_v2.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/K_T.mod",
+      "archive_path": "files/modfiles/K_T.mod",
+      "sha256": "597dd6df72e18cc9952bbaa83101f72e81874ec9ac6fb590cd812073f8397bc5",
+      "restorable": true,
+      "target_relative_path": "modfiles/K_T.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Kd.mod",
+      "archive_path": "files/modfiles/Kd.mod",
+      "sha256": "412494d19fd3e6c3ae99bb61d4d74978934b697133a938ef08620afff7d36501",
+      "restorable": true,
+      "target_relative_path": "modfiles/Kd.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Kv2like.mod",
+      "archive_path": "files/modfiles/Kv2like.mod",
+      "sha256": "d69819023b6bae0d0a90aa1a067b297d46a33b04cd92bea52c1cf6d8482e2ecf",
+      "restorable": true,
+      "target_relative_path": "modfiles/Kv2like.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Kv3_1.mod",
+      "archive_path": "files/modfiles/Kv3_1.mod",
+      "sha256": "65a085bc8ae1c6f0d9c75609900da009f662bab1390388e172d39dc09620600a",
+      "restorable": true,
+      "target_relative_path": "modfiles/Kv3_1.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/NaTa.mod",
+      "archive_path": "files/modfiles/NaTa.mod",
+      "sha256": "0d16b8c326e5635186c969707daad08ddc34f4195327bce7a78de7406b4ed701",
+      "restorable": true,
+      "target_relative_path": "modfiles/NaTa.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Nap.mod",
+      "archive_path": "files/modfiles/Nap.mod",
+      "sha256": "831061caa3e5844188005de66d07cf9bd0270b6a63ed2f23ba80341c0d3a3217",
+      "restorable": true,
+      "target_relative_path": "modfiles/Nap.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/SK.mod",
+      "archive_path": "files/modfiles/SK.mod",
+      "sha256": "079f1e3cac7444696d480b8e02853b215cd93e0c7b9986dbb54925fc49eddbeb",
+      "restorable": true,
+      "target_relative_path": "modfiles/SK.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/vecstim.mod",
+      "archive_path": "files/modfiles/vecstim.mod",
+      "sha256": "4e5454f99cb0cbd9b7fafebf37961c0e543100f317f5ef3a5894eb118e86366b",
+      "restorable": true,
+      "target_relative_path": "modfiles/vecstim.mod"
+    }
+  ],
+  "errors": []
+}

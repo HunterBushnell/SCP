@@ -35,18 +35,26 @@ def _load_from_manifest(manifest_path: Path) -> Dict[str, Any]:
     if files.get("meta"):
         meta = json.loads((run_dir / files["meta"]).read_text())
 
-    if files.get("syn_config"):
-        meta["syn_config"] = json.loads((run_dir / files["syn_config"]).read_text())
-    if files.get("cell_config"):
-        meta["cell_config"] = json.loads((run_dir / files["cell_config"]).read_text())
-    if files.get("geometry_config"):
-        meta["geometry_config"] = json.loads((run_dir / files["geometry_config"]).read_text())
-    if files.get("avg_rate_curve"):
-        meta["avg_rate_curve"] = json.loads((run_dir / files["avg_rate_curve"]).read_text())
-    if files.get("input_stats"):
-        meta["input_stats"] = json.loads((run_dir / files["input_stats"]).read_text())
-    if files.get("input_summaries"):
-        meta["input_summaries"] = json.loads((run_dir / files["input_summaries"]).read_text())
+    def _load_optional_json(name: str) -> Any:
+        filename = files.get(name)
+        if not filename:
+            return None
+        path = run_dir / filename
+        if not path.is_file():
+            return None
+        return json.loads(path.read_text())
+
+    for name in (
+        "syn_config",
+        "cell_config",
+        "geometry_config",
+        "avg_rate_curve",
+        "input_stats",
+        "input_summaries",
+    ):
+        value = _load_optional_json(name)
+        if value is not None:
+            meta[name] = value
 
     spikes = None
     if files.get("spikes"):

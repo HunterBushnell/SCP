@@ -1,0 +1,192 @@
+{
+  "format_version": 1,
+  "loader": "allen_manifest",
+  "tune": "tuned",
+  "artifacts": [
+    {
+      "kind": "manifest",
+      "source_path": "manifest.json",
+      "archive_path": "files/manifest.json",
+      "sha256": "c546d0f42a8c056b9cde09e2352b8bc09c54a795ec1658c3bd9f3388d4659b63",
+      "restorable": true,
+      "target_relative_path": "manifest.json"
+    },
+    {
+      "kind": "model_file",
+      "source_path": "484635029_fit.json",
+      "archive_path": "files/484635029_fit.json",
+      "sha256": "7b5b9f14459d1a2f22f854949fc1208a84df9c762df9d9103dbd6908fb869c48",
+      "restorable": true,
+      "target_relative_path": "484635029_fit.json"
+    },
+    {
+      "kind": "morphology",
+      "source_path": "Pvalb-IRES-Cre_Ai14-201791.05.01.01_496079599_m.swc",
+      "archive_path": "files/Pvalb-IRES-Cre_Ai14-201791.05.01.01_496079599_m.swc",
+      "sha256": "18ddca15992cc63627fbe5dd24709d7a79077b3c8b99476279875bd615994cbf",
+      "restorable": true,
+      "target_relative_path": "Pvalb-IRES-Cre_Ai14-201791.05.01.01_496079599_m.swc"
+    },
+    {
+      "kind": "marker",
+      "source_path": "Pvalb-IRES-Cre_Ai14-201791.05.01.01_496079599_marker_m.swc",
+      "archive_path": "files/Pvalb-IRES-Cre_Ai14-201791.05.01.01_496079599_marker_m.swc",
+      "sha256": "710cede4272f6224002455956c94926468a15b47feaad303d4286e759fc35f30",
+      "restorable": true,
+      "target_relative_path": "Pvalb-IRES-Cre_Ai14-201791.05.01.01_496079599_marker_m.swc"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/AMPA_NMDA_STP.mod",
+      "archive_path": "files/modfiles/AMPA_NMDA_STP.mod",
+      "sha256": "98fc93f27e66ad44af93847b0aa040e268653e85469ca1c4248d9faef0aaa004",
+      "restorable": true,
+      "target_relative_path": "modfiles/AMPA_NMDA_STP.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/CaDynamics.mod",
+      "archive_path": "files/modfiles/CaDynamics.mod",
+      "sha256": "f012def9758f7d0244b81c54291edea6597c15fad99b9f7b5725b121a3567f16",
+      "restorable": true,
+      "target_relative_path": "modfiles/CaDynamics.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Ca_HVA.mod",
+      "archive_path": "files/modfiles/Ca_HVA.mod",
+      "sha256": "aaae4303229cd9f5ab98dfce8ba11500760d8ab147370f233030fafa72c1221f",
+      "restorable": true,
+      "target_relative_path": "modfiles/Ca_HVA.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Ca_LVA.mod",
+      "archive_path": "files/modfiles/Ca_LVA.mod",
+      "sha256": "a9660ed6cbd62f4af4c9f448c6411863f1609a292d982c568e047140c1ccedf2",
+      "restorable": true,
+      "target_relative_path": "modfiles/Ca_LVA.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/GABA_A.mod",
+      "archive_path": "files/modfiles/GABA_A.mod",
+      "sha256": "58ede1a5c4991c12e126e7de90916e65f771b963e4856349476000184b0dfc93",
+      "restorable": true,
+      "target_relative_path": "modfiles/GABA_A.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Ih.mod",
+      "archive_path": "files/modfiles/Ih.mod",
+      "sha256": "ffa81c11c3d22a9cf0860a6bc4c4e2f33355a8f9dff4e860a09742e57b731600",
+      "restorable": true,
+      "target_relative_path": "modfiles/Ih.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Im.mod",
+      "archive_path": "files/modfiles/Im.mod",
+      "sha256": "e1c3bfb2186439bdb963ff2c53268efb824d8e00401aef0a14b7d2234071bb2c",
+      "restorable": true,
+      "target_relative_path": "modfiles/Im.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Im_v2.mod",
+      "archive_path": "files/modfiles/Im_v2.mod",
+      "sha256": "4859dff03f4d58bc447e217776eee111aacc3b0c8d60fbc37ceba047b117a477",
+      "restorable": true,
+      "target_relative_path": "modfiles/Im_v2.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/K_P.mod",
+      "archive_path": "files/modfiles/K_P.mod",
+      "sha256": "2254697617c8da162ff8e5495e4d512fce53f77b44b86754855f11cee4ab3b3e",
+      "restorable": true,
+      "target_relative_path": "modfiles/K_P.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/K_T.mod",
+      "archive_path": "files/modfiles/K_T.mod",
+      "sha256": "f4ee28ba605c362f40c32e241bbc00970363149db1eb01b22cbe914bb39497e8",
+      "restorable": true,
+      "target_relative_path": "modfiles/K_T.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Kd.mod",
+      "archive_path": "files/modfiles/Kd.mod",
+      "sha256": "c6586003e94e76671ae2afb49eed580f2f90b8e03ae59c9f1d96bf55dc5ae4a3",
+      "restorable": true,
+      "target_relative_path": "modfiles/Kd.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Kv2like.mod",
+      "archive_path": "files/modfiles/Kv2like.mod",
+      "sha256": "b5bc916161d9a27c91e46b82ddc662478205a0cb528195d9297b58141504ec7b",
+      "restorable": true,
+      "target_relative_path": "modfiles/Kv2like.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Kv3_1.mod",
+      "archive_path": "files/modfiles/Kv3_1.mod",
+      "sha256": "3cac182099e568c371233cd720365241691625014436df5744a7b6cdffd67c6b",
+      "restorable": true,
+      "target_relative_path": "modfiles/Kv3_1.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/NaTa.mod",
+      "archive_path": "files/modfiles/NaTa.mod",
+      "sha256": "2b3e1382c67a8fbf08ecea53c7d52bef368037bf8fc7cb9e9300dfc2ae233106",
+      "restorable": true,
+      "target_relative_path": "modfiles/NaTa.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/NaTs.mod",
+      "archive_path": "files/modfiles/NaTs.mod",
+      "sha256": "d75ed63d6367fe27c6e5671704594a510e8d83b57db835f30fc36e2f24bef6cf",
+      "restorable": true,
+      "target_relative_path": "modfiles/NaTs.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/NaV.mod",
+      "archive_path": "files/modfiles/NaV.mod",
+      "sha256": "635605ba861c070f8fdc273365f3a0fca6eee24762afc9b102161fdd6e9cfc42",
+      "restorable": true,
+      "target_relative_path": "modfiles/NaV.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/Nap.mod",
+      "archive_path": "files/modfiles/Nap.mod",
+      "sha256": "3128ea6b8fbce1ae8d56ab5dc7eb46238be9d9af28de1d9b9287bd0fb89a312f",
+      "restorable": true,
+      "target_relative_path": "modfiles/Nap.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/SK.mod",
+      "archive_path": "files/modfiles/SK.mod",
+      "sha256": "079f1e3cac7444696d480b8e02853b215cd93e0c7b9986dbb54925fc49eddbeb",
+      "restorable": true,
+      "target_relative_path": "modfiles/SK.mod"
+    },
+    {
+      "kind": "mechanism_source",
+      "source_path": "modfiles/vecstim.mod",
+      "archive_path": "files/modfiles/vecstim.mod",
+      "sha256": "4e5454f99cb0cbd9b7fafebf37961c0e543100f317f5ef3a5894eb118e86366b",
+      "restorable": true,
+      "target_relative_path": "modfiles/vecstim.mod"
+    }
+  ],
+  "errors": []
+}

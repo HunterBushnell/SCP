@@ -24,10 +24,10 @@ class PipelineNotebookUIStep5Tests(unittest.TestCase):
         options = [
             value for _label, value in ui.controls["input_preview_groups"].options
         ]
-        self.assertEqual(options, ["pn_exc", "bg_exc", "bg_inh"])
+        self.assertEqual(options, ["pn_exc", "bg_exc", "bg_inh", "pv_inh", "sst_inh"])
         self.assertEqual(
             tuple(ui.controls["input_preview_groups"].value),
-            ("pn_exc", "bg_exc", "bg_inh"),
+            ("pn_exc", "bg_exc", "bg_inh", "pv_inh", "sst_inh"),
         )
         ui.controls["input_preview_groups"].value = ("pn_exc", "bg_inh")
         self.assertEqual(settings["input_preview_groups"], ["pn_exc", "bg_inh"])

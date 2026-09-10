@@ -1,0 +1,12 @@
+{
+  "cell_name": "SST",
+  "tune": "tuned",
+  "color": "magenta",
+  "cell_loader": "allen_manifest",
+  "paths": {
+    "manifest": "manifest.json"
+  },
+  "tuning": {
+    "soma_diam_multiplier": 10.0
+  }
+}

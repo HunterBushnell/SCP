@@ -67,7 +67,7 @@
       "linestyle": "--"
     },
     {
-      "path": "cells/PV/tunes/tuned_ampa/output_data/PV5.0_base",
+      "path": "cells/PV/tunes/tuned/output_data/PV5_base",
       "label": "PV base",
       "enabled": false,
       "shift_ms": 0,
@@ -76,7 +76,7 @@
       "linestyle": "-"
     },
     {
-      "path": "cells/PV/tunes/tuned_ampa/output_data/PV5.0.3_tuned",
+      "path": "cells/PV/tunes/tuned/output_data/PV5_tuned",
       "label": "PV tuned",
       "enabled": true,
       "shift_ms": 0,
@@ -85,7 +85,7 @@
       "linestyle": "-"
     },
     {
-      "path": "cells/SST/tunes/tuned_ampa/output_data/SST5_base",
+      "path": "cells/SST/tunes/tuned/output_data/SST5_base",
       "label": "SST base",
       "enabled": false,
       "shift_ms": 0,
@@ -94,7 +94,7 @@
       "linestyle": "-"
     },
     {
-      "path": "cells/SST/tunes/tuned_ampa/output_data/SST5_tuned",
+      "path": "cells/SST/tunes/tuned/output_data/SST5_tuned",
       "label": "SST tuned",
       "enabled": true,
       "shift_ms": 0,

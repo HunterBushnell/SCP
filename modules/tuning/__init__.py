@@ -178,6 +178,11 @@ from .synapse_tuning_config import (
     selected_connection,
     synapse_tuning_config_path,
 )
+from .manual_synapse_probe import (
+    calculate_manual_synapse_metrics,
+    plot_manual_synapse_probe,
+    run_manual_synapse_probe,
+)
 
 __all__ = [
     "ACT_ENV_VARS",
@@ -217,6 +222,7 @@ __all__ = [
     "aggregate_passive_sweeps",
     "allen_nwb_block",
     "build_tuning_cell",
+    "calculate_manual_synapse_metrics",
     "collect_act_predictions",
     "compact_display_data",
     "create_scp_synapse_tuner",
@@ -289,6 +295,7 @@ __all__ = [
     "plot_active_trace_check",
     "plot_fi_curve",
     "plot_passive_trace_check",
+    "plot_manual_synapse_probe",
     "resolve_act_repo",
     "resolve_act_workspace_from_labels",
     "resolve_active_tuning_targets",
@@ -299,6 +306,7 @@ __all__ = [
     "run_act_active_module",
     "run_act_active_modules",
     "run_active_protocol",
+    "run_manual_synapse_probe",
     "run_passive_protocol",
     "selected_connection",
     "section_summary",

@@ -110,9 +110,11 @@ Section 1.2 uses this precedence:
    file.
 
 A standard tune-local `modfiles/` directory is detected with the HOC source.
-Leave `MODEL_SOURCE_OVERRIDES = None` for these common cases. Use the override
-only for a new Allen download, multiple candidate sources, a nonstandard path,
-constructor arguments, or a noncanonical HOC section map.
+The released notebook starts with a PV Allen/ADB example override. Set
+`MODEL_SOURCE_OVERRIDES = None` when reusing an existing/staged tune with one
+unambiguous source, or edit the override for a new Allen download, multiple
+candidate sources, a nonstandard path, constructor arguments, or a noncanonical
+HOC section map.
 
 ### `source_type = "adb"`
 

@@ -25,10 +25,12 @@ staged tune, it then accepts exactly one `manifest.json` or exactly one HOC
 generated config. A standard tune-local `modfiles/` directory is detected for
 HOC models.
 
-Set the notebook's `MODEL_SOURCE_OVERRIDES` block only for a new Allen download,
-multiple candidate files/templates, nonstandard paths, HOC constructor
-arguments, or explicit section mappings. Ambiguity is reported instead of
-silently selecting a source.
+The released Step 1 notebook starts with a PV Allen/ADB example override. Set
+`MODEL_SOURCE_OVERRIDES = None` when reusing an existing/staged tune with one
+unambiguous source. Keep or edit the override for a new Allen download, multiple
+candidate files/templates, nonstandard paths, HOC constructor arguments, or
+explicit section mappings. Ambiguity is reported instead of silently selecting a
+source.
 
 ## Canonical Cell Interface
 

@@ -21,7 +21,10 @@ Use `force_save = True` in `5_simulate.ipynb` or `--force-save` in
 
 ## Optional Sidecars
 
-- `input_stats.json`: input summaries when `save_input_stats` is enabled.
+- `input_stats.json`: detailed per-trial binned input stats when
+  `save_input_stats` is enabled. This file can be large and may be omitted from
+  curated public examples; loaders skip it safely when absent.
+- `input_summaries.json`: compact per-trial input counts and summary metadata.
 - `inputs_sample.pkl`: saved input samples.
 - `syn_records.pkl`: synapse recordings when requested.
 - `syn_records_by_trial.pkl`: per-trial synapse recordings when requested.
