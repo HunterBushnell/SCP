@@ -2,49 +2,49 @@
   "cell": "PV",
   "tune": "tuned",
   "randomness": {
-    "base_seed_used": 8381885441086020325,
+    "base_seed_used": 648591467065329371,
     "trials_setting": true,
     "trial_nonces": {
-      "0": 17603332883796025875,
-      "1": 18053391607340771079,
-      "2": 17918494397449930509,
-      "3": 14475056578869025964,
-      "4": 4191351323062569009,
-      "5": 1688436487058385767,
-      "6": 8368225077083236680,
-      "7": 15388493848100813960,
-      "8": 12705723906103680180,
-      "9": 6264963991335067467,
-      "10": 12416633623830383432,
-      "11": 1811765029946926748,
-      "12": 13643292879793977501,
-      "13": 3489772033208123918,
-      "14": 11250533635690302006,
-      "15": 4116389767637048415,
-      "16": 4713190489169766401,
-      "17": 13878864534002236767,
-      "18": 9770771497049787253,
-      "19": 13880377055373765911,
-      "20": 1421225688072193933,
-      "21": 14113228542346853839,
-      "22": 9908888203080600980,
-      "23": 1261213729972792365,
-      "24": 1433926275070123451,
-      "25": 1165508997754839443,
-      "26": 5689355133715248392,
-      "27": 9285776447572144258,
-      "28": 5388583084325608534,
-      "29": 10227766298629723749,
-      "30": 15423494496213737159,
-      "31": 16872601338137861756,
-      "32": 12539734789314364128,
-      "33": 16656605063645016381,
-      "34": 12695528473521744631,
-      "35": 3793645060791456587,
-      "36": 9171683372837553852,
-      "37": 7101747237776113047,
-      "38": 8584816330685827601,
-      "39": 7185637870854492414
+      "0": 15636041216362526017,
+      "1": 495996373827924071,
+      "2": 8365042359568979058,
+      "3": 17047031597411165882,
+      "4": 13139554613785931685,
+      "5": 8822079221572433149,
+      "6": 12296280826353307953,
+      "7": 15686208500989250420,
+      "8": 1630472232407747008,
+      "9": 5239064876969705086,
+      "10": 5131984845391614853,
+      "11": 7418736735509062260,
+      "12": 2149392242657706435,
+      "13": 1635819335387099608,
+      "14": 6315787303495354403,
+      "15": 8815858158298096733,
+      "16": 15089056985134725372,
+      "17": 12452051610643715850,
+      "18": 7603816677770962993,
+      "19": 9562644102200652144,
+      "20": 10275555645582671142,
+      "21": 17665987911709569700,
+      "22": 2783411832491854925,
+      "23": 2673019358569294634,
+      "24": 10583965777959806855,
+      "25": 15212197440641702238,
+      "26": 7365692548670839915,
+      "27": 4746462590799123706,
+      "28": 12531693549445757746,
+      "29": 7581275280099629802,
+      "30": 14971145878981419571,
+      "31": 4728969956064207286,
+      "32": 10530676085222903377,
+      "33": 18251947827208715962,
+      "34": 10297550088330660281,
+      "35": 7602990538355973990,
+      "36": 13123349204860250049,
+      "37": 15446538242946420015,
+      "38": 14260755153838899469,
+      "39": 633396295162876813
     },
     "random_seeds_used": [
       {
@@ -53,7 +53,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 8393739762056519100
+        "seed_used": 3994763135461161845
       },
       {
         "trial_idx": 0,
@@ -61,7 +61,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 135723103455891220
+        "seed_used": 13682901216651161470
       },
       {
         "trial_idx": 0,
@@ -69,7 +69,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 11316362479565723768
+        "seed_used": 11787441838824337953
       },
       {
         "trial_idx": 0,
@@ -77,7 +77,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 7937568484314398291
+        "seed_used": 9133001432072471927
       },
       {
         "trial_idx": 0,
@@ -85,7 +85,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6511036612882423808
+        "seed_used": 1341434329728364434
       },
       {
         "trial_idx": 0,
@@ -93,7 +93,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 12653376305236035265
+        "seed_used": 14301738346436392972
       },
       {
         "trial_idx": 0,
@@ -101,7 +101,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4547152407361328074
+        "seed_used": 5130892925192171399
       },
       {
         "trial_idx": 0,
@@ -109,7 +109,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10923233952887916110
+        "seed_used": 769310617255556959
       },
       {
         "trial_idx": 0,
@@ -117,7 +117,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 8942707588828696725
+        "seed_used": 16461980988986428602
       },
       {
         "trial_idx": 0,
@@ -125,7 +125,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 2089764424405165897
+        "seed_used": 1692838705017072803
       },
       {
         "trial_idx": 0,
@@ -133,7 +133,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 6044644223705666943
+        "seed_used": 13023300340333666909
       },
       {
         "trial_idx": 0,
@@ -141,7 +141,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9894514862991378350
+        "seed_used": 12365142412976531015
       },
       {
         "trial_idx": 0,
@@ -149,7 +149,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 12934299652172354568
+        "seed_used": 10486394918062763613
       },
       {
         "trial_idx": 0,
@@ -157,7 +157,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10322276581018564302
+        "seed_used": 4608453228531636532
       },
       {
         "trial_idx": 0,
@@ -165,7 +165,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 6215633951492659146
+        "seed_used": 5127723407375011534
       },
       {
         "trial_idx": 0,
@@ -173,7 +173,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 1560732912280679550
+        "seed_used": 1658286157992426981
       },
       {
         "trial_idx": 1,
@@ -181,7 +181,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 7243352743899237241
+        "seed_used": 15759240757993804065
       },
       {
         "trial_idx": 1,
@@ -189,7 +189,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 17245075894407022696
+        "seed_used": 18325952166047138385
       },
       {
         "trial_idx": 1,
@@ -197,7 +197,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 2724886485433911197
+        "seed_used": 12377502609071382084
       },
       {
         "trial_idx": 1,
@@ -205,7 +205,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6669350084154192296
+        "seed_used": 17348279796415614415
       },
       {
         "trial_idx": 1,
@@ -213,7 +213,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 14636428609148444339
+        "seed_used": 8869518927930257979
       },
       {
         "trial_idx": 1,
@@ -221,7 +221,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 8558173610762167690
+        "seed_used": 14671109840222105065
       },
       {
         "trial_idx": 1,
@@ -229,7 +229,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 6990825764413474624
+        "seed_used": 7981343659658446325
       },
       {
         "trial_idx": 1,
@@ -237,7 +237,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 15455126594487169039
+        "seed_used": 2333511642747245660
       },
       {
         "trial_idx": 1,
@@ -245,7 +245,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 10680018562941646018
+        "seed_used": 4271268319914651482
       },
       {
         "trial_idx": 1,
@@ -253,7 +253,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9564904639117107094
+        "seed_used": 10428375082495121946
       },
       {
         "trial_idx": 1,
@@ -261,7 +261,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 84249877870785586
+        "seed_used": 9807151575294986015
       },
       {
         "trial_idx": 1,
@@ -269,7 +269,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 6122402081586949108
+        "seed_used": 8125996554661603656
       },
       {
         "trial_idx": 1,
@@ -277,7 +277,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 7108529177208378167
+        "seed_used": 18322114454448512494
       },
       {
         "trial_idx": 1,
@@ -285,7 +285,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 1553694636936737476
+        "seed_used": 9157492409823183518
       },
       {
         "trial_idx": 1,
@@ -293,7 +293,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 16664990073914997573
+        "seed_used": 7437153573511322235
       },
       {
         "trial_idx": 1,
@@ -301,7 +301,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 489328107860777112
+        "seed_used": 6321812144489281564
       },
       {
         "trial_idx": 2,
@@ -309,7 +309,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 13721851426667529656
+        "seed_used": 13472151135453397101
       },
       {
         "trial_idx": 2,
@@ -317,7 +317,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 3226229409712188355
+        "seed_used": 4420544028765677486
       },
       {
         "trial_idx": 2,
@@ -325,7 +325,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 2860623709906755835
+        "seed_used": 8065653561131104061
       },
       {
         "trial_idx": 2,
@@ -333,7 +333,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13631653721284657183
+        "seed_used": 7236847256518361741
       },
       {
         "trial_idx": 2,
@@ -341,7 +341,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6378032306868986153
+        "seed_used": 9132721680884724531
       },
       {
         "trial_idx": 2,
@@ -349,7 +349,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 3293215293896026126
+        "seed_used": 16109231372853195067
       },
       {
         "trial_idx": 2,
@@ -357,7 +357,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3429609715036920820
+        "seed_used": 14321098630081194828
       },
       {
         "trial_idx": 2,
@@ -365,7 +365,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 5267881226297923317
+        "seed_used": 6954698783948180469
       },
       {
         "trial_idx": 2,
@@ -373,7 +373,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11240839108377561808
+        "seed_used": 9683420968583050861
       },
       {
         "trial_idx": 2,
@@ -381,7 +381,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 6979931491944542091
+        "seed_used": 17621471555782190645
       },
       {
         "trial_idx": 2,
@@ -389,7 +389,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 6117466952364265769
+        "seed_used": 4468390304929138649
       },
       {
         "trial_idx": 2,
@@ -397,7 +397,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 11741914164288357867
+        "seed_used": 1689532357516034390
       },
       {
         "trial_idx": 2,
@@ -405,7 +405,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 8316165354875047638
+        "seed_used": 16638633594182967755
       },
       {
         "trial_idx": 2,
@@ -413,7 +413,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3777088144058645013
+        "seed_used": 12155378638832474106
       },
       {
         "trial_idx": 2,
@@ -421,7 +421,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3053264451724313128
+        "seed_used": 658495004165591220
       },
       {
         "trial_idx": 2,
@@ -429,7 +429,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 12917280981855123110
+        "seed_used": 3197002768706315389
       },
       {
         "trial_idx": 3,
@@ -437,7 +437,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 13699783670098637231
+        "seed_used": 10951269828760452313
       },
       {
         "trial_idx": 3,
@@ -445,7 +445,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 10836884275829823459
+        "seed_used": 128004829460141525
       },
       {
         "trial_idx": 3,
@@ -453,7 +453,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 5775198607155902944
+        "seed_used": 2683896124919837948
       },
       {
         "trial_idx": 3,
@@ -461,7 +461,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 5931193582397358788
+        "seed_used": 583264939716376489
       },
       {
         "trial_idx": 3,
@@ -469,7 +469,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 18314125980398681954
+        "seed_used": 10385960440000904857
       },
       {
         "trial_idx": 3,
@@ -477,7 +477,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 7022639363991531890
+        "seed_used": 14953053045047881811
       },
       {
         "trial_idx": 3,
@@ -485,7 +485,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 448213324798669738
+        "seed_used": 8985513713798714539
       },
       {
         "trial_idx": 3,
@@ -493,7 +493,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 2354720030692508475
+        "seed_used": 15421577147475508061
       },
       {
         "trial_idx": 3,
@@ -501,7 +501,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 1898638098747462990
+        "seed_used": 3235803033600488849
       },
       {
         "trial_idx": 3,
@@ -509,7 +509,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10400342248754004198
+        "seed_used": 17614569056855749052
       },
       {
         "trial_idx": 3,
@@ -517,7 +517,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11128771350583736250
+        "seed_used": 10862411025102321706
       },
       {
         "trial_idx": 3,
@@ -525,7 +525,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 15619705994985733674
+        "seed_used": 2010659403885124976
       },
       {
         "trial_idx": 3,
@@ -533,7 +533,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 16768959463076880039
+        "seed_used": 14851718900903011874
       },
       {
         "trial_idx": 3,
@@ -541,7 +541,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 842136092887932760
+        "seed_used": 16657112051700027471
       },
       {
         "trial_idx": 3,
@@ -549,7 +549,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3849487144759943052
+        "seed_used": 16097065293165258390
       },
       {
         "trial_idx": 3,
@@ -557,7 +557,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 14056032775295758823
+        "seed_used": 17461567361415994344
       },
       {
         "trial_idx": 4,
@@ -565,7 +565,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 13406138233870834916
+        "seed_used": 2650054903781203097
       },
       {
         "trial_idx": 4,
@@ -573,7 +573,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13217394604500767820
+        "seed_used": 10101535182653533895
       },
       {
         "trial_idx": 4,
@@ -581,7 +581,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 10005293734411565031
+        "seed_used": 10364545849765754043
       },
       {
         "trial_idx": 4,
@@ -589,7 +589,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 7455142833562802516
+        "seed_used": 3230759536302446266
       },
       {
         "trial_idx": 4,
@@ -597,7 +597,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6112114351004173867
+        "seed_used": 8563802869035360786
       },
       {
         "trial_idx": 4,
@@ -605,7 +605,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 15145314608261600806
+        "seed_used": 553649999335665932
       },
       {
         "trial_idx": 4,
@@ -613,7 +613,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 7728872984870227502
+        "seed_used": 11330298111166257698
       },
       {
         "trial_idx": 4,
@@ -621,7 +621,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 14304065087151750876
+        "seed_used": 15929413822264714418
       },
       {
         "trial_idx": 4,
@@ -629,7 +629,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4937048874218004959
+        "seed_used": 224499330087342567
       },
       {
         "trial_idx": 4,
@@ -637,7 +637,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10605468655170692225
+        "seed_used": 9957505727584123071
       },
       {
         "trial_idx": 4,
@@ -645,7 +645,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 1740724385879654895
+        "seed_used": 353180052307554099
       },
       {
         "trial_idx": 4,
@@ -653,7 +653,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 13037163998499021068
+        "seed_used": 4743304381502821280
       },
       {
         "trial_idx": 4,
@@ -661,7 +661,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 6124829217568998775
+        "seed_used": 17378190007549328549
       },
       {
         "trial_idx": 4,
@@ -669,7 +669,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 11270501574023933675
+        "seed_used": 8672105566079894381
       },
       {
         "trial_idx": 4,
@@ -677,7 +677,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 14168157859289981712
+        "seed_used": 16298494693827827575
       },
       {
         "trial_idx": 4,
@@ -685,7 +685,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 6912153657307769697
+        "seed_used": 3564875070185426237
       },
       {
         "trial_idx": 5,
@@ -693,7 +693,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 3847626597804193533
+        "seed_used": 5817981072739112727
       },
       {
         "trial_idx": 5,
@@ -701,7 +701,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 14216940363827145831
+        "seed_used": 2844952064159769693
       },
       {
         "trial_idx": 5,
@@ -709,7 +709,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 5274085900085919110
+        "seed_used": 14333750887924144943
       },
       {
         "trial_idx": 5,
@@ -717,7 +717,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1891091684697036154
+        "seed_used": 321177575693880979
       },
       {
         "trial_idx": 5,
@@ -725,7 +725,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 15405837470021164511
+        "seed_used": 12848283290626770231
       },
       {
         "trial_idx": 5,
@@ -733,7 +733,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 14103482299079138582
+        "seed_used": 15214480594495552321
       },
       {
         "trial_idx": 5,
@@ -741,7 +741,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 5670763526586933706
+        "seed_used": 16937885184068100965
       },
       {
         "trial_idx": 5,
@@ -749,7 +749,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3834168233644529241
+        "seed_used": 2158469610278994309
       },
       {
         "trial_idx": 5,
@@ -757,7 +757,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3984263677812065031
+        "seed_used": 10018700814864491944
       },
       {
         "trial_idx": 5,
@@ -765,7 +765,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 5267556231100754544
+        "seed_used": 13568935120610363698
       },
       {
         "trial_idx": 5,
@@ -773,7 +773,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 9272304299237106172
+        "seed_used": 10219856745022289844
       },
       {
         "trial_idx": 5,
@@ -781,7 +781,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 12673522779689767467
+        "seed_used": 6647977287599864077
       },
       {
         "trial_idx": 5,
@@ -789,7 +789,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 7844100483537733893
+        "seed_used": 12197810793985243872
       },
       {
         "trial_idx": 5,
@@ -797,7 +797,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 6718600008856454067
+        "seed_used": 782551238205056831
       },
       {
         "trial_idx": 5,
@@ -805,7 +805,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 7856548263173011581
+        "seed_used": 15672100043770845031
       },
       {
         "trial_idx": 5,
@@ -813,7 +813,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 4410076224691162272
+        "seed_used": 2011703367894643409
       },
       {
         "trial_idx": 6,
@@ -821,7 +821,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 9623808725553025638
+        "seed_used": 5789094419052059439
       },
       {
         "trial_idx": 6,
@@ -829,7 +829,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9446247993437150101
+        "seed_used": 17468493532903462098
       },
       {
         "trial_idx": 6,
@@ -837,7 +837,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 17984723841707482787
+        "seed_used": 8878148600674822242
       },
       {
         "trial_idx": 6,
@@ -845,7 +845,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 18234406719571986126
+        "seed_used": 7939232693246043279
       },
       {
         "trial_idx": 6,
@@ -853,7 +853,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9710931678253457623
+        "seed_used": 11320453009891854623
       },
       {
         "trial_idx": 6,
@@ -861,7 +861,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9821369308214066316
+        "seed_used": 18333835640011032443
       },
       {
         "trial_idx": 6,
@@ -869,7 +869,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11350005918710683807
+        "seed_used": 10631971156923020020
       },
       {
         "trial_idx": 6,
@@ -877,7 +877,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 228694263201482738
+        "seed_used": 11377507708920493420
       },
       {
         "trial_idx": 6,
@@ -885,7 +885,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 5382782861896390473
+        "seed_used": 2655277269124288631
       },
       {
         "trial_idx": 6,
@@ -893,7 +893,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 7806003847670909250
+        "seed_used": 4910400564094184436
       },
       {
         "trial_idx": 6,
@@ -901,7 +901,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 12330555309340177776
+        "seed_used": 15911522615653369776
       },
       {
         "trial_idx": 6,
@@ -909,7 +909,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 14801145816979177990
+        "seed_used": 12155245811026522269
       },
       {
         "trial_idx": 6,
@@ -917,7 +917,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 18376477328682573571
+        "seed_used": 4284202359333220191
       },
       {
         "trial_idx": 6,
@@ -925,7 +925,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 4128283455649378887
+        "seed_used": 10754366310362175257
       },
       {
         "trial_idx": 6,
@@ -933,7 +933,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 5230460335051030372
+        "seed_used": 17191418720193179886
       },
       {
         "trial_idx": 6,
@@ -941,7 +941,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 13380034736944477320
+        "seed_used": 4769057653765460173
       },
       {
         "trial_idx": 7,
@@ -949,7 +949,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 4141718594250013531
+        "seed_used": 3875600849424576481
       },
       {
         "trial_idx": 7,
@@ -957,7 +957,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13024010011977676214
+        "seed_used": 17172328634969359976
       },
       {
         "trial_idx": 7,
@@ -965,7 +965,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 4341031759765401079
+        "seed_used": 565823327237067393
       },
       {
         "trial_idx": 7,
@@ -973,7 +973,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 7448640013402989738
+        "seed_used": 12933206650622930551
       },
       {
         "trial_idx": 7,
@@ -981,7 +981,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 10676328833571253009
+        "seed_used": 17451312002544113495
       },
       {
         "trial_idx": 7,
@@ -989,7 +989,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 14529837429707120687
+        "seed_used": 636574373701799859
       },
       {
         "trial_idx": 7,
@@ -997,7 +997,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 7374590736158316397
+        "seed_used": 7240171575025094418
       },
       {
         "trial_idx": 7,
@@ -1005,7 +1005,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 11008237101564031142
+        "seed_used": 882525636517698148
       },
       {
         "trial_idx": 7,
@@ -1013,7 +1013,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 13663442193883901224
+        "seed_used": 6014291279508564881
       },
       {
         "trial_idx": 7,
@@ -1021,7 +1021,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3012966422997136391
+        "seed_used": 507259654981799280
       },
       {
         "trial_idx": 7,
@@ -1029,7 +1029,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3425153154756020135
+        "seed_used": 748311353856196340
       },
       {
         "trial_idx": 7,
@@ -1037,7 +1037,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 5194604895393589806
+        "seed_used": 7599408986767599011
       },
       {
         "trial_idx": 7,
@@ -1045,7 +1045,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 379089847662515912
+        "seed_used": 5814266567022230528
       },
       {
         "trial_idx": 7,
@@ -1053,7 +1053,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9514050421992229392
+        "seed_used": 7464567527219849535
       },
       {
         "trial_idx": 7,
@@ -1061,7 +1061,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 2060878693872655230
+        "seed_used": 17424977445781177764
       },
       {
         "trial_idx": 7,
@@ -1069,7 +1069,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 6726497351586469392
+        "seed_used": 16147122034663339255
       },
       {
         "trial_idx": 8,
@@ -1077,7 +1077,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 6320843450571984865
+        "seed_used": 13384695285665442113
       },
       {
         "trial_idx": 8,
@@ -1085,7 +1085,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9172746904345252574
+        "seed_used": 10462417624297791331
       },
       {
         "trial_idx": 8,
@@ -1093,7 +1093,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 2915335000635958423
+        "seed_used": 14042131568715122141
       },
       {
         "trial_idx": 8,
@@ -1101,7 +1101,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 15152266547270318906
+        "seed_used": 16370935409471259017
       },
       {
         "trial_idx": 8,
@@ -1109,7 +1109,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1532680350652329128
+        "seed_used": 17099416385283458578
       },
       {
         "trial_idx": 8,
@@ -1117,7 +1117,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 8366159192753155826
+        "seed_used": 12933831548188594994
       },
       {
         "trial_idx": 8,
@@ -1125,7 +1125,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 13905454594851552987
+        "seed_used": 16201271605841920477
       },
       {
         "trial_idx": 8,
@@ -1133,7 +1133,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 2141618013913153662
+        "seed_used": 6446529334636474641
       },
       {
         "trial_idx": 8,
@@ -1141,7 +1141,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 13048839852321863437
+        "seed_used": 11999076520958463110
       },
       {
         "trial_idx": 8,
@@ -1149,7 +1149,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 2531601850443423320
+        "seed_used": 13182506780992921883
       },
       {
         "trial_idx": 8,
@@ -1157,7 +1157,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 12545649728941935824
+        "seed_used": 16854701662723578610
       },
       {
         "trial_idx": 8,
@@ -1165,7 +1165,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10607851277870756813
+        "seed_used": 2793363141568694483
       },
       {
         "trial_idx": 8,
@@ -1173,7 +1173,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 17288412012112907952
+        "seed_used": 9917499560109503694
       },
       {
         "trial_idx": 8,
@@ -1181,7 +1181,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 14713531151811892522
+        "seed_used": 18014378490504431905
       },
       {
         "trial_idx": 8,
@@ -1189,7 +1189,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 10955867694103346868
+        "seed_used": 10064659082945867615
       },
       {
         "trial_idx": 8,
@@ -1197,7 +1197,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 2834489226873482186
+        "seed_used": 16334091196801315486
       },
       {
         "trial_idx": 9,
@@ -1205,7 +1205,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 11434781731207256587
+        "seed_used": 8295701274832753540
       },
       {
         "trial_idx": 9,
@@ -1213,7 +1213,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 7511354728758870506
+        "seed_used": 3282623619702625028
       },
       {
         "trial_idx": 9,
@@ -1221,7 +1221,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13820122691813473092
+        "seed_used": 7251079790178188765
       },
       {
         "trial_idx": 9,
@@ -1229,7 +1229,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 7016738686151906408
+        "seed_used": 14793647396245070278
       },
       {
         "trial_idx": 9,
@@ -1237,7 +1237,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 7775822223340540897
+        "seed_used": 5929565024250498613
       },
       {
         "trial_idx": 9,
@@ -1245,7 +1245,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 17737658920597372594
+        "seed_used": 14525485964948541104
       },
       {
         "trial_idx": 9,
@@ -1253,7 +1253,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 9540332047106429408
+        "seed_used": 14124337008312514894
       },
       {
         "trial_idx": 9,
@@ -1261,7 +1261,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 8910246466172656447
+        "seed_used": 13939757569271872537
       },
       {
         "trial_idx": 9,
@@ -1269,7 +1269,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4024161860698982824
+        "seed_used": 1420411307638551165
       },
       {
         "trial_idx": 9,
@@ -1277,7 +1277,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 7338774722596851401
+        "seed_used": 5051238930459875800
       },
       {
         "trial_idx": 9,
@@ -1285,7 +1285,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 17861955758525670634
+        "seed_used": 5153553803395058130
       },
       {
         "trial_idx": 9,
@@ -1293,7 +1293,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 2156774152275260643
+        "seed_used": 15094084253461492696
       },
       {
         "trial_idx": 9,
@@ -1301,7 +1301,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3707452778267316572
+        "seed_used": 15399242124053307557
       },
       {
         "trial_idx": 9,
@@ -1309,7 +1309,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 4445117440646110655
+        "seed_used": 1670098537651297621
       },
       {
         "trial_idx": 9,
@@ -1317,7 +1317,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4489083260502251808
+        "seed_used": 3926436383009369827
       },
       {
         "trial_idx": 9,
@@ -1325,7 +1325,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 13740448786968253498
+        "seed_used": 11782352045213986718
       },
       {
         "trial_idx": 10,
@@ -1333,7 +1333,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 16786097336219562531
+        "seed_used": 2378248146494148729
       },
       {
         "trial_idx": 10,
@@ -1341,7 +1341,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 2267324561532960081
+        "seed_used": 3396559551852219582
       },
       {
         "trial_idx": 10,
@@ -1349,7 +1349,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16598076184101730169
+        "seed_used": 6970678410045376986
       },
       {
         "trial_idx": 10,
@@ -1357,7 +1357,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 309322056744948811
+        "seed_used": 4154593281621668499
       },
       {
         "trial_idx": 10,
@@ -1365,7 +1365,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9601030289417899770
+        "seed_used": 7321567944132548791
       },
       {
         "trial_idx": 10,
@@ -1373,7 +1373,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 10776225980047319429
+        "seed_used": 9948186835145892995
       },
       {
         "trial_idx": 10,
@@ -1381,7 +1381,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 17386351824831979692
+        "seed_used": 2086651348736414871
       },
       {
         "trial_idx": 10,
@@ -1389,7 +1389,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10842798253859415328
+        "seed_used": 11554610592449212074
       },
       {
         "trial_idx": 10,
@@ -1397,7 +1397,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 426222670778948949
+        "seed_used": 12060647729072365203
       },
       {
         "trial_idx": 10,
@@ -1405,7 +1405,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 14516054314535010520
+        "seed_used": 7959458433602829109
       },
       {
         "trial_idx": 10,
@@ -1413,7 +1413,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 1981441701606973212
+        "seed_used": 6286605631428419113
       },
       {
         "trial_idx": 10,
@@ -1421,7 +1421,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 13110867574595814666
+        "seed_used": 2765851592837059834
       },
       {
         "trial_idx": 10,
@@ -1429,7 +1429,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 10902509852217962276
+        "seed_used": 10081025660630106221
       },
       {
         "trial_idx": 10,
@@ -1437,7 +1437,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 4981994059088202886
+        "seed_used": 17559049328309607696
       },
       {
         "trial_idx": 10,
@@ -1445,7 +1445,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 190000643405128030
+        "seed_used": 10349311326194132673
       },
       {
         "trial_idx": 10,
@@ -1453,7 +1453,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 2564301108189181752
+        "seed_used": 12624657349509113220
       },
       {
         "trial_idx": 11,
@@ -1461,7 +1461,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 4709547658683191483
+        "seed_used": 7863249372015600713
       },
       {
         "trial_idx": 11,
@@ -1469,7 +1469,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 12982644164849341115
+        "seed_used": 3924490167388467264
       },
       {
         "trial_idx": 11,
@@ -1477,7 +1477,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 11913652688321133656
+        "seed_used": 15349867166094395095
       },
       {
         "trial_idx": 11,
@@ -1485,7 +1485,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 8131261038806974162
+        "seed_used": 12686445197206615719
       },
       {
         "trial_idx": 11,
@@ -1493,7 +1493,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 8150005295094146194
+        "seed_used": 8962492588479709171
       },
       {
         "trial_idx": 11,
@@ -1501,7 +1501,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9341918958385003111
+        "seed_used": 2640656502705893681
       },
       {
         "trial_idx": 11,
@@ -1509,7 +1509,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 892419922005345064
+        "seed_used": 1414177741302825044
       },
       {
         "trial_idx": 11,
@@ -1517,7 +1517,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 8567091805527955210
+        "seed_used": 3092065165209150173
       },
       {
         "trial_idx": 11,
@@ -1525,7 +1525,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11844498964007602885
+        "seed_used": 8160686229581705654
       },
       {
         "trial_idx": 11,
@@ -1533,7 +1533,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 8384215426784460318
+        "seed_used": 7879428073978310120
       },
       {
         "trial_idx": 11,
@@ -1541,7 +1541,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 8376441369550901041
+        "seed_used": 11874201379839174061
       },
       {
         "trial_idx": 11,
@@ -1549,7 +1549,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 12636299652003658348
+        "seed_used": 18398423432428353468
       },
       {
         "trial_idx": 11,
@@ -1557,7 +1557,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 8117298007211255656
+        "seed_used": 11782618441763611584
       },
       {
         "trial_idx": 11,
@@ -1565,7 +1565,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 818891605633995761
+        "seed_used": 15931509804461330066
       },
       {
         "trial_idx": 11,
@@ -1573,7 +1573,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 7565274298686074569
+        "seed_used": 15633959617584612252
       },
       {
         "trial_idx": 11,
@@ -1581,7 +1581,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9696882036323757766
+        "seed_used": 2879513604875934335
       },
       {
         "trial_idx": 12,
@@ -1589,7 +1589,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 8057603442235079752
+        "seed_used": 9801893877983009746
       },
       {
         "trial_idx": 12,
@@ -1597,7 +1597,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 10282937237476553579
+        "seed_used": 4840533357155038404
       },
       {
         "trial_idx": 12,
@@ -1605,7 +1605,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16991253701145720851
+        "seed_used": 838076184395685333
       },
       {
         "trial_idx": 12,
@@ -1613,7 +1613,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 18140273725744081126
+        "seed_used": 7540760891313457800
       },
       {
         "trial_idx": 12,
@@ -1621,7 +1621,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 10553651180693777860
+        "seed_used": 7470562207312326324
       },
       {
         "trial_idx": 12,
@@ -1629,7 +1629,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 116456092842854349
+        "seed_used": 13910305347733090480
       },
       {
         "trial_idx": 12,
@@ -1637,7 +1637,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11248534013364473369
+        "seed_used": 8527345653444825629
       },
       {
         "trial_idx": 12,
@@ -1645,7 +1645,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 14309366658084786480
+        "seed_used": 5962121295777662940
       },
       {
         "trial_idx": 12,
@@ -1653,7 +1653,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 14454275948843466163
+        "seed_used": 154918923495735782
       },
       {
         "trial_idx": 12,
@@ -1661,7 +1661,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 7437408313456347028
+        "seed_used": 18264280822977991351
       },
       {
         "trial_idx": 12,
@@ -1669,7 +1669,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 9413134188867550102
+        "seed_used": 16805272832515980028
       },
       {
         "trial_idx": 12,
@@ -1677,7 +1677,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9627953808622216761
+        "seed_used": 7883364237314559534
       },
       {
         "trial_idx": 12,
@@ -1685,7 +1685,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 14513443859903589237
+        "seed_used": 2928375634271447532
       },
       {
         "trial_idx": 12,
@@ -1693,7 +1693,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9676369315814611893
+        "seed_used": 12822372971237183044
       },
       {
         "trial_idx": 12,
@@ -1701,7 +1701,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4917762336141701653
+        "seed_used": 1487237812056445051
       },
       {
         "trial_idx": 12,
@@ -1709,7 +1709,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 4598301832120053705
+        "seed_used": 17079452101265421758
       },
       {
         "trial_idx": 13,
@@ -1717,7 +1717,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 12075601897821388184
+        "seed_used": 14483221017037095323
       },
       {
         "trial_idx": 13,
@@ -1725,7 +1725,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 2700794244446423074
+        "seed_used": 436492578572691310
       },
       {
         "trial_idx": 13,
@@ -1733,7 +1733,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 11339703640524155459
+        "seed_used": 4787353960591122122
       },
       {
         "trial_idx": 13,
@@ -1741,7 +1741,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 8574421539286701311
+        "seed_used": 16734503882754408744
       },
       {
         "trial_idx": 13,
@@ -1749,7 +1749,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6388514862428170934
+        "seed_used": 10231755085734995501
       },
       {
         "trial_idx": 13,
@@ -1757,7 +1757,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 4692026847040851289
+        "seed_used": 1393728823019017902
       },
       {
         "trial_idx": 13,
@@ -1765,7 +1765,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 14294127992956399416
+        "seed_used": 15459560990610811742
       },
       {
         "trial_idx": 13,
@@ -1773,7 +1773,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 17458464067297699359
+        "seed_used": 2188604960095320848
       },
       {
         "trial_idx": 13,
@@ -1781,7 +1781,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3805389406751570203
+        "seed_used": 4046558581465768512
       },
       {
         "trial_idx": 13,
@@ -1789,7 +1789,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10721730636141398979
+        "seed_used": 15104976726296244306
       },
       {
         "trial_idx": 13,
@@ -1797,7 +1797,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 5047962482616519360
+        "seed_used": 3929658855878516323
       },
       {
         "trial_idx": 13,
@@ -1805,7 +1805,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9609338404040522023
+        "seed_used": 5367411772831474991
       },
       {
         "trial_idx": 13,
@@ -1813,7 +1813,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 16286001477225902955
+        "seed_used": 13490539002675756311
       },
       {
         "trial_idx": 13,
@@ -1821,7 +1821,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 6763476496838945551
+        "seed_used": 16493537843361252462
       },
       {
         "trial_idx": 13,
@@ -1829,7 +1829,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 1680493638172484091
+        "seed_used": 10842391312885553283
       },
       {
         "trial_idx": 13,
@@ -1837,7 +1837,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10953820214160922936
+        "seed_used": 9796299316126486257
       },
       {
         "trial_idx": 14,
@@ -1845,7 +1845,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 14135140609664647037
+        "seed_used": 2340295735040538207
       },
       {
         "trial_idx": 14,
@@ -1853,7 +1853,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 4215071062000188589
+        "seed_used": 6762726422988897432
       },
       {
         "trial_idx": 14,
@@ -1861,7 +1861,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 17094185478058898919
+        "seed_used": 13352128819164350300
       },
       {
         "trial_idx": 14,
@@ -1869,7 +1869,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13445825724656980842
+        "seed_used": 11132247572971378391
       },
       {
         "trial_idx": 14,
@@ -1877,7 +1877,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9514656476429468926
+        "seed_used": 2876002712796688736
       },
       {
         "trial_idx": 14,
@@ -1885,7 +1885,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9874529073984768854
+        "seed_used": 3720761473973358847
       },
       {
         "trial_idx": 14,
@@ -1893,7 +1893,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 8325190454031498299
+        "seed_used": 9152091791579815144
       },
       {
         "trial_idx": 14,
@@ -1901,7 +1901,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 15816006435180810698
+        "seed_used": 5480151679967258258
       },
       {
         "trial_idx": 14,
@@ -1909,7 +1909,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 5531015565255282812
+        "seed_used": 15832238534405352567
       },
       {
         "trial_idx": 14,
@@ -1917,7 +1917,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 13232863081797778767
+        "seed_used": 2481235636616145393
       },
       {
         "trial_idx": 14,
@@ -1925,7 +1925,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3830194219659424488
+        "seed_used": 15332363806385720698
       },
       {
         "trial_idx": 14,
@@ -1933,7 +1933,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 16683062464210710226
+        "seed_used": 7212501960639480595
       },
       {
         "trial_idx": 14,
@@ -1941,7 +1941,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 18011236828497234440
+        "seed_used": 15757882341189513690
       },
       {
         "trial_idx": 14,
@@ -1949,7 +1949,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9846470230759492677
+        "seed_used": 16641787463203897440
       },
       {
         "trial_idx": 14,
@@ -1957,7 +1957,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 14545432760276664846
+        "seed_used": 16991600982811586609
       },
       {
         "trial_idx": 14,
@@ -1965,7 +1965,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3530259454593660062
+        "seed_used": 2592654954552036348
       },
       {
         "trial_idx": 15,
@@ -1973,7 +1973,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 4650198552758755016
+        "seed_used": 519388381831643260
       },
       {
         "trial_idx": 15,
@@ -1981,7 +1981,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 12956530901227100884
+        "seed_used": 10335555259925619152
       },
       {
         "trial_idx": 15,
@@ -1989,7 +1989,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1380463746639409882
+        "seed_used": 7814877725850188809
       },
       {
         "trial_idx": 15,
@@ -1997,7 +1997,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13824887708348059614
+        "seed_used": 10587421628912235916
       },
       {
         "trial_idx": 15,
@@ -2005,7 +2005,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 5891764291272262765
+        "seed_used": 9744189667612547386
       },
       {
         "trial_idx": 15,
@@ -2013,7 +2013,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16041581701836744368
+        "seed_used": 7258917412157232227
       },
       {
         "trial_idx": 15,
@@ -2021,7 +2021,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 331783019781512896
+        "seed_used": 9439157752283953673
       },
       {
         "trial_idx": 15,
@@ -2029,7 +2029,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 16311258926374096371
+        "seed_used": 13903836389751569859
       },
       {
         "trial_idx": 15,
@@ -2037,7 +2037,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 9607691720712693003
+        "seed_used": 15160035103574204845
       },
       {
         "trial_idx": 15,
@@ -2045,7 +2045,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 12002131482631879195
+        "seed_used": 9155286093435926099
       },
       {
         "trial_idx": 15,
@@ -2053,7 +2053,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 16890065303575966298
+        "seed_used": 16047240684489416939
       },
       {
         "trial_idx": 15,
@@ -2061,7 +2061,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 15255177990917052741
+        "seed_used": 18361436596519951037
       },
       {
         "trial_idx": 15,
@@ -2069,7 +2069,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 149600469215036364
+        "seed_used": 17569009569092166581
       },
       {
         "trial_idx": 15,
@@ -2077,7 +2077,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 12374906947869763707
+        "seed_used": 14379975626817643768
       },
       {
         "trial_idx": 15,
@@ -2085,7 +2085,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11232229106532733585
+        "seed_used": 6735015725608134047
       },
       {
         "trial_idx": 15,
@@ -2093,7 +2093,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10607465885305182888
+        "seed_used": 6451914644447419606
       },
       {
         "trial_idx": 16,
@@ -2101,7 +2101,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 14197628376242811035
+        "seed_used": 6218830885840768807
       },
       {
         "trial_idx": 16,
@@ -2109,7 +2109,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 2468834815113424524
+        "seed_used": 18048953915865141516
       },
       {
         "trial_idx": 16,
@@ -2117,7 +2117,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 5301186799395983875
+        "seed_used": 3087372422876664296
       },
       {
         "trial_idx": 16,
@@ -2125,7 +2125,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13860093946242646743
+        "seed_used": 594768701370974268
       },
       {
         "trial_idx": 16,
@@ -2133,7 +2133,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 15081592831005680422
+        "seed_used": 6828177264514613214
       },
       {
         "trial_idx": 16,
@@ -2141,7 +2141,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1778111571408992002
+        "seed_used": 8369751419956858071
       },
       {
         "trial_idx": 16,
@@ -2149,7 +2149,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 9324842607070187526
+        "seed_used": 8579935457476433696
       },
       {
         "trial_idx": 16,
@@ -2157,7 +2157,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 18095607053602097482
+        "seed_used": 11975605573521567907
       },
       {
         "trial_idx": 16,
@@ -2165,7 +2165,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 17718436468762112363
+        "seed_used": 5445231906447869249
       },
       {
         "trial_idx": 16,
@@ -2173,7 +2173,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9512071272287266305
+        "seed_used": 16604641073836717319
       },
       {
         "trial_idx": 16,
@@ -2181,7 +2181,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 562318889224045038
+        "seed_used": 10818483397390968400
       },
       {
         "trial_idx": 16,
@@ -2189,7 +2189,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 6087789691325771498
+        "seed_used": 2532071873527183527
       },
       {
         "trial_idx": 16,
@@ -2197,7 +2197,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 6945096171264397851
+        "seed_used": 10811862876292544951
       },
       {
         "trial_idx": 16,
@@ -2205,7 +2205,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 13348226605750587384
+        "seed_used": 4811701951960186728
       },
       {
         "trial_idx": 16,
@@ -2213,7 +2213,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 6487063873214907772
+        "seed_used": 9893155527874148798
       },
       {
         "trial_idx": 16,
@@ -2221,7 +2221,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 15020234025841770798
+        "seed_used": 5127564028911176186
       },
       {
         "trial_idx": 17,
@@ -2229,7 +2229,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 13010810178898515666
+        "seed_used": 6577447564362438132
       },
       {
         "trial_idx": 17,
@@ -2237,7 +2237,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 18345075691187191274
+        "seed_used": 5917099671209552595
       },
       {
         "trial_idx": 17,
@@ -2245,7 +2245,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1743218775809844491
+        "seed_used": 5098525922788986740
       },
       {
         "trial_idx": 17,
@@ -2253,7 +2253,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16123607661402333709
+        "seed_used": 8493369377702677907
       },
       {
         "trial_idx": 17,
@@ -2261,7 +2261,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9836937318682201259
+        "seed_used": 8446721731895496661
       },
       {
         "trial_idx": 17,
@@ -2269,7 +2269,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9897457858945044828
+        "seed_used": 10281446604229268654
       },
       {
         "trial_idx": 17,
@@ -2277,7 +2277,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 329000231795797245
+        "seed_used": 12607753382231569511
       },
       {
         "trial_idx": 17,
@@ -2285,7 +2285,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3690480628482997595
+        "seed_used": 5117910563064014392
       },
       {
         "trial_idx": 17,
@@ -2293,7 +2293,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 15328403345371240753
+        "seed_used": 15734512066077869940
       },
       {
         "trial_idx": 17,
@@ -2301,7 +2301,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 8573373740266275880
+        "seed_used": 17014967884175370412
       },
       {
         "trial_idx": 17,
@@ -2309,7 +2309,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 1482036923751018439
+        "seed_used": 17815819147258223637
       },
       {
         "trial_idx": 17,
@@ -2317,7 +2317,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 11885925983675219914
+        "seed_used": 14540198112747507685
       },
       {
         "trial_idx": 17,
@@ -2325,7 +2325,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 16411009555581882888
+        "seed_used": 4958315633763676234
       },
       {
         "trial_idx": 17,
@@ -2333,7 +2333,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10266037393817301553
+        "seed_used": 8745417774681458767
       },
       {
         "trial_idx": 17,
@@ -2341,7 +2341,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 6542203199216110742
+        "seed_used": 4874249773330366997
       },
       {
         "trial_idx": 17,
@@ -2349,7 +2349,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 624566062647223919
+        "seed_used": 15458026749684521333
       },
       {
         "trial_idx": 18,
@@ -2357,7 +2357,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 13487242574371033400
+        "seed_used": 15243772201298385523
       },
       {
         "trial_idx": 18,
@@ -2365,7 +2365,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 18343425212731981002
+        "seed_used": 10513391263797614382
       },
       {
         "trial_idx": 18,
@@ -2373,7 +2373,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9427950782996607528
+        "seed_used": 578273794848096783
       },
       {
         "trial_idx": 18,
@@ -2381,7 +2381,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 11296533191572440844
+        "seed_used": 4488917773086201024
       },
       {
         "trial_idx": 18,
@@ -2389,7 +2389,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 8749771137441396717
+        "seed_used": 15869264500957193684
       },
       {
         "trial_idx": 18,
@@ -2397,7 +2397,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 5295497144549543208
+        "seed_used": 12311940534358135021
       },
       {
         "trial_idx": 18,
@@ -2405,7 +2405,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11850191044368524448
+        "seed_used": 5599330446539780909
       },
       {
         "trial_idx": 18,
@@ -2413,7 +2413,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 5542413255635201732
+        "seed_used": 7696810539935389530
       },
       {
         "trial_idx": 18,
@@ -2421,7 +2421,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 652277440919390413
+        "seed_used": 9251275453379428490
       },
       {
         "trial_idx": 18,
@@ -2429,7 +2429,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10507008922686755829
+        "seed_used": 1359276599321672839
       },
       {
         "trial_idx": 18,
@@ -2437,7 +2437,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 9941586179419934703
+        "seed_used": 1613806846145254833
       },
       {
         "trial_idx": 18,
@@ -2445,7 +2445,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10270926455900979359
+        "seed_used": 9129236842751606171
       },
       {
         "trial_idx": 18,
@@ -2453,7 +2453,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4337448429641881258
+        "seed_used": 1638553253267381615
       },
       {
         "trial_idx": 18,
@@ -2461,7 +2461,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 13166161734011011418
+        "seed_used": 8140239904768657660
       },
       {
         "trial_idx": 18,
@@ -2469,7 +2469,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 7770976942155742774
+        "seed_used": 10082353830547895477
       },
       {
         "trial_idx": 18,
@@ -2477,7 +2477,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 16139501835950825588
+        "seed_used": 15057565656408505364
       },
       {
         "trial_idx": 19,
@@ -2485,7 +2485,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 6096408026629699371
+        "seed_used": 9077841720488711802
       },
       {
         "trial_idx": 19,
@@ -2493,7 +2493,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 10437448428815467537
+        "seed_used": 13335068376295374306
       },
       {
         "trial_idx": 19,
@@ -2501,7 +2501,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1583099262548555990
+        "seed_used": 10217265966114970877
       },
       {
         "trial_idx": 19,
@@ -2509,7 +2509,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16639968801876493912
+        "seed_used": 1804726804663011685
       },
       {
         "trial_idx": 19,
@@ -2517,7 +2517,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 5956674988861250072
+        "seed_used": 4188455231620624674
       },
       {
         "trial_idx": 19,
@@ -2525,7 +2525,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 17576197412875729479
+        "seed_used": 12451965958943019909
       },
       {
         "trial_idx": 19,
@@ -2533,7 +2533,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3769104899543983688
+        "seed_used": 14651123467351436052
       },
       {
         "trial_idx": 19,
@@ -2541,7 +2541,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 12848968693160839643
+        "seed_used": 12989725234857089904
       },
       {
         "trial_idx": 19,
@@ -2549,7 +2549,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 5590872222536012337
+        "seed_used": 4309486250189943348
       },
       {
         "trial_idx": 19,
@@ -2557,7 +2557,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10738622146774495029
+        "seed_used": 15050605860387103608
       },
       {
         "trial_idx": 19,
@@ -2565,7 +2565,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 15152322629252293998
+        "seed_used": 5996837508338526818
       },
       {
         "trial_idx": 19,
@@ -2573,7 +2573,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 18166003632499154528
+        "seed_used": 1456900932863721179
       },
       {
         "trial_idx": 19,
@@ -2581,7 +2581,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 17350177407329282892
+        "seed_used": 3271287390428508777
       },
       {
         "trial_idx": 19,
@@ -2589,7 +2589,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 16708337066020877335
+        "seed_used": 7335101902263319964
       },
       {
         "trial_idx": 19,
@@ -2597,7 +2597,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 9244007492462639821
+        "seed_used": 274099228369799827
       },
       {
         "trial_idx": 19,
@@ -2605,7 +2605,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3359181696541176252
+        "seed_used": 1893068958417567636
       },
       {
         "trial_idx": 20,
@@ -2613,7 +2613,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 14570562045099103702
+        "seed_used": 17499353413445940356
       },
       {
         "trial_idx": 20,
@@ -2621,7 +2621,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 905415619932680341
+        "seed_used": 6072903133619567852
       },
       {
         "trial_idx": 20,
@@ -2629,7 +2629,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 12948149637150924693
+        "seed_used": 9060925849896507621
       },
       {
         "trial_idx": 20,
@@ -2637,7 +2637,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 8260429872768393601
+        "seed_used": 13862945284274295241
       },
       {
         "trial_idx": 20,
@@ -2645,7 +2645,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 11904520123047061313
+        "seed_used": 1324280154060824942
       },
       {
         "trial_idx": 20,
@@ -2653,7 +2653,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 7627475292884295850
+        "seed_used": 10559017292853229393
       },
       {
         "trial_idx": 20,
@@ -2661,7 +2661,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3174386082094713233
+        "seed_used": 12739829273845771348
       },
       {
         "trial_idx": 20,
@@ -2669,7 +2669,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9130406708440491231
+        "seed_used": 13844806382340630414
       },
       {
         "trial_idx": 20,
@@ -2677,7 +2677,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3297650354168680465
+        "seed_used": 11998244951283118199
       },
       {
         "trial_idx": 20,
@@ -2685,7 +2685,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 2861489235971851033
+        "seed_used": 16590543318703299123
       },
       {
         "trial_idx": 20,
@@ -2693,7 +2693,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4339214575315961841
+        "seed_used": 10042510033412076279
       },
       {
         "trial_idx": 20,
@@ -2701,7 +2701,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 11922939278846318364
+        "seed_used": 1233271158810858159
       },
       {
         "trial_idx": 20,
@@ -2709,7 +2709,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 15147397618247454842
+        "seed_used": 9154216037102301170
       },
       {
         "trial_idx": 20,
@@ -2717,7 +2717,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9552212563217319079
+        "seed_used": 2197222780133715888
       },
       {
         "trial_idx": 20,
@@ -2725,7 +2725,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 6418534638670105726
+        "seed_used": 18209386748222590244
       },
       {
         "trial_idx": 20,
@@ -2733,7 +2733,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 7010212847201277040
+        "seed_used": 13028763087583171066
       },
       {
         "trial_idx": 21,
@@ -2741,7 +2741,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 7366375285146806282
+        "seed_used": 13506503313136772384
       },
       {
         "trial_idx": 21,
@@ -2749,7 +2749,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16965723465515143819
+        "seed_used": 11909607342510612278
       },
       {
         "trial_idx": 21,
@@ -2757,7 +2757,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 928776375786455483
+        "seed_used": 5214626348308857451
       },
       {
         "trial_idx": 21,
@@ -2765,7 +2765,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13032399558173479689
+        "seed_used": 13137201101352469987
       },
       {
         "trial_idx": 21,
@@ -2773,7 +2773,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 8269573169079551925
+        "seed_used": 6105524736239565745
       },
       {
         "trial_idx": 21,
@@ -2781,7 +2781,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 12994565668483582624
+        "seed_used": 5271287194218113504
       },
       {
         "trial_idx": 21,
@@ -2789,7 +2789,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 6024656144524523043
+        "seed_used": 17680217244924417874
       },
       {
         "trial_idx": 21,
@@ -2797,7 +2797,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9177555464083752534
+        "seed_used": 12083292011099704101
       },
       {
         "trial_idx": 21,
@@ -2805,7 +2805,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3711327763233410399
+        "seed_used": 12801811000952730594
       },
       {
         "trial_idx": 21,
@@ -2813,7 +2813,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 17226804166198048618
+        "seed_used": 16044564871291077137
       },
       {
         "trial_idx": 21,
@@ -2821,7 +2821,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11482370998982114706
+        "seed_used": 17335474821287325072
       },
       {
         "trial_idx": 21,
@@ -2829,7 +2829,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3842017880624404446
+        "seed_used": 14959259887699848608
       },
       {
         "trial_idx": 21,
@@ -2837,7 +2837,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 13411028068801931516
+        "seed_used": 2027439680154739078
       },
       {
         "trial_idx": 21,
@@ -2845,7 +2845,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 11386380540830528263
+        "seed_used": 15788291564675288070
       },
       {
         "trial_idx": 21,
@@ -2853,7 +2853,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 12697280499391720356
+        "seed_used": 7577875251864774043
       },
       {
         "trial_idx": 21,
@@ -2861,7 +2861,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 8543459972204145354
+        "seed_used": 5334888663872892188
       },
       {
         "trial_idx": 22,
@@ -2869,7 +2869,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 17512269709259624344
+        "seed_used": 8084174288316219467
       },
       {
         "trial_idx": 22,
@@ -2877,7 +2877,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 402833249742291622
+        "seed_used": 4289095537501925448
       },
       {
         "trial_idx": 22,
@@ -2885,7 +2885,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 8389293144072319647
+        "seed_used": 4531211565607078165
       },
       {
         "trial_idx": 22,
@@ -2893,7 +2893,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 226724378640651325
+        "seed_used": 10829216968966944266
       },
       {
         "trial_idx": 22,
@@ -2901,7 +2901,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 14771319845321618854
+        "seed_used": 558079502521103930
       },
       {
         "trial_idx": 22,
@@ -2909,7 +2909,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 14467083371070446884
+        "seed_used": 71164184610406458
       },
       {
         "trial_idx": 22,
@@ -2917,7 +2917,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11701068523986695759
+        "seed_used": 11228382518826781057
       },
       {
         "trial_idx": 22,
@@ -2925,7 +2925,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 14225194621259564202
+        "seed_used": 8192411026907401514
       },
       {
         "trial_idx": 22,
@@ -2933,7 +2933,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 1479577978875948456
+        "seed_used": 15333831236183979718
       },
       {
         "trial_idx": 22,
@@ -2941,7 +2941,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 15269439911746641405
+        "seed_used": 15020557183540020732
       },
       {
         "trial_idx": 22,
@@ -2949,7 +2949,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 6563001507745685943
+        "seed_used": 11315527820726983986
       },
       {
         "trial_idx": 22,
@@ -2957,7 +2957,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 7260121785306676805
+        "seed_used": 2160940524419575715
       },
       {
         "trial_idx": 22,
@@ -2965,7 +2965,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11256897747481063952
+        "seed_used": 14305063150239148219
       },
       {
         "trial_idx": 22,
@@ -2973,7 +2973,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3918777103104213667
+        "seed_used": 1892988264382840148
       },
       {
         "trial_idx": 22,
@@ -2981,7 +2981,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 16418831391262557008
+        "seed_used": 4730907794400129096
       },
       {
         "trial_idx": 22,
@@ -2989,7 +2989,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 15951855313864997047
+        "seed_used": 13495758138707914475
       },
       {
         "trial_idx": 23,
@@ -2997,7 +2997,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 11366086458319744395
+        "seed_used": 15864638279251735275
       },
       {
         "trial_idx": 23,
@@ -3005,7 +3005,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 14056090664108668469
+        "seed_used": 8233860429701508807
       },
       {
         "trial_idx": 23,
@@ -3013,7 +3013,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 8644434987684139397
+        "seed_used": 17804742420947228374
       },
       {
         "trial_idx": 23,
@@ -3021,7 +3021,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 7438415795333319616
+        "seed_used": 15682236837681878461
       },
       {
         "trial_idx": 23,
@@ -3029,7 +3029,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13495976917544680693
+        "seed_used": 5687043615944239794
       },
       {
         "trial_idx": 23,
@@ -3037,7 +3037,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16055598396053534224
+        "seed_used": 11149352289910719590
       },
       {
         "trial_idx": 23,
@@ -3045,7 +3045,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 1589526154532409040
+        "seed_used": 11476342396913176637
       },
       {
         "trial_idx": 23,
@@ -3053,7 +3053,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 13488952246978540224
+        "seed_used": 12559989476162260473
       },
       {
         "trial_idx": 23,
@@ -3061,7 +3061,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4617807891482746076
+        "seed_used": 2233432705373607909
       },
       {
         "trial_idx": 23,
@@ -3069,7 +3069,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3921600244682520758
+        "seed_used": 3129737531953158205
       },
       {
         "trial_idx": 23,
@@ -3077,7 +3077,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11662799161428802401
+        "seed_used": 11637740544323185060
       },
       {
         "trial_idx": 23,
@@ -3085,7 +3085,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 11591689581272371982
+        "seed_used": 14502155881865697415
       },
       {
         "trial_idx": 23,
@@ -3093,7 +3093,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 260191434894202093
+        "seed_used": 8390215840260640558
       },
       {
         "trial_idx": 23,
@@ -3101,7 +3101,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 11628248158965373912
+        "seed_used": 2885517682757196801
       },
       {
         "trial_idx": 23,
@@ -3109,7 +3109,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 10583711229323994746
+        "seed_used": 9818809306306797169
       },
       {
         "trial_idx": 23,
@@ -3117,7 +3117,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 12777125909391184896
+        "seed_used": 6623313650711603187
       },
       {
         "trial_idx": 24,
@@ -3125,7 +3125,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 8149063927863641444
+        "seed_used": 10815713769424262749
       },
       {
         "trial_idx": 24,
@@ -3133,7 +3133,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 2384917111880560118
+        "seed_used": 450602114981346729
       },
       {
         "trial_idx": 24,
@@ -3141,7 +3141,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6856041560956026768
+        "seed_used": 2400569799256801149
       },
       {
         "trial_idx": 24,
@@ -3149,7 +3149,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16636910388885549405
+        "seed_used": 13708640952930667510
       },
       {
         "trial_idx": 24,
@@ -3157,7 +3157,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6781551062463869874
+        "seed_used": 4411581921851088400
       },
       {
         "trial_idx": 24,
@@ -3165,7 +3165,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 11166269738682674205
+        "seed_used": 13958914767131348362
       },
       {
         "trial_idx": 24,
@@ -3173,7 +3173,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 9389442040903169749
+        "seed_used": 2282951998437594041
       },
       {
         "trial_idx": 24,
@@ -3181,7 +3181,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3816082972792231704
+        "seed_used": 13714675196271853184
       },
       {
         "trial_idx": 24,
@@ -3189,7 +3189,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 17424872442860375048
+        "seed_used": 12272509196095379479
       },
       {
         "trial_idx": 24,
@@ -3197,7 +3197,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 5309985339059419464
+        "seed_used": 12550482178952589117
       },
       {
         "trial_idx": 24,
@@ -3205,7 +3205,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3636482195764737996
+        "seed_used": 17706606373859515316
       },
       {
         "trial_idx": 24,
@@ -3213,7 +3213,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 1702371878039141184
+        "seed_used": 9553820316227229599
       },
       {
         "trial_idx": 24,
@@ -3221,7 +3221,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 17293792188441243501
+        "seed_used": 7826069908056732374
       },
       {
         "trial_idx": 24,
@@ -3229,7 +3229,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 16001075717953567095
+        "seed_used": 14901887853272266189
       },
       {
         "trial_idx": 24,
@@ -3237,7 +3237,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11935212196816655827
+        "seed_used": 2548558730557757544
       },
       {
         "trial_idx": 24,
@@ -3245,7 +3245,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 17890935858232620773
+        "seed_used": 16327365737715904910
       },
       {
         "trial_idx": 25,
@@ -3253,7 +3253,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 13633589163699090252
+        "seed_used": 16121430353988734302
       },
       {
         "trial_idx": 25,
@@ -3261,7 +3261,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16842310376027143775
+        "seed_used": 7921133982632220370
       },
       {
         "trial_idx": 25,
@@ -3269,7 +3269,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 11351578606701768825
+        "seed_used": 4928113246583495527
       },
       {
         "trial_idx": 25,
@@ -3277,7 +3277,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1580595480867418619
+        "seed_used": 983990860876242400
       },
       {
         "trial_idx": 25,
@@ -3285,7 +3285,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 12380027237923676851
+        "seed_used": 12564143800666769297
       },
       {
         "trial_idx": 25,
@@ -3293,7 +3293,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 14896667100793055921
+        "seed_used": 15429535646140266076
       },
       {
         "trial_idx": 25,
@@ -3301,7 +3301,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 5183713502811644080
+        "seed_used": 3546553967644592319
       },
       {
         "trial_idx": 25,
@@ -3309,7 +3309,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 8074671658972829478
+        "seed_used": 430794353061305580
       },
       {
         "trial_idx": 25,
@@ -3317,7 +3317,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 13815351352868316947
+        "seed_used": 10408107072165608958
       },
       {
         "trial_idx": 25,
@@ -3325,7 +3325,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 17726455364864000835
+        "seed_used": 11822199535219216352
       },
       {
         "trial_idx": 25,
@@ -3333,7 +3333,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 1640627857320934293
+        "seed_used": 11970324581219300142
       },
       {
         "trial_idx": 25,
@@ -3341,7 +3341,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 12870799451004713463
+        "seed_used": 16237842606449171930
       },
       {
         "trial_idx": 25,
@@ -3349,7 +3349,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 8508653175413627692
+        "seed_used": 8110674384254950804
       },
       {
         "trial_idx": 25,
@@ -3357,7 +3357,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 5121891577952940379
+        "seed_used": 4081808679752090053
       },
       {
         "trial_idx": 25,
@@ -3365,7 +3365,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4308506936325355210
+        "seed_used": 4864680812568600432
       },
       {
         "trial_idx": 25,
@@ -3373,7 +3373,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 17318957570865004980
+        "seed_used": 8906830818209193117
       },
       {
         "trial_idx": 26,
@@ -3381,7 +3381,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 15709031824360699835
+        "seed_used": 1229001029345511476
       },
       {
         "trial_idx": 26,
@@ -3389,7 +3389,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1178499763579604774
+        "seed_used": 15320378631280139853
       },
       {
         "trial_idx": 26,
@@ -3397,7 +3397,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13149894180312957798
+        "seed_used": 4538400307704451784
       },
       {
         "trial_idx": 26,
@@ -3405,7 +3405,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 7681898983494656541
+        "seed_used": 6110379949600812722
       },
       {
         "trial_idx": 26,
@@ -3413,7 +3413,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 17236983477581124388
+        "seed_used": 11823443426426652096
       },
       {
         "trial_idx": 26,
@@ -3421,7 +3421,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 14472842872176618809
+        "seed_used": 5467753973659457425
       },
       {
         "trial_idx": 26,
@@ -3429,7 +3429,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 7729147192991176909
+        "seed_used": 14928867075170483884
       },
       {
         "trial_idx": 26,
@@ -3437,7 +3437,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 11631296525145627996
+        "seed_used": 1088523936194365227
       },
       {
         "trial_idx": 26,
@@ -3445,7 +3445,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 1129636366207850126
+        "seed_used": 4145311762949551118
       },
       {
         "trial_idx": 26,
@@ -3453,7 +3453,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 5882916763406595259
+        "seed_used": 6681170913917811715
       },
       {
         "trial_idx": 26,
@@ -3461,7 +3461,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 17854139437485775217
+        "seed_used": 5480164904713874070
       },
       {
         "trial_idx": 26,
@@ -3469,7 +3469,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3105438706934109366
+        "seed_used": 5592591870468023077
       },
       {
         "trial_idx": 26,
@@ -3477,7 +3477,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 8078479114186515250
+        "seed_used": 14164770249994581892
       },
       {
         "trial_idx": 26,
@@ -3485,7 +3485,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 11342792646868395237
+        "seed_used": 11453698293646115875
       },
       {
         "trial_idx": 26,
@@ -3493,7 +3493,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3248693919525650811
+        "seed_used": 3826196479364156838
       },
       {
         "trial_idx": 26,
@@ -3501,7 +3501,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 8787516762423882823
+        "seed_used": 17795767847515663552
       },
       {
         "trial_idx": 27,
@@ -3509,7 +3509,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 13476880405103712398
+        "seed_used": 3579072437761531419
       },
       {
         "trial_idx": 27,
@@ -3517,7 +3517,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 18347999611435243874
+        "seed_used": 17320852612932895822
       },
       {
         "trial_idx": 27,
@@ -3525,7 +3525,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16730669937346236113
+        "seed_used": 13752095717807088875
       },
       {
         "trial_idx": 27,
@@ -3533,7 +3533,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 3327211816723315317
+        "seed_used": 9868232992509635478
       },
       {
         "trial_idx": 27,
@@ -3541,7 +3541,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 2383047184780136123
+        "seed_used": 11039049104058028962
       },
       {
         "trial_idx": 27,
@@ -3549,7 +3549,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 7867257973377595983
+        "seed_used": 3681268973427681076
       },
       {
         "trial_idx": 27,
@@ -3557,7 +3557,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 12770758153907607479
+        "seed_used": 14551863317043576238
       },
       {
         "trial_idx": 27,
@@ -3565,7 +3565,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 15734195071606640752
+        "seed_used": 4120569827902196024
       },
       {
         "trial_idx": 27,
@@ -3573,7 +3573,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 14735067964304018306
+        "seed_used": 12291258059501760616
       },
       {
         "trial_idx": 27,
@@ -3581,7 +3581,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 411783510401058483
+        "seed_used": 17493164672563009754
       },
       {
         "trial_idx": 27,
@@ -3589,7 +3589,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 17430789290578782172
+        "seed_used": 5798192731325701337
       },
       {
         "trial_idx": 27,
@@ -3597,7 +3597,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 1256619325193159034
+        "seed_used": 17096910966982919732
       },
       {
         "trial_idx": 27,
@@ -3605,7 +3605,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 18430617994435227965
+        "seed_used": 13874474944806481155
       },
       {
         "trial_idx": 27,
@@ -3613,7 +3613,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9169349100722651899
+        "seed_used": 8702188271887814801
       },
       {
         "trial_idx": 27,
@@ -3621,7 +3621,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 395221707879703697
+        "seed_used": 5316808272378880588
       },
       {
         "trial_idx": 27,
@@ -3629,7 +3629,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 15563447984863712448
+        "seed_used": 13133493743368796720
       },
       {
         "trial_idx": 28,
@@ -3637,7 +3637,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 6733862718528558459
+        "seed_used": 13967811537256603787
       },
       {
         "trial_idx": 28,
@@ -3645,7 +3645,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 373935568232982120
+        "seed_used": 5022683937879991844
       },
       {
         "trial_idx": 28,
@@ -3653,7 +3653,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 14671893632522176716
+        "seed_used": 11018598098485585017
       },
       {
         "trial_idx": 28,
@@ -3661,7 +3661,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 11217073549408471873
+        "seed_used": 10196174291081899147
       },
       {
         "trial_idx": 28,
@@ -3669,7 +3669,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1603833085042574265
+        "seed_used": 12013440953928300144
       },
       {
         "trial_idx": 28,
@@ -3677,7 +3677,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16044202860408231130
+        "seed_used": 11295038660819615720
       },
       {
         "trial_idx": 28,
@@ -3685,7 +3685,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 8927138943581769252
+        "seed_used": 12520064115952011960
       },
       {
         "trial_idx": 28,
@@ -3693,7 +3693,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 7787576563857330524
+        "seed_used": 1543409882725434316
       },
       {
         "trial_idx": 28,
@@ -3701,7 +3701,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11672683938628510366
+        "seed_used": 2672586255050049430
       },
       {
         "trial_idx": 28,
@@ -3709,7 +3709,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 12744382491473494311
+        "seed_used": 7470349720439714187
       },
       {
         "trial_idx": 28,
@@ -3717,7 +3717,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 15027193438764400314
+        "seed_used": 17248451499144215476
       },
       {
         "trial_idx": 28,
@@ -3725,7 +3725,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 15862556142049376189
+        "seed_used": 13335735439946427088
       },
       {
         "trial_idx": 28,
@@ -3733,7 +3733,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 16362427002352609241
+        "seed_used": 1496603203757328879
       },
       {
         "trial_idx": 28,
@@ -3741,7 +3741,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 12180744268403491154
+        "seed_used": 3577732126470656625
       },
       {
         "trial_idx": 28,
@@ -3749,7 +3749,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 5767806870585295289
+        "seed_used": 11644395666720742916
       },
       {
         "trial_idx": 28,
@@ -3757,7 +3757,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 11115178099435547595
+        "seed_used": 3313702727830598469
       },
       {
         "trial_idx": 29,
@@ -3765,7 +3765,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 15459275635877908923
+        "seed_used": 5512041577722540321
       },
       {
         "trial_idx": 29,
@@ -3773,7 +3773,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1363648846968858441
+        "seed_used": 16457138187771644275
       },
       {
         "trial_idx": 29,
@@ -3781,7 +3781,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1144400442760432869
+        "seed_used": 9190053576344607705
       },
       {
         "trial_idx": 29,
@@ -3789,7 +3789,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 18276315646388542131
+        "seed_used": 13388003386689239279
       },
       {
         "trial_idx": 29,
@@ -3797,7 +3797,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6294119840943943691
+        "seed_used": 8532327397649292690
       },
       {
         "trial_idx": 29,
@@ -3805,7 +3805,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 260436656998932317
+        "seed_used": 6230191067715926840
       },
       {
         "trial_idx": 29,
@@ -3813,7 +3813,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 9956847587076305985
+        "seed_used": 12996951572736559629
       },
       {
         "trial_idx": 29,
@@ -3821,7 +3821,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3774317759128277749
+        "seed_used": 17495634262081415108
       },
       {
         "trial_idx": 29,
@@ -3829,7 +3829,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4706117474560572272
+        "seed_used": 5367271752355287154
       },
       {
         "trial_idx": 29,
@@ -3837,7 +3837,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 1290759989357221062
+        "seed_used": 10359186745847323105
       },
       {
         "trial_idx": 29,
@@ -3845,7 +3845,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 8507388376288170902
+        "seed_used": 4085510042119040247
       },
       {
         "trial_idx": 29,
@@ -3853,7 +3853,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 4621776136371604958
+        "seed_used": 16333521198143384340
       },
       {
         "trial_idx": 29,
@@ -3861,7 +3861,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 17252309887793020825
+        "seed_used": 12538104084878964200
       },
       {
         "trial_idx": 29,
@@ -3869,7 +3869,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 1196061286191620480
+        "seed_used": 15700509911418990964
       },
       {
         "trial_idx": 29,
@@ -3877,7 +3877,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 1690257468827484669
+        "seed_used": 9378361953983793813
       },
       {
         "trial_idx": 29,
@@ -3885,7 +3885,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10966988815457425795
+        "seed_used": 2767234104031142831
       },
       {
         "trial_idx": 30,
@@ -3893,7 +3893,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 17131548113098000494
+        "seed_used": 17716893862738122962
       },
       {
         "trial_idx": 30,
@@ -3901,7 +3901,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 15078088321343922698
+        "seed_used": 9974532443232709466
       },
       {
         "trial_idx": 30,
@@ -3909,7 +3909,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13494145924983338566
+        "seed_used": 12218198991285751367
       },
       {
         "trial_idx": 30,
@@ -3917,7 +3917,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9555417146147775809
+        "seed_used": 6904849956269195822
       },
       {
         "trial_idx": 30,
@@ -3925,7 +3925,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 10461768823634997823
+        "seed_used": 11402789806662479238
       },
       {
         "trial_idx": 30,
@@ -3933,7 +3933,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 18446518094380230675
+        "seed_used": 5620736154557405630
       },
       {
         "trial_idx": 30,
@@ -3941,7 +3941,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 14333686570757454875
+        "seed_used": 1872050053968545051
       },
       {
         "trial_idx": 30,
@@ -3949,7 +3949,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 7933017173587429308
+        "seed_used": 13968125527080341065
       },
       {
         "trial_idx": 30,
@@ -3957,7 +3957,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 14203238447041332849
+        "seed_used": 6617030137581661022
       },
       {
         "trial_idx": 30,
@@ -3965,7 +3965,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 8063692310881324914
+        "seed_used": 13209623611617406374
       },
       {
         "trial_idx": 30,
@@ -3973,7 +3973,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 10992066684654003354
+        "seed_used": 11676356767138039820
       },
       {
         "trial_idx": 30,
@@ -3981,7 +3981,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 13546313148585376556
+        "seed_used": 13827052958527497555
       },
       {
         "trial_idx": 30,
@@ -3989,7 +3989,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4353536571187217585
+        "seed_used": 12663565518805408093
       },
       {
         "trial_idx": 30,
@@ -3997,7 +3997,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 7871328628264737345
+        "seed_used": 17041769943061397899
       },
       {
         "trial_idx": 30,
@@ -4005,7 +4005,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11712514105150350550
+        "seed_used": 11845199781423173477
       },
       {
         "trial_idx": 30,
@@ -4013,7 +4013,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 6583152957551910725
+        "seed_used": 1830497829436034346
       },
       {
         "trial_idx": 31,
@@ -4021,7 +4021,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 4943572736897421555
+        "seed_used": 13248914631395830719
       },
       {
         "trial_idx": 31,
@@ -4029,7 +4029,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 62121912901119169
+        "seed_used": 5798034052441300848
       },
       {
         "trial_idx": 31,
@@ -4037,7 +4037,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1541288066323528651
+        "seed_used": 943648182022642247
       },
       {
         "trial_idx": 31,
@@ -4045,7 +4045,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 12890982141239578447
+        "seed_used": 10866277433274277167
       },
       {
         "trial_idx": 31,
@@ -4053,7 +4053,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6640036956330004357
+        "seed_used": 7231698988189209110
       },
       {
         "trial_idx": 31,
@@ -4061,7 +4061,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13936881884789951360
+        "seed_used": 9175916606410129712
       },
       {
         "trial_idx": 31,
@@ -4069,7 +4069,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4772009727774049333
+        "seed_used": 6641694406287055648
       },
       {
         "trial_idx": 31,
@@ -4077,7 +4077,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3357579761821676788
+        "seed_used": 15354930343720551460
       },
       {
         "trial_idx": 31,
@@ -4085,7 +4085,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 651494920030966780
+        "seed_used": 16236912435322896449
       },
       {
         "trial_idx": 31,
@@ -4093,7 +4093,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10021004566908264687
+        "seed_used": 5831119676398781101
       },
       {
         "trial_idx": 31,
@@ -4101,7 +4101,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 7876858369757254777
+        "seed_used": 7915176485941677587
       },
       {
         "trial_idx": 31,
@@ -4109,7 +4109,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 2386426431979188960
+        "seed_used": 11055908676747121601
       },
       {
         "trial_idx": 31,
@@ -4117,7 +4117,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3920807500517920461
+        "seed_used": 239968465413535281
       },
       {
         "trial_idx": 31,
@@ -4125,7 +4125,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 1484805129012158416
+        "seed_used": 12737551525355551250
       },
       {
         "trial_idx": 31,
@@ -4133,7 +4133,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 16799740597843240588
+        "seed_used": 8997872432963320386
       },
       {
         "trial_idx": 31,
@@ -4141,7 +4141,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 7279812268950526910
+        "seed_used": 17626031583173063257
       },
       {
         "trial_idx": 32,
@@ -4149,7 +4149,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 18022487912312516849
+        "seed_used": 4125483244185263660
       },
       {
         "trial_idx": 32,
@@ -4157,7 +4157,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 2726330411042657591
+        "seed_used": 946526663210554770
       },
       {
         "trial_idx": 32,
@@ -4165,7 +4165,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 3077625536069823188
+        "seed_used": 1461188590806003072
       },
       {
         "trial_idx": 32,
@@ -4173,7 +4173,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 11358178950849908181
+        "seed_used": 13949898758852474594
       },
       {
         "trial_idx": 32,
@@ -4181,7 +4181,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 245678161289537796
+        "seed_used": 2637686818770651428
       },
       {
         "trial_idx": 32,
@@ -4189,7 +4189,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6047373882948344623
+        "seed_used": 16087812013194221264
       },
       {
         "trial_idx": 32,
@@ -4197,7 +4197,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 6410461250655224255
+        "seed_used": 2376175505974556
       },
       {
         "trial_idx": 32,
@@ -4205,7 +4205,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10966089686878063705
+        "seed_used": 16347600752749873970
       },
       {
         "trial_idx": 32,
@@ -4213,7 +4213,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3321182009109970251
+        "seed_used": 18339116587105523665
       },
       {
         "trial_idx": 32,
@@ -4221,7 +4221,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9424500202124420482
+        "seed_used": 10313605579784373127
       },
       {
         "trial_idx": 32,
@@ -4229,7 +4229,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4401218285692413043
+        "seed_used": 9760438813697956980
       },
       {
         "trial_idx": 32,
@@ -4237,7 +4237,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 7297535109563304433
+        "seed_used": 127634388013345266
       },
       {
         "trial_idx": 32,
@@ -4245,7 +4245,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 16070631778940021836
+        "seed_used": 4544722833770602604
       },
       {
         "trial_idx": 32,
@@ -4253,7 +4253,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 14113669835965801030
+        "seed_used": 4312710059062547394
       },
       {
         "trial_idx": 32,
@@ -4261,7 +4261,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 18300880562395978885
+        "seed_used": 782720925587804918
       },
       {
         "trial_idx": 32,
@@ -4269,7 +4269,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 448359786934794128
+        "seed_used": 3263635010956918355
       },
       {
         "trial_idx": 33,
@@ -4277,7 +4277,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 6234626651463421465
+        "seed_used": 13390948788365738396
       },
       {
         "trial_idx": 33,
@@ -4285,7 +4285,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 12100139785293346436
+        "seed_used": 10442054050567976036
       },
       {
         "trial_idx": 33,
@@ -4293,7 +4293,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6879361766524259221
+        "seed_used": 4170489312343092023
       },
       {
         "trial_idx": 33,
@@ -4301,7 +4301,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 10372815979185209404
+        "seed_used": 11970370665622495903
       },
       {
         "trial_idx": 33,
@@ -4309,7 +4309,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9832708811178738002
+        "seed_used": 17812854541810128251
       },
       {
         "trial_idx": 33,
@@ -4317,7 +4317,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 17038130851420716838
+        "seed_used": 4551655549734193411
       },
       {
         "trial_idx": 33,
@@ -4325,7 +4325,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11047540090269376235
+        "seed_used": 2327106006351327756
       },
       {
         "trial_idx": 33,
@@ -4333,7 +4333,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 7232062872450472099
+        "seed_used": 4312485170697806583
       },
       {
         "trial_idx": 33,
@@ -4341,7 +4341,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 7418908972815746617
+        "seed_used": 10370619038310152877
       },
       {
         "trial_idx": 33,
@@ -4349,7 +4349,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3535513709513779083
+        "seed_used": 16193077080610983296
       },
       {
         "trial_idx": 33,
@@ -4357,7 +4357,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 7932172398610227453
+        "seed_used": 10167637604686630427
       },
       {
         "trial_idx": 33,
@@ -4365,7 +4365,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10250871576784337000
+        "seed_used": 11966284622327260734
       },
       {
         "trial_idx": 33,
@@ -4373,7 +4373,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 14208416498130622085
+        "seed_used": 12987913743862203728
       },
       {
         "trial_idx": 33,
@@ -4381,7 +4381,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 11439762709706825495
+        "seed_used": 6261192181570979006
       },
       {
         "trial_idx": 33,
@@ -4389,7 +4389,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 4411443108396779599
+        "seed_used": 9475650695177287457
       },
       {
         "trial_idx": 33,
@@ -4397,7 +4397,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 2412679622267288107
+        "seed_used": 9607473157886086271
       },
       {
         "trial_idx": 34,
@@ -4405,7 +4405,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 5397089268783138523
+        "seed_used": 2033390304208385528
       },
       {
         "trial_idx": 34,
@@ -4413,7 +4413,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6668752123875761676
+        "seed_used": 17357844626591182131
       },
       {
         "trial_idx": 34,
@@ -4421,7 +4421,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 8425210468067744310
+        "seed_used": 14926586822498830627
       },
       {
         "trial_idx": 34,
@@ -4429,7 +4429,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1388507031750401129
+        "seed_used": 14035892887876682903
       },
       {
         "trial_idx": 34,
@@ -4437,7 +4437,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 11296314965568648756
+        "seed_used": 12276334828677989168
       },
       {
         "trial_idx": 34,
@@ -4445,7 +4445,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 3999896134064797784
+        "seed_used": 18405064242848573649
       },
       {
         "trial_idx": 34,
@@ -4453,7 +4453,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 3562761295519996577
+        "seed_used": 14910318604603915650
       },
       {
         "trial_idx": 34,
@@ -4461,7 +4461,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 16452240666724997192
+        "seed_used": 12203123160469719743
       },
       {
         "trial_idx": 34,
@@ -4469,7 +4469,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 10590372533055254903
+        "seed_used": 12825623109820562466
       },
       {
         "trial_idx": 34,
@@ -4477,7 +4477,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 16128950906917058872
+        "seed_used": 2743102954811942058
       },
       {
         "trial_idx": 34,
@@ -4485,7 +4485,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 8502834562761803507
+        "seed_used": 2475911144704738132
       },
       {
         "trial_idx": 34,
@@ -4493,7 +4493,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 5920150530616925228
+        "seed_used": 5933355006336084058
       },
       {
         "trial_idx": 34,
@@ -4501,7 +4501,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 16167056954528950338
+        "seed_used": 17525368373996906280
       },
       {
         "trial_idx": 34,
@@ -4509,7 +4509,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 6678818574288769376
+        "seed_used": 2801113071496516211
       },
       {
         "trial_idx": 34,
@@ -4517,7 +4517,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 17235674667868747338
+        "seed_used": 12248720663302969057
       },
       {
         "trial_idx": 34,
@@ -4525,7 +4525,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 15752653933970855645
+        "seed_used": 71151721217209205
       },
       {
         "trial_idx": 35,
@@ -4533,7 +4533,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 9764295271848197319
+        "seed_used": 9898402606107806356
       },
       {
         "trial_idx": 35,
@@ -4541,7 +4541,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 4268370425880554966
+        "seed_used": 8668043968344024471
       },
       {
         "trial_idx": 35,
@@ -4549,7 +4549,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16456027231134232125
+        "seed_used": 8195143968918137418
       },
       {
         "trial_idx": 35,
@@ -4557,7 +4557,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 17052136839972342911
+        "seed_used": 7738274106970829464
       },
       {
         "trial_idx": 35,
@@ -4565,7 +4565,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9308933078723755265
+        "seed_used": 13840590985061175536
       },
       {
         "trial_idx": 35,
@@ -4573,7 +4573,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6954228528276263894
+        "seed_used": 17071101939225873470
       },
       {
         "trial_idx": 35,
@@ -4581,7 +4581,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 6223577445015226074
+        "seed_used": 16718542344607057390
       },
       {
         "trial_idx": 35,
@@ -4589,7 +4589,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 12448674817195825181
+        "seed_used": 6423178595133758460
       },
       {
         "trial_idx": 35,
@@ -4597,7 +4597,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 9872520640308978447
+        "seed_used": 16182529598172716657
       },
       {
         "trial_idx": 35,
@@ -4605,7 +4605,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 1983058179811380901
+        "seed_used": 1582373128560178332
       },
       {
         "trial_idx": 35,
@@ -4613,7 +4613,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 12503182759641317509
+        "seed_used": 13794354859062350368
       },
       {
         "trial_idx": 35,
@@ -4621,7 +4621,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3363124490266478056
+        "seed_used": 2127873397609270362
       },
       {
         "trial_idx": 35,
@@ -4629,7 +4629,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 13641975111106010918
+        "seed_used": 12499117735632037832
       },
       {
         "trial_idx": 35,
@@ -4637,7 +4637,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 2961191701232121573
+        "seed_used": 1699536189732191434
       },
       {
         "trial_idx": 35,
@@ -4645,7 +4645,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 1404280683525628042
+        "seed_used": 13559773614495133148
       },
       {
         "trial_idx": 35,
@@ -4653,7 +4653,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 449561480120045651
+        "seed_used": 17499610109529890275
       },
       {
         "trial_idx": 36,
@@ -4661,7 +4661,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 5586690343327404169
+        "seed_used": 15030180126540744401
       },
       {
         "trial_idx": 36,
@@ -4669,7 +4669,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 1292762421203701882
+        "seed_used": 9633113542066432003
       },
       {
         "trial_idx": 36,
@@ -4677,7 +4677,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 15548292494251499348
+        "seed_used": 7675558512101686265
       },
       {
         "trial_idx": 36,
@@ -4685,7 +4685,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 5822783952245010872
+        "seed_used": 10681638262881472688
       },
       {
         "trial_idx": 36,
@@ -4693,7 +4693,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 4483870853357010124
+        "seed_used": 3939478569783594515
       },
       {
         "trial_idx": 36,
@@ -4701,7 +4701,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16229035939953563447
+        "seed_used": 4402633193432410138
       },
       {
         "trial_idx": 36,
@@ -4709,7 +4709,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 5500502385176290944
+        "seed_used": 8510822971816556701
       },
       {
         "trial_idx": 36,
@@ -4717,7 +4717,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 6471266536446268726
+        "seed_used": 12956104664813977152
       },
       {
         "trial_idx": 36,
@@ -4725,7 +4725,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 2535488737102742035
+        "seed_used": 7226171327523740604
       },
       {
         "trial_idx": 36,
@@ -4733,7 +4733,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 16334033157061650570
+        "seed_used": 3146804651140157615
       },
       {
         "trial_idx": 36,
@@ -4741,7 +4741,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 12236707937227192715
+        "seed_used": 7157629728786015461
       },
       {
         "trial_idx": 36,
@@ -4749,7 +4749,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 13686504793964117912
+        "seed_used": 9427115857879134933
       },
       {
         "trial_idx": 36,
@@ -4757,7 +4757,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 50836171314114780
+        "seed_used": 3803200713937294815
       },
       {
         "trial_idx": 36,
@@ -4765,7 +4765,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 3442531375794835636
+        "seed_used": 4193827307572633903
       },
       {
         "trial_idx": 36,
@@ -4773,7 +4773,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 2981974769275062133
+        "seed_used": 4035307458328757239
       },
       {
         "trial_idx": 36,
@@ -4781,7 +4781,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 5250520436634889286
+        "seed_used": 7162157724101482777
       },
       {
         "trial_idx": 37,
@@ -4789,7 +4789,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 14700233843585368745
+        "seed_used": 6517280194121994604
       },
       {
         "trial_idx": 37,
@@ -4797,7 +4797,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 2631061736368433202
+        "seed_used": 6650926815022470142
       },
       {
         "trial_idx": 37,
@@ -4805,7 +4805,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 8654138221546012829
+        "seed_used": 17273932278530698611
       },
       {
         "trial_idx": 37,
@@ -4813,7 +4813,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 3448349394332507668
+        "seed_used": 11515451618484812502
       },
       {
         "trial_idx": 37,
@@ -4821,7 +4821,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 8495873928089195814
+        "seed_used": 8408258502871273912
       },
       {
         "trial_idx": 37,
@@ -4829,7 +4829,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 11914514637630187139
+        "seed_used": 9112253373805372127
       },
       {
         "trial_idx": 37,
@@ -4837,7 +4837,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 7668328510990154602
+        "seed_used": 6573463461416119280
       },
       {
         "trial_idx": 37,
@@ -4845,7 +4845,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 10282384736926024859
+        "seed_used": 15469204061500333442
       },
       {
         "trial_idx": 37,
@@ -4853,7 +4853,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11906120007871692671
+        "seed_used": 13674935052281247831
       },
       {
         "trial_idx": 37,
@@ -4861,7 +4861,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 2760660418662255392
+        "seed_used": 17464020217937483848
       },
       {
         "trial_idx": 37,
@@ -4869,7 +4869,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 10507676062845801558
+        "seed_used": 8988469007429032571
       },
       {
         "trial_idx": 37,
@@ -4877,7 +4877,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 7730428108434133102
+        "seed_used": 7893176910715221776
       },
       {
         "trial_idx": 37,
@@ -4885,7 +4885,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 15252637207284414248
+        "seed_used": 15979028986924287139
       },
       {
         "trial_idx": 37,
@@ -4893,7 +4893,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 16974115611858648696
+        "seed_used": 12279558848070449145
       },
       {
         "trial_idx": 37,
@@ -4901,7 +4901,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 5934136844582783032
+        "seed_used": 402380195116931609
       },
       {
         "trial_idx": 37,
@@ -4909,7 +4909,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 1765979463247940639
+        "seed_used": 11642437867610586587
       },
       {
         "trial_idx": 38,
@@ -4917,7 +4917,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 4072532123579283789
+        "seed_used": 3596183288218947979
       },
       {
         "trial_idx": 38,
@@ -4925,7 +4925,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 17676847207639876756
+        "seed_used": 12605554409846015603
       },
       {
         "trial_idx": 38,
@@ -4933,7 +4933,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 14702320052387404968
+        "seed_used": 12411427388006868590
       },
       {
         "trial_idx": 38,
@@ -4941,7 +4941,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 16054281348823593172
+        "seed_used": 11993528886135689534
       },
       {
         "trial_idx": 38,
@@ -4949,7 +4949,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 9572831899100978475
+        "seed_used": 9293863670172248031
       },
       {
         "trial_idx": 38,
@@ -4957,7 +4957,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13806208214098162962
+        "seed_used": 1749618992568324723
       },
       {
         "trial_idx": 38,
@@ -4965,7 +4965,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 2208560772094426831
+        "seed_used": 14032279547473986035
       },
       {
         "trial_idx": 38,
@@ -4973,7 +4973,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 16295444857365588804
+        "seed_used": 9439801257694507513
       },
       {
         "trial_idx": 38,
@@ -4981,7 +4981,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 12282261376407961650
+        "seed_used": 8054861007994191146
       },
       {
         "trial_idx": 38,
@@ -4989,7 +4989,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 15822521536254492542
+        "seed_used": 5589398141319808654
       },
       {
         "trial_idx": 38,
@@ -4997,7 +4997,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 10128495182793902561
+        "seed_used": 12314576915643444822
       },
       {
         "trial_idx": 38,
@@ -5005,7 +5005,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 8566743115339013861
+        "seed_used": 5714619366673355790
       },
       {
         "trial_idx": 38,
@@ -5013,7 +5013,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 5785303298579365395
+        "seed_used": 8160523477311043693
       },
       {
         "trial_idx": 38,
@@ -5021,7 +5021,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 8759785542114714062
+        "seed_used": 2525508183388292262
       },
       {
         "trial_idx": 38,
@@ -5029,7 +5029,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 10221227810899018722
+        "seed_used": 14180122476297917656
       },
       {
         "trial_idx": 38,
@@ -5037,7 +5037,7 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 9848355514385033274
+        "seed_used": 11638875701545045525
       },
       {
         "trial_idx": 39,
@@ -5045,7 +5045,7 @@
         "group": null,
         "stream": "jitter",
         "label": "inputs",
-        "seed_used": 5067363051702875623
+        "seed_used": 11352730798583910075
       },
       {
         "trial_idx": 39,
@@ -5053,7 +5053,7 @@
         "group": "pn_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 6895002794666210064
+        "seed_used": 11161484799942670843
       },
       {
         "trial_idx": 39,
@@ -5061,7 +5061,7 @@
         "group": "bg_exc",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 10937986597947389843
+        "seed_used": 12348694978327921560
       },
       {
         "trial_idx": 39,
@@ -5069,7 +5069,7 @@
         "group": "bg_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 3378744392101802315
+        "seed_used": 2130030171548106424
       },
       {
         "trial_idx": 39,
@@ -5077,7 +5077,7 @@
         "group": "pv_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 11499065299143037798
+        "seed_used": 14104924551981236806
       },
       {
         "trial_idx": 39,
@@ -5085,7 +5085,7 @@
         "group": "sst_inh",
         "stream": "block_sequence",
         "label": "inputs",
-        "seed_used": 13770892042858540603
+        "seed_used": 15574629602655417113
       },
       {
         "trial_idx": 39,
@@ -5093,7 +5093,7 @@
         "group": "pn_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 893239052647353619
+        "seed_used": 14136336497377634188
       },
       {
         "trial_idx": 39,
@@ -5101,7 +5101,7 @@
         "group": "pn_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 16152160450568415496
+        "seed_used": 8373101994301616641
       },
       {
         "trial_idx": 39,
@@ -5109,7 +5109,7 @@
         "group": "bg_exc",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 18114894225770678687
+        "seed_used": 5618021804352920001
       },
       {
         "trial_idx": 39,
@@ -5117,7 +5117,7 @@
         "group": "bg_exc",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 17270582985217742898
+        "seed_used": 5965847649900456564
       },
       {
         "trial_idx": 39,
@@ -5125,7 +5125,7 @@
         "group": "bg_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 11935105806131868013
+        "seed_used": 14294434904046320644
       },
       {
         "trial_idx": 39,
@@ -5133,7 +5133,7 @@
         "group": "bg_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 4089440065086560134
+        "seed_used": 3776864354045427775
       },
       {
         "trial_idx": 39,
@@ -5141,7 +5141,7 @@
         "group": "pv_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 18047457124762437602
+        "seed_used": 1429912418439913257
       },
       {
         "trial_idx": 39,
@@ -5149,7 +5149,7 @@
         "group": "pv_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 1590443305122899888
+        "seed_used": 5184368385173021752
       },
       {
         "trial_idx": 39,
@@ -5157,7 +5157,7 @@
         "group": "sst_inh",
         "stream": "placement",
         "label": "synapses.placement",
-        "seed_used": 14055469502810204842
+        "seed_used": 6986850817289573733
       },
       {
         "trial_idx": 39,
@@ -5165,14 +5165,14 @@
         "group": "sst_inh",
         "stream": "weights",
         "label": "synapses.weights",
-        "seed_used": 5740095239638483263
+        "seed_used": 6119408026134332249
       }
     ],
     "seed_recipe": "SeedSequence([base_seed_used, trial_component, group_hash_u32, stream_hash_u32]) with base_seed_used expanded to 2x uint32 words"
   },
   "fit_json": {
     "filename": "484635029_fit.json",
-    "source_path": "cells/PV/tunes/tuned/484635029_fit.json",
+    "source_path": "/home/hrbncv/SCP/cells/PV/tunes/tuned/484635029_fit.json",
     "sha256": "7b5b9f14459d1a2f22f854949fc1208a84df9c762df9d9103dbd6908fb869c48"
   },
   "model_artifacts": {

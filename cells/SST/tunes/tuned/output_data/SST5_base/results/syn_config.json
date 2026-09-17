@@ -69,7 +69,7 @@
       "anchors": {
         "sim_tstart": 0.0,
         "sim_tstop": 1000.0,
-        "jitter_tstart_ms": 78.94117001104586,
+        "jitter_tstart_ms": 51.10263590611024,
         "input_window_tstart": 0.0,
         "input_window_tstop": 1000.0,
         "block_count": 3
@@ -220,7 +220,7 @@
       "anchors": {
         "sim_tstart": 0.0,
         "sim_tstop": 1000.0,
-        "jitter_tstart_ms": 78.94117001104586,
+        "jitter_tstart_ms": 51.10263590611024,
         "input_window_tstart": 0.0,
         "input_window_tstop": 1000.0,
         "block_count": 1
@@ -300,7 +300,7 @@
       "anchors": {
         "sim_tstart": 0.0,
         "sim_tstop": 1000.0,
-        "jitter_tstart_ms": 78.94117001104586,
+        "jitter_tstart_ms": 51.10263590611024,
         "input_window_tstart": 0.0,
         "input_window_tstop": 1000.0,
         "block_count": 1
@@ -353,12 +353,12 @@
         }
       },
       "params": {
-        "wt_mean": 5.5,
+        "wt_mean": 1.0,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,
-        "tau_r_GABAA": 0.5,
-        "tau_d_GABAA": 5.5
+        "tau_r_GABAA": 1.0,
+        "tau_d_GABAA": 10.0
       }
     },
     "input_blocks": [
@@ -366,15 +366,15 @@
         "name": "pre_baseline",
         "role": "baseline",
         "start_ms": 0.0,
-        "stop_ms": 320.0,
+        "stop_ms": 310.0,
         "mode": "homogeneous_poisson",
         "rate_hz": 2.3
       },
       {
         "name": "stimulus",
         "role": "stimulus",
-        "start_ms": 320.0,
-        "stop_ms": 870.0,
+        "start_ms": 310.0,
+        "stop_ms": 860.0,
         "mode": "inhomogeneous_poisson",
         "source": {
           "path": "external_data/pyrFiringRateAvg.csv",
@@ -388,7 +388,7 @@
       {
         "name": "post_baseline",
         "role": "baseline",
-        "start_ms": 870.0,
+        "start_ms": 860.0,
         "stop_ms": 1000.0,
         "mode": "homogeneous_poisson",
         "rate_hz": 2.3

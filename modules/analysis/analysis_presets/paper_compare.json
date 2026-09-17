@@ -13,7 +13,7 @@
     "output_plot_window_zero_origin": false,
 
     "compare_output_layout": "overlay",
-    "output_compare_figsize": [10.0, 4.0],
+    "output_compare_figsize": [8.0,4.0],
     "multi_plot_type": "line",
     "multi_shade_mode": null,
     "multi_norm_fr": null,
@@ -27,7 +27,7 @@
     "output_metric_window_ms": 0.0,
     "output_metric_window_markers": false,
     "output_show_metric_points": false,
-    "output_bin_ms": 1.0,
+    "output_bin_ms": 5.0,
     "win_size": 25.0,
     "output_smooth_mode": "center",
     "output_stim_start_ms": 300.0,
@@ -69,7 +69,7 @@
     {
       "path": "cells/PV/tunes/tuned/output_data/PV5_base",
       "label": "PV base",
-      "enabled": false,
+      "enabled": true,
       "shift_ms": 0,
       "scale": 1,
       "color": "royalblue",
@@ -96,7 +96,7 @@
     {
       "path": "cells/SST/tunes/tuned/output_data/SST5_tuned",
       "label": "SST tuned",
-      "enabled": true,
+      "enabled": false,
       "shift_ms": 0,
       "scale": 1,
       "color": "darkmagenta",

@@ -27,8 +27,8 @@
     {"path": "external_data/SSTFiringRateAvg.csv@300;color=magenta;linestyle=--;label=SST_bio", "enabled": false},
     {"path": "external_data/PVFiringRateAvg.csv@300;color=blue;linestyle=--;label=PV_bio", "enabled": false},
 
-    {"path": "cells/PV/tunes/tuned/output_data/PV5_base;color=royalblue;linestyle=--;label=PV5_base", "enabled": true},
-    {"path": "cells/PV/tunes/tuned/output_data/PV5_tuned;color=navy;linestyle=--;label=PV5_tuned", "enabled": true},
+    {"path": "cells/PV/tunes/tuned/output_data/PV5_base;color=royalblue;linestyle=--;label=PV5_base", "enabled": false},
+    {"path": "cells/PV/tunes/tuned/output_data/PV5_tuned;color=navy;linestyle=--;label=PV5_tuned", "enabled": false},
 
     {"path": "cells/SST/tunes/tuned/output_data/SST5_base;color=magenta;linestyle=--;label=SST5_base", "enabled": false},
     {"path": "cells/SST/tunes/tuned/output_data/SST5_tuned;color=darkmagenta;linestyle=--;label=SST5_tuned", "enabled": false}

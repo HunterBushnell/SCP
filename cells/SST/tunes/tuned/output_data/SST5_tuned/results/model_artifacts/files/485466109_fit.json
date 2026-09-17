@@ -110,7 +110,7 @@
 
       "name": "gbar_Ih",
 
-      "value": 0.0001,
+      "value": 0.002,
 
       "mechanism": "Ih"
 
@@ -158,7 +158,7 @@
 
       "name": "gbar_Kv2like",
 
-      "value": 0.00018,
+      "value": 0.0002,
 
       "mechanism": "Kv2like"
 
@@ -266,7 +266,7 @@
 
       "name": "g_pas",
 
-      "value": 0.0000567,
+      "value": 0.000058,
 
       "mechanism": ""
 
@@ -278,7 +278,7 @@
 
       "name": "g_pas",
 
-      "value": 0.0000567,
+      "value": 0.000058,
 
       "mechanism": ""
 
@@ -410,7 +410,7 @@
 
       "name": "g_pas",
 
-      "value": 0.0000567,
+      "value": 0.000058,
 
       "mechanism": ""
 
@@ -446,7 +446,7 @@
 
       "name": "gbar_Ih",
 
-      "value": 0.000003,
+      "value": 0.002,
 
       "mechanism": "Ih"
 

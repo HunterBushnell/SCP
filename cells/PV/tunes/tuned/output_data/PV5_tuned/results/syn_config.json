@@ -68,7 +68,7 @@
       "anchors": {
         "sim_tstart": 0.0,
         "sim_tstop": 1000.0,
-        "jitter_tstart_ms": 83.9772325068022,
+        "jitter_tstart_ms": 92.25014300981337,
         "input_window_tstart": 0.0,
         "input_window_tstop": 1000.0,
         "block_count": 3
@@ -218,7 +218,7 @@
       "anchors": {
         "sim_tstart": 0.0,
         "sim_tstop": 1000.0,
-        "jitter_tstart_ms": 83.9772325068022,
+        "jitter_tstart_ms": 92.25014300981337,
         "input_window_tstart": 0.0,
         "input_window_tstop": 1000.0,
         "block_count": 1
@@ -273,7 +273,7 @@
         }
       },
       "params": {
-        "wt_mean": 1.5,
+        "wt_mean": 0.4,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,
@@ -289,7 +289,7 @@
         "start_ms": 0.0,
         "stop_ms": 1000.0,
         "mode": "homogeneous_poisson",
-        "rate_hz": 0.2
+        "rate_hz": 0.75
       }
     ],
     "name": "bg_inh",
@@ -299,7 +299,7 @@
       "anchors": {
         "sim_tstart": 0.0,
         "sim_tstop": 1000.0,
-        "jitter_tstart_ms": 83.9772325068022,
+        "jitter_tstart_ms": 92.25014300981337,
         "input_window_tstart": 0.0,
         "input_window_tstop": 1000.0,
         "block_count": 1
@@ -315,9 +315,9 @@
           "start_ms": 0.0,
           "stop_ms": 1000.0,
           "source": {
-            "freq": 0.2
+            "freq": 0.75
           },
-          "rate_hz": 0.2
+          "rate_hz": 0.75
         }
       ],
       "input_blocks": [
@@ -331,9 +331,9 @@
           "start_ms": 0.0,
           "stop_ms": 1000.0,
           "source": {
-            "freq": 0.2
+            "freq": 0.75
           },
-          "rate_hz": 0.2
+          "rate_hz": 0.75
         }
       ]
     }
@@ -354,7 +354,7 @@
         }
       },
       "params": {
-        "wt_mean": 0.5,
+        "wt_mean": 0.4,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,
@@ -386,7 +386,7 @@
       "anchors": {
         "sim_tstart": 0.0,
         "sim_tstop": 1000.0,
-        "jitter_tstart_ms": 83.9772325068022,
+        "jitter_tstart_ms": 92.25014300981337,
         "input_window_tstart": 0.0,
         "input_window_tstop": 1000.0,
         "block_count": 1
@@ -447,7 +447,7 @@
         }
       },
       "params": {
-        "wt_mean": 0.5,
+        "wt_mean": 0.4,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,
@@ -464,7 +464,7 @@
         "stop_ms": 1000.0,
         "mode": "precomputed",
         "source": {
-          "path": "cells/SST/tunes/tuned/output_data/SST5_tuned/results/spikes.npz",
+          "path": "cells/SST/tunes/tuned/output_data/SST5.3_tuned/results/spikes.npz",
           "selection": "sample",
           "crop_start_ms": 0.0,
           "crop_stop_ms": 1000.0,
@@ -479,7 +479,7 @@
       "anchors": {
         "sim_tstart": 0.0,
         "sim_tstop": 1000.0,
-        "jitter_tstart_ms": 83.9772325068022,
+        "jitter_tstart_ms": 92.25014300981337,
         "input_window_tstart": 0.0,
         "input_window_tstop": 1000.0,
         "block_count": 1
@@ -495,7 +495,7 @@
           "start_ms": 0.0,
           "stop_ms": 1000.0,
           "source": {
-            "path": "cells/SST/tunes/tuned/output_data/SST5_tuned/results/spikes.npz",
+            "path": "cells/SST/tunes/tuned/output_data/SST5.3_tuned/results/spikes.npz",
             "selection": "sample",
             "crop_start_ms": 0.0,
             "crop_stop_ms": 1000.0,
@@ -514,7 +514,7 @@
           "start_ms": 0.0,
           "stop_ms": 1000.0,
           "source": {
-            "path": "cells/SST/tunes/tuned/output_data/SST5_tuned/results/spikes.npz",
+            "path": "cells/SST/tunes/tuned/output_data/SST5.3_tuned/results/spikes.npz",
             "selection": "sample",
             "crop_start_ms": 0.0,
             "crop_stop_ms": 1000.0,

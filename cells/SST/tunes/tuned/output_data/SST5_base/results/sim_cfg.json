@@ -123,11 +123,11 @@
       "precomputed": true
     }
   },
-  "tune_dir": "cells/SST/tunes/tuned",
+  "tune_dir": "/home/hrbncv/SCP/cells/SST/tunes/tuned",
   "cell": "SST",
   "tune": "tuned",
   "color": "magenta",
-  "_jitter_delay_ms": 230.33963919542813,
-  "_jitter_tstart_ms": 230.33963919542813,
+  "_jitter_delay_ms": 20.557604223464185,
+  "_jitter_tstart_ms": 20.557604223464185,
   "output_stem": "results"
 }
