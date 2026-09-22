@@ -50,6 +50,7 @@ analysis controls.
 
 - [Roadmap](project/roadmap.md)
 - [Demo outline](project/demo_outline.md)
+- [Public release cleanup](project/public_release_cleanup.md)
 - [v0.2.0 release notes](project/release_notes_v0.2.0.md)
 - [v0.1.0 release notes](project/release_notes_v0.1.0.md)
 - [Design contracts](../contracts/README.md)

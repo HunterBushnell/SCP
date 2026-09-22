@@ -34,6 +34,10 @@ the primary example and public default.
 
 - `cells/PV/tunes/tuned` remains the primary worked example and default in
   public notebooks.
+- Four curated 2,000-trial analysis examples are bundled: `PV5_base`,
+  `PV5_tuned`, `SST5_base`, and `SST5_tuned`. Their metadata uses portable
+  paths, while local scheduler logs and large regenerable input-stat sidecars
+  are omitted.
 - PN, PV, and SST retain their Allen-manifest layouts and historical loader
   aliases.
 - EUSmn, HYPO, and PGN exercise the same core Steps 1–3, IClamp simulation, and

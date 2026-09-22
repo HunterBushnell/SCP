@@ -28,12 +28,6 @@ cells/**/restore_backups/
 cells/**/*.nwb
 cells/**/act_workspace/
 
-# Local exploratory tune variants; keep curated public examples in `tuned`.
-cells/SST/tunes/tuned_allactive_newampa/
-cells/SST/tunes/tuned_allactive_oldampa/
-cells/SST/tunes/tuned_ampa_tune5.0_dantune2/
-cells/SST/tunes/tuned_peri_dantune1/
-
 # Local scratch morphology/browser exports.
 cells/*/tunes*.svg
 cells/*/tunes/*.svg

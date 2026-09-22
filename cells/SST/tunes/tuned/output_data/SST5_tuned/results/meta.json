@@ -4212,7 +4212,7 @@
   },
   "fit_json": {
     "filename": "485466109_fit.json",
-    "source_path": "/home/hrbncv/SCP/cells/SST/tunes/tuned/485466109_fit.json",
+    "source_path": "cells/SST/tunes/tuned/485466109_fit.json",
     "sha256": "7a547cc731261ebd106bba39889bc2fd1c2d6c80ec182935e34aa8250ab6b7cb"
   },
   "model_artifacts": {

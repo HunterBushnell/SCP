@@ -87,7 +87,7 @@
     {
       "path": "cells/SST/tunes/tuned/output_data/SST5_base",
       "label": "SST base",
-      "enabled": false,
+      "enabled": true,
       "shift_ms": 0,
       "scale": 1,
       "color": "magenta",
@@ -96,7 +96,7 @@
     {
       "path": "cells/SST/tunes/tuned/output_data/SST5_tuned",
       "label": "SST tuned",
-      "enabled": false,
+      "enabled": true,
       "shift_ms": 0,
       "scale": 1,
       "color": "darkmagenta",

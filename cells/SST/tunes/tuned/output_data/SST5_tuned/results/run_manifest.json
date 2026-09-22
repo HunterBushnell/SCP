@@ -9,7 +9,6 @@
     "cell_config": "cell_config.json",
     "geometry_config": "geometry_config.json",
     "avg_rate_curve": "avg_rate_curve.json",
-    "input_stats": "input_stats.json",
     "input_summaries": "input_summaries.json",
     "fit_json": "485466109_fit.json",
     "model_artifacts": "model_artifacts/manifest.json",
@@ -17,8 +16,8 @@
     "traces": "traces.npz",
     "inputs_sample": "inputs_sample.pkl",
     "plots": {
-      "single_plot": "/home/hrbncv/SCP/cells/SST/tunes/tuned/output_data/slurm_53140/plots/single_plot.svg",
-      "single_plot_1": "/home/hrbncv/SCP/cells/SST/tunes/tuned/output_data/slurm_53140/plots/single_plot.png"
+      "single_plot": "../plots/single_plot.svg",
+      "single_plot_1": "../plots/single_plot.png"
     }
   }
 }

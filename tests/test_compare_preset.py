@@ -29,7 +29,7 @@ class PaperComparePresetTests(unittest.TestCase):
         loaded = _engine._load_compare_preset(defaults["compare_preset_path"], self.repo_root)
         self.assertEqual(
             [entry["label"] for entry in loaded],
-            ["PV tuned", "SST tuned"],
+            ["PV base", "PV tuned", "SST base", "SST tuned"],
         )
 
     def test_enabled_flag_separates_available_path_from_active_mode(self) -> None:
