@@ -57,7 +57,7 @@ class PortableNotebookGuidanceTests(unittest.TestCase):
                 )
                 if parsed.scheme:
                     self.assertTrue(parsed.netloc, "Web links must include a host")
-                prefix = "/HunterBushnell/SCP/blob/main/"
+                prefix = "/cyneuro/SCP/blob/main/"
                 if parsed.netloc.lower() != "github.com" or not parsed.path.startswith(prefix):
                     continue
                 relative = unquote(parsed.path[len(prefix):])

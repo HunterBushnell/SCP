@@ -41,8 +41,10 @@ python scripts/check_notebooks.py
   already stuck, use **Developer: Reload Window** in VS Code first, then restart
   and Run All; a kernel restart alone may not reset extension state. Do not
   retry Save/Create blindly: check the existing Tune list or files first.
-  The workaround has real-kernel comm regression coverage; confirmation in the
-  affected live frontend remains part of the [roadmap](project/roadmap.md).
+  The user confirmed discovery, save, and copy feedback working after the
+  VS Code window reload. The workaround also has real-kernel comm regression
+  coverage; neither establishes broad browser/VS Code end-to-end coverage.
+  See the [roadmap](project/roadmap.md) for remaining validation boundaries.
 - Preview, registration, and working-copy errors do not lock model loading.
   Correct the input and retry; file/config checks run before the load lock in
   both workspace modes. Each action replaces only its own feedback.

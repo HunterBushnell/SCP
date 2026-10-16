@@ -224,7 +224,10 @@ Ask reviewers to focus on:
 
 ## 7. Suggested Closing
 
-SCP `v0.2.0` keeps PV as the primary example while demonstrating that the same
-core workflow supports Allen-manifest and object-owned HOC-template cells. The
-project remains a public preview; model-specific scientific tuning and optional
-ACT/BMTool workflows should still be reviewed for each new use case.
+SCP `v0.3.0` keeps PV as the primary worked example while extending the same
+core workflow to project-owned portable notebooks, saved Python builders, live
+cells, and external native sources alongside Allen and HOC models. The project
+remains a public preview; model-specific scientific tuning and optional ACT/BMTool
+workflows should still be reviewed for each new use case. See the
+[v0.3.0 release notes](release_notes_v0.3.0.md) for the prepared checkpoint's
+scope and remaining limitations.

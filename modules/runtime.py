@@ -12,7 +12,7 @@ def software_provenance():
     try:
         version = metadata.version("scp-pipeline")
     except metadata.PackageNotFoundError:
-        version = "0.2.0"
+        version = "0.3.0"
     result = {"name": "scp-pipeline", "version": version}
     root = code_root()
     try:

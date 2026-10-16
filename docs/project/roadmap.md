@@ -1,21 +1,29 @@
 # Roadmap
 
-This roadmap tracks deferred work after the v0.2.0 model-neutral pipeline and
-public HOC-example release. It is intentionally short; detailed implementation
-contracts belong in `contracts/` or issue trackers.
+This roadmap tracks deferred work after the v0.3.0 portable-pipeline and
+project-workspace checkpoint. It is intentionally short; detailed
+implementation contracts belong in `contracts/` or issue trackers.
 
 ## Near Term
 
-- Confirm the setup-feedback workaround in the affected live VS Code frontend.
-  Extension-host logs identified an Output-widget acknowledgement failure
+- Publish the reviewed v0.3.0 checkpoint, then complete the manual
+  `HunterBushnell/SCP` → `cyneuro/SCP` transfer and check access, settings, and
+  apps. Live canonical-link and Colab verification is post-transfer work.
+  Version metadata and release notes do not create a tag or GitHub release.
+  See the [transfer checklist](repository_transfer.md).
+- Retain setup-feedback regression coverage and extend frontend checks as
+  needed. The user confirmed discovery, save, and copy feedback working after
+  a VS Code window reload. Extension-host logs had identified an
+  Output-widget acknowledgement failure
   (`onKernelSocketMessage`, undefined `promise`) after discovery/copy actions.
   Setup and notebook-defaults text logs now use stock HTML widgets instead of
   OutputModel. A disposable Jupyter kernel verifies real frontend-style comm
   events for discovery, template selection, panel expansion, save, and repeated
   copy preview/create, with no OutputModel updates from those actions. This is
-  not a browser/VS Code end-to-end test. Preserve already-created tunes, reload
-  the VS Code window if its extension state is stuck, and retain NEURON's
-  construction/restart safeguards. Rich protocol plots still use Output widgets.
+  not a broad browser/VS Code end-to-end test. Preserve already-created tunes,
+  reload the VS Code window if its extension state is stuck, and retain
+  NEURON's construction/restart safeguards. Rich protocol plots still use
+  Output widgets.
 - Resolve ACT's pinned-source custom-builder copy bug before claiming a complete
   optimization walkthrough. At revision `2b3fdc190107b8242e3496329cfdf240abd09694`,
   `ACTModule._simulate_cells` calls

@@ -1,5 +1,12 @@
 # Single Cell Pipeline (SCP)
 
+Developed in the Neural Engineering Laboratory at the University of Missouri
+(Mizzou), with the project hosted through [CyNeuro](https://github.com/cyneuro).
+
+Current checkpoint: **v0.3.0**. See the
+[release notes](docs/project/release_notes_v0.3.0.md) for the dependency,
+portable-notebook, and model/workspace improvements since v0.2.0.
+
 SCP is a notebook-first workflow for preparing, tuning, simulating, and analyzing
 single-cell NEURON models. The tuned PV cell remains the primary example and
 the default in detailed notebooks and CLI checks. The compact notebook restores
@@ -98,8 +105,9 @@ SCP prefers installed packages; cloning either tool requires explicit opt-in. Se
 [installation guide](docs/installation.md) for optional-tool setup and overrides.
 
 The lab-use workflow is supported, but setup UI polish is ongoing. Setup text
-feedback avoids a diagnosed VS Code Jupyter Output-widget failure; see
-[troubleshooting](docs/troubleshooting.md#compact-notebook-action-fails) if
+feedback has real-kernel regression coverage and was confirmed working in the
+reported VS Code case after a window reload. This is not broad browser coverage;
+see [troubleshooting](docs/troubleshooting.md#compact-notebook-action-fails) if
 controls stop updating. Already registered cells do not need rebuilding.
 
 ## Optional Notebooks
@@ -167,6 +175,16 @@ Curated PV and SST saved outputs support analysis demonstrations but are not
 required to use the repo. Generate fresh outputs with Step 5 when you want to
 use Step 6 analysis.
 
+## Project and Contact
+
+SCP is a project of the Neural Engineering Laboratory at the University of
+Missouri (Mizzou), [CyNeuro](https://github.com/cyneuro). Hunter Bushnell is
+SCP's original creator and SCP contact: [hrbncv@missouri.edu](mailto:hrbncv@missouri.edu).
+
+The canonical repository is [cyneuro/SCP](https://github.com/cyneuro/SCP);
+report reproducible bugs and feature requests through its
+[issue tracker](https://github.com/cyneuro/SCP/issues).
+
 ## Licensing
 
 SCP-authored source code and documentation are available under the root
@@ -204,6 +222,8 @@ configs have been prepared.
 - [Output layout](docs/reference/outputs_layout.md)
 - [CLI and SLURM](docs/advanced/cli_slurm.md)
 - [Troubleshooting](docs/troubleshooting.md)
+- [Repository transfer checklist](docs/project/repository_transfer.md)
+- [v0.3.0 release notes](docs/project/release_notes_v0.3.0.md)
 - [v0.2.0 release notes](docs/project/release_notes_v0.2.0.md)
 
 Contracts in `contracts/` are developer/design references, not the primary user

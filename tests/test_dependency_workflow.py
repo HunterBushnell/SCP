@@ -1,4 +1,5 @@
 """Dependency acceptance tests use temporary, non-biological project assets."""
+import ast
 from contextlib import redirect_stdout
 import io
 import json
@@ -9,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import uuid
 import zipfile
 
@@ -107,6 +109,22 @@ endtemplate {self.name}
                         'assert modules.loaders.registry is scp_pipeline.loaders.registry; '
                         'from modules.model.load_cell import load_cell; '
                         'from scp_pipeline.model import load_cell as public; assert public is load_cell')
+
+    def test_checkout_provenance_fallback_matches_package_version(self):
+        from scp_pipeline import runtime
+
+        tree = ast.parse((ROOT / 'setup.py').read_text(encoding='utf-8'))
+        setup_call = next(node for node in ast.walk(tree)
+                          if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                          and node.func.id == 'setup')
+        package_version = next(ast.literal_eval(item.value) for item in setup_call.keywords
+                               if item.arg == 'version')
+        with patch.object(runtime.metadata, 'version',
+                          side_effect=runtime.metadata.PackageNotFoundError('scp-pipeline')) as lookup:
+            with patch.object(runtime, 'code_root', return_value=self.root):
+                provenance = runtime.software_provenance()
+        lookup.assert_called_once_with('scp-pipeline')
+        self.assertEqual(provenance, {'name': 'scp-pipeline', 'version': package_version})
 
     def test_preflight_conditions_and_overlap(self):
         from scp_pipeline.simulation.result_paths import _build_output_path
@@ -282,7 +300,7 @@ assert Path('.scp_project.json').is_file()
         self.assertEqual(installed.returncode, 0, installed.stdout + installed.stderr)
         imported = subprocess.run([str(python), '-c', 'from scp_pipeline.simulation import SimulationSession; '
                                    'from importlib.metadata import distribution; '
-                                   'assert distribution("scp-pipeline").version == "0.2.0"'],
+                                   'assert distribution("scp-pipeline").version == "0.3.0"'],
                                   cwd=self.root, capture_output=True, text=True)
         self.assertEqual(imported.returncode, 0, imported.stdout + imported.stderr)
         wheels = self.root / 'wheels'

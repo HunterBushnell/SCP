@@ -4,6 +4,19 @@ Use this checklist after a research cycle and before publishing a new SCP
 snapshot. The cleanup commands are dry-run by default so the archive inventory
 can be reviewed before any files move or are deleted.
 
+## Repository transfer does not require archive cleanup
+
+The prepared v0.3.0 checkpoint records completed workflow improvements and
+readiness for `HunterBushnell/SCP` → `cyneuro/SCP`. It does not publish itself,
+create a release, or perform the transfer. Follow the
+[transfer checklist](repository_transfer.md): commit/push the reviewed checkpoint,
+manually transfer, verify access/settings/apps, then update the local remote.
+Live links and Colab entry points still need post-transfer checks.
+
+Do not run archive cleanup for this ownership change. Leave A1, production and
+private workspaces, scientific assets, generated research data, and licensing
+files unchanged.
+
 ## Lightweight lab-use commit checkpoint
 
 A code/documentation update does not require archiving research runs or deleting
@@ -21,8 +34,9 @@ Before committing:
 - Run the checks in section 4, the installed CLI help paths, and the copied
   notebook/package tests. The optional ACT/BMTool integrations need validation
   only when used; core single-cell characterization must remain independent.
-- Read the [roadmap](roadmap.md) for known limitations. In particular, the live
-  Preview copy feedback issue remains open, ACT active optimization is
+- Read the [roadmap](roadmap.md) for known limitations. The user confirmed
+  discovery, save, and copy feedback working after reloading VS Code; this does
+  not establish broad browser coverage. ACT active optimization remains
   experimental with a known upstream defect, and detailed synaptic recording
   remains paused/default-off. Passing unit tests do not close those reviews.
 
