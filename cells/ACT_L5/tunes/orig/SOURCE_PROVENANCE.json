@@ -1,0 +1,159 @@
+{
+  "schema_version": 2,
+  "cell_name": "ACT_L5",
+  "tune": "orig",
+  "source_repository": {
+    "name": "ACT",
+    "remote": "https://github.com/V-Marco/ACT.git",
+    "commit": "2b3fdc190107b8242e3496329cfdf240abd09694"
+  },
+  "model_relationship": "Pristine Allen bundle supplied by ACT",
+  "runtime_conditions": {
+    "celsius_C": 34,
+    "v_init_mV": -90
+  },
+  "selection_policy": "Pinned native source bytes and declared/intrinsic dependencies only; no compiled outputs, drivers, checkpoints, or network execution.",
+  "compiled_outputs_included": false,
+  "files": [
+    {
+      "source_path": "data/L5/adb/497232429_fit.json",
+      "source_sha256": "a9b2fee5639dbfdbd79608bbd5d56944b7561d3e0338fa98cae24e58a119475b",
+      "destination_path": "497232429_fit.json",
+      "current_sha256": "a9b2fee5639dbfdbd79608bbd5d56944b7561d3e0338fa98cae24e58a119475b",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/Rorb-IRES2-Cre-D_Ai14-197851.04.01.01_491770985_m.swc",
+      "source_sha256": "f31bacb32ee2910719071354a792e4df5bc7e39c1ff2611c3d1e46065b11c816",
+      "destination_path": "Rorb-IRES2-Cre-D_Ai14-197851.04.01.01_491770985_m.swc",
+      "current_sha256": "f31bacb32ee2910719071354a792e4df5bc7e39c1ff2611c3d1e46065b11c816",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/Rorb-IRES2-Cre-D_Ai14-197851.04.01.01_491770985_marker_m.swc",
+      "source_sha256": "f3f851f210aa9f0d6ac4d4cb447582bc4d7b3fcbd6cc6fd7f21959e93e384d98",
+      "destination_path": "Rorb-IRES2-Cre-D_Ai14-197851.04.01.01_491770985_marker_m.swc",
+      "current_sha256": "f3f851f210aa9f0d6ac4d4cb447582bc4d7b3fcbd6cc6fd7f21959e93e384d98",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/manifest.json",
+      "source_sha256": "42085f93c925d4f9dd23accce3174d53f343de7778b3cc4ae7209b910c94f0f0",
+      "destination_path": "manifest.json",
+      "current_sha256": "42085f93c925d4f9dd23accce3174d53f343de7778b3cc4ae7209b910c94f0f0",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/CaDynamics.mod",
+      "source_sha256": "f012def9758f7d0244b81c54291edea6597c15fad99b9f7b5725b121a3567f16",
+      "destination_path": "modfiles/CaDynamics.mod",
+      "current_sha256": "f012def9758f7d0244b81c54291edea6597c15fad99b9f7b5725b121a3567f16",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/Ca_HVA.mod",
+      "source_sha256": "021d34cf9ef3e76b0f2afee1a1eeab40eed56d0d3b1362b7e1019f4433273c71",
+      "destination_path": "modfiles/Ca_HVA.mod",
+      "current_sha256": "021d34cf9ef3e76b0f2afee1a1eeab40eed56d0d3b1362b7e1019f4433273c71",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/Ca_LVA.mod",
+      "source_sha256": "a7a9ef262541dc96f5d19afd97778f9320808d01ce397350f1f2be3db30f920f",
+      "destination_path": "modfiles/Ca_LVA.mod",
+      "current_sha256": "a7a9ef262541dc96f5d19afd97778f9320808d01ce397350f1f2be3db30f920f",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/Ih.mod",
+      "source_sha256": "8616325d83add9a1a6546972352b4a62e57095ba25f3c6b5a57ab8b397e2d662",
+      "destination_path": "modfiles/Ih.mod",
+      "current_sha256": "8616325d83add9a1a6546972352b4a62e57095ba25f3c6b5a57ab8b397e2d662",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/Im.mod",
+      "source_sha256": "e1c3bfb2186439bdb963ff2c53268efb824d8e00401aef0a14b7d2234071bb2c",
+      "destination_path": "modfiles/Im.mod",
+      "current_sha256": "e1c3bfb2186439bdb963ff2c53268efb824d8e00401aef0a14b7d2234071bb2c",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/Im_v2.mod",
+      "source_sha256": "bc378428d3b4da76b6f9b1820dde1f52abef47389ce6edbcddb0c8fb967970fd",
+      "destination_path": "modfiles/Im_v2.mod",
+      "current_sha256": "bc378428d3b4da76b6f9b1820dde1f52abef47389ce6edbcddb0c8fb967970fd",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/K_P.mod",
+      "source_sha256": "2254697617c8da162ff8e5495e4d512fce53f77b44b86754855f11cee4ab3b3e",
+      "destination_path": "modfiles/K_P.mod",
+      "current_sha256": "2254697617c8da162ff8e5495e4d512fce53f77b44b86754855f11cee4ab3b3e",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/K_T.mod",
+      "source_sha256": "1cb9d72f985ef028922cafafed079df5c47b87a893001304181ec48881367ba7",
+      "destination_path": "modfiles/K_T.mod",
+      "current_sha256": "1cb9d72f985ef028922cafafed079df5c47b87a893001304181ec48881367ba7",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/Kd.mod",
+      "source_sha256": "1cac92486bf77c2976cad9a34e1741dc20ecda70d7b2c9bf5c3474e66f7dfcce",
+      "destination_path": "modfiles/Kd.mod",
+      "current_sha256": "1cac92486bf77c2976cad9a34e1741dc20ecda70d7b2c9bf5c3474e66f7dfcce",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/Kv2like.mod",
+      "source_sha256": "9244b0eb301dacee5a844910d6b4945856b90dc60937a74ac7f4f19f778d0895",
+      "destination_path": "modfiles/Kv2like.mod",
+      "current_sha256": "9244b0eb301dacee5a844910d6b4945856b90dc60937a74ac7f4f19f778d0895",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/Kv3_1.mod",
+      "source_sha256": "e636c3437a9d9ccb69a0a7efc09fcfe1f16ad97f0468615b70fdbc352fe0855c",
+      "destination_path": "modfiles/Kv3_1.mod",
+      "current_sha256": "e636c3437a9d9ccb69a0a7efc09fcfe1f16ad97f0468615b70fdbc352fe0855c",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/NaTa.mod",
+      "source_sha256": "fd6af6564b365f5ec016b453c8f540a15780dea62597053d10cc402443541caf",
+      "destination_path": "modfiles/NaTa.mod",
+      "current_sha256": "fd6af6564b365f5ec016b453c8f540a15780dea62597053d10cc402443541caf",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/NaTs.mod",
+      "source_sha256": "d75ed63d6367fe27c6e5671704594a510e8d83b57db835f30fc36e2f24bef6cf",
+      "destination_path": "modfiles/NaTs.mod",
+      "current_sha256": "d75ed63d6367fe27c6e5671704594a510e8d83b57db835f30fc36e2f24bef6cf",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/NaV.mod",
+      "source_sha256": "635605ba861c070f8fdc273365f3a0fca6eee24762afc9b102161fdd6e9cfc42",
+      "destination_path": "modfiles/NaV.mod",
+      "current_sha256": "635605ba861c070f8fdc273365f3a0fca6eee24762afc9b102161fdd6e9cfc42",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/Nap.mod",
+      "source_sha256": "979d21508f5b089e7b782835ea7f60311223bdc3a8e5242056c594305d2fb220",
+      "destination_path": "modfiles/Nap.mod",
+      "current_sha256": "979d21508f5b089e7b782835ea7f60311223bdc3a8e5242056c594305d2fb220",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/adb/modfiles/SK.mod",
+      "source_sha256": "079f1e3cac7444696d480b8e02853b215cd93e0c7b9986dbb54925fc49eddbeb",
+      "destination_path": "modfiles/SK.mod",
+      "current_sha256": "079f1e3cac7444696d480b8e02853b215cd93e0c7b9986dbb54925fc49eddbeb",
+      "relationship": "exact_copy"
+    }
+  ]
+}

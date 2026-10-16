@@ -1,4 +1,4 @@
-from modules.loaders.base import (
+from scp_pipeline.loaders.base import (
     CANONICAL_SECTION_GROUPS,
     LoadedCell,
     apply_soma_diameter_multiplier,
@@ -6,7 +6,7 @@ from modules.loaders.base import (
     ensure_section_aliases,
     unique_sections,
 )
-from modules.loaders.registry import (
+from scp_pipeline.loaders.registry import (
     DEFAULT_CELL_LOADER,
     LoaderSpec,
     available_cell_loaders,

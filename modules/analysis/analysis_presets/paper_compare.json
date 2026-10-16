@@ -40,7 +40,7 @@
   },
   "entries": [
     {
-      "path": "external_data/pyrFiringRateAvg.csv",
+      "path": "cells/PN/data/pyrFiringRateAvg.csv",
       "label": "PN bio",
       "enabled": false,
       "shift_ms": 290,
@@ -49,7 +49,7 @@
       "linestyle": "--"
     },
     {
-      "path": "external_data/PVFiringRateAvg.csv",
+      "path": "cells/PV/data/PVFiringRateAvg.csv",
       "label": "PV bio",
       "enabled": false,
       "shift_ms": 500,
@@ -58,7 +58,7 @@
       "linestyle": "--"
     },
     {
-      "path": "external_data/SSTFiringRateAvg.csv",
+      "path": "cells/SST/data/SSTFiringRateAvg.csv",
       "label": "SST bio",
       "enabled": false,
       "shift_ms": 500,

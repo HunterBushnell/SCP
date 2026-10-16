@@ -66,7 +66,8 @@ class Step4UI(PipelineUIComponent):
                     "<span style='font-size:90%; color:#555'>"
                     "Enable this optional stage and choose the configured "
                     "connection used to create the tuner around the shared "
-                    "Step 1 cell."
+                    "Step 1 cell. Install SCP's suggested BMTool extra once "
+                    "in this environment; no per-project BMTool path is needed."
                     "</span>"
                 ),
                 w.HBox([enabled, connection, initialize]),
@@ -152,7 +153,7 @@ class Step4UI(PipelineUIComponent):
         connection = self.controls.get("synapse_connection")
         if connection is None or self.pipeline_state is None:
             return
-        from modules.tuning import (
+        from scp_pipeline.tuning import (
             default_synapse_tuning_config,
             load_synapse_tuning_config,
             synapse_tuning_config_path,

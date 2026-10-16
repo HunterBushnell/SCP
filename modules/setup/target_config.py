@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
 
 from .defaults import default_target_config
-from .json_utils import CONFIG_MODE_VALUES, _write_json, _write_scaffold_json
+from .json_utils import CONFIG_MODE_VALUES, _read_json, _write_json, _write_scaffold_json
 from .paths import resolve_step1_paths
 
 TARGET_SOURCE_MODES = ("none", "manual", "traces", "allen_nwb")
@@ -39,8 +39,11 @@ def prepare_target_config(
         raise ValueError(f"config_mode must be one of {CONFIG_MODE_VALUES}, got {mode!r}")
 
     paths = resolve_step1_paths(Path(tune_dir).expanduser().resolve())
-    paths.config_dir.mkdir(parents=True, exist_ok=True)
     target_path = paths.target_config
+    if mode == "skip":
+        config = _read_json(target_path) if target_path.is_file() else {}
+        return {"path": str(target_path), "status": "skipped",
+                "target_source_mode": _current_target_mode(config)}
     resolved_source_mode = infer_target_source_mode(
         target_source_mode=target_source_mode,
         passive_trace=passive_trace,
@@ -63,13 +66,6 @@ def prepare_target_config(
         ),
         mode,
     )
-    if mode == "skip":
-        return {
-            "path": str(target_path),
-            "status": "skipped",
-            "target_source_mode": _current_target_mode(config),
-        }
-
     before = deepcopy(config)
     _apply_target_source(config, resolved_source_mode, target_description)
     if resolved_source_mode == "manual" or include_manual:

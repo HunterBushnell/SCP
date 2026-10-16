@@ -12,10 +12,22 @@ from .result_paths import (
     _build_output_path,
     _copy_fit_json_sidecar,
     _json_default,
+    _result_filename,
     _resolve_tune_path,
     _write_json,
 )
 from .model_artifacts import archive_model_artifacts
+from scp_pipeline.workspaces import WorkspaceMismatchError, result_workspace_identity
+
+
+def _record_workspace_identity(results: Dict[str, Any]) -> Dict[str, Any]:
+    """Persist additive identity metadata without relabeling legacy fields."""
+    identity = result_workspace_identity(results)
+    results.setdefault("sim_cfg", {})["workspace_identity"] = copy.deepcopy(identity)
+    results.setdefault("meta", {})["workspace_identity"] = copy.deepcopy(identity)
+    from scp_pipeline.runtime import software_provenance
+    results['meta'].setdefault('scp_software', software_provenance())
+    return identity
 
 
 def _load_tune_config_fallback(sim_cfg: Dict[str, Any], filename: str) -> Optional[Dict[str, Any]]:
@@ -35,6 +47,7 @@ def _load_tune_config_fallback(sim_cfg: Dict[str, Any], filename: str) -> Option
 
 
 def _save_sidecars(results: Dict[str, Any], run_dir: Path) -> Dict[str, str]:
+    _record_workspace_identity(results)
     run_dir.mkdir(parents=True, exist_ok=True)
     mode = results.get("mode", "")
     sim_cfg = results.get("sim_cfg", {}) or {}
@@ -48,6 +61,7 @@ def _save_sidecars(results: Dict[str, Any], run_dir: Path) -> Dict[str, str]:
     syn_config = meta.pop("syn_config", None)
     cell_config = meta.pop("cell_config", None)
     geometry_config = meta.pop("geometry_config", None)
+    model_state = meta.pop('model_state', None)
     if cell_config is None:
         cell_config = _load_tune_config_fallback(sim_cfg, "cell_config.json")
     if geometry_config is None:
@@ -57,13 +71,15 @@ def _save_sidecars(results: Dict[str, Any], run_dir: Path) -> Dict[str, str]:
     avg_rate_curve = meta.pop("avg_rate_curve", None)
     input_stats = meta.pop("input_stats", None)
     input_summaries = meta.pop("input_summaries", None)
-    fit_sidecar = _copy_fit_json_sidecar(sim_cfg, run_dir)
+    runtime_only = (cell_config or {}).get('cell_loader') == 'runtime_cell'
+    fit_sidecar = None if runtime_only else _copy_fit_json_sidecar(sim_cfg, run_dir)
     if fit_sidecar is not None:
         meta["fit_json"] = fit_sidecar
     artifact_info = archive_model_artifacts(
         sim_cfg,
         run_dir,
         cell_config=cell_config,
+        prepared_inputs=(meta.get('model_provenance') or {}).get('inputs'),
     )
     if artifact_info is not None:
         meta["model_artifacts"] = artifact_info
@@ -80,6 +96,9 @@ def _save_sidecars(results: Dict[str, Any], run_dir: Path) -> Dict[str, str]:
     if geometry_config is not None:
         _write_json(run_dir / "geometry_config.json", geometry_config)
         files["geometry_config"] = "geometry_config.json"
+    if model_state is not None:
+        _write_json(run_dir / 'model_state.json', model_state)
+        files['model_state'] = 'model_state.json'
     if avg_rate_curve is not None:
         _write_json(run_dir / "avg_rate_curve.json", avg_rate_curve)
         files["avg_rate_curve"] = "avg_rate_curve.json"
@@ -104,20 +123,20 @@ def _save_sidecars(results: Dict[str, Any], run_dir: Path) -> Dict[str, str]:
         files["spikes"] = "spikes.npz"
 
     traces = results.get("traces", {}) or {}
-    if "T" in traces:
+    if traces:
         trace_path = run_dir / "traces.npz"
+        # Keep the complete legacy trace mapping, including I/G when present.
+        # Synaptic aggregate recordings have their own independent time axis.
+        trace_payload = {"traces_payload": _object_scalar(traces)}
         if mode == "multi":
-            np.savez(
-                trace_path,
-                T=np.asarray(traces.get("T")),
-                V_trials=np.array(traces.get("V", []), dtype=object),
-            )
+            if "V" in traces:
+                trace_payload["V_trials"] = np.array(traces["V"], dtype=object)
         else:
-            np.savez(
-                trace_path,
-                T=np.asarray(traces.get("T")),
-                V=np.asarray(traces.get("V")),
-            )
+            if "V" in traces:
+                trace_payload["V"] = np.asarray(traces["V"])
+        if "T" in traces:
+            trace_payload["T"] = np.asarray(traces["T"])
+        np.savez(trace_path, **trace_payload)
         files["traces"] = "traces.npz"
 
     cell_recordings = results.get("cell_recordings")
@@ -160,6 +179,16 @@ def _save_sidecars(results: Dict[str, Any], run_dir: Path) -> Dict[str, str]:
             pickle.dump(syn_records_by_trial, f)
         files["syn_records_by_trial"] = "syn_records_by_trial.pkl"
 
+    # These are measured variables, not the placement metadata in syn_records.
+    # Saving never reapplies capture limits: format conversion must be lossless.
+    for key in ("syn_recordings", "syn_recordings_by_trial"):
+        value = results.get(key)
+        if value is not None:
+            filename = f"{key}.pkl"
+            with (run_dir / filename).open("wb") as f:
+                pickle.dump(value, f)
+            files[key] = filename
+
     return files
 
 
@@ -168,15 +197,22 @@ def save_results(
     base_dir: Union[str, Path] = "output_data",
 ) -> Optional[Path]:
 
-    from .result_appending import _append_results_to_path
+    from .result_appending import _append_results_to_path, _validate_append_destination
 
     sim_cfg = results.get("sim_cfg", {})
+    identity = _record_workspace_identity(results)
+    append_to = sim_cfg.get("append_to")
+    if sim_cfg.get("append_enabled", True) and append_to:
+        warnings = _validate_append_destination(results, append_to, base_dir=base_dir)
+        results.setdefault("meta", {}).setdefault("append_warnings", []).extend(warnings)
     out_path = _build_output_path(sim_cfg, base_dir=base_dir)
     if out_path is None:
         append_to = sim_cfg.get("append_to")
-        if append_to:
+        if sim_cfg.get("append_enabled", True) and append_to:
             try:
                 _append_results_to_path(results, append_to, base_dir=base_dir)
+            except WorkspaceMismatchError:
+                raise
             except Exception as exc:
                 print(f"append_to failed: {exc}")
         return None
@@ -186,6 +222,7 @@ def save_results(
     run_dir = out_path.parent
     manifest = {
         "format_version": 1,
+        "workspace_identity": identity,
         "mode": results.get("mode", ""),
         "output_stem": sim_cfg.get("output"),
         "files": {},
@@ -204,39 +241,7 @@ def save_results(
         manifest["files"].update(_save_sidecars(results, run_dir))
 
     if save_full_results and fmt == "npz":
-        # compact, interoperable: arrays + JSON metadata
-        mode = results.get("mode", "")
-        meta = results.get("meta", {})
-        traces = results.get("traces", {}) or {}
-        spikes = results.get("spikes", None)
-
-        payload = {
-            "mode": np.array(mode),
-            "sim_cfg_json": np.array(json.dumps(sim_cfg, default=_json_default)),
-            "meta_json": np.array(json.dumps(meta, default=_json_default)),
-        }
-
-        if "T" in traces:
-            payload["T"] = traces["T"]
-
-        if mode == "single":
-            if "V" in traces:
-                payload["V"] = traces["V"]
-            if spikes is not None:
-                payload["spikes"] = spikes
-            if results.get("cell_recordings") is not None:
-                payload["cell_recordings"] = np.array(results.get("cell_recordings"), dtype=object)
-        elif mode == "multi":
-            if spikes is not None:
-                payload["spikes"] = np.array(spikes, dtype=object)
-            if "V" in traces:
-                payload["V_trials"] = np.array(traces["V"], dtype=object)
-            if results.get("cell_recordings_by_trial") is not None:
-                payload["cell_recordings_by_trial"] = np.array(
-                    results.get("cell_recordings_by_trial"), dtype=object
-                )
-
-        np.savez(out_path, **payload)
+        _write_results_file(results, out_path, "npz")
         manifest["files"]["results_npz"] = out_path.name
     elif save_full_results:
         # full Python dict with everything
@@ -247,7 +252,7 @@ def save_results(
     # Optional: auto-save plots into run_dir/plots
     if sim_cfg.get("save_plots", False):
         try:
-            from modules.analysis import auto_plots
+            from scp_pipeline.analysis import auto_plots
 
             saved_plots = auto_plots.save_default_plots(
                 results,
@@ -278,7 +283,7 @@ def save_results(
     # This is independent of plot saving and remains non-fatal for completed runs.
     if sim_cfg.get("save_output_metrics", False):
         try:
-            from modules.analysis import output_metrics
+            from scp_pipeline.analysis import output_metrics
 
             saved_metrics = output_metrics.save_output_metrics_from_results(
                 results,
@@ -305,6 +310,8 @@ def save_results(
     if sim_cfg.get("append_enabled", True) and append_to:
         try:
             _append_results_to_path(results, append_to, base_dir=run_dir.parent)
+        except WorkspaceMismatchError:
+            raise
         except Exception as exc:
             print(f"append_to failed: {exc}")
 
@@ -327,7 +334,15 @@ def save_results_with_name(
     sim_cfg["output"] = str(output_stem)
     return save_results(results, base_dir=base_dir)
 
+def _object_scalar(value: Any) -> np.ndarray:
+    """Store nested Python payloads without NumPy reshaping equal-sized lists."""
+    array = np.empty((), dtype=object)
+    array[()] = value
+    return array
+
+
 def _write_results_file(results: Dict[str, Any], out_path: Path, fmt: str) -> None:
+    _record_workspace_identity(results)
     fmt = str(fmt).lower()
     if fmt == "npz":
         mode = results.get("mode", "")
@@ -340,6 +355,7 @@ def _write_results_file(results: Dict[str, Any], out_path: Path, fmt: str) -> No
             "mode": np.array(mode),
             "sim_cfg_json": np.array(json.dumps(sim_cfg, default=_json_default)),
             "meta_json": np.array(json.dumps(meta, default=_json_default)),
+            "traces_payload": _object_scalar(traces),
         }
 
         if "T" in traces:
@@ -350,17 +366,18 @@ def _write_results_file(results: Dict[str, Any], out_path: Path, fmt: str) -> No
                 payload["V"] = traces["V"]
             if spikes is not None:
                 payload["spikes"] = spikes
-            if results.get("cell_recordings") is not None:
-                payload["cell_recordings"] = np.array(results.get("cell_recordings"), dtype=object)
         elif mode == "multi":
             if spikes is not None:
                 payload["spikes"] = np.array(spikes, dtype=object)
             if "V" in traces:
                 payload["V_trials"] = np.array(traces["V"], dtype=object)
-            if results.get("cell_recordings_by_trial") is not None:
-                payload["cell_recordings_by_trial"] = np.array(
-                    results.get("cell_recordings_by_trial"), dtype=object
-                )
+
+        for key in (
+            "cell_recordings", "cell_recordings_by_trial", "inputs", "inputs_by_trial",
+            "syn_records", "syn_records_by_trial", "syn_recordings", "syn_recordings_by_trial",
+        ):
+            if results.get(key) is not None:
+                payload[key] = _object_scalar(results[key])
 
         np.savez(out_path, **payload)
     else:
@@ -374,6 +391,7 @@ def _write_results_to_run_dir(
     fmt: Optional[str] = None,
     results_name: Optional[str] = None,
 ) -> Path:
+    identity = _record_workspace_identity(results)
     run_dir.mkdir(parents=True, exist_ok=True)
     sim_cfg = results.get("sim_cfg", {}) or {}
 
@@ -382,16 +400,15 @@ def _write_results_to_run_dir(
     fmt = str(fmt).lower()
 
     if results_name is None:
-        cell = sim_cfg.get("cell", "cell")
-        tune = sim_cfg.get("tune", "tune")
         stem = sim_cfg.get("output") or run_dir.name
         suffix = ".npz" if fmt == "npz" else ".pkl"
-        results_name = f"{cell}_{tune}_{stem}{suffix}"
+        results_name = _result_filename(sim_cfg, stem, suffix)
 
     out_path = run_dir / results_name
 
     manifest = {
         "format_version": 1,
+        "workspace_identity": identity,
         "mode": results.get("mode", ""),
         "output_stem": sim_cfg.get("output"),
         "files": {},

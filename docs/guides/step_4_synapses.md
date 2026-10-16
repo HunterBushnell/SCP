@@ -134,7 +134,7 @@ modules/tuning/bmtool_synapse_adapter.py
 It handles:
 
 - locating the SCP repo,
-- locating or cloning BMTool,
+- resolving the environment's BMTool package or an explicit/legacy checkout,
 - compiling/loading tune mechanisms,
 - building the SCP cell,
 - rejecting unavailable point-process names and invalid `sec_id` values before
@@ -415,45 +415,56 @@ public notebooks.
 
 Local use:
 
-- install SCP's environment,
+- install SCP's environment with the suggested `.[bmtool]` extra, or add
+  `python -m pip install -r requirements-bmtool.txt` once in that environment,
 - open `4_synapses.ipynb`.
-- click/run BMTool initialization; SCP reuses a configured checkout or clones
-  a missing one to `../mods/bmtool`.
+- click/run BMTool initialization; SCP uses the installed package without
+  requiring a checkout path.
 
 Colab use:
 
 - open the root `4_synapses.ipynb`,
 - run the environment setup cell,
-- allow the notebook to clone SCP and BMTool when needed,
+- allow the notebook to bootstrap SCP, then explicitly run
+  `%pip install bmtool==0.8.6` for BMTool and restart the runtime if needed,
 - make sure any required tune/model files are available in the runtime.
 
 BMTool resolution order:
 
 1. `SCP_BMTOOL_PATH`, `SCP_BMTOOL_DIR`, `BMTOOL_PATH`, or `BMTOOL_ROOT`,
-2. `../mods/bmtool` relative to SCP,
-3. common local `mods/bmtool` locations,
-4. action-triggered automatic clone locally or in Colab.
+2. the environment's importable `bmtool` package (normal or editable install),
+3. existing legacy `mods/bmtool` locations, including `../mods/bmtool`,
+4. a clone only if explicitly opted into with `SCP_AUTO_CLONE_BMTOOL=1`.
+
+An invalid explicit override or an installed package with broken imports or an
+incompatible synapse API is reported directly, not replaced by another copy.
+Changing BMTool installations/checkouts requires a fresh kernel. The
+`--check-bmtool` setup check follows the same selection/API validation without
+cloning or constructing a tuner. Neither ordinary initialization nor this check
+runs pip or upgrades the environment.
 
 ## Troubleshooting
 
 ### BMTool Not Found
 
-Initialization normally clones BMTool when it is missing. If that fails, check
-Git/network access and confirm `../mods/bmtool` is absent or empty. You can
-also clone BMTool next to SCP manually:
+Install the suggested package once in the active SCP environment, then restart
+the kernel:
 
 ```bash
-mkdir -p ../mods
-git clone https://github.com/cyneuro/bmtool.git ../mods/bmtool
+python -m pip install -r requirements-bmtool.txt
 ```
 
-Or set:
+Run this from SCP, or give the requirements file's full path. Verify the notebook
+kernel uses that same environment. If you deliberately need a source-checkout
+override, set:
 
 ```bash
 export SCP_BMTOOL_PATH=/path/to/bmtool
 ```
 
-Set `SCP_AUTO_CLONE_BMTOOL=0` to opt out of automatic installation.
+Unset that override to use an environment installation instead. Automatic
+cloning is disabled by default; optional legacy provisioning is documented in
+the [installation guide](../installation.md#external-repositories).
 
 ### Mechanism Already Loaded
 
@@ -493,3 +504,10 @@ to the current variable exposed by the synapse mechanism.
 `sec_id` indexes `list(cell.all)`, which is useful for a single test synapse but
 not necessarily intuitive. Start with soma/proximal test locations, then use
 Step 5 placement preview for full group-level placement.
+
+## Custom cell adoption
+
+Step 4 accepts `CELL_OVERRIDE` and explicit runtime conditions, retaining the
+cell's canonical soma/all sections without reconstruction. BMTool remains
+optional and is imported only after mechanism/index checks. No missing synapse
+mechanism is silently substituted. See [Custom models](custom_models.md).

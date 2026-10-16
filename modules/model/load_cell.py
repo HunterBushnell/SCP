@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from modules.loaders import (
+from scp_pipeline.loaders import (
     LoadedCell,
     get_cell_loader_name,
     load_cell_with_registered_loader,

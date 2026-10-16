@@ -80,7 +80,7 @@ Object entries are also supported in `compare_list_paths`:
 
 ```json
 {
-  "path": "external_data/pyrFiringRateAvg.csv@290",
+  "path": "cells/PN/data/pyrFiringRateAvg.csv@290",
   "enabled": true,
   "color": "k",
   "label": "PN bio"
@@ -89,5 +89,9 @@ Object entries are also supported in `compare_list_paths`:
 
 ## User Docs
 
+- Bundled curves now live under `cells/<cell>/data/`. Historical saved-run
+  snapshots retain their original `external_data/...` paths; compatibility
+  aliases resolve them without rewriting recorded configs. See
+  [cell-scoped data](../../docs/guides/cell_data.md).
 - Main guide: `docs/guides/analysis.md`
 - Detailed Step 6 reference: `docs/guides/step_6_analysis.md`

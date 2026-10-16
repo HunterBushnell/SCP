@@ -17,7 +17,8 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-from modules.model.geometry import cell_sections
+from scp_pipeline.model.geometry import cell_sections
+from scp_pipeline.workspaces import discover_cells, discover_projects, discover_tunes, resolve_workspace, result_workspace_identity
 
 
 def _get_duration_ms(results: Dict[str, Any]) -> Optional[float]:
@@ -1873,6 +1874,12 @@ def _select_trace_trial_series(value: Any, *, trial_idx: Optional[int] = None) -
         return None
 
 
+from .synaptic_recordings import (
+    summarize_synaptic_recordings, format_synaptic_recording_table,
+    plot_synaptic_recordings, recorded_group_totals,
+)
+
+
 def summarize_total_synaptic_traces(
     results: Dict[str, Any],
     *,
@@ -1881,7 +1888,8 @@ def summarize_total_synaptic_traces(
     stim_start_ms: Optional[float] = None,
     stim_stop_ms: Optional[float] = None,
 ) -> Dict[str, Any]:
-    traces = results.get("traces", {}) or {}
+    measured = recorded_group_totals(results, trial_idx)
+    traces = measured['series'] if measured is not None else (results.get("traces", {}) or {})
     i_trace = _select_trace_trial_series(traces.get("I"), trial_idx=trial_idx)
     g_trace = _select_trace_trial_series(traces.get("G"), trial_idx=trial_idx)
     if i_trace is None and g_trace is None:
@@ -1889,7 +1897,9 @@ def summarize_total_synaptic_traces(
             "available": False,
             "trial_idx": trial_idx,
             "series": {},
-            "message": "No total synaptic traces (I/G) found in results['traces'].",
+            "message": "No complete recorded-group I/G sums found; individual/group recordings may still be available.",
+            "aggregation_verified": measured is not None,
+            "incomplete_groups": measured.get('incomplete_groups', {}) if measured else {},
         }
 
     n_hint = 0
@@ -1897,7 +1907,7 @@ def summarize_total_synaptic_traces(
         n_hint = max(n_hint, int(i_trace.size))
     if g_trace is not None:
         n_hint = max(n_hint, int(g_trace.size))
-    t_ms = _resolve_time_axis(results, n_hint=n_hint)
+    t_ms = measured['T'] if measured is not None else _resolve_time_axis(results, n_hint=n_hint)
     if t_ms.size == 0 and n_hint > 0:
         t_ms = np.arange(n_hint, dtype=float)
 
@@ -1944,6 +1954,9 @@ def summarize_total_synaptic_traces(
 
     return {
         "available": bool(series),
+        "aggregation_verified": measured is not None,
+        "scope": 'recorded_groups' if measured is not None else 'legacy_aggregation_unknown',
+        "recorded_groups": measured.get('recorded_groups', []) if measured else [],
         "trial_idx": trial_idx,
         "time_start_ms": float(t_ms[0]) if t_ms.size else None,
         "time_stop_ms": float(t_ms[-1]) if t_ms.size else None,
@@ -1965,6 +1978,10 @@ def format_total_synaptic_trace_table(
     lines: list[str] = []
     if title:
         lines.append(f"**{title}**")
+    if not summary.get('aggregation_verified', False):
+        lines += ['', 'Legacy I/G traces: aggregation is unknown; these are not verified synaptic totals.', '']
+    else:
+        lines += ['', 'Sums of complete recorded groups, not necessarily all synapses in the cell.', '']
     lines.extend(
         [
             "| Trace | n | mean | std | min | max | baseline_mean | stim_mean | stim_delta | stim_peak_abs | stim_auc |",
@@ -1985,7 +2002,7 @@ def format_total_synaptic_trace_table(
         )
         rows += 1
     if rows == 0:
-        lines.append("| (no total synaptic traces found) | — | — | — | — | — | — | — | — | — | — |")
+        lines.append("| (no verified recorded-group sums found) | — | — | — | — | — | — | — | — | — | — |")
     return "\n".join(lines)
 
 
@@ -3183,7 +3200,7 @@ def compare_config_runs(
         label_raw = None
         if labels is not None and idx < len(labels):
             label_raw = labels[idx]
-        base_label = str(label_raw).strip() if label_raw not in (None, "") else run_label(run_dir)
+        base_label = str(label_raw).strip() if label_raw not in (None, "") else comparison_run_label(run_dir)
         suffix_idx = used_labels.get(base_label, 0)
         label = base_label if suffix_idx == 0 else f"{base_label}_{suffix_idx + 1}"
         used_labels[base_label] = suffix_idx + 1
@@ -3517,7 +3534,7 @@ def format_snapshot_compare(
 def _load_results_any(run_or_results: Union[str, Path, Dict[str, Any]]) -> Dict[str, Any]:
     if isinstance(run_or_results, dict):
         return run_or_results
-    from modules import run_sim
+    from scp_pipeline import run_sim
 
     return run_sim.load_results(run_or_results)
 
@@ -3709,6 +3726,10 @@ def find_scp_root(start: Path) -> Path:
     Locate the SCP repo root starting from `start`.
     Falls back to `start` if no SCP layout is detected.
     """
+    from scp_pipeline.projects import project_for_tune
+    project = project_for_tune(Path(start) / '__analysis__')
+    if project is not None:
+        return project
     for p in [start] + list(start.parents):
         if (p / "cells").is_dir() and (p / "run_pipeline.py").is_file():
             return p
@@ -3743,6 +3764,10 @@ def resolve_scp_root_for_results(results: Dict[str, Any], run_dir: Union[str, Pa
     """
     sim_cfg = results.get("sim_cfg", {}) or {}
     candidates: list[Path] = []
+    if sim_cfg.get('project_root'):
+        owner = Path(sim_cfg['project_root']).expanduser()
+        if owner.is_dir():
+            return owner.resolve()
 
     env_root = os.environ.get("SCP_ROOT")
     if env_root:
@@ -3775,15 +3800,20 @@ def resolve_scp_root_for_results(results: Dict[str, Any], run_dir: Union[str, Pa
     return Path(__file__).resolve().parents[2]
 
 
-def list_cells(base_dir: Path) -> list[str]:
-    cells_dir = base_dir / "cells"
-    if not cells_dir.is_dir():
+def list_projects(base_dir: Path) -> list[str]:
+    """List named projects without merging their cells into the legacy scope."""
+    return discover_projects(base_dir)
+
+
+def list_cells(base_dir: Path, project_name: Optional[str] = None) -> list[str]:
+    return discover_cells(base_dir, project_name=project_name)
+
+
+def list_tunes(base_dir: Path, cell: str, project_name: Optional[str] = None) -> list[str]:
+    if not cell:
         return []
-    return sorted([p.name for p in cells_dir.iterdir() if p.is_dir()])
-
-
-def list_tunes(base_dir: Path, cell: str) -> list[str]:
-    base = base_dir / "cells" / cell
+    base = resolve_workspace(repo_root=base_dir, project_name=project_name,
+                             cell_name=cell, tune_name="__discovery__", cell_config={}).tune_dir.parent.parent
     if not base.is_dir():
         return []
     if (base / "tunes").is_dir():
@@ -3791,11 +3821,10 @@ def list_tunes(base_dir: Path, cell: str) -> list[str]:
     return sorted([p.name for p in base.iterdir() if p.is_dir()])
 
 
-def list_models(base_dir: Path, cell: str, tunes: str) -> list[str]:
-    base = base_dir / "cells" / cell / tunes
-    if not base.is_dir():
+def list_models(base_dir: Path, cell: str, tunes: str, project_name: Optional[str] = None) -> list[str]:
+    if not cell or not tunes:
         return []
-    return sorted([p.name for p in base.iterdir() if p.is_dir()])
+    return discover_tunes(base_dir, cell, project_name=project_name, tunes_parent=tunes)
 
 
 def resolve_run_dir(candidate: Path) -> Path:
@@ -3873,6 +3902,40 @@ def run_label(run_dir: Path) -> str:
     return run_dir.parent.name if _is_wrapped_results_dir(run_dir) else run_dir.name
 
 
+def comparison_run_label(run_dir: Path) -> str:
+    """Qualify project comparison labels without changing selectable run tokens.
+
+    Saved metadata permits runs exported outside their source workspace to keep
+    their namespace. No model construction or source configuration writes occur.
+    The separator is filesystem-safe because these labels also name exports.
+    """
+    run_dir = resolve_run_dir(Path(run_dir))
+    label = run_label(run_dir)
+    saved_metadata: Dict[str, Any] = {}
+    manifest = run_dir / "run_manifest.json"
+    if manifest.is_file():
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+        if isinstance(payload, dict):
+            saved_metadata.update(payload)
+    metadata = run_dir / "sim_cfg.json"
+    if metadata.is_file():
+        payload = json.loads(metadata.read_text(encoding="utf-8"))
+        if isinstance(payload, dict):
+            saved_metadata["sim_cfg"] = payload
+    metadata = run_dir / "meta.json"
+    if metadata.is_file():
+        payload = json.loads(metadata.read_text(encoding="utf-8"))
+        if isinstance(payload, dict):
+            saved_metadata["meta"] = payload
+    # A run's current directory is not historical model provenance. In
+    # particular, moving an old unscoped run into a project must not relabel it.
+    identity = result_workspace_identity(saved_metadata) if saved_metadata else None
+    if not identity or identity.get("project_name") is None:
+        return label
+    return "__".join(str(value) for value in (identity["project_name"], identity.get("cell_name"),
+                                             identity.get("tune_name"), label) if value is not None)
+
+
 def plot_dir_for_run(run_dir: Path) -> Path:
     return run_dir.parent / "plots" if _is_wrapped_results_dir(run_dir) else run_dir / "plots"
 
@@ -3882,12 +3945,12 @@ def analysis_dir_for_run(run_dir: Path) -> Path:
 
 
 def plot_dir_for_compare(base_dir: Path, run_a: Path, run_b: Path) -> Path:
-    label = f"{run_label(run_a)}_vs_{run_label(run_b)}"
+    label = f"{comparison_run_label(run_a)}_vs_{comparison_run_label(run_b)}"
     return base_dir / "_comparisons" / label / "plots"
 
 
 def analysis_dir_for_compare(base_dir: Path, run_a: Path, run_b: Path) -> Path:
-    label = f"{run_label(run_a)}_vs_{run_label(run_b)}"
+    label = f"{comparison_run_label(run_a)}_vs_{comparison_run_label(run_b)}"
     return base_dir / "_comparisons" / label / "analysis"
 
 
@@ -4010,18 +4073,23 @@ def build_multi_plot_inputs(
 
 def load_cell_and_geometry(
     tune_dir: Path,
+    *, cell_override=None,
 ) -> tuple[Any, Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     cell_cfg_path = tune_dir / "cell_configs" / "cell_config.json"
     geom_cfg_path = tune_dir / "cell_configs" / "geometry.json"
-    cell_cfg = json.loads(cell_cfg_path.read_text())
+    cell_cfg = json.loads(cell_cfg_path.read_text()) if cell_cfg_path.is_file() else {}
     geom_cfg = json.loads(geom_cfg_path.read_text()) if geom_cfg_path.is_file() else None
 
-    from modules.model import geometry as geom_mod
-    from modules.model import load_cell
-    from modules.simulation.session_setup import load_mechanisms
+    from scp_pipeline.model import geometry as geom_mod
+    from scp_pipeline.model import load_cell
+    from scp_pipeline.simulation.session_setup import load_mechanisms
 
-    load_mechanisms(tune_dir, cell_cfg)
-    cell = load_cell(cell_cfg, base_dir=tune_dir)
+    if cell_override is not None:
+        from scp_pipeline.model import wrap_cell
+        cell = wrap_cell(cell_override)
+    else:
+        load_mechanisms(tune_dir, cell_cfg)
+        cell = load_cell(cell_cfg, base_dir=tune_dir)
     geom = geom_mod.define_geometry(cell, geom_cfg)
 
     return cell, geom, geom_cfg

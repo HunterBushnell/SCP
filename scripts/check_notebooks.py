@@ -35,6 +35,7 @@ DEFAULT_NOTEBOOKS = [
     "6_analysis.ipynb",
     "7_tools.ipynb",
     "extra_notebooks/act_segmentation.ipynb",
+    "extra_notebooks/custom_cells.ipynb",
 ]
 
 FORBIDDEN_SOURCE_PATTERNS = [

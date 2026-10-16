@@ -1,5 +1,16 @@
 # Troubleshooting
 
+## Project-owned notebook setup
+
+If a copied compact notebook cannot import `scp_pipeline`, select the SCP kernel
+and install the checkout once with `python -m pip install -e /path/to/SCP` in that
+environment. Do not add the generic `modules` package to a project's imports.
+If paths point at the wrong directory, check Project dir: Jupyter's starting
+directory need not be the notebook file's directory. Preview errors can be
+corrected without restarting; errors after Prepare begins may require a fresh
+kernel because NEURON definitions are process-global. See the
+[dependency workflow](guides/dependency_workflow.md).
+
 ## First Check
 
 Run the setup checker:
@@ -19,9 +30,34 @@ python scripts/check_notebooks.py
 
 ## Compact Notebook Action Fails
 
+- **Buttons look clickable, but feedback and expanding panels stop updating:**
+  VS Code Jupyter can fail in its Output-widget message handler while Python
+  callbacks continue, including successful saves/copies. A diagnosed instance
+  logged `Cannot read properties of undefined (reading 'promise')` in
+  `onKernelSocketMessage` in **Output → Log (Extension Host)**. Setup and
+  notebook-defaults text logs now use ordinary HTML widgets, avoiding that
+  Output-specific handler. Rich protocol plots still need Jupyter outputs.
+  After updating SCP, restart the kernel and Run All. If the frontend was
+  already stuck, use **Developer: Reload Window** in VS Code first, then restart
+  and Run All; a kernel restart alone may not reset extension state. Do not
+  retry Save/Create blindly: check the existing Tune list or files first.
+  The workaround has real-kernel comm regression coverage; confirmation in the
+  affected live frontend remains part of the [roadmap](project/roadmap.md).
+- Preview, registration, and working-copy errors do not lock model loading.
+  Correct the input and retry; file/config checks run before the load lock in
+  both workspace modes. Each action replaces only its own feedback.
+- If a copy already exists after an error, select that existing tune using
+  Cell/Tune or Tune path instead of creating it again. A copy can succeed even
+  if the subsequent navigation/settings update fails.
 - Step 1 prevents a second model-construction attempt after a failed load.
   Restart the kernel, correct the reported setup/config issue, and rerun from
   the top.
+- If buttons look clickable but do nothing while the kernel is idle, try a new
+  code cell with `print("kernel responds")`. If it runs, check the action status
+  and whether the displayed controls belong to the current kernel. After a
+  restart, Run All to render fresh controls; saved widget displays are not live
+  connections. Restarting does not remove saved tunes or results. If even a
+  plain code cell does not run, resolve the Jupyter/kernel connection first.
 - If a source fingerprint warning names `cell_config.json`, morphology,
   fit/HOC, or MOD files, restart the kernel. For target, simulation, geometry,
   synapse, or ACT config edits, rerun the action that consumes the file instead.
@@ -117,14 +153,38 @@ terminated and its retained manifest is marked incomplete. Rerunning an earlier
 module can make later predictions stale because the later module was trained
 against the earlier proposal.
 
-If compact preparation cannot install or import ACT, inspect the concise error
-for Git/network access, an invalid non-empty `SCP_ACT_DIR`, or missing Python
-dependencies. SCP attempts a fresh clone when the ACT action is requested,
-both locally and in Colab. You can instead set `ACT_ROOT`/`SCP_ACT_PATH` and
-prepare again. Non-PV/SST cells need a complete
+If compact preparation cannot import ACT, install the pinned source package
+once with `python -m pip install -r requirements-act.txt` from SCP in the active
+environment, then restart the kernel. Do not substitute an unqualified
+`pip install act`. Check the underlying exception for missing Python dependencies
+or an incompatible API. Correct/unset stale `ACT_ROOT` / `SCP_ACT_PATH` /
+`SCP_ACT_DIR` / `ACT_PATH` overrides, which take precedence over the environment
+package. Preparation does not run pip or clone ACT by default.
+Non-PV/SST cells need a complete
 `act_workspace/act_active_config.json` prepared and validated in
 `3_active.ipynb`; registered non-Allen loaders are accepted experimentally only
 after fresh-process cell construction succeeds.
+
+If optimization reaches ACT but reports `TypeError: 'tuple' object is not
+callable`, the pinned ACT revision has a known custom-builder copy bug inside
+`ACTModule._simulate_cells`; reinstalling or moving the checkout does not fix
+it. See the [installation limitation](installation.md#act-suggested-install-once-source-dependency)
+and [roadmap](project/roadmap.md). Passive proposals and model-neutral SCP
+protocols do not depend on that optimizer path.
+
+## BMTool import or synapse API unavailable
+
+BMTool is a suggested, install-once environment dependency for Step 4, not a
+required sibling checkout. From SCP in the active environment, run
+`python -m pip install -r requirements-bmtool.txt`, restart the kernel, and check
+`scp-pipeline check --steps 4 --cell PV --tune tuned --check-bmtool`.
+For an external workspace, pass its `--tune-dir` instead of the example names.
+
+Check the underlying import exception for missing Python dependencies. An
+installed but broken/incompatible BMTool does not trigger a replacement clone.
+Correct or unset `SCP_BMTOOL_PATH` / `SCP_BMTOOL_DIR` / `BMTOOL_PATH` /
+`BMTOOL_ROOT` if an old override selects another checkout. Do not switch already
+imported copies in the same kernel. See [installation](installation.md).
 
 ## Missing Configs
 
@@ -173,6 +233,27 @@ Common causes:
 
 Gaps between input blocks are allowed and treated as quiescent.
 
+## HOC Load Reports “Not a MECHANISM”
+
+A HOC file can depend on custom ion channels implemented in separate `.mod`
+files. Selecting the HOC/template alone does not supply those channels.
+`paths.modfiles: null` means built-in mechanisms only; it is not automatic MOD
+discovery. Include the required MOD folder in the registered source bundle and
+set `paths.modfiles` relative to its native-source root. Compile/load those
+mechanisms before constructing the cell.
+
+For copy-mode sources, pointing at a new path is not enough: the MOD sources
+must also be present in the saved snapshot. Review an explicit, backed-up source
+refresh, preserving any manually edited native files; opening or copying a tune
+does not refresh its snapshot automatically.
+
+NEURON can leave a partially defined template after reporting a failed HOC
+load. SCP rejects that failed source even if its template name exists, and does
+not attempt construction. Fix the source/MOD setup, then **restart the kernel**
+before retrying. Repeated loads in the same process cannot repair native state.
+This guard does not sandbox arbitrary native HOC/Python code or prevent every
+possible native-code crash.
+
 ## Input File Not Found
 
 - Paths in `syn_config.json` resolve relative to `cell_configs/`.
@@ -203,6 +284,29 @@ Step 6 reads saved Step 5 output folders. If no runs appear:
 - confirm the selected `cell_name`, `tunes_dir`, and `model_dir`,
 - confirm `cells/<CELL>/tunes/<TUNE>/output_data/` exists in the runtime.
 
+For project workspaces, also select `project_name` and check
+`projects/<PROJECT>/cells/<CELL>/tunes/<TUNE>/output_data/`. An explicit
+`tune_dir_override` takes precedence over the shorthand settings. Relative
+notebook workspace paths are SCP-root-relative; relative CLI paths are
+invocation-directory-relative.
+
+## Project Workspace or Identity Errors
+
+- Use `project_name = None` for legacy/bundled `cells/` selection; do not use a
+  UI label such as "Bundled / legacy" as a literal project directory name.
+- Project/cell/tune shorthand accepts directory names, not complete paths. Use
+  `tune_dir_override`, `--tune-dir`, or SLURM `TUNE_DIR` for a complete path.
+- If stored `project_name` contradicts a project path, verify which workspace
+  you intended. Do not resolve the error by silently moving existing sources.
+- Append/merge rejection can mean two runs have the same cell/tune labels but
+  different projects. Compare them in Step 6 instead of combining their trials.
+- A project directory does not isolate HOC or mechanism definitions. Restart
+  after switching conflicting native definitions.
+- Generated-output ignores do not hide model/config files. Entire private
+  projects need an exact local Git exclusion; tracked files remain visible.
+
+See [Project workspaces](guides/project_workspaces.md) for the full workflow.
+
 ## Notebook vs SLURM Mismatch
 
 - Use the same `tune_dir`, config files, and (when applicable) compiled mechanisms.
@@ -212,41 +316,65 @@ Step 6 reads saved Step 5 output folders. If no runs appear:
 
 ## ACT or BMTool Not Found
 
-ACT and BMTool are optional and are resolved only when their corresponding
-buttons/code paths are used. On the first ACT proposal/optimization or BMTool
-tuner action, SCP normally clones a missing checkout into `../mods/ACT` or
-`../mods/bmtool`. A failure here usually means Git/network access is unavailable
-or the destination already contains unrelated files.
+Both integrations are optional and resolved only when requested. For BMTool,
+use the environment installation described under
+[BMTool import or synapse API unavailable](#bmtool-import-or-synapse-api-unavailable)
+above. It needs no sibling checkout; cloning is off by default.
 
-To provision them manually:
+ACT also supports install-once environment use: run
+`python -m pip install -r requirements-act.txt`, restart, and validate with
+`scp-pipeline check --steps 2 3 --cell PV --tune tuned --check-act` (or select
+your external tune explicitly). See [installation](installation.md) for the
+pinned source revision, constraints, and Colab instructions.
+
+For an intentional development checkout instead:
 
 ```bash
 mkdir -p ../mods
 git clone https://github.com/V-Marco/ACT.git ../mods/ACT
-git clone https://github.com/cyneuro/bmtool.git ../mods/bmtool
+git -C ../mods/ACT checkout 2b3fdc190107b8242e3496329cfdf240abd09694
+python -m pip install -e ../mods/ACT -c requirements.txt
 ```
 
 If stored elsewhere:
 
 ```bash
 export SCP_ACT_PATH=/path/to/ACT
-export SCP_BMTOOL_PATH=/path/to/bmtool
 ```
 
 ACT is optional for Step 2 target-derived proposals and Step 3 ACT active
 tuning. Core passive sweeps and manual active/FI checks run without ACT.
 BMTool is needed only when Step 4 synapse tuning is requested.
 
-Useful controls:
+Optional legacy checkout provisioning:
 
 ```bash
 export SCP_ACT_DIR=/path/for/new/ACT
-export SCP_BMTOOL_DIR=/path/for/new/bmtool
-export SCP_AUTO_CLONE_ACT=0
-export SCP_AUTO_CLONE_BMTOOL=0
+export SCP_AUTO_CLONE_ACT=1
 ```
 
-The final two variables disable automatic installation. If ACT is found but
-reports missing `scikit-learn` or `timeout-decorator`, update the SCP Conda
-environment from `environment.yml`; cloning ACT does not modify the active
-Python environment.
+Cloning is disabled by default; the last variable explicitly opts in. It is not
+the pinned installation recipe. The setup checker never clones. If ACT reports
+missing `scikit-learn` or `timeout-decorator`, update the environment from
+`environment.yml`; cloning ACT does not install Python dependencies.
+
+## Custom cells and external sources
+
+- **runtime_cell cannot be rebuilt:** recreate `CELL_OVERRIDE` in this kernel,
+  or register a saved Python/HOC builder for CLI/SLURM.
+- **Missing canonical soma/all:** use `wrap_cell` with an explicit owner map
+  or actual section collections. Do not substitute global `h.allsec()`.
+- **Relative asset/import missing:** declare the full native source folders and
+  appropriate root-relative working directory; constructor arguments are not
+  rewritten. Avoid importing a network driver that runs simulations on import.
+- **Source snapshot differs:** normal reruns do not refresh it. Review the
+  source preview; an explicit refresh makes backups and may replace local edits.
+- **Changed source or conflicting template/module/library:** restart the Python
+  process and rebuild/recreate the cell. Autoreload cannot safely replace loaded
+  NEURON definitions. A live object must be created after mechanism preparation.
+- **Current inspection differs from a saved run:** inspect saved source hashes
+  and provenance. A live summary is descriptive, not a full replay checkpoint.
+
+See [Custom models](guides/custom_models.md) for end-to-end guidance. SCP-managed
+reference operations do not edit upstream sources, but trusted user model code
+is not sandboxed.

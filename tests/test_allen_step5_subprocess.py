@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
 import textwrap
 import unittest
 from pathlib import Path
@@ -27,6 +29,7 @@ _SUBPROCESS_PROGRAM = textwrap.dedent(
         sys.path.insert(0, str(repo_root))
 
     from modules.simulation import SimulationOptions, SimulationSession
+    from modules.simulation.current_injection import run_current_injection
 
     options = SimulationOptions(
         iclamp=True,
@@ -51,6 +54,11 @@ _SUBPROCESS_PROGRAM = textwrap.dedent(
     result = session.run()
     times = list(result["traces"]["T"])
     voltages = list(result["traces"]["V"])
+    currents = run_current_injection(session.cell, {{
+        "stim_amp": 0.05, "stim_delay": 5.0, "stim_dur": 10.0,
+        "h_tstop": 20.0, "h_dt": 0.025,
+        "conditions": result["meta"]["conditions"],
+    }})
     payload = {{
         "mode": result.get("mode"),
         "section_count": len(session.cell.all),
@@ -65,6 +73,12 @@ _SUBPROCESS_PROGRAM = textwrap.dedent(
         "groups_empty": session.groups_cfg == {{}},
         "saved_path": None if session.saved_path is None else str(session.saved_path),
         "save_output": result.get("sim_cfg", {{}}).get("save_output"),
+        "iclamp_currents_omitted": "I" not in result["iclamp"],
+        "current_trace_count": len(currents["I"]),
+        "finite_current_traces": all(
+            len(values) == len(currents["T"]) and all(math.isfinite(float(v)) for v in values)
+            for values in currents["I"].values()
+        ),
     }}
     print({RESULT_SENTINEL!r} + json.dumps(payload, sort_keys=True))
     """
@@ -122,21 +136,54 @@ class AllenStep5SubprocessTests(unittest.TestCase):
                 + ", ".join(str(path.relative_to(REPO_ROOT)) for path in missing_assets)
             )
 
-        dll_candidates = (
-            tune_dir / "modfiles" / "x86_64" / ".libs" / "libnrnmech.so",
-            tune_dir / "modfiles" / "x86_64" / "libnrnmech.so",
-            tune_dir / "modfiles" / "nrnmech.dll",
-        )
-        if not any(path.is_file() for path in dll_candidates):
-            self.skipTest(
-                "compiled optional Allen test mechanism library is unavailable under "
-                f"{tune_dir / 'modfiles'}"
-            )
-
     def _run_iclamp(self, cell_name: str) -> dict:
+        from modules.setup.mechanisms import (
+            find_compiled_mechanism_dll,
+            find_nrnivmodl,
+            resolve_modfiles_dir,
+        )
+
         tune_dir = REPO_ROOT / "cells" / cell_name / "tunes" / "tuned"
         self._require_optional_runtime(tune_dir)
+        if find_compiled_mechanism_dll(tune_dir) is not None:
+            return self._run_iclamp_subprocess(cell_name, tune_dir)
 
+        mod_dir = resolve_modfiles_dir(tune_dir)
+        if mod_dir is None or not mod_dir.is_dir() or not any(mod_dir.glob("*.mod")):
+            self.skipTest(f"optional Allen mechanism sources are unavailable for {cell_name}")
+        compiler = find_nrnivmodl()
+        if compiler is None or not (shutil.which("c++") or shutil.which("g++")):
+            self.skipTest(
+                "compiled optional Allen library is unavailable and nrnivmodl/C++ "
+                f"build tools are missing for {cell_name}"
+            )
+
+        # Build only a temporary source copy; keep production cells read-only.
+        with tempfile.TemporaryDirectory(prefix=f"scp-{cell_name.lower()}-regression-") as tmp:
+            copied_tune = Path(tmp) / "tuned"
+            shutil.copytree(
+                tune_dir,
+                copied_tune,
+                ignore=shutil.ignore_patterns("output_data", "x86_64", "__pycache__"),
+            )
+            copied_mod_dir = resolve_modfiles_dir(copied_tune)
+            self.assertIsNotNone(copied_mod_dir)
+            self.assertTrue(copied_mod_dir.is_relative_to(copied_tune))
+            try:
+                built = subprocess.run(
+                    [compiler], cwd=str(copied_mod_dir), capture_output=True,
+                    text=True, check=False, timeout=SUBPROCESS_TIMEOUT_SECONDS,
+                )
+            except subprocess.TimeoutExpired as exc:
+                self.fail(f"{cell_name} temporary mechanism build timed out: {exc}")
+            self.assertEqual(
+                built.returncode, 0,
+                f"{cell_name} mechanism build failed.\nstdout:\n{built.stdout}\nstderr:\n{built.stderr}",
+            )
+            self.assertIsNotNone(find_compiled_mechanism_dll(copied_tune))
+            return self._run_iclamp_subprocess(cell_name, copied_tune)
+
+    def _run_iclamp_subprocess(self, cell_name: str, tune_dir: Path) -> dict:
         try:
             completed = subprocess.run(
                 [sys.executable, "-c", _SUBPROCESS_PROGRAM, str(REPO_ROOT), str(tune_dir)],
@@ -191,6 +238,9 @@ class AllenStep5SubprocessTests(unittest.TestCase):
         self.assertTrue(payload["groups_empty"])
         self.assertIsNone(payload["saved_path"])
         self.assertIs(payload["save_output"], False)
+        self.assertTrue(payload["iclamp_currents_omitted"])
+        self.assertGreater(payload["current_trace_count"], 0)
+        self.assertTrue(payload["finite_current_traces"])
         self.assertAlmostEqual(
             float(payload["conditions"]["v_init_mV"]),
             expected_v_init_mv,

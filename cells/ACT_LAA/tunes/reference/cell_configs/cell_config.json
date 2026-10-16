@@ -1,0 +1,21 @@
+{
+  "cell_name": "ACT_LAA",
+  "tune": "reference",
+  "color": "k",
+  "cell_loader": "hoc_template",
+  "paths": {
+    "modfiles": "modfiles",
+    "hoc_template": "model/target_template.hoc"
+  },
+  "hoc_template": {
+    "template_name": "Cell_A",
+    "constructor_args": [],
+    "section_map": {
+      "soma": "soma",
+      "dend": null,
+      "apic": null,
+      "axon": null,
+      "all": "all"
+    }
+  }
+}

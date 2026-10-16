@@ -6,6 +6,13 @@ turns saved Step 5 outputs into plots, metrics, tables, and comparison reports.
 For regular usage, start with `docs/guides/analysis.md`. This file is the more
 technical reference for Step 6 inputs, defaults, and utility outputs.
 
+Project selection groups same-named cells without moving bundled runs. Set
+`project_name` alongside `cell_name`, `tunes_dir`, and `model_dir`, or use an
+explicit `tune_dir_override`. Step 6 comparison can use explicit run paths from
+different projects; this does not merge their trials or prove model equivalence.
+Saved-result analysis remains independent of current-cell reconstruction. See
+[Project workspaces](project_workspaces.md).
+
 ## Notebook Structure
 
 - **6.0 Environment Setup**: local/Colab bootstrap and imports
@@ -287,7 +294,9 @@ Generates optional tables for:
 - geometry distances
 - synapse records
 - cell recordings
-- total synaptic traces
+- measured group/individual synaptic traces with coverage and units; see
+  [Synaptic recording](synaptic_recording.md). Legacy I/G traces have unverified
+  aggregation and are not automatically labeled as totals.
 
 Cell and geometry tables require `load_cell_for_analysis = true`.
 
@@ -367,6 +376,16 @@ Notes:
 - Missing run folder: check Selection path and run token.
 - External CSV not shown: check path, delimiter, and compare-path syntax.
 - Synapse plot skipped: selected run lacks saved synapse records.
-- Recording table empty: selected run lacks `cell_recordings` or total synaptic traces.
+- Recording table empty: selected run lacks measured cell/synaptic recordings
+  for the selected trial. Enable capture before running; analysis cannot recover
+  unrecorded traces from synapse-placement metadata.
 - Cell/geometry table skipped: `load_cell_for_analysis` is false or cell loading failed.
 - Colab widget not shown: rerun setup/import cells and verify `ipywidgets`.
+
+## Current model versus saved provenance
+
+`CELL_OVERRIDE` supplies an in-kernel cell for model-dependent inspection.
+`tune_dir_override` selects workspaces outside the standard cells tree.
+Saved-result-only analysis remains independent of reconstruction; runtime-only
+results do not contain a complete model checkpoint. Current sources/objects
+may differ from a saved run. See [Custom models](custom_models.md).

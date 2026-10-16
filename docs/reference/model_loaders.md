@@ -1,20 +1,33 @@
 # Model Loaders and the Canonical Cell Interface
 
-SCP constructs every model through a registered loader, then exposes the same
-cell-scoped interface to Steps 1–7. `allen_manifest` remains the default and
+For project-local notebooks use the installed `scp_pipeline.model` interface;
+checkout-local `modules` imports remain compatible. External source declarations
+accept individual root-relative `files` alongside `folders`. See the
+[dependency workflow](../guides/dependency_workflow.md) for editable installation,
+interactive setup, and flat native-source layouts.
+
+SCP constructs configured models through registered loaders or adopts an
+existing NEURON cell, then exposes the same cell-scoped interface to Steps 1–7.
+`allen_manifest` remains the default and
 retains the existing Allen aliases. `hoc_template` is the first object-owned
 adapter.
 
 The public entry point is:
 
 ```python
-from modules.model.load_cell import load_cell
+from scp_pipeline.model import load_cell
 
 cell = load_cell(cell_config, base_dir=tune_dir)
 ```
 
 Pass the tune directory explicitly. Current-directory path resolution exists
 only for older callers.
+
+The tune may use `cells/<cell>/tunes/<tune>/` or
+`projects/<project>/cells/<cell>/tunes/<tune>/`; the loader interface and native
+source paths are the same. A project is a workspace namespace, not a new loader
+or an isolated NEURON runtime. See
+[Project workspaces](../guides/project_workspaces.md).
 
 ## Step 1 Source Discovery
 
@@ -31,6 +44,23 @@ unambiguous source. Keep or edit the override for a new Allen download, multiple
 candidate files/templates, nonstandard paths, HOC constructor arguments, or
 explicit section mappings. Ambiguity is reported instead of silently selecting a
 source.
+
+For a staged file containing multiple templates, use the read-only helper:
+
+```python
+from modules.setup import discover_hoc_templates
+
+choices = discover_hoc_templates(tune_dir)
+# [{"path": "model/SharedCells.hoc", "template_name": "ExampleCell"}, ...]
+```
+
+Results are sorted by tune-relative path and template name and follow Step 1's
+existing discovery exclusions. The helper executes no HOC and changes no files.
+Set the chosen pair as `paths.hoc_template` and `hoc_template.template_name` in
+`MODEL_SOURCE_OVERRIDES`. Step 1 saves it in `cell_config.json`; set the override
+to `None` to use the stored selection on reruns. Preserve the complete native
+source instead of splitting or renaming its template definitions. Switching to
+a copied source with already-defined template names requires a fresh process.
 
 ## Canonical Cell Interface
 
@@ -117,10 +147,14 @@ SCP validates and applies these values after construction and before each Step
 2, Step 3, or Step 5 protocol/trial. Legacy Allen tunes without the block keep
 their loader/runtime fallback behavior.
 
-Bundled object-owned examples are available under `cells/EUSmn/`,
-`cells/HYPO/`, and `cells/PGN/`. Each includes an `orig` baseline and a
-manually edited `tuned` copy. PV remains the recommended first example for the
-complete public workflow.
+Bundled object-owned examples are available under `cells/ACT_Spiker/`,
+`cells/ACT_BursterCa/`, and `cells/ACT_LAA/`. Each includes an ACT starting
+`orig`, an initially identical untuned working `tuned` copy, and a separate
+known-target `reference`. See the [ACT example catalog](../guides/act_examples.md).
+These are staged examples, not completed scientific walkthroughs. PV remains
+the recommended first example for the complete public workflow. Earlier LUT
+examples are now maintained as private project workspaces rather than public
+loader examples.
 
 ## Optional Mechanisms, Targets, and External Tools
 
@@ -146,6 +180,22 @@ For a cell-only Step 5 run, enable `sim_config.iclamp`; neither
 require synapse configuration, and a positive synapse count cannot target an
 empty canonical geometry group.
 
+## Current Recording
+
+Step 2, Step 3/FI, and Step 5 use shared reference handling for mechanism
+currents, including built-in `extracellular`. Existing results retain keys such
+as `pas.i` and `extracellular.i_membrane`. The latter is total membrane current
+density, not an individual channel current, and should not be added to channel
+currents as though it were an independent contribution.
+
+The low-level `run_current_injection(cell, sim_params, *, record_currents=True)`
+keeps current recording enabled for existing callers. With `False`, it bypasses
+current discovery and returns an empty `I` dictionary. Step 5 forwards
+`iclamp.record_currents` before recording setup and omits `I` when disabled.
+Requested currents with unavailable references or invalid native pointers raise
+errors identifying the section, mechanism, and variable; source-model pointer
+initialization remains the model's responsibility.
+
 ## Saved Model Provenance
 
 Saved runs archive loader-declared native sources plus tune-local `.mod` sources
@@ -159,6 +209,19 @@ and warns that restored HOC sources need a process restart.
 
 ## Current Phase Boundary
 
-Python-factory loading, parameter-overlay files, and new electrophysiology
-metrics are not part of this interface. Loader adapters normalize native model
+Parameter-overlay files and new electrophysiology metrics are not part of this interface. Loader adapters normalize native model
 ownership and paths; they do not rewrite model-specific parameters or geometry.
+
+## Python, Live Cells, and External Bundles
+
+See [Custom models](../guides/custom_models.md) for complete recipes and contracts.
+`python_factory` uses `paths.python_factory`, a named `callable`, JSON `args`/`kwargs`,
+and optional `section_map`. `runtime_cell` records a notebook-only construction
+that needs an override; `wrap_cell`/`validate_cell` and `SimulationSession.from_cell`
+adopt an existing object without reconstruction.
+
+With `model_source`, paths are relative to the selected root. Copy mode uses
+the tune's `model_sources/` snapshot; reference mode uses the originals while
+retaining that snapshot. External MOD builds use `.scp_build/`. Runtime saves
+are explicitly nonreconstructible. External archive materialization is opt-in
+and always tune-local.

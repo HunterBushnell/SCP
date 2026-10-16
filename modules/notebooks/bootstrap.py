@@ -18,9 +18,9 @@ from typing import Any, Dict, Iterable, Optional
 
 
 DEFAULT_STEP5_EXTERNAL_INPUTS = (
-    "external_data/pyrFiringRateAvg.csv",
-    "external_data/PVFiringRateAvg.csv",
-    "external_data/SSTFiringRateAvg.csv",
+    "cells/PN/data/pyrFiringRateAvg.csv",
+    "cells/PV/data/PVFiringRateAvg.csv",
+    "cells/SST/data/SSTFiringRateAvg.csv",
 )
 
 
@@ -245,9 +245,9 @@ def ensure_modfiles(
     cell_config: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Ensure configured NEURON mechanisms exist for a tune directory."""
-    from modules.setup.mechanisms import (
+    from scp_pipeline.setup.mechanisms import (
         find_compiled_mechanism_dll,
-        find_nrnivmodl,
+        compile_modfiles as prepare_compiled_mechanisms,
         resolve_modfiles_dir,
     )
 
@@ -265,16 +265,10 @@ def ensure_modfiles(
         print(f"No .mod sources in {mod_dir}; using NEURON built-in mechanisms.")
         return
     if compile_modfiles:
-        nrnivmodl = find_nrnivmodl()
-        if nrnivmodl is None:
-            raise FileNotFoundError(
-                "nrnivmodl not found on PATH or next to the active Python "
-                f"executable: {sys.executable}"
-            )
         print("Compiling modfiles with nrnivmodl...")
-        subprocess.check_call([nrnivmodl], cwd=str(mod_dir))
+        prepare_compiled_mechanisms(tune_path, load_dll=False, cell_config=cell_config)
     else:
-        print("Missing compiled modfiles; run nrnivmodl in", mod_dir)
+        print("Missing compiled modfiles; enable compilation in Step 1 or Step 5 for", mod_dir)
 
 
 def finish_step5_notebook_setup(
@@ -285,7 +279,7 @@ def finish_step5_notebook_setup(
     print_status: bool = True,
 ) -> Dict[str, Any]:
     """Finish Step 5 notebook setup after the SCP repo is available."""
-    from modules.notebooks.helpers import ensure_scp_repo_on_syspath
+    from scp_pipeline.notebooks.helpers import ensure_scp_repo_on_syspath
 
     root = ensure_scp_repo_on_syspath(Path(repo_root))
     os.environ["SCP_ROOT"] = str(root)
@@ -313,7 +307,7 @@ def finish_step1_notebook_setup(
     print_status: bool = True,
 ) -> Dict[str, Any]:
     """Finish Step 1 notebook setup after the SCP repo is available."""
-    from modules.notebooks.helpers import ensure_scp_repo_on_syspath
+    from scp_pipeline.notebooks.helpers import ensure_scp_repo_on_syspath
 
     root = ensure_scp_repo_on_syspath(Path(repo_root))
     os.environ["SCP_ROOT"] = str(root)

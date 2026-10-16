@@ -13,6 +13,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from modules.workspaces import infer_workspace, result_workspace_identity, saved_namespace_tune_dir
+
 
 APPLY_CHOICES = (
     "sim_config",
@@ -57,6 +63,8 @@ class RestoreReport:
     warnings: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
     backup_dir: Optional[Path] = None
+    source_identity: Dict[str, Any] = field(default_factory=dict)
+    destination_identity: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def changed_files(self) -> int:
@@ -86,6 +94,8 @@ class _RestoreBackupSet:
 
     def _create_directory(self) -> Path:
         backup_root = self.target_tune.resolve() / _RESTORE_BACKUP_DIRNAME
+        if not _path_is_within(backup_root.resolve(), self.target_tune.resolve()):
+            raise ValueError('Restore backup directory escapes the destination tune.')
         backup_root.mkdir(parents=True, exist_ok=True)
 
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -306,13 +316,7 @@ def _resolve_manifest_path(run_path: Path) -> Path:
 def _resolve_tune_path_from_sim(sim_cfg: Optional[Dict[str, Any]]) -> Optional[Path]:
     if not isinstance(sim_cfg, dict):
         return None
-    tune_dir = sim_cfg.get("tune_dir")
-    if not tune_dir:
-        return None
-    try:
-        return Path(str(tune_dir)).expanduser().resolve()
-    except Exception:
-        return None
+    return saved_namespace_tune_dir(sim_cfg)
 
 
 def _has_group_file_manifest(groups_cfg_raw: Any) -> bool:
@@ -447,6 +451,7 @@ def _collect_source_payloads(
         files = {}
 
     source: Dict[str, Any] = {
+        "workspace_identity": manifest.get("workspace_identity"),
         "sim_config": None,
         "cell_config": None,
         "geometry": None,
@@ -571,6 +576,9 @@ def _apply_single_json_file(
     adapt_for_sim: bool = False,
     backup_set: Optional[_RestoreBackupSet] = None,
 ) -> None:
+    if not _path_is_within(target_path.resolve(), report.to_tune.resolve()) or target_path.resolve() == report.to_tune.resolve():
+        report.errors.append(f'Refusing restore destination outside target tune: {target_path}')
+        return
     if source_payload is None:
         report.file_reports.append(
             FileReport(
@@ -597,6 +605,21 @@ def _apply_single_json_file(
     src_payload = copy.deepcopy(source_payload)
     if adapt_for_sim and isinstance(target_payload, dict) and isinstance(src_payload, dict):
         src_payload = _adapt_sim_source_for_target(target_payload, src_payload)
+    if isinstance(src_payload, dict) and kind in {"sim_config", "cell_config", "geometry"}:
+        # Model/protocol values are restorable; the source's workspace routing
+        # is not. Set only fields the destination already owns through the
+        # structure-preserving overlay below.
+        identity = report.destination_identity
+        values = {"project_name": identity.get("project_name"),
+                  "cell_name": identity.get("cell_name"), "cell": identity.get("cell_name"),
+                  "tune": identity.get("tune_name"), "tune_dir": str(report.to_tune),
+                  "workspace_identity": identity}
+        for key, value in values.items():
+            src_payload[key] = copy.deepcopy(value)
+        if isinstance(src_payload.get("paths"), dict) or (
+            isinstance(target_payload.get("paths"), dict) and "tune_dir" in target_payload["paths"]
+        ):
+            src_payload.setdefault("paths", {})["tune_dir"] = str(report.to_tune)
 
     new_payload, changes = _overlay_values_keep_structure(target_payload, src_payload, ())
     if not changes:
@@ -838,6 +861,7 @@ def _apply_model_artifacts(
     dry_run: bool,
     report: RestoreReport,
     backup_set: Optional[_RestoreBackupSet] = None,
+    materialize_external: bool = False,
 ) -> None:
     """Restore archived native model sources without writing outside a tune."""
     if not isinstance(artifact_manifest, dict) or artifact_manifest_path is None:
@@ -873,6 +897,49 @@ def _apply_model_artifacts(
     tune_root = target_tune.resolve()
     restored_mod_source = False
     restored_hoc_source = False
+    if materialize_external:
+        recipe = artifact_manifest.get('cell_config')
+        if not isinstance(recipe, dict) or not recipe.get('model_source'):
+            report.errors.append('External materialization requires an archived declared model_source recipe.')
+            return
+        if not artifact_manifest.get('construction_recipe_available', True):
+            report.errors.append('A runtime-only result has no reconstruction recipe to materialize.')
+            return
+        from modules.loaders.source_context import relative_path, source_relative_path
+        try:
+            from modules.loaders.source_context import source_options
+            options = source_options(recipe)
+            origin = artifact_manifest.get('original_source_root') or options['source_root']
+            upstream = Path(origin).expanduser().resolve()
+            selected_native = [upstream / part for part in options.get('folders', []) + options.get('files', [])]
+            if any(_path_is_within(tune_root, item.resolve()) or _path_is_within(item.resolve(), tune_root) for item in selected_native):
+                raise ValueError('Refusing materialization into the original upstream model source tree. Select a local tune workspace.')
+            layouts = {entry['materialize_relative_path'] for entry in artifacts}
+            for role in ('hoc_template', 'python_factory', 'manifest', 'modfiles'):
+                value = recipe.get('paths', {}).get(role)
+                if value not in (None, ''):
+                    relative = source_relative_path(recipe, value)
+                    if role != 'modfiles' and (Path('model_sources') / relative).as_posix() not in layouts:
+                        raise ValueError(f'Archive lacks required recipe source paths.{role}; it cannot be materialized as a complete bundle.')
+            for target in (tune_root / 'cell_configs/cell_config.json', tune_root / 'MODEL_SOURCE_PROVENANCE.json'):
+                if not _path_is_within(target.resolve(), tune_root):
+                    raise ValueError('Materialized recipe/provenance destination escapes the target tune.')
+            for entry in artifacts:
+                relative = relative_path(entry['materialize_relative_path'])
+                if not relative.parts or relative.parts[0] != 'model_sources':
+                    raise ValueError('Materialized artifacts must be inside model_sources/.')
+                if not _path_is_within((tune_root / relative).resolve(), tune_root):
+                    raise ValueError('Materialized artifact destination escapes the target tune.')
+                source = (archive_root / relative_path(entry['archive_path'])).resolve()
+                if not _path_is_within(source, archive_root) or not source.is_file() or hashlib.sha256(source.read_bytes()).hexdigest() != entry.get('sha256'):
+                    raise ValueError(f'Invalid materialization artifact: {source}')
+            for directory in artifact_manifest.get('model_directories', []):
+                target = tune_root / 'model_sources' / relative_path(directory)
+                if not _path_is_within(target.resolve(), tune_root):
+                    raise ValueError('Materialized directory escapes the target tune.')
+        except (KeyError, TypeError, ValueError, AttributeError, OSError) as exc:
+            report.errors.append(str(exc))
+            return
 
     archived_loader = artifact_manifest.get("loader")
     target_cell_config = tune_root / "cell_configs" / "cell_config.json"
@@ -896,10 +963,10 @@ def _apply_model_artifacts(
             report.warnings.append("Skipped malformed model-artifact entry (expected object).")
             continue
 
-        rel_target = entry.get("target_relative_path")
+        rel_target = entry.get('materialize_relative_path') if materialize_external else entry.get("target_relative_path")
         archive_rel = entry.get("archive_path")
         kind = str(entry.get("kind", "model_source"))
-        if entry.get("restorable", True) is False:
+        if entry.get("restorable", True) is False and not materialize_external:
             report.file_reports.append(
                 FileReport(
                     path=tune_root / str(rel_target or "<external_artifact>"),
@@ -976,7 +1043,7 @@ def _apply_model_artifacts(
                 file_report.backup_path = backup_set.backup_file(target_path)
             shutil.copy2(source_path, target_path)
         report.file_reports.append(file_report)
-        if kind == "mechanism_source" or target_path.suffix.lower() == ".mod":
+        if kind == "mechanism_source" or target_path.suffix.lower() in {".mod", ".inc"}:
             restored_mod_source = True
         if target_path.suffix.lower() == ".hoc":
             restored_hoc_source = True
@@ -991,6 +1058,63 @@ def _apply_model_artifacts(
             "One or more HOC sources differ from the archived run. Restart the "
             "Python/Jupyter process before reconstructing that template."
         )
+    if materialize_external and not report.errors:
+        if not dry_run:
+            for directory in artifact_manifest.get('model_directories', []):
+                (tune_root / 'model_sources' / directory).mkdir(parents=True, exist_ok=True)
+        recipe = copy.deepcopy(artifact_manifest['cell_config'])
+        for role in ('hoc_template', 'python_factory', 'manifest', 'modfiles'):
+            value = recipe.get('paths', {}).get(role)
+            if value not in (None, ''):
+                recipe['paths'][role] = source_relative_path(recipe, value).as_posix()
+        recipe['model_source']['mode'] = 'copy'
+        # The root is provenance in copy mode, not a reconstruction dependency.
+        if artifact_manifest.get('original_source_root'):
+            recipe['model_source']['source_root'] = artifact_manifest['original_source_root']
+        recipe['project_name'] = report.destination_identity.get('project_name')
+        recipe['cell_name'] = report.destination_identity.get('cell_name')
+        recipe['tune'] = report.destination_identity.get('tune_name')
+        recipe['workspace_identity'] = copy.deepcopy(report.destination_identity)
+        destination_config_path = tune_root / 'cell_configs/cell_config.json'
+        destination_config = _read_json(destination_config_path) if destination_config_path.is_file() else {}
+        if destination_config.get('workspace_layout') == 'project_owned':
+            recipe['workspace_layout'] = 'project_owned'
+            recipe['workspace_project_root'] = destination_config.get('workspace_project_root')
+        else:
+            recipe.pop('workspace_layout', None)
+            recipe.pop('workspace_project_root', None)
+        recipe['paths'].pop('tune_dir', None)
+        target = tune_root / 'cell_configs' / 'cell_config.json'
+        if not _path_is_within(target.resolve(), tune_root):
+            report.errors.append('Refusing recipe materialization outside the target tune.')
+            return
+        item = FileReport(path=target, kind='cell_config', status='would_change' if dry_run else 'changed',
+                          message='Materialize the archived recipe in copy mode; upstream sources remain untouched.')
+        if not dry_run:
+            if target.exists() and backup_set is not None:
+                item.backup_path = backup_set.backup_file(target)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            _write_json(target, recipe)
+        report.file_reports.append(item)
+        provenance_path = tune_root / 'MODEL_SOURCE_PROVENANCE.json'
+        provenance = {'format_version': 1, 'source_root': recipe['model_source']['source_root'],
+                      'mode': 'copy', 'restored_from_archive': str(artifact_manifest_path),
+                      'source_workspace_identity': copy.deepcopy(report.source_identity),
+                      'destination_workspace_identity': copy.deepcopy(report.destination_identity),
+                      'directories': artifact_manifest.get('model_directories', []),
+                      'files': [{'source_path': Path(entry['materialize_relative_path']).relative_to('model_sources').as_posix(),
+                                 'destination_path': entry['materialize_relative_path'], 'sha256': entry['sha256'],
+                                 'size_bytes': (archive_root / entry['archive_path']).stat().st_size}
+                                for entry in artifacts]}
+        provenance['file_count'] = len(provenance['files'])
+        provenance['size_bytes'] = sum(entry['size_bytes'] for entry in provenance['files'])
+        if not dry_run:
+            if provenance_path.exists() and backup_set is not None:
+                backup_set.backup_file(provenance_path)
+            _write_json(provenance_path, provenance)
+        report.file_reports.append(FileReport(path=provenance_path, kind='model_source_provenance',
+                                             status='would_change' if dry_run else 'changed'))
+        report.warnings.append('Materialized source recipe requires a fresh Python process; rebuild mechanisms if present.')
 
 
 def restore_run_state(
@@ -1003,6 +1127,7 @@ def restore_run_state(
     source_tune: Optional[Path] = None,
     allow_source_fallback: bool = True,
     backup: bool = True,
+    materialize_external: bool = False,
 ) -> RestoreReport:
     manifest_path = _resolve_manifest_path(Path(from_run))
     run_dir, manifest_files, source_payloads, source_warnings = _collect_source_payloads(
@@ -1012,17 +1137,23 @@ def restore_run_state(
     )
 
     apply_set = _resolve_apply_set(apply)
+    if materialize_external and 'model_artifacts' not in apply_set:
+        raise ValueError('materialize_external requires apply=model_artifacts.')
     source_sim = source_payloads.get("sim_config")
 
     if to_tune is None:
-        inferred = _resolve_tune_path_from_sim(source_sim)
+        # Keep the lexical path until managed-namespace containment has been
+        # checked. Resolving first would hide an escaping workspace symlink.
+        recorded_path = source_sim.get('tune_dir') if isinstance(source_sim, dict) else None
+        inferred = (infer_workspace(recorded_path).tune_dir if recorded_path
+                    else _resolve_tune_path_from_sim(source_sim))
         if inferred is None:
             raise ValueError(
                 "Could not infer target tune from run sim_cfg['tune_dir']; pass --to-tune explicitly."
             )
         target_tune = inferred
     else:
-        target_tune = Path(to_tune).expanduser().resolve()
+        target_tune = infer_workspace(Path(to_tune).expanduser()).tune_dir
 
     report = RestoreReport(
         from_run=run_dir,
@@ -1037,7 +1168,26 @@ def restore_run_state(
         report.errors.append(f"Target tune directory does not exist: {target_tune}")
         return report
 
+    report.source_identity = result_workspace_identity({
+        "workspace_identity": source_payloads.get("workspace_identity"),
+        "sim_cfg": source_sim or {},
+        "meta": {"cell_config": source_payloads.get("cell_config") or {}},
+    })
+    report.destination_identity = infer_workspace(target_tune).identity
+    if report.source_identity != report.destination_identity:
+        report.warnings.append(
+            f"Restoring values across workspace identities: {report.source_identity} -> "
+            f"{report.destination_identity}. Destination routing is preserved.")
+
     config_root = target_tune / "cell_configs"
+    filenames = {'sim_config': 'sim_config.json', 'cell_config': 'cell_config.json',
+                 'geometry': 'geometry.json', 'syn_config': 'syn_config.json', 'syn_groups': 'syn_config.json'}
+    for kind in apply_set & filenames.keys():
+        destination = config_root / filenames[kind]
+        if not _path_is_within(destination.resolve(), target_tune):
+            report.errors.append(f'Refusing restore destination outside target tune: {destination}')
+    if report.errors:
+        return report
     backup_set = (
         _RestoreBackupSet(target_tune=target_tune)
         if backup and not dry_run
@@ -1137,6 +1287,7 @@ def restore_run_state(
             dry_run=dry_run,
             report=report,
             backup_set=backup_set,
+            materialize_external=materialize_external,
         )
 
     if backup_set is not None:
@@ -1151,6 +1302,8 @@ def print_report(report: RestoreReport) -> None:
     print(f"[restore_run_state] Mode: {mode}")
     print(f"[restore_run_state] Source run: {report.from_run}")
     print(f"[restore_run_state] Target tune: {report.to_tune}")
+    print(f"[restore_run_state] Source identity: {report.source_identity}")
+    print(f"[restore_run_state] Destination identity: {report.destination_identity}")
     print(f"[restore_run_state] Apply: {', '.join(sorted(report.apply))}")
     print(f"[restore_run_state] Syn groups: {report.syn_groups}")
     print("")
@@ -1241,6 +1394,8 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
             "<target tune>/restore_backups/<timestamp>/ before writing."
         ),
     )
+    p.add_argument('--materialize-external', action='store_true',
+                   help='With --apply model_artifacts, restore declared external sources into the target tune in copy mode.')
     return p.parse_args(argv)
 
 
@@ -1257,6 +1412,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             source_tune=Path(args.source_tune) if args.source_tune else None,
             allow_source_fallback=not bool(args.no_source_fallback),
             backup=not bool(args.no_backup),
+            materialize_external=bool(args.materialize_external),
         )
     except Exception as exc:
         print(f"[error] restore_run_state failed: {exc}")

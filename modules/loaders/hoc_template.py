@@ -1,31 +1,23 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
 
-import os
 
-from modules.loaders.base import (
+from scp_pipeline.loaders.base import (
     CANONICAL_SECTION_GROUPS,
     LoadedCell,
     ensure_section_aliases,
 )
-from modules.loaders.paths import resolve_loader_path
+from scp_pipeline.loaders.paths import resolve_loader_path
+from scp_pipeline.loaders.source_context import model_execution, sha256_file, working_directory, declared_source_files
 
 
 _LOADED_HOC_SOURCES: set[Path] = set()
+_LOADED_HOC_HASHES: Dict[Path, str] = {}
+_LOADED_BUNDLE_HASHES = {}
 _LOADED_TEMPLATE_SOURCES: Dict[str, Path] = {}
-
-
-@contextmanager
-def _pushd(path: Path):
-    old = Path.cwd()
-    os.chdir(str(path))
-    try:
-        yield
-    finally:
-        os.chdir(str(old))
+_FAILED_HOC_SOURCES: set[Path] = set()
 
 
 def _hoc_options(cell_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -133,6 +125,18 @@ def discover_source_artifacts(
 
 
 def _load_template_definition(h: Any, template_path: Path, template_name: str) -> None:
+    failure_message = (
+        f"NEURON failed to load HOC source {template_path} (template {template_name!r}). "
+        "The source may be partially defined; SCP will not instantiate it. "
+        "Check the NEURON error above. If it reports 'not a MECHANISM', configure "
+        "paths.modfiles and stage/compile the required MOD sources before loading. "
+        "Restart the Python/Jupyter kernel before retrying."
+    )
+    if template_path in _FAILED_HOC_SOURCES:
+        raise RuntimeError(f"HOC source previously failed to load in this process. {failure_message}")
+    digest = sha256_file(template_path)
+    if template_path in _LOADED_HOC_HASHES and _LOADED_HOC_HASHES[template_path] != digest:
+        raise RuntimeError(f"HOC source changed after loading: {template_path}. Restart the Python/Jupyter process.")
     previous_source = _LOADED_TEMPLATE_SOURCES.get(template_name)
     if previous_source is not None and previous_source != template_path:
         raise RuntimeError(
@@ -162,11 +166,19 @@ def _load_template_definition(h: Any, template_path: Path, template_name: str) -
             "kernel so SCP can load an unambiguous template definition."
         )
 
-    with _pushd(template_path.parent):
+    # Failed parsing can leave a template symbol behind. Its presence does NOT
+    # establish a valid definition: constructing it can segfault inside NEURON.
+    # Poison the source until a successful return, including Python exceptions.
+    _FAILED_HOC_SOURCES.add(template_path)
+    try:
         loaded = h.load_file(str(template_path))
+    except Exception as exc:
+        raise RuntimeError(failure_message) from exc
+    if loaded != 1:
+        raise RuntimeError(failure_message)
+    _FAILED_HOC_SOURCES.discard(template_path)
     _LOADED_HOC_SOURCES.add(template_path)
-    if int(loaded) != 1 and not hasattr(h, template_name):
-        raise RuntimeError(f"NEURON failed to load HOC source: {template_path}")
+    _LOADED_HOC_HASHES[template_path] = digest
     if not hasattr(h, template_name):
         raise AttributeError(
             f"HOC source {template_path} did not define template {template_name!r}. "
@@ -193,15 +205,23 @@ def load_cell(
     from neuron import h
 
     h.load_file("stdrun.hoc")
-    _load_template_definition(h, template_path, template_name)
-    constructor = getattr(h, template_name)
-    try:
-        model = constructor(*constructor_args)
-    except Exception as exc:
-        raise RuntimeError(
-            f"Failed to instantiate HOC template {template_name!r} from "
-            f"{template_path} with constructor_args={constructor_args!r}: {exc}"
-        ) from exc
+    directory = working_directory(cell_config, template_path, base_dir)
+    inventory = declared_source_files(cell_config, base_dir)
+    if inventory:
+        fingerprint = tuple((str(p), sha256_file(p)) for p in inventory)
+        if template_path in _LOADED_BUNDLE_HASHES and _LOADED_BUNDLE_HASHES[template_path] != fingerprint:
+            raise RuntimeError('Declared HOC model dependencies changed after loading. Restart the Python/Jupyter process.')
+        _LOADED_BUNDLE_HASHES[template_path] = fingerprint
+    with model_execution(directory):
+        _load_template_definition(h, template_path, template_name)
+        constructor = getattr(h, template_name)
+        try:
+            model = constructor(*constructor_args)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to instantiate HOC template {template_name!r} from "
+                f"{template_path} with constructor_args={constructor_args!r}: {exc}"
+            ) from exc
 
     config = dict(cell_config)
     config["cell_loader"] = "hoc_template"
@@ -217,6 +237,7 @@ def load_cell(
         model=model,
         source_artifacts={role: str(path) for role, path in artifacts.items()},
     )
+    cell.working_directory = directory
     ensure_section_aliases(
         cell,
         owner=model,

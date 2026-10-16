@@ -14,7 +14,7 @@
 # #SBATCH -e logs/pvsst.err
 
 # Optional: load modules / activate env if needed
-# module load python/3.10
+# module load python/3.11
 # source <conda_root>/bin/activate <env-name>
 
 set -euo pipefail
@@ -280,7 +280,22 @@ fi
 #   - Set CELL and TUNE (defaults below)
 CELL=${CELL:-SST}
 TUNE=${TUNE:-tuned}
-TUNE_DIR=${TUNE_DIR:-${REPO_ROOT}/cells/${CELL}/tunes/${TUNE}}
+PROJECT=${PROJECT:-}
+# Explicit paths stay submit-directory-relative; all shorthand uses the shared
+# resolver, including name validation and namespace symlink protection.
+TUNE_DIR="$(REPO_ROOT="$REPO_ROOT" CELL="$CELL" TUNE="$TUNE" PROJECT="$PROJECT" \
+    TUNE_DIR="${TUNE_DIR:-}" SUBMIT_DIR="$SUBMIT_DIR" "$PYTHON_BIN" - <<'PY'
+import os
+import sys
+from pathlib import Path
+sys.path.insert(0, os.environ['REPO_ROOT'])
+from modules.workspaces import resolve_workspace
+print(resolve_workspace(repo_root=os.environ['REPO_ROOT'],
+    project_name=os.environ['PROJECT'] or None, cell_name=os.environ['CELL'],
+    tune_name=os.environ['TUNE'], tune_dir_override=os.environ['TUNE_DIR'] or None,
+    relative_to=Path(os.environ['SUBMIT_DIR'])).tune_dir)
+PY
+)"
 
 OUTPUT_DIR=${OUTPUT_DIR:-${TUNE_DIR}/output_data}
 MODE=${MODE:-}              # leave empty to auto-pick based on n_trials

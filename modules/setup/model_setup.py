@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
-from modules.loaders import get_cell_loader_name
+from scp_pipeline.loaders import get_cell_loader_name
 
 from .defaults import guess_specimen_from_cell
 from .mechanisms import load_tune_cell_config
@@ -17,7 +17,9 @@ _HOC_TEMPLATE_PATTERN = re.compile(
     r"^\s*begintemplate\s+([A-Za-z_][A-Za-z0-9_]*)\b",
     flags=re.MULTILINE | re.IGNORECASE,
 )
-_IGNORED_DISCOVERY_PARTS = {
+from scp_pipeline.loaders.source_context import EXCLUDED_PARTS
+
+_IGNORED_DISCOVERY_PARTS = EXCLUDED_PARTS | {
     ".git",
     "__pycache__",
     "cell_configs",
@@ -38,6 +40,8 @@ _OVERRIDE_KEYS = {
     "loader_paths",
     "hoc_template",
     "loader_config",
+    "python_factory",
+    "model_source",
 }
 
 
@@ -74,11 +78,22 @@ def resolve_step1_model_setup(
     elif _declares_complete_hoc_source(normalized_overrides):
         setup = _setup_from_explicit_hoc(tune_root, normalized_overrides)
         discovery_mode = "overrides"
+    elif normalized_overrides.get('cell_loader') == 'python_factory':
+        setup = {'source_type': 'existing', 'cell_loader': 'python_factory',
+                 'specimen_id': None, 'model_type': '',
+                 'loader_paths': {}, 'loader_config': {}}
+        discovery_mode = 'overrides'
     else:
         setup = _discover_staged_setup(tune_root)
         discovery_mode = str(setup.pop("_discovery_mode"))
 
     _deep_update(setup, normalized_overrides)
+    if stored and setup.get('loader_config', {}).get('model_source'):
+        selected = setup['loader_config']['model_source']
+        previous = stored.get('model_source') or {}
+        from scp_pipeline.loaders.source_context import same_source_selection
+        if not same_source_selection(selected, previous, tune_root):
+            raise ValueError('External source root/folders changed. Preview and explicitly refresh with register_model_sources(refresh=True); the stored snapshot is authoritative on reruns.')
     normalized = _normalize_setup(setup, cell_name=cell_name)
     normalized["discovery"] = discovery_mode
     return normalized
@@ -128,6 +143,11 @@ def _normalize_overrides(
         if not isinstance(existing, dict):
             raise TypeError("loader_config.hoc_template must be a dictionary.")
         _deep_update(existing, dict(raw_hoc))
+    for key in ('python_factory', 'model_source'):
+        if key in overrides:
+            if not isinstance(overrides[key], Mapping):
+                raise TypeError(f'MODEL_SOURCE_OVERRIDES {key} must be a dictionary.')
+            normalized.setdefault('loader_config', {})[key] = copy.deepcopy(dict(overrides[key]))
     return normalized
 
 
@@ -144,6 +164,9 @@ def _setup_from_cell_config(cell_config: Mapping[str, Any]) -> dict[str, Any]:
                 "Stored cell_config.json hoc_template must be a dictionary."
             )
         loader_config["hoc_template"] = copy.deepcopy(dict(hoc_options))
+    for key in ('python_factory', 'model_source'):
+        if key in cell_config:
+            loader_config[key] = copy.deepcopy(cell_config[key])
     return {
         "source_type": "existing",
         "cell_loader": loader_name,
@@ -156,7 +179,7 @@ def _setup_from_cell_config(cell_config: Mapping[str, Any]) -> dict[str, Any]:
 
 def _discover_staged_setup(tune_root: Path) -> dict[str, Any]:
     manifests = _candidate_files(tune_root, "manifest.json")
-    hoc_templates = _hoc_template_declarations(tune_root)
+    hoc_templates = discover_hoc_templates(tune_root)
     if manifests and hoc_templates:
         raise ValueError(
             "Model-source discovery found both an Allen manifest and HOC template "
@@ -180,17 +203,17 @@ def _discover_staged_setup(tune_root: Path) -> dict[str, Any]:
         }
     if len(hoc_templates) > 1:
         choices = ", ".join(
-            f"{_relative_path(path, tune_root)}:{name}"
-            for path, name in hoc_templates
+            f"{candidate['path']}:{candidate['template_name']}"
+            for candidate in hoc_templates
         )
         raise ValueError(
             "Model-source discovery found multiple HOC template declarations: "
             f"{choices}. Set MODEL_SOURCE_OVERRIDES to select one."
         )
     if hoc_templates:
-        path, template_name = hoc_templates[0]
+        candidate = hoc_templates[0]
         paths: dict[str, Any] = {
-            "hoc_template": _relative_path(path, tune_root),
+            "hoc_template": candidate["path"],
         }
         modfiles = tune_root / "modfiles"
         if modfiles.is_dir():
@@ -202,7 +225,7 @@ def _discover_staged_setup(tune_root: Path) -> dict[str, Any]:
             "model_type": "perisomatic",
             "loader_paths": paths,
             "loader_config": {
-                "hoc_template": {"template_name": template_name},
+                "hoc_template": {"template_name": candidate["template_name"]},
             },
             "_discovery_mode": "staged_hoc_template",
         }
@@ -313,8 +336,15 @@ def _candidate_files(tune_root: Path, filename: str) -> list[Path]:
     )
 
 
-def _hoc_template_declarations(tune_root: Path) -> list[tuple[Path, str]]:
-    declarations: list[tuple[Path, str]] = []
+def discover_hoc_templates(tune_dir: str | Path) -> list[dict[str, str]]:
+    """List staged HOC declarations without executing or modifying sources.
+
+    Each record contains a tune-relative ``path`` and a ``template_name``.
+    Results are sorted by path/name using the same exclusions as Step 1 model
+    discovery. Empty or absent tune directories yield an empty list.
+    """
+    tune_root = Path(tune_dir).expanduser().resolve()
+    declarations: list[dict[str, str]] = []
     for path in sorted(tune_root.rglob("*")):
         if (
             not path.is_file()
@@ -324,10 +354,10 @@ def _hoc_template_declarations(tune_root: Path) -> list[tuple[Path, str]]:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         declarations.extend(
-            (path.resolve(), match.group(1))
+            {"path": _relative_path(path, tune_root), "template_name": match.group(1)}
             for match in _HOC_TEMPLATE_PATTERN.finditer(text)
         )
-    return declarations
+    return sorted(declarations, key=lambda item: (item["path"], item["template_name"]))
 
 
 def _is_ignored(path: Path, tune_root: Path) -> bool:

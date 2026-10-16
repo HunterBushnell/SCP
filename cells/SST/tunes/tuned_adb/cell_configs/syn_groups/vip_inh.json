@@ -37,7 +37,7 @@
         "stop_ms": 870.0,
         "mode": "inhomogeneous_poisson",
         "source": {
-          "path": "external_data/pyrFiringRateAvg.csv",
+          "path": "cells/SST/data/pyrFiringRateAvg.csv",
           "time_col": "Time",
           "rate_col": "AvgFiringRate",
           "bin_ms": 5.0,

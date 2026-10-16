@@ -16,8 +16,8 @@ def build_input_preview(
 ) -> dict[str, Any]:
     """Prepare current configs and sample preview-only synapse records."""
 
-    from modules.analysis import analysis
-    from modules.simulation import SimulationOptions, SimulationSession
+    from scp_pipeline.analysis import analysis
+    from scp_pipeline.simulation import SimulationOptions, SimulationSession
 
     options = SimulationOptions(
         n_trials=1,

@@ -1,0 +1,82 @@
+{
+  "schema_version": 2,
+  "cell_name": "ACT_BursterCa",
+  "tune": "reference",
+  "source_repository": {
+    "name": "ACT",
+    "remote": "https://github.com/V-Marco/ACT.git",
+    "commit": "2b3fdc190107b8242e3496329cfdf240abd09694"
+  },
+  "model_relationship": "ACT known-reference target model; not an exported optimization result",
+  "runtime_conditions": {
+    "celsius_C": 6.3,
+    "v_init_mV": -50.0
+  },
+  "selection_policy": "Pinned native source bytes and declared/intrinsic dependencies only; no compiled outputs, drivers, checkpoints, or network execution.",
+  "compiled_outputs_included": false,
+  "files": [
+    {
+      "source_path": "data/BursterCa/orig/target_template.hoc",
+      "source_sha256": "0e611199c0e338b325a93e4606ff37d7c78392e90d972f2bdbb67ca3b17a5fab",
+      "destination_path": "model/target_template.hoc",
+      "current_sha256": "0e611199c0e338b325a93e4606ff37d7c78392e90d972f2bdbb67ca3b17a5fab",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/BursterCa/orig/modfiles/leak.mod",
+      "source_sha256": "81bfc68ffbce3d4d6ef7d731549ea3e1b4cd4832cd129a53b01b413d07e984e6",
+      "destination_path": "modfiles/leak.mod",
+      "current_sha256": "81bfc68ffbce3d4d6ef7d731549ea3e1b4cd4832cd129a53b01b413d07e984e6",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/BursterCa/orig/modfiles/na.mod",
+      "source_sha256": "ee2f7ad37871ff6e7a100c4005266acb87d099fd569e82ff2593ecd9aba77da3",
+      "destination_path": "modfiles/na.mod",
+      "current_sha256": "ee2f7ad37871ff6e7a100c4005266acb87d099fd569e82ff2593ecd9aba77da3",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/BursterCa/orig/modfiles/kdr.mod",
+      "source_sha256": "685b5c7c00290b1830e80b931ac922a9bfd49415a5906fbb4570a3ee1343e0d0",
+      "destination_path": "modfiles/kdr.mod",
+      "current_sha256": "685b5c7c00290b1830e80b931ac922a9bfd49415a5906fbb4570a3ee1343e0d0",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/BursterCa/orig/modfiles/capool.mod",
+      "source_sha256": "57fb9b67268223555f321d0c6f9ced90a0559a130ae09034189fe977e968674f",
+      "destination_path": "modfiles/capool.mod",
+      "current_sha256": "57fb9b67268223555f321d0c6f9ced90a0559a130ae09034189fe977e968674f",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/BursterCa/orig/modfiles/cas.mod",
+      "source_sha256": "2921e0bc5bedcecb2ba6cb2947f639e711e4a316b8872ecd523805c33fbe2b0b",
+      "destination_path": "modfiles/cas.mod",
+      "current_sha256": "2921e0bc5bedcecb2ba6cb2947f639e711e4a316b8872ecd523805c33fbe2b0b",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/BursterCa/orig/modfiles/ka.mod",
+      "source_sha256": "5c9eafcf384f0d42dfb02d95c3f0f3dd7a68a8298e7d5acbde708b3ba7090340",
+      "destination_path": "modfiles/ka.mod",
+      "current_sha256": "5c9eafcf384f0d42dfb02d95c3f0f3dd7a68a8298e7d5acbde708b3ba7090340",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/BursterCa/orig/modfiles/kca.mod",
+      "source_sha256": "a009f58a05b5f08bf56be6cd44899cceb5590e287e1c6f98e70d8fc68fecb060",
+      "destination_path": "modfiles/kca.mod",
+      "current_sha256": "a009f58a05b5f08bf56be6cd44899cceb5590e287e1c6f98e70d8fc68fecb060",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/BursterCa/orig/modfiles/cat.mod",
+      "source_sha256": "1233aad475e26558b0151e2f3d7bae0ee76fb38b160aa6953f65d6c72dd6ec05",
+      "destination_path": "modfiles/cat.mod",
+      "current_sha256": "1233aad475e26558b0151e2f3d7bae0ee76fb38b160aa6953f65d6c72dd6ec05",
+      "relationship": "exact_copy"
+    }
+  ]
+}

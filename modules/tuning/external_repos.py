@@ -150,15 +150,24 @@ def ensure_external_repo_checkout(
             repo_url=repo_url,
         )
 
-    checkout = checkout.resolve()
-    _assert_import_location_is_compatible(spec, checkout)
+    checkout = activate_external_repo_checkout(spec, checkout, prepend=prepend)
     os.environ[spec.canonical_path_env] = str(checkout)
+    return checkout
+
+
+def activate_external_repo_checkout(
+    spec: ExternalRepoSpec, checkout: Path, *, prepend: bool = False,
+) -> Path:
+    """Activate a validated checkout without downloading or setting overrides."""
+    checkout = Path(checkout).expanduser().resolve()
+    if not looks_like_external_repo(checkout, spec):
+        raise FileNotFoundError(f"{spec.display_name} checkout is missing {spec.marker_rel}: {checkout}")
+    _assert_import_location_is_compatible(spec, checkout)
     path_string = str(checkout)
-    if path_string not in sys.path:
-        if prepend:
-            sys.path.insert(0, path_string)
-        else:
-            sys.path.append(path_string)
+    if prepend:
+        sys.path[:] = [path_string, *[entry for entry in sys.path if entry != path_string]]
+    elif path_string not in sys.path:
+        sys.path.append(path_string)
     return checkout
 
 
@@ -304,16 +313,18 @@ def _assert_import_location_is_compatible(
     spec: ExternalRepoSpec,
     checkout: Path,
 ) -> None:
-    module = sys.modules.get(spec.package_name)
-    module_file = getattr(module, "__file__", None) if module is not None else None
-    if not module_file:
-        return
-    imported_path = Path(module_file).resolve()
-    try:
-        imported_path.relative_to(checkout)
-    except ValueError:
-        raise RuntimeError(
-            f"{spec.display_name} is already imported from {imported_path}, but "
-            f"SCP resolved {checkout}. Restart the kernel before switching "
-            f"{spec.display_name} checkouts."
-        ) from None
+    for name, module in tuple(sys.modules.items()):
+        if name != spec.package_name and not name.startswith(spec.package_name + "."):
+            continue
+        module_file = getattr(module, "__file__", None)
+        if not module_file:
+            continue
+        imported_path = Path(module_file).resolve()
+        try:
+            imported_path.relative_to(checkout)
+        except ValueError:
+            raise RuntimeError(
+                f"{spec.display_name} is already imported from {imported_path}, but "
+                f"SCP resolved {checkout}. Restart the kernel before switching "
+                f"{spec.display_name} checkouts."
+            ) from None

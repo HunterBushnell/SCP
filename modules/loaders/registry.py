@@ -28,9 +28,18 @@ class LoaderSpec:
 
 
 _SPECS: Dict[str, LoaderSpec] = {
+    "runtime_cell": LoaderSpec(
+        name="runtime_cell", module="scp_pipeline.loaders.runtime_cell",
+        capabilities=frozenset({"manual_tuning", "geometry", "synapses", "simulation"}),
+    ),
+    "python_factory": LoaderSpec(
+        name="python_factory", module="scp_pipeline.loaders.python_factory",
+        required_path_keys=("python_factory",),
+        capabilities=frozenset({"manual_tuning", "geometry", "synapses", "simulation", "act_active"}),
+    ),
     "allen_manifest": LoaderSpec(
         name="allen_manifest",
-        module="modules.loaders.allen_manifest",
+        module="scp_pipeline.loaders.allen_manifest",
         aliases=("adb", "allen", "allen_sdk", "allensdk"),
         required_path_keys=("manifest",),
         capabilities=frozenset(
@@ -39,7 +48,7 @@ _SPECS: Dict[str, LoaderSpec] = {
     ),
     "hoc_template": LoaderSpec(
         name="hoc_template",
-        module="modules.loaders.hoc_template",
+        module="scp_pipeline.loaders.hoc_template",
         aliases=("hoc", "template", "hoc-template"),
         required_path_keys=("hoc_template",),
         capabilities=frozenset(
@@ -169,7 +178,12 @@ def discover_cell_source_artifacts(
         raise TypeError(
             f"{spec.name} discover_source_artifacts() must return dict[str, Path]."
         )
-    return {str(role): Path(path).resolve() for role, path in artifacts.items()}
+    from .source_context import declared_source_files
+    artifacts = dict(artifacts)
+    for index, path in enumerate(declared_source_files(cell_config, base_dir)):
+        artifacts[f"dependency:{index}"] = path
+    return {str(role): Path(path).absolute() if str(role).startswith('dependency:')
+            else Path(path).resolve() for role, path in artifacts.items()}
 
 
 def load_cell_with_registered_loader(

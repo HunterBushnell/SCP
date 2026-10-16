@@ -168,13 +168,17 @@ class Step2UI(PipelineUIComponent):
         return panel
 
     def _configured_passive_target_display(self) -> tuple[str, dict[str, Any]]:
-        from modules.tuning import (
+        from scp_pipeline.tuning import (
             load_target_config,
             passive_targets_from_config,
             target_source_mode_from_config,
         )
 
-        config = load_target_config(self._selected_tune_dir())
+        try:
+            selected = self._selected_tune_dir()
+        except ValueError:
+            selected = None  # An empty project may render before model selection.
+        config = load_target_config(selected) if selected is not None else None
         source_mode = (
             target_source_mode_from_config(config) if config else "none"
         )

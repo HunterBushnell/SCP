@@ -16,6 +16,15 @@ LINK_PATTERN = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 
 
 class DocumentationTests(unittest.TestCase):
+    def test_readme_explains_checkout_relative_and_full_path_installation(self) -> None:
+        readme = " ".join((REPO_ROOT / "README.md").read_text(encoding="utf-8").split())
+        self.assertIn("python -m pip install -e .", readme)
+        self.assertIn('python -m pip install -e "/path/to/SCP"', readme)
+        self.assertIn("current directory", readme)
+        self.assertIn("Replace `/path/to/SCP`", readme)
+        self.assertIn("YAML installs dependencies", readme)
+        self.assertIn("once per environment", readme)
+
     def test_relative_markdown_links_resolve(self) -> None:
         failures: list[str] = []
         for document in MARKDOWN_FILES:

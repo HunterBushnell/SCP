@@ -16,7 +16,7 @@ import json
 
 import numpy as np
 
-from modules.core import randomness
+from scp_pipeline.core import randomness
 
 from .config import (
     _expand_group_includes,

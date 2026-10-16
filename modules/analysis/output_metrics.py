@@ -1067,7 +1067,7 @@ def load_or_compute_output_metrics(
         used_saved = False
     if metrics is None:
         if results is None:
-            from modules import run_sim
+            from scp_pipeline import run_sim
 
             results = run_sim.load_results(run_path)
         metrics = compute_output_metrics_from_results(results, cfg)

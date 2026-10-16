@@ -133,7 +133,7 @@ def _collect_neuron_state() -> Dict[str, Any]:
 
 
 def _collect_mechanism_info(sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
-    from modules.setup.mechanisms import (
+    from scp_pipeline.setup.mechanisms import (
         find_compiled_mechanism_dll,
         resolve_modfiles_dir,
     )

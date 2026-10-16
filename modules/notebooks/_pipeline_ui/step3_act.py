@@ -41,7 +41,8 @@ class Step3ACTUI(PipelineUIComponent):
             "<b>Experimental:</b> this compact ACT active-tuning workflow has "
             "not yet been fully validated. Treat every prediction as a "
             "review-only proposal; the active protocol and FI curve above are "
-            "the established Step 3 checks."
+            "the established Step 3 checks. Install SCP's optional ACT extra "
+            "once in this environment; no project-specific ACT path is needed."
             "</div>"
         )
         info = w.HTML(
@@ -735,7 +736,7 @@ class Step3ACTUI(PipelineUIComponent):
         inspection = getattr(self, "_act_inspection", None)
         if control is None or inspection is None:
             return
-        from modules.tuning import estimate_act_workload
+        from scp_pipeline.tuning import estimate_act_workload
 
         cfg = deepcopy(inspection.resolved_config)
         modules_override = (self.settings.get("act_overrides") or {}).get("modules")
@@ -864,7 +865,7 @@ class Step3ACTUI(PipelineUIComponent):
         except Exception as exc:
             self._show_validation_error("step3", exc, output_key="step3_act")
             return
-        from modules.tuning import (
+        from scp_pipeline.tuning import (
             act_output_status,
             collect_act_predictions,
             load_act_module_metrics,
@@ -884,7 +885,7 @@ class Step3ACTUI(PipelineUIComponent):
         metrics: dict[str, list[dict[str, Any]]],
         statuses: dict[str, dict[str, Any]],
     ) -> None:
-        from modules.tuning import display_tuning_rows, load_act_active_config
+        from scp_pipeline.tuning import display_tuning_rows, load_act_active_config
 
         config_path = (
             self.act_workspace_result.config_path

@@ -27,24 +27,45 @@ prepare + build once -> reuse one in-kernel cell -> fresh preview/simulation
 4. **Synapse Tuning** optionally initializes BMTool around the shared cell, then
    exposes Single Event and Interactive Tuner separately.
 5. **Check Inputs, Simulate, and Plot** previews inputs and runs the final model
-   in fresh processes, loads the saved manifest, and plots compact diagnostics.
+   in fresh processes for configured models, loads the saved manifest, and plots
+   compact diagnostics. Explicit live-cell overrides preview/run in the kernel;
+   they cannot be reconstructed by a subprocess.
 
 Each card owns its controls, status, and output. There are no tabs, accordions,
 or global run button. Advanced options expand only within the relevant card.
 
 ## Settings and Config Ownership
 
-`pipeline_settings` and the widgets synchronize in both directions. Rerunning
-the settings cell refreshes unlocked widgets; widget edits update the mapping.
+The optional `pipeline_settings` hook supplies initial notebook defaults;
+widgets are the normal editing interface. The compact notebook restores a
+project-local preset automatically when enabled, while repeated Run All leaves
+current edits intact. Code-first `pipeline_ui.apply_settings(...)` still updates
+unlocked controls explicitly.
 Model-selection fields lock after Step 1 because the model may only be built
 once per kernel.
 
-The compact UI has two kinds of values:
+The compact UI separates navigation, persistent cell configuration, and notebook choices:
+
+- **Navigation:** `.scp_project.json`, explicitly saved with **Save project settings**
+  below the main Location/Cell/Tune/Results controls. It can be saved before
+  registering any cell; model registration stays under **Cell setup**.
 
 - **File-backed config:** the durable source of truth under
   `cell_configs/*.json` and `cell_configs/syn_groups/*.json`.
 - **Session-only override:** a widget or `pipeline_settings` value used for the
   current notebook session. It does not rewrite JSON automatically.
+- **Remembered notebook choice:** **Save notebook defaults** writes panel
+  preferences/explicit overrides to `.scp_pipeline_settings.json`. The next
+  session restores it for that project; changing cells retains its choices.
+  It never rewrites native files or cell configurations. Reload/reset and
+  Colab import/export are under Notebook defaults options.
+
+Step 1 normally shows selection, the resolved model/source/conditions summary,
+and loading. **Cell setup** reveals model registration and advanced cell setup
+only when needed; empty projects open it automatically. Copy/reference mode
+is prominent during registration. Loading options include Quiet load and
+Recompile mechanisms. See the [dependency workflow](guides/dependency_workflow.md)
+for the first-use and returning-user paths and settings precedence.
 
 Missing standard configs are scaffolded in fill mode, preserving existing
 values and loader metadata. Runtime, target, geometry, and synapse files are

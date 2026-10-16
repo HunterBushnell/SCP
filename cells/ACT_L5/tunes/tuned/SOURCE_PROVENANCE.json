@@ -1,0 +1,159 @@
+{
+  "schema_version": 2,
+  "cell_name": "ACT_L5",
+  "tune": "tuned",
+  "source_repository": {
+    "name": "ACT",
+    "remote": "https://github.com/V-Marco/ACT.git",
+    "commit": "2b3fdc190107b8242e3496329cfdf240abd09694"
+  },
+  "model_relationship": "ACT seg_tuned bundle with its active manifest-selected fit and matching mechanisms",
+  "runtime_conditions": {
+    "celsius_C": 34,
+    "v_init_mV": -90
+  },
+  "selection_policy": "Pinned native source bytes and declared/intrinsic dependencies only; no compiled outputs, drivers, checkpoints, or network execution.",
+  "compiled_outputs_included": false,
+  "files": [
+    {
+      "source_path": "data/L5/seg_tuned/497232429_fit.json",
+      "source_sha256": "4aa449642e2f34590329a9328133e4ca3095908cdafb00cff7d48d18f8da418b",
+      "destination_path": "497232429_fit.json",
+      "current_sha256": "4aa449642e2f34590329a9328133e4ca3095908cdafb00cff7d48d18f8da418b",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/Rorb-IRES2-Cre-D_Ai14-197851.04.01.01_491770985_m.swc",
+      "source_sha256": "f31bacb32ee2910719071354a792e4df5bc7e39c1ff2611c3d1e46065b11c816",
+      "destination_path": "Rorb-IRES2-Cre-D_Ai14-197851.04.01.01_491770985_m.swc",
+      "current_sha256": "f31bacb32ee2910719071354a792e4df5bc7e39c1ff2611c3d1e46065b11c816",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/Rorb-IRES2-Cre-D_Ai14-197851.04.01.01_491770985_marker_m.swc",
+      "source_sha256": "f3f851f210aa9f0d6ac4d4cb447582bc4d7b3fcbd6cc6fd7f21959e93e384d98",
+      "destination_path": "Rorb-IRES2-Cre-D_Ai14-197851.04.01.01_491770985_marker_m.swc",
+      "current_sha256": "f3f851f210aa9f0d6ac4d4cb447582bc4d7b3fcbd6cc6fd7f21959e93e384d98",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/manifest.json",
+      "source_sha256": "42085f93c925d4f9dd23accce3174d53f343de7778b3cc4ae7209b910c94f0f0",
+      "destination_path": "manifest.json",
+      "current_sha256": "42085f93c925d4f9dd23accce3174d53f343de7778b3cc4ae7209b910c94f0f0",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/CaDynamics.mod",
+      "source_sha256": "f012def9758f7d0244b81c54291edea6597c15fad99b9f7b5725b121a3567f16",
+      "destination_path": "modfiles/CaDynamics.mod",
+      "current_sha256": "f012def9758f7d0244b81c54291edea6597c15fad99b9f7b5725b121a3567f16",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/Ca_HVA.mod",
+      "source_sha256": "968e23391f4096c37ae262d7b2dc3063ece328bc3aa4d765d92d76b5f1f6959d",
+      "destination_path": "modfiles/Ca_HVA.mod",
+      "current_sha256": "968e23391f4096c37ae262d7b2dc3063ece328bc3aa4d765d92d76b5f1f6959d",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/Ca_LVA.mod",
+      "source_sha256": "bf59b68e70a1e24383b0c8d708f08960c9f16e9e752b2b2ad3524364a8a55b77",
+      "destination_path": "modfiles/Ca_LVA.mod",
+      "current_sha256": "bf59b68e70a1e24383b0c8d708f08960c9f16e9e752b2b2ad3524364a8a55b77",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/Ih.mod",
+      "source_sha256": "3a124d1cb91212ba99ac99039084c6fd5ddb753cf8bf53b140b8b12948f7f1e3",
+      "destination_path": "modfiles/Ih.mod",
+      "current_sha256": "3a124d1cb91212ba99ac99039084c6fd5ddb753cf8bf53b140b8b12948f7f1e3",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/Im.mod",
+      "source_sha256": "e1c3bfb2186439bdb963ff2c53268efb824d8e00401aef0a14b7d2234071bb2c",
+      "destination_path": "modfiles/Im.mod",
+      "current_sha256": "e1c3bfb2186439bdb963ff2c53268efb824d8e00401aef0a14b7d2234071bb2c",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/Im_v2.mod",
+      "source_sha256": "7e6b50215b82cfacf9d9dcb1fe3667c1f63350fac4360ea7255a7bf97d9da100",
+      "destination_path": "modfiles/Im_v2.mod",
+      "current_sha256": "7e6b50215b82cfacf9d9dcb1fe3667c1f63350fac4360ea7255a7bf97d9da100",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/K_P.mod",
+      "source_sha256": "2254697617c8da162ff8e5495e4d512fce53f77b44b86754855f11cee4ab3b3e",
+      "destination_path": "modfiles/K_P.mod",
+      "current_sha256": "2254697617c8da162ff8e5495e4d512fce53f77b44b86754855f11cee4ab3b3e",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/K_T.mod",
+      "source_sha256": "42fb1e7b1837717b107c16a3f5faa1db378e2d3b35d3448f2b43fa2aeab53422",
+      "destination_path": "modfiles/K_T.mod",
+      "current_sha256": "42fb1e7b1837717b107c16a3f5faa1db378e2d3b35d3448f2b43fa2aeab53422",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/Kd.mod",
+      "source_sha256": "0eed5b30cc8a8beeabeaf03c5ce33aa6ef8a788b8d23ade2a16ae08eb285e235",
+      "destination_path": "modfiles/Kd.mod",
+      "current_sha256": "0eed5b30cc8a8beeabeaf03c5ce33aa6ef8a788b8d23ade2a16ae08eb285e235",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/Kv2like.mod",
+      "source_sha256": "d69819023b6bae0d0a90aa1a067b297d46a33b04cd92bea52c1cf6d8482e2ecf",
+      "destination_path": "modfiles/Kv2like.mod",
+      "current_sha256": "d69819023b6bae0d0a90aa1a067b297d46a33b04cd92bea52c1cf6d8482e2ecf",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/Kv3_1.mod",
+      "source_sha256": "65a085bc8ae1c6f0d9c75609900da009f662bab1390388e172d39dc09620600a",
+      "destination_path": "modfiles/Kv3_1.mod",
+      "current_sha256": "65a085bc8ae1c6f0d9c75609900da009f662bab1390388e172d39dc09620600a",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/NaTa.mod",
+      "source_sha256": "631788f29d2ac1fcd951903cc275015521590c7063b5095cd141dff12b1bfdef",
+      "destination_path": "modfiles/NaTa.mod",
+      "current_sha256": "631788f29d2ac1fcd951903cc275015521590c7063b5095cd141dff12b1bfdef",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/NaTs.mod",
+      "source_sha256": "d75ed63d6367fe27c6e5671704594a510e8d83b57db835f30fc36e2f24bef6cf",
+      "destination_path": "modfiles/NaTs.mod",
+      "current_sha256": "d75ed63d6367fe27c6e5671704594a510e8d83b57db835f30fc36e2f24bef6cf",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/NaV.mod",
+      "source_sha256": "635605ba861c070f8fdc273365f3a0fca6eee24762afc9b102161fdd6e9cfc42",
+      "destination_path": "modfiles/NaV.mod",
+      "current_sha256": "635605ba861c070f8fdc273365f3a0fca6eee24762afc9b102161fdd6e9cfc42",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/Nap.mod",
+      "source_sha256": "03bccfc41b5edc92a09c2825e23b82e817cb1b3aa737b7c35ee13e2af18e14ea",
+      "destination_path": "modfiles/Nap.mod",
+      "current_sha256": "03bccfc41b5edc92a09c2825e23b82e817cb1b3aa737b7c35ee13e2af18e14ea",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/L5/seg_tuned/modfiles/SK.mod",
+      "source_sha256": "079f1e3cac7444696d480b8e02853b215cd93e0c7b9986dbb54925fc49eddbeb",
+      "destination_path": "modfiles/SK.mod",
+      "current_sha256": "079f1e3cac7444696d480b8e02853b215cd93e0c7b9986dbb54925fc49eddbeb",
+      "relationship": "exact_copy"
+    }
+  ]
+}

@@ -23,9 +23,9 @@
   "compare_preset_enabled": false,
   "compare_list_paths_enabled": true,
   "compare_list_paths": [
-    {"path": "external_data/pyrFiringRateAvg.csv@290;color=k;linestyle=--;label=PN_bio", "enabled": true},
-    {"path": "external_data/SSTFiringRateAvg.csv@300;color=magenta;linestyle=--;label=SST_bio", "enabled": false},
-    {"path": "external_data/PVFiringRateAvg.csv@300;color=blue;linestyle=--;label=PV_bio", "enabled": false},
+    {"path": "cells/PN/data/pyrFiringRateAvg.csv@290;color=k;linestyle=--;label=PN_bio", "enabled": true},
+    {"path": "cells/SST/data/SSTFiringRateAvg.csv@300;color=magenta;linestyle=--;label=SST_bio", "enabled": false},
+    {"path": "cells/PV/data/PVFiringRateAvg.csv@300;color=blue;linestyle=--;label=PV_bio", "enabled": false},
 
     {"path": "cells/PV/tunes/tuned/output_data/PV5_base;color=royalblue;linestyle=--;label=PV5_base", "enabled": false},
     {"path": "cells/PV/tunes/tuned/output_data/PV5_tuned;color=navy;linestyle=--;label=PV5_tuned", "enabled": false},
@@ -34,7 +34,9 @@
     {"path": "cells/SST/tunes/tuned/output_data/SST5_tuned;color=darkmagenta;linestyle=--;label=SST5_tuned", "enabled": false}
   ],
   "compare_list_dir_paths": [
-  "external_data"
+    "cells/PN/data",
+    "cells/PV/data",
+    "cells/SST/data"
   ],
   "extra_mode": "output_metrics"
 }

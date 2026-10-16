@@ -114,7 +114,7 @@ def _standard_plot(
             max_traces=max_traces,
         )
 
-    from modules.analysis import plotting
+    from scp_pipeline.analysis import plotting
 
     sim_cfg = results.get("sim_cfg", {}) or {}
     if win_size is None:
@@ -159,7 +159,7 @@ def _single_plot_diagnostic(
         fig = _plot_vm_summary(results)
         return {"fig": fig, "warnings": ["single-plot diagnostics unavailable for IClamp"]}
 
-    from modules.analysis import single_plot_panel
+    from scp_pipeline.analysis import single_plot_panel
 
     preset = single_plot_panel.load_single_plot_preset(
         repo_root=repo_root,

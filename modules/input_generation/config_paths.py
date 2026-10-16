@@ -56,7 +56,6 @@ def _inject_path_metadata(sim_cfg: Dict[str, Any], config_root: Path) -> None:
     when those fields are missing.
     """
     tune_dir = config_root.parent if config_root.name == "cell_configs" else config_root
-    sim_cfg.setdefault("tune_dir", str(tune_dir))
     cell_cfg_path = (
         config_root / "cell_config.json"
         if config_root.name == "cell_configs"
@@ -69,14 +68,9 @@ def _inject_path_metadata(sim_cfg: Dict[str, Any], config_root: Path) -> None:
         except Exception:
             cell_cfg = {}
 
-    if not sim_cfg.get("cell") and cell_cfg.get("cell_name"):
-        sim_cfg["cell"] = str(cell_cfg.get("cell_name"))
-    if not sim_cfg.get("tune") and cell_cfg.get("tune"):
-        sim_cfg["tune"] = str(cell_cfg.get("tune"))
+    from scp_pipeline.workspaces import infer_workspace, apply_workspace_metadata
+    workspace = infer_workspace(tune_dir, cell_config=cell_cfg,
+        cell_name=sim_cfg.get('cell'), tune_name=sim_cfg.get('tune'))
+    apply_workspace_metadata(sim_cfg, workspace)
     if not sim_cfg.get("color") and cell_cfg.get("color") is not None:
         sim_cfg["color"] = cell_cfg.get("color")
-
-    if not sim_cfg.get("tune"):
-        sim_cfg["tune"] = tune_dir.name
-    if not sim_cfg.get("cell") and tune_dir.parent.name == "tunes":
-        sim_cfg["cell"] = tune_dir.parent.parent.name

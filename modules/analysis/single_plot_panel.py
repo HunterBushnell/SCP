@@ -1159,7 +1159,7 @@ def run_single_plot_from_selection(
             "preview_path": (str(preview) if preview is not None else None),
         }
 
-    from modules import run_sim  # local import to keep module dependencies light
+    from scp_pipeline import run_sim  # local import to keep module dependencies light
 
     results = run_sim.load_results(run_dir)
     if not bool(allow_export):

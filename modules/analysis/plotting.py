@@ -13,7 +13,7 @@ from itertools import cycle, chain
 
 from neuron import h
 
-from modules.model.geometry import cell_sections
+from scp_pipeline.model.geometry import cell_sections
 
 # ---------------------------------------------------------------------------
 def moving_average(arr, 
@@ -1852,7 +1852,7 @@ def plot_multi(
     # optional benchmark curve from another current-format run
     if benchmark_path:
         try:
-            from modules import run_sim as run_sim_mod
+            from scp_pipeline import run_sim as run_sim_mod
 
             bench_res = run_sim_mod.load_results(benchmark_path)
             bench_spikes = bench_res.get("spikes", []) if bench_res.get("mode") == "multi" else []

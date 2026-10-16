@@ -1,4 +1,6 @@
 setuptools<81
+# Suggested Step 4 add-on: python -m pip install -r requirements-bmtool.txt
+# Suggested ACT add-on: python -m pip install -r requirements-act.txt
 numpy==1.23.5
 scipy==1.10.1
 pandas==1.5.3

@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
+from scp_pipeline.workspaces import resolve_workspace
+
 from .. import analysis
 from ._engine import _parse_compare_list_paths, resolve_compare, resolve_single
 
@@ -34,6 +36,7 @@ def get_selection_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
     use_widgets = bool(g.get("use_widgets", False))
     have_widgets = bool(g.get("_HAVE_WIDGETS", False))
     if use_widgets and have_widgets and g.get("cell_dd") is not None:
+        project = (g["project_dd"].value or None) if g.get("project_dd") is not None else g.get("project_name")
         cell = g["cell_dd"].value
         tunes = g["tunes_dd"].value
         model = g["model_dd"].value
@@ -54,6 +57,7 @@ def get_selection_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
             else []
         )
     else:
+        project = g.get("project_name")
         cell = g.get("cell_name")
         tunes = g.get("tunes_dir")
         model = g.get("model_dir")
@@ -71,20 +75,22 @@ def get_selection_from_globals(g: Dict[str, Any]) -> Dict[str, Any]:
     if compare_list_paths and not compare_list:
         compare_list = ["latest"]
 
-    cells_root = g.get("CELLS_DIR")
-    if cells_root is None:
-        base_root = g.get("BASE_DIR")
-        if base_root is None:
-            base_root = analysis.find_scp_root(Path.cwd())
-            g["BASE_DIR"] = base_root
-        cells_root = Path(base_root) / "cells"
-        g["CELLS_DIR"] = cells_root
-
-    base_dir = Path(cells_root) / cell / tunes / model / "output_data"
+    base_root = g.get("BASE_DIR")
+    if base_root is None:
+        cells_root = g.get("CELLS_DIR")
+        base_root = Path(cells_root).parent if cells_root is not None else analysis.find_scp_root(Path.cwd())
+        g["BASE_DIR"] = base_root
+    workspace = resolve_workspace(
+        repo_root=base_root, project_name=project, cell_name=cell, tune_name=model,
+        tunes_parent=tunes or "tunes", tune_dir_override=g.get("tune_dir_override"),
+    )
+    base_dir = workspace.tune_dir / "output_data"
     return {
-        "cell": cell,
+        "project_name": workspace.project_name,
+        "tune_dir": workspace.tune_dir,
+        "cell": workspace.cell_name,
         "tunes": tunes,
-        "model": model,
+        "model": workspace.tune_name,
         "base": base_dir,
         "run_single": run_single,
         "run_a": run_a,

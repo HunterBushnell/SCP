@@ -43,14 +43,21 @@ PV remains the primary/default example. To demonstrate loader portability,
 also show one of the single-compartment HOC-template examples:
 
 ```text
-cells/EUSmn/tunes/tuned/
-cells/HYPO/tunes/tuned/
-cells/PGN/tunes/tuned/
+cells/ACT_Spiker/tunes/orig/
+cells/ACT_BursterCa/tunes/orig/
+cells/ACT_LAA/tunes/orig/
 ```
 
 Their HOC and MOD sources have explicit source lineage and are not relicensed
 by SCP's MIT license. See `THIRD_PARTY_NOTICES.md` and each tune's
 `SOURCE_PROVENANCE.json`.
+
+These ACT-sourced families are staged and smoke-tested, not completed SCP
+characterization/tuning demonstrations. Their `tuned` copies are initially
+untuned; `reference` is a known target model, not an exported optimized fit.
+ACT L5/SST separately preserve original Allen and imported ACT tuned variants.
+Keep PV as the main demo until the new walkthroughs and datasets are developed.
+See [ACT examples](../guides/act_examples.md).
 
 ## 3. Main Workflow
 
@@ -58,6 +65,9 @@ For the main demo, open `0_pipeline.ipynb`, choose **Run All**, and show how
 each step has its own small card and output. Emphasize that Steps 2–4 reuse one
 loaded cell, while Check Inputs and Run Simulation use fresh processes so they
 reload current configs and avoid carrying BMTool state into the final run.
+Explicit live-cell overrides instead preview/run in the current kernel. Keep
+the PV/configured workflow as the main demo; see the custom-cell walkthrough
+for session-only adoption.
 
 ### Step 1: Setup
 
@@ -191,10 +201,11 @@ Current status:
   interface-render execution; its scientific actions remain explicitly
   user-triggered.
 - PV/SST example simulation paths have been validated locally and in Colab.
-- The EUSmn, HYPO, and PGN bundles exercise setup, cell construction,
-  current-injection, and loader-aware analysis without an Allen manifest. They
-  are reproducible manual-tuning examples rather than independent biological
-  validation.
+- The public ACT HOC bundles exercise setup, cell construction, current-injection,
+  and loader-aware analysis without an Allen manifest. ACT's Allen bundles
+  preserve their matching manifest-selected fits and mechanisms. These models
+  are staged and integration-smoke-tested, not completed SCP walkthroughs or
+  independently biologically validated examples.
 - CLI and SLURM simulation entry points have been checked on the current
   examples.
 - Model-specific ACT active tuning quality remains the major intentionally

@@ -11,6 +11,7 @@ from typing import Any, Optional
 
 
 PIPELINE_UI_DEFAULTS: dict[str, Any] = {
+    "project_name": None,
     "cell_name": "PV",
     "tune_name": "tuned",
     "tune_dir_override": None,
@@ -74,6 +75,7 @@ PIPELINE_UI_DEFAULTS: dict[str, Any] = {
 }
 
 MODEL_SETTING_KEYS = (
+    "project_name",
     "cell_name",
     "tune_name",
     "tune_dir_override",

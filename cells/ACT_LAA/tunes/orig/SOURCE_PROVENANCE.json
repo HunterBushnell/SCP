@@ -1,0 +1,96 @@
+{
+  "schema_version": 2,
+  "cell_name": "ACT_LAA",
+  "tune": "orig",
+  "source_repository": {
+    "name": "ACT",
+    "remote": "https://github.com/V-Marco/ACT.git",
+    "commit": "2b3fdc190107b8242e3496329cfdf240abd09694"
+  },
+  "model_relationship": "ACT perturbed starting model",
+  "runtime_conditions": {
+    "celsius_C": 31.0,
+    "v_init_mV": -70.0
+  },
+  "selection_policy": "Pinned native source bytes and declared/intrinsic dependencies only; no compiled outputs, drivers, checkpoints, or network execution.",
+  "compiled_outputs_included": false,
+  "files": [
+    {
+      "source_path": "data/LAA/orig/template.hoc",
+      "source_sha256": "14b0bc52a2e747d1744141f3a87d07f25b7df3ffd7d0ab84b7e3285e377443fd",
+      "destination_path": "model/template.hoc",
+      "current_sha256": "14b0bc52a2e747d1744141f3a87d07f25b7df3ffd7d0ab84b7e3285e377443fd",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/LAA/orig/modfiles/leak.mod",
+      "source_sha256": "6b2fa34ae39b67d20452cb82aaa2e69e77e2318b0f0d84f62390a57f3e8268c9",
+      "destination_path": "modfiles/leak.mod",
+      "current_sha256": "6b2fa34ae39b67d20452cb82aaa2e69e77e2318b0f0d84f62390a57f3e8268c9",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/LAA/orig/modfiles/h.mod",
+      "source_sha256": "48a9b327283d629ab696bf6f9114d8a6484ab9403a028fb285191be6e3f053cd",
+      "destination_path": "modfiles/h.mod",
+      "current_sha256": "48a9b327283d629ab696bf6f9114d8a6484ab9403a028fb285191be6e3f053cd",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/LAA/orig/modfiles/na3.mod",
+      "source_sha256": "3f0b5ee342be30b08723f208e21a0f796494c65fb763c5ef9f28402d3a21a7fe",
+      "destination_path": "modfiles/na3.mod",
+      "current_sha256": "3f0b5ee342be30b08723f208e21a0f796494c65fb763c5ef9f28402d3a21a7fe",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/LAA/orig/modfiles/nap.mod",
+      "source_sha256": "f83e6d97521a6eaca4042c69bf0b0f58178a0a4f009c32648da77372162077a4",
+      "destination_path": "modfiles/nap.mod",
+      "current_sha256": "f83e6d97521a6eaca4042c69bf0b0f58178a0a4f009c32648da77372162077a4",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/LAA/orig/modfiles/kdrca1.mod",
+      "source_sha256": "a68169d227aae3780462af8ef669e59a09a55dcc69ba8be203489dc452ee4f0c",
+      "destination_path": "modfiles/kdrca1.mod",
+      "current_sha256": "a68169d227aae3780462af8ef669e59a09a55dcc69ba8be203489dc452ee4f0c",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/LAA/orig/modfiles/cadyn.mod",
+      "source_sha256": "91edb3ff5584eee9ee1770a8c47bef2d2850a4783b3264f48cddf4d03c815ac0",
+      "destination_path": "modfiles/cadyn.mod",
+      "current_sha256": "91edb3ff5584eee9ee1770a8c47bef2d2850a4783b3264f48cddf4d03c815ac0",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/LAA/orig/modfiles/capool.mod",
+      "source_sha256": "6cf96f79fba681537ed55b52e52f02578efeae59b181b41add6f443659f423c7",
+      "destination_path": "modfiles/capool.mod",
+      "current_sha256": "6cf96f79fba681537ed55b52e52f02578efeae59b181b41add6f443659f423c7",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/LAA/orig/modfiles/sahp.mod",
+      "source_sha256": "98edb65c3546f9d5f105f2ba29dcee885d4494e7cc872172e228e85caa198440",
+      "destination_path": "modfiles/sahp.mod",
+      "current_sha256": "98edb65c3546f9d5f105f2ba29dcee885d4494e7cc872172e228e85caa198440",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/LAA/orig/modfiles/im.mod",
+      "source_sha256": "d38c3efcc35c3af4bd00aca21a2f2c685a355197c32e5709909a4376fe5e5772",
+      "destination_path": "modfiles/im.mod",
+      "current_sha256": "d38c3efcc35c3af4bd00aca21a2f2c685a355197c32e5709909a4376fe5e5772",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/LAA/orig/modfiles/kaprox.mod",
+      "source_sha256": "9a2374b4fdea45d2476c306035dac618969547d1674f3ccddd9e59cfaf2449a6",
+      "destination_path": "modfiles/kaprox.mod",
+      "current_sha256": "9a2374b4fdea45d2476c306035dac618969547d1674f3ccddd9e59cfaf2449a6",
+      "relationship": "exact_copy"
+    }
+  ]
+}

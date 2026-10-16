@@ -48,12 +48,12 @@ def _write_scaffold_json(path: Path, defaults: Dict[str, Any], mode: str) -> Tup
     if mode not in CONFIG_MODE_VALUES:
         raise ValueError(f"config_mode must be one of {CONFIG_MODE_VALUES}, got {mode!r}")
 
+    if mode == "skip":
+        return "unchanged", _read_json(path) if path.exists() else {}
+
     if not path.exists():
         _write_json(path, defaults)
         return "created", dict(defaults)
-
-    if mode == "skip":
-        return "unchanged", _read_json(path)
 
     if mode == "overwrite":
         _write_json(path, defaults)

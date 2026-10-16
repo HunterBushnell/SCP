@@ -13,7 +13,7 @@
         }
       },
       "params": {
-        "wt_mean": 0.5,
+        "wt_mean": 0.4,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax_AMPA": 0.001,
@@ -43,7 +43,7 @@
         "stop_ms": 840.0,
         "mode": "inhomogeneous_poisson",
         "source": {
-          "path": "external_data/pyrFiringRateAvg.csv",
+          "path": "cells/PV/data/pyrFiringRateAvg.csv",
           "time_col": "Time",
           "rate_col": "AvgFiringRate",
           "bin_ms": 5.0,

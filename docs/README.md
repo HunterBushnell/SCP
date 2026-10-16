@@ -39,6 +39,20 @@ analysis controls.
 
 ## Recipes and Advanced Interfaces
 
+- [Project-owned dependency workflow](guides/dependency_workflow.md): editable
+  installation, portable compact notebook, interactive registration, and APIs.
+- [Custom cells and external models](guides/custom_models.md): live objects,
+  Python builders, external snapshots, and copy/reference selection.
+- [Project workspaces](guides/project_workspaces.md): separate same-named cells,
+  select project tunes, and interpret saved workspace identity.
+- [Cell data and public baselines](guides/cell_data.md): cell-owned inputs,
+  independent project data, historical aliases, and required dependencies.
+- [Synaptic recordings](guides/synaptic_recording.md): draft usage guidance for
+  the [paused implementation](project/synaptic_recording_update.md).
+- [ACT example catalog](guides/act_examples.md): staged HOC/Allen source
+  variants, reference models, initial use, and characterization boundaries.
+- [Synthetic walkthrough](../extra_notebooks/custom_cells.ipynb)
+
 - [Example saved run](recipes/example_run.md)
 - [Configuration cookbook](recipes/config_cookbook.md)
 - [CLI and SLURM](advanced/cli_slurm.md)

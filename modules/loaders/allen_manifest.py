@@ -4,19 +4,19 @@ import contextlib
 import configparser
 import io
 import json
-import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from allensdk.model.biophys_sim.config import Config
 from allensdk.model.biophysical.utils import AllActiveUtils, Utils
 
-from modules.loaders.base import (
+from scp_pipeline.loaders.base import (
     LoadedCell,
     apply_soma_diameter_multiplier,
     ensure_section_aliases,
 )
-from modules.loaders.paths import resolve_loader_path
+from scp_pipeline.loaders.paths import resolve_loader_path
+from scp_pipeline.loaders.source_context import model_execution, working_directory, effective_source_root, source_relative_path
 
 
 PERISOMATIC_MODEL_TYPE = "Biophysical - perisomatic"
@@ -108,6 +108,12 @@ def discover_source_artifacts(
         if not source.is_absolute():
             source = manifest_path.parent / source
         source = source.resolve()
+        root = effective_source_root(cell_config, base_dir)
+        if root is not None:
+            try:
+                source_relative_path(cell_config, source.relative_to(root.resolve()))
+            except ValueError as exc:
+                raise ValueError(f'Allen manifest declares a source outside its selected dependency root: {source}') from exc
         if source in seen:
             continue
         if not source.is_file():
@@ -377,13 +383,10 @@ def load_cell(
     artifacts = validate_config(cell_config, base_dir=base_dir)
     manifest_path = artifacts["manifest"]
 
-    original_cwd = Path.cwd()
-    manifest_dir = manifest_path.parent
-    try:
-        os.chdir(manifest_dir)
-
+    directory = working_directory(cell_config, manifest_path, base_dir)
+    with model_execution(directory):
         _ensure_configparser_readfp()
-        description = Config().load(str(manifest_path.name))
+        description = Config().load(str(manifest_path))
         utils, utils_label = _build_utils(cell_config, description)
         h = utils.h
         preexisting_section_names = {str(sec.name()) for sec in h.allsec()}
@@ -409,8 +412,6 @@ def load_cell(
             model_sections,
             force_scoped=bool(preexisting_section_names),
         )
-    finally:
-        os.chdir(original_cwd)
 
     Vinit: Optional[float] = None
     data = utils.description.data
@@ -425,7 +426,8 @@ def load_cell(
     config["cell_loader"] = "allen_manifest"
     config.setdefault("allen_model_type", _manifest_model_type(description))
     paths = dict(config.get("paths", {}) or {})
-    paths["manifest"] = str(manifest_path)
+    if cell_config.get('model_source') is None:
+        paths["manifest"] = str(manifest_path)
     config["paths"] = paths
 
     scoped_sections = {
@@ -452,6 +454,7 @@ def load_cell(
         require_soma=True,
     )
     soma_diam_multiplier = apply_soma_diameter_multiplier(cell)
+    cell.working_directory = directory
 
     print(
         f"Loaded Allen cell for {cell_name!r} from {manifest_path}, "

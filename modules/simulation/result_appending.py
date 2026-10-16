@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional, Union
 
 import numpy as np
 
+from scp_pipeline.input_generation.recording_config import resolve_n_syn_recording_trials
+
 from .result_helpers import (
     _aggregate_input_stats,
     _resolve_inputs_to_save,
@@ -15,6 +17,7 @@ from .result_helpers import (
 )
 from .result_loading import load_results
 from .result_saving import _write_results_file, _write_results_to_run_dir
+from scp_pipeline.workspaces import assert_same_workspace, result_workspace_identity
 
 
 def _ensure_multi_results(results: Dict[str, Any]) -> Dict[str, Any]:
@@ -23,53 +26,82 @@ def _ensure_multi_results(results: Dict[str, Any]) -> Dict[str, Any]:
     """
     mode = results.get("mode", "single")
     if mode == "multi":
-        return results
+        return copy.deepcopy(results)
     if mode != "single":
         raise ValueError(f"append_to: unsupported results mode {mode!r}")
 
-    sim_cfg = copy.deepcopy(results.get("sim_cfg", {}))
-    traces = results.get("traces", {}) or {}
-    inputs = results.get("inputs", None)
-    cell_recordings = results.get("cell_recordings", None)
+    multi = copy.deepcopy(results)
+    multi["mode"] = "multi"
+    spikes = multi.get("spikes")
+    multi["spikes"] = [spikes if spikes is not None else np.array([], dtype=float)]
+    traces = multi.get("traces", {}) or {}
+    multi["traces"] = {key: value if key == "T" else [value]
+                       for key, value in traces.items()}
 
-    spikes = results.get("spikes", None)
-    spikes_list = [spikes] if spikes is not None else []
-
-    multi = {
-        "mode": "multi",
-        "sim_cfg": sim_cfg,
-        "spikes": spikes_list,
-        "traces": {},
-        "cell_recordings_by_trial": None,
-        "inputs_by_trial": None,
-        "meta": copy.deepcopy(results.get("meta", {})),
-    }
-
-    if "T" in traces and "V" in traces:
-        multi["traces"] = {"T": traces["T"], "V": [traces["V"]]}
-
-    if inputs:
-        multi["inputs_by_trial"] = [{"trial_idx": 0, "inputs": inputs}]
-    if cell_recordings is not None:
-        multi["cell_recordings_by_trial"] = [
-            {"trial_idx": 0, "recordings": cell_recordings}
-        ]
+    for single_key, trial_key, payload_key in (
+        ("inputs", "inputs_by_trial", "inputs"),
+        ("cell_recordings", "cell_recordings_by_trial", "recordings"),
+        ("syn_recordings", "syn_recordings_by_trial", "recordings"),
+    ):
+        value = multi.pop(single_key, None)
+        if value is not None:
+            multi[trial_key] = [{"trial_idx": 0, payload_key: value}]
+        else:
+            multi.setdefault(trial_key, None)
+    if not multi.get("syn_records_by_trial") and multi.get("syn_records") is not None:
+        multi["syn_records_by_trial"] = [{"trial_idx": 0, "records": copy.deepcopy(multi["syn_records"])}]
 
     meta = multi.setdefault("meta", {})
-    meta["n_trials"] = len(spikes_list)
-    meta["trial_ids"] = list(range(len(spikes_list)))
+    multi.setdefault("sim_cfg", {})["n_trials"] = 1
+    meta["n_trials"] = 1
+    meta["trial_ids"] = [0]
     return multi
 
 
-def _append_results_to_path(
-    results: Dict[str, Any],
+def _resolve_syn_recording_trials_to_save(sim_cfg: Dict[str, Any], n_trials: int) -> int:
+    """Resolve capture retention without importing NEURON-backed runtime code."""
+    return resolve_n_syn_recording_trials(sim_cfg, n_trials)
+
+
+def _merge_syn_recordings_by_trial(
+    dst: Dict[str, Any], src: Dict[str, Any], *, trial_offset: int, n_trials: int,
+) -> None:
+    """Copy recorded trials with global indices and their independent retention cap.
+
+    Mixing different recorded axes would make a pooled result misleading. Reject
+    that explicitly, including differing array lengths (which must not broadcast).
+    """
+    entries = list(dst.get("syn_recordings_by_trial") or [])
+    incoming = list(src.get("syn_recordings_by_trial") or [])
+    template = None
+    for entry in entries + incoming:
+        recordings = entry.get("recordings", {})
+        if "T" not in recordings:
+            raise ValueError("syn_recording_time_mismatch: recording payload has no T axis")
+        axis = np.asarray(recordings["T"], dtype=float)
+        if axis.ndim != 1:
+            raise ValueError("syn_recording_time_mismatch: T must be one-dimensional")
+        if template is None:
+            template = axis
+        elif template.shape != axis.shape or not np.allclose(template, axis, rtol=0, atol=1e-9):
+            raise ValueError("syn_recording_time_mismatch: cannot merge different recording time axes")
+
+    if not entries and not incoming:
+        return
+    cap = _resolve_syn_recording_trials_to_save(dst.get("sim_cfg", {}) or {}, n_trials)
+    combined = copy.deepcopy(entries)
+    for idx, entry in enumerate(incoming):
+        new_entry = copy.deepcopy(entry)
+        new_entry["trial_idx"] = trial_offset + int(new_entry.get("trial_idx", idx))
+        combined.append(new_entry)
+    dst["syn_recordings_by_trial"] = combined[:cap] or None
+
+
+def _resolve_append_path(
     append_to: Union[str, Path],
     *,
     base_dir: Union[str, Path, None] = None,
-) -> Optional[Path]:
-    """
-    Append results to an existing file/folder (or create a new one).
-    """
+) -> Path:
     append_path = Path(append_to)
     if not append_path.is_absolute() and base_dir is not None:
         base_dir = Path(base_dir)
@@ -81,9 +113,34 @@ def _append_results_to_path(
     # Normalize run_manifest.json to its parent folder
     if append_path.name == "run_manifest.json":
         append_path = append_path.parent
+    return append_path
+
+
+def _validate_append_destination(
+    results: Dict[str, Any],
+    append_to: Union[str, Path],
+    *,
+    base_dir: Union[str, Path, None] = None,
+) -> list[str]:
+    """Reject a foreign workspace before any result directory is created."""
+    path = _resolve_append_path(append_to, base_dir=base_dir)
+    if path.exists():
+        return assert_same_workspace(load_results(path), results, context="append_to")
+    return []
+
+
+def _append_results_to_path(
+    results: Dict[str, Any],
+    append_to: Union[str, Path],
+    *,
+    base_dir: Union[str, Path, None] = None,
+) -> Optional[Path]:
+    """Append trials from the same logical workspace only."""
+    append_path = _resolve_append_path(append_to, base_dir=base_dir)
 
     if append_path.exists():
         base_results = load_results(append_path)
+        assert_same_workspace(base_results, results, context="append_to")
         merged = append_multi_results(
             _ensure_multi_results(base_results),
             _ensure_multi_results(results),
@@ -95,6 +152,18 @@ def _append_results_to_path(
     if append_path.suffix.lower() in (".pkl", ".npz"):
         append_path.parent.mkdir(parents=True, exist_ok=True)
         fmt = "npz" if append_path.suffix.lower() == ".npz" else "pickle"
+        manifest_path = append_path.parent / "run_manifest.json"
+        if manifest_path.is_file():
+            try:
+                files = json.loads(manifest_path.read_text()).get("files", {})
+                paired = append_path.name in (files.get("results_pkl"), files.get("results_npz"))
+            except (OSError, ValueError, AttributeError):
+                paired = False
+            if paired:
+                # An explicitly paired full-result file is part of the saved
+                # run, so its snapshots must change with the appended data.
+                return _write_results_to_run_dir(
+                    merged, append_path.parent, fmt=fmt, results_name=append_path.name)
         _write_results_file(merged, append_path, fmt)
         return append_path
 
@@ -137,18 +206,53 @@ def append_multi_results(
     if new_results.get("mode") != "multi":
         raise ValueError("append_multi_results: new_results.mode must be 'multi'")
 
+    identity_warnings = assert_same_workspace(base_results, new_results, context="append_multi_results")
+    base_identity = result_workspace_identity(base_results)
+    incoming_identity = result_workspace_identity(new_results)
+    identity = {key: base_identity[key] if base_identity[key] is not None else incoming_identity[key]
+                for key in base_identity}
     merged = copy.deepcopy(base_results)
+    if "workspace_identity" in merged:
+        merged["workspace_identity"] = copy.deepcopy(identity)
     meta = merged.setdefault("meta", {})
+    meta["workspace_identity"] = copy.deepcopy(identity)
     warnings = meta.setdefault("append_warnings", [])
+    warnings.extend(identity_warnings)
+    sources = meta.setdefault("append_sources", [])
+    if not sources:
+        sources.append({"workspace_identity": result_workspace_identity(base_results),
+                        "tune_dir": (base_results.get("sim_cfg") or {}).get("tune_dir"),
+                        "output": (base_results.get("sim_cfg") or {}).get("output"),
+                        "model_provenance": copy.deepcopy((base_results.get("meta") or {}).get("model_provenance"))})
+    sources.append({"workspace_identity": result_workspace_identity(new_results),
+                    "tune_dir": (new_results.get("sim_cfg") or {}).get("tune_dir"),
+                    "output": (new_results.get("sim_cfg") or {}).get("output"),
+                    "model_provenance": copy.deepcopy((new_results.get("meta") or {}).get("model_provenance"))})
+    # A relocated workspace can retain its logical identity. Fresh archives
+    # describe the incoming construction, never an old absolute tune location;
+    # earlier constructions remain explicitly recorded in append_sources.
+    for key in ("model_provenance", "cell_config", "geometry_config", "model_state"):
+        if key in (new_results.get("meta") or {}):
+            meta[key] = copy.deepcopy(new_results["meta"][key])
+    if "model_state" not in (new_results.get("meta") or {}) and "model_provenance" in (new_results.get("meta") or {}):
+        meta.pop("model_state", None)
 
     base_spikes = list(merged.get("spikes", []) or [])
-    new_spikes  = list(new_results.get("spikes", []) or [])
+    new_spikes  = copy.deepcopy(list(new_results.get("spikes", []) or []))
     base_trial_count = len(base_spikes)
     merged_spikes = base_spikes + new_spikes
     merged["spikes"] = merged_spikes
 
     # update n_trials
     sim_cfg = merged.setdefault("sim_cfg", {})
+    sim_cfg["workspace_identity"] = copy.deepcopy(identity)
+    sim_cfg["project_name"] = identity["project_name"]
+    if not sim_cfg.get("cell"):
+        sim_cfg["cell"] = identity["cell_name"]
+    if not sim_cfg.get("tune"):
+        sim_cfg["tune"] = identity["tune_name"]
+    if (new_results.get("sim_cfg") or {}).get("tune_dir"):
+        sim_cfg["tune_dir"] = new_results["sim_cfg"]["tune_dir"]
     n_trials = len(merged_spikes)
     sim_cfg["n_trials"] = n_trials
     meta["n_trials"] = n_trials
@@ -164,12 +268,20 @@ def append_multi_results(
 
     if max_traces <= 0:
         merged["traces"] = {}
+    elif T_base is None and T_new is not None:
+        merged["traces"] = copy.deepcopy(new_traces)
+        for key in merged["traces"]:
+            if key != "T":
+                merged["traces"][key] = list(merged["traces"][key])[:max_traces]
     elif T_base is not None and T_new is not None:
         try:
-            if np.allclose(np.asarray(T_base), np.asarray(T_new)):
-                V_base = list(base_traces.get("V", []) or [])
-                V_new  = list(new_traces.get("V", []) or [])
-                base_traces["V"] = (V_base + V_new)[:max_traces]
+            if np.shape(T_base) == np.shape(T_new) and np.allclose(np.asarray(T_base), np.asarray(T_new)):
+                for key in set(base_traces) | set(new_traces):
+                    if key == "T":
+                        continue
+                    values_base = list(base_traces.get(key, []) or [])
+                    values_new = copy.deepcopy(list(new_traces.get(key, []) or []))
+                    base_traces[key] = (values_base + values_new)[:max_traces]
                 merged["traces"] = base_traces
             else:
                 warnings.append("trace_time_mismatch: skipped merging traces")
@@ -220,6 +332,20 @@ def append_multi_results(
                 _offset_trial_idx(new_entry, base_trial_count, idx)
             dst_recs.append(new_entry)
         merged["cell_recordings_by_trial"] = dst_recs if dst_recs else None
+
+    def _merge_syn_placements_by_trial() -> None:
+        # Placement provenance is separate from sampled variables and has no
+        # voltage/synaptic trace retention cap.
+        entries = list(merged.get("syn_records_by_trial") or [])
+        for idx, entry in enumerate(new_results.get("syn_records_by_trial") or []):
+            new_entry = copy.deepcopy(entry)
+            if isinstance(new_entry, dict):
+                _offset_trial_idx(new_entry, base_trial_count, idx)
+            entries.append(new_entry)
+        if entries:
+            merged["syn_records_by_trial"] = entries
+        if "syn_records" not in merged and "syn_records" in new_results:
+            merged["syn_records"] = copy.deepcopy(new_results["syn_records"])
 
     def _merge_input_summaries() -> None:
         src_meta = new_results.get("meta", {}) or {}
@@ -323,6 +449,8 @@ def append_multi_results(
     meta["appended_trials"] = meta.get("appended_trials", 0) + appended
     _merge_inputs_by_trial()
     _merge_cell_recordings_by_trial()
+    _merge_syn_placements_by_trial()
+    _merge_syn_recordings_by_trial(merged, new_results, trial_offset=base_trial_count, n_trials=n_trials)
     _merge_input_summaries()
     _merge_input_stats()
     _recompute_avg_rate()

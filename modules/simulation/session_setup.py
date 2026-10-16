@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from modules.setup.mechanisms import (
+from scp_pipeline.setup.mechanisms import (
     find_compiled_mechanism_dll,
     load_compiled_mechanism_library,
     resolve_modfiles_dir,
@@ -74,6 +74,11 @@ def load_mechanisms(
         return None
 
     dll = find_compiled_mechanism_dll(tune_dir, cell_config=cell_config)
+    from scp_pipeline.loaders.source_context import within
+    if dll is None and not within(mod_dir, tune_dir):
+        from scp_pipeline.setup.mechanisms import compile_modfiles
+        prepared = compile_modfiles(tune_dir, cell_config=cell_config, load_dll=False)
+        dll = Path(prepared['dll'])
     if dll is not None:
         summary = load_compiled_mechanism_library(dll)
         action = (
@@ -85,8 +90,9 @@ def load_mechanisms(
         return Path(summary["dll"])
 
     raise FileNotFoundError(
-        "Compiled mechanisms not found. Run `nrnivmodl` inside the configured "
-        f"MOD source directory {mod_dir} to build {mod_dir / 'x86_64'}, then rerun."
+        "Compiled mechanisms not found. Enable mechanism compilation in Step 1/5 "
+        "or call modules.setup.compile_modfiles(tune_dir), then rerun. "
+        f"Configured MOD sources: {mod_dir}. External sources are built only in a tune-owned mirror."
     )
 
 

@@ -113,10 +113,12 @@ def _resolve_source_path(raw_path: str, sim_cfg: Dict[str, Any]) -> Path:
     tune_dir_raw = sim_cfg.get("tune_dir")
     tune_dir = Path(tune_dir_raw) if tune_dir_raw else Path.cwd()
     tune_dir = tune_dir.resolve()
-    repo_root = _find_scp_root(tune_dir)
+    from scp_pipeline.projects import project_for_tune
+    repo_root = Path(sim_cfg['project_root']).resolve() if sim_cfg.get('project_root') else project_for_tune(tune_dir) or _find_scp_root(tune_dir)
 
-    if repo_root and p.parts and p.parts[0] in ("external_data", "cells"):
-        return (repo_root / p).resolve()
+    if repo_root and p.parts and p.parts[0] in ("external_data", "cells", "projects"):
+        from scp_pipeline.data_paths import resolve_data_alias
+        return resolve_data_alias(p, repo_root)
 
     return (tune_dir / p).resolve()
 

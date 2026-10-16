@@ -5,10 +5,17 @@ forced:
 
 ```text
 cells/<CELL>/tunes/<TUNE>/output_data/<output_stem>/
+projects/<PROJECT>/cells/<CELL>/tunes/<TUNE>/output_data/<output_stem>/
 ```
 
 Use `force_save = True` in `5_simulate.ipynb` or `--force-save` in
 `run_pipeline.py` when configs keep saving disabled by default.
+
+Both layouts share the same run format. An explicit output directory can still
+place results elsewhere. Saved `workspace_identity` contains `project_name`,
+`cell_name`, and `tune_name`, separately from the absolute runtime `tune_dir`;
+legacy workspaces use a null project. Use saved metadata, not filenames, to
+identify a project run. See [Project workspaces](../guides/project_workspaces.md).
 
 ## Typical Files
 
@@ -37,6 +44,12 @@ Use `force_save = True` in `5_simulate.ipynb` or `--force-save` in
 - `plots/`: auto plots when enabled by `plots_profile` or lower-level save flags.
 - `<cell>_<tune>_<output_stem>.pkl`: full results bundle when `save.full_results` is enabled.
 
+New named-project bundles use
+`<project>_<cell>_<tune>_<output_stem>.pkl` (or `.npz` for that full-results
+format). Legacy filenames stay unchanged. The run manifest and saved
+`workspace_identity` remain authoritative; do not parse filenames for routing
+or trial-pooling compatibility.
+
 ## Notebook Exports
 
 Some notebooks can write lightweight diagnostics under the selected tune:
@@ -47,6 +60,7 @@ cells/<CELL>/tunes/<TUNE>/notebook_exports/
 
 These exports are scratch artifacts for notebook review, not Step 5 pipeline
 runs. They are intentionally separate from `output_data/`.
+Project tunes use the same tune-relative export location.
 
 Common Step 2 passive target exports:
 
@@ -75,6 +89,8 @@ Typical generated review/config files:
 The complete `act_workspace/` directory is generated, machine-specific state and
 is ignored by Git. It may contain absolute paths and multiprocessing artifacts;
 keep it locally or archive selected review results outside the workspace.
+Project tunes also keep `act_workspace/` under their selected tune; project
+selection does not change optional ACT execution behavior.
 
 ## SLURM Array Runs
 
@@ -115,3 +131,17 @@ The repo ignores local/generated data such as:
 - `cells/**/act_workspace/`
 - `cells/**/x86_64/`
 - `cells/**/modfiles/x86_64/`
+
+Equivalent generated-output, export, backup, ACT, and compiled-product rules
+apply under `projects/*/cells/`. Native source files and configs remain
+Git-eligible in both layouts. Entire private projects need local exclusions.
+
+## Custom-model provenance
+
+`meta.json` records construction kind, source mode, and recipe availability.
+Runtime-only runs additionally write `model_state.json`: a descriptive pre-run
+cell-scoped inventory, not a resumable NEURON checkpoint. Their artifact
+manifest records that reconstruction is unavailable and does not attribute an
+unused workspace recipe. Declared Python/HOC/native bundles retain logical
+layout and hashes in `model_artifacts/`; compiled caches are excluded.
+See [Custom models](../guides/custom_models.md).

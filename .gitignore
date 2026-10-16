@@ -28,6 +28,15 @@ cells/**/restore_backups/
 cells/**/*.nwb
 cells/**/act_workspace/
 
+# Project workspaces follow the same source/config visibility policy as cells/.
+# Keep native models and configs eligible for Git; ignore generated products.
+projects/*/cells/**/output_data/*
+projects/*/cells/**/notebook_exports/
+projects/*/cells/**/tuning_exports/
+projects/*/cells/**/restore_backups/
+projects/*/cells/**/*.nwb
+projects/*/cells/**/act_workspace/
+
 # Local scratch morphology/browser exports.
 cells/*/tunes*.svg
 cells/*/tunes/*.svg
@@ -39,7 +48,11 @@ external_data/*.xlsx
 external_data/*.xls
 
 # Python cache/build artifacts
+*.egg-info/
+build/
+dist/
 __pycache__/
+.scp_build/
 *.py[cod]
 *.pyo
 
@@ -52,6 +65,13 @@ __pycache__/
 # NEURON compiled artifacts (build as needed per tune)
 cells/**/x86_64/
 cells/**/modfiles/x86_64/
+projects/*/cells/**/x86_64/
+projects/*/cells/**/aarch64/
 
 # Local release checklist
 PUBLIC_RELEASE_TODO.local.md
+
+# Checkout-local notebook navigation/preferences are not public example defaults.
+# Project-owned repositories may track their own settings independently.
+/.scp_project.json
+/.scp_pipeline_settings.json

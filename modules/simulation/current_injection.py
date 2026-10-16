@@ -6,7 +6,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from neuron import h
 
-from modules.model.geometry import cell_soma_segment, cell_sections
+from scp_pipeline.model.geometry import cell_soma_segment, cell_sections
+
+from .recording import _record_mechanism_current
+from scp_pipeline.loaders.source_context import cell_execution
 
 
 def validate_required_sim_conditions(cell_or_config, sim_cfg=None):
@@ -17,50 +20,47 @@ def validate_required_sim_conditions(cell_or_config, sim_cfg=None):
         if isinstance(cell_or_config, dict)
         else (getattr(cell_or_config, "config", {}) or {})
     )
-    from modules.loaders import get_cell_loader_name
+    from scp_pipeline.loaders import get_cell_loader_name
 
-    if get_cell_loader_name(config) != "hoc_template":
+    loader_name = get_cell_loader_name(config)
+    if loader_name == "allen_manifest":
         return
     conditions = sim_cfg.get("conditions")
     if not isinstance(conditions, dict):
         raise KeyError(
-            "hoc_template runs require sim_config.conditions with explicit "
+            "Non-Allen cell runs require sim_config.conditions with explicit "
             "v_init_mV and celsius_C values."
         )
     for field in ("v_init_mV", "celsius_C"):
         value = conditions.get(field)
         if isinstance(value, bool) or value in (None, ""):
             raise ValueError(
-                f"hoc_template runs require explicit numeric conditions.{field}."
+                f"{loader_name} runs require explicit numeric conditions.{field}."
             )
         try:
             numeric = float(value)
         except (TypeError, ValueError) as exc:
             raise ValueError(
-                f"hoc_template sim_config.conditions.{field} must be numeric, got {value!r}."
+                f"{loader_name} sim_config.conditions.{field} must be numeric, got {value!r}."
             ) from exc
         if not math.isfinite(numeric):
             raise ValueError(
-                f"hoc_template sim_config.conditions.{field} must be finite, got {value!r}."
+                f"{loader_name} sim_config.conditions.{field} must be finite, got {value!r}."
             )
 
 
-def get_rec_vars_for_i_in_sec(sec,seg):#create recording variables for every current in a section
+def get_rec_vars_for_i_in_sec(sec, seg):
+    """Record the existing i-prefixed current variables at one section site."""
     current_recording_vars = {}
-
-    for mech in sec.psection()['density_mechs']:
-        for param in sec.psection()['density_mechs'][mech]:
-            if param[0] == 'i':#assumes only current names start with i
-                attr = getattr(sec(seg),mech)
-                ref = getattr(attr, f"_ref_{param}")
-                current_recording_vars[f"{mech}.{param}"] = h.Vector().record(ref)
-    # print(current_recording_vars)
-    # ivecs = {}
-    # for name,vec in current_recording_vars.items():
-    #     # print(name)
-    #     ivecs[name] = vec.as_numpy().copy
-
-    return current_recording_vars #ivecs
+    segment = sec(seg)
+    density_mechs = sec.psection()['density_mechs']
+    for mech, parameters in density_mechs.items():
+        for param in parameters:
+            if param.startswith('i'):
+                current_recording_vars[f"{mech}.{param}"] = _record_mechanism_current(
+                    segment, mech, param
+                )
+    return current_recording_vars
 
 
 def get_frequency(v,sim_params):
@@ -139,7 +139,9 @@ def apply_sim_conditions(cell, sim_cfg=None):
     return resolved
 
 
-def run_current_injection(cell,sim_params,):
+@cell_execution
+def run_current_injection(cell, sim_params, *, record_currents: bool = True):
+    """Run a somatic current step, optionally collecting mechanism currents."""
     
     # from neuron import h
     # h.load_file("stdrun.hoc")
@@ -160,8 +162,10 @@ def run_current_injection(cell,sim_params,):
     vvec = h.Vector().record(soma_seg._ref_v)
     tvec = h.Vector().record(h._ref_t)
 
-    # Attach *all* the current recorders in that section
-    current_recording_vars = get_rec_vars_for_i_in_sec(cell_sections(cell, "soma")[0], 0.5)
+    current_recording_vars = (
+        get_rec_vars_for_i_in_sec(cell_sections(cell, "soma")[0], 0.5)
+        if record_currents else {}
+    )
 
     # Run
     resolved_conditions = apply_sim_conditions(cell, sim_params)
@@ -218,7 +222,7 @@ def run_iclamp_test(cell, sim_cfg, iclamp_cfg=None):
     }
 
     record_currents = bool(iclamp.get("record_currents", False))
-    recorded = run_current_injection(cell, sim_params)
+    recorded = run_current_injection(cell, sim_params, record_currents=record_currents)
     if not record_currents:
         recorded.pop("I", None)
 

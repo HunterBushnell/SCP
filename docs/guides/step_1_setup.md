@@ -22,6 +22,29 @@ Use Step 1 when you need to:
 
 Step 1 does not tune model parameters and does not run final simulations.
 
+### Compact notebook setup
+
+`0_pipeline.ipynb` supports normal registration in either SCP-hosted or
+project-owned workspaces. Its upper dropdowns navigate existing cells/tunes;
+new names are entered under **Cell setup → Register new model**. See the
+[portable workflow guide](dependency_workflow.md#optional-targets-and-working-copies)
+for initial target forms, optional disabled synapse templates, and snapshot-based
+working copies. **Preview → Save cell setup → Prepare and load** keeps file
+generation separate from compilation/construction. Existing scientific files
+are preserved; subsequent edits are made directly in their configs.
+
+Shared file-only APIs are `preview_setup_outputs` / `create_setup_outputs`.
+Registration accepts optional `target_options` / `synapse_options` using the
+existing generators' fields; omitting them generates neither. `config_mode="skip"`
+also creates neither optional files nor their directories. Compact working
+copies call `create_working_copy(..., content_policy="model", dry_run=True)` for
+preview and `dry_run=False` for application, with optional `source_mode="inherit"`,
+`"copy"`, or `"reference"`. The default API copy policy retains historical behavior
+for existing callers; compact uses only the model/config/data policy.
+`dry_run=True` respects the requested copy policy; a legacy preview still includes
+historical outputs, whereas compact/model previews exclude them. Preview never
+deletes or overwrites a destination, even if a legacy caller requests overwrite.
+
 ## What Step 1 Produces
 
 For a tune directory such as `cells/PV/tunes/orig`, Step 1 prepares:
@@ -46,6 +69,9 @@ Synapse configs are optional. They can be skipped for cell-only or IClamp work.
 Before running Step 1, decide:
 
 - `cell_name`: display/model label, such as `PV`, `SST`, or `PN`.
+- `project_name`: optional workspace namespace; `None` retains bundled/legacy
+  `cells/` paths. Project tunes live under
+  `projects/<project>/cells/<cell>/tunes/<tune>/`.
 - `tune_name`: tune folder name, usually `orig` for raw setup or `tuned` for the working model.
 - Whether the model is already staged under the tune or must be downloaded from
   the Allen Database.
@@ -85,6 +111,12 @@ The notebook runs locally or in Colab. In a fresh Colab session it can clone the
 repo and install dependencies using the same environment variables as Step 5.
 
 ## Tune Selection
+
+An explicit `tune_dir_override` takes precedence over project/cell/tune
+shorthand. Otherwise, set `project_name` to select a project workspace, or leave
+it `None` for the unchanged PV/orig default. New project work does not move
+existing assets. Normal orig-to-tuned copying stays within the selected cell's
+`tunes/` directory. See [Project workspaces](project_workspaces.md).
 
 Common bundled setup targets:
 
@@ -193,6 +225,34 @@ MODEL_SOURCE_OVERRIDES = {
     },
 }
 ```
+
+For files containing several templates, inspect the available pairs first:
+
+```python
+from modules.setup import discover_hoc_templates
+
+print(discover_hoc_templates(tune_dir))
+# [{"path": "model/SharedCells.hoc", "template_name": "ExampleCell"}, ...]
+```
+
+The helper reads staged HOC declarations without executing them. It returns
+records sorted by relative path and template name, excluding generated output,
+archived model sources, and build directories. Select the intended pair:
+
+```python
+MODEL_SOURCE_OVERRIDES = {
+    "cell_loader": "hoc_template",
+    "paths": {"hoc_template": "model/SharedCells.hoc", "modfiles": "modfiles"},
+    "hoc_template": {"template_name": "ExampleCell", "constructor_args": []},
+}
+```
+
+Keep the complete native HOC file, including its other template definitions.
+Section 1.4 saves the selection in `cell_config.json`. Set
+`MODEL_SOURCE_OVERRIDES = None` on later runs to reuse that selection. Changing
+to a copied source file that defines already-loaded template names requires a
+fresh Python process or notebook kernel, even when selecting a different cell
+from the shared file.
 
 ## Mechanisms
 
@@ -545,3 +605,17 @@ validates:
 
 Validating the raw tune first keeps download/setup problems separate from
 segmentation edits.
+
+## Custom object, Python builder, or external bundle
+
+See [Custom models](custom_models.md). `CELL_OVERRIDE` adopts a cell already
+created after environment setup. With explicit `RUNTIME_SIM_CONFIG.conditions`,
+a new workspace can be prepared without model acquisition; existing recipes
+are not overwritten. Use a saved `python_factory` for reconstruction in other
+processes. Python discovery never executes unselected source files.
+
+External `model_source` registration previews user-selected native folders and
+keeps a local `model_sources/` snapshot in either copy/reference mode. Loader
+paths then resolve against the selected source root. Source copying preserves
+native layout/bytes; orig-to-tuned copying remains a separate action. Compilation
+of external MOD sources is isolated in the tune's `.scp_build/` mirror.

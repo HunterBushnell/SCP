@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib
 import json
 import traceback
 from pathlib import Path
@@ -18,11 +17,10 @@ def _write_result(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 def _run(request: Mapping[str, Any]) -> dict[str, Any]:
-    from modules.tuning import (
+    from scp_pipeline.tuning import (
         act_config_fingerprint,
         act_output_status,
         collect_act_predictions,
-        ensure_act_on_syspath,
         evaluate_act_predictions,
         load_act_active_config,
         load_act_module_metrics,
@@ -35,11 +33,8 @@ def _run(request: Mapping[str, Any]) -> dict[str, Any]:
     print(f"SCP ACT worker: {action}", flush=True)
     print(f"ACT workspace: {cfg['workspace']}", flush=True)
     if action == "probe":
-        ensure_act_on_syspath(repo_root=Path(cfg["repo_root"]))
-        from modules.tuning.act_active import _import_act_api, _import_workspace_builder
+        from scp_pipeline.tuning.act_active import _import_act_api, _import_workspace_builder
 
-        importlib.import_module("sklearn")
-        importlib.import_module("timeout_decorator")
         _import_act_api(cfg)
         builder = _import_workspace_builder(cfg)
         cell = builder()

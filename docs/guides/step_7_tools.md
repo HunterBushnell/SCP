@@ -61,6 +61,13 @@ scripts/restore_run_state.py
 Use this to restore values from a saved run into a target tune while preserving
 the target file structure.
 
+Explicit restore destinations may be in another project. The destination keeps
+its project/cell/tune workspace identity; restoring model/config values does not
+rename it to the source workspace. Compare source and destination paths in the
+dry run before writing. Compatible-result merging, unlike comparison or explicit
+restoration, guards against mixed project/cell/tune identities. See
+[Project workspaces](project_workspaces.md).
+
 Common controls:
 
 - `from_run`: saved run folder, results folder, or `run_manifest.json`.
@@ -203,3 +210,12 @@ Good Step 7 additions should:
 - need only a few user-facing options,
 - be useful to notebook-first users,
 - not duplicate a full workflow from Steps 1-6.
+
+## Declared external model materialization
+
+With `apply` including `model_artifacts`, opt into `materialize_external=True`
+(or CLI `--materialize-external`) to restore a declared bundle into the selected
+tune and remap its recipe to copy mode. Dry-run first; backups, hashes, and
+restart/recompile notices remain in force. No source is restored into the
+upstream repository. Runtime-only object reconstruction is not supported.
+See [Custom models](custom_models.md).

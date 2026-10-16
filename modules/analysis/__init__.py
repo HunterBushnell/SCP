@@ -24,6 +24,9 @@ __all__ = sorted(_SUBMODULES)
 
 
 def __getattr__(name: str) -> Any:
+    if name == 'load_results':
+        from scp_pipeline.simulation.result_loading import load_results
+        return load_results
     if name in _SUBMODULES:
         module = import_module(f"{__name__}.{name}")
         globals()[name] = module

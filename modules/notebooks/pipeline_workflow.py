@@ -57,10 +57,18 @@ class PipelineNotebookState:
     setup_summary: dict[str, Any]
     mechanism_summary: dict[str, Any]
     source_fingerprint: dict[str, str]
+    runtime_only: bool = False
+    runtime_sim_config: Optional[dict[str, Any]] = None
+    project_root: Optional[Path] = None
+    output_dir: Optional[Path] = None
 
     def assert_sources_unchanged(self) -> None:
         """Require a restart when cell-construction inputs changed on disk."""
 
+        if self.runtime_only:
+            from scp_pipeline.model import validate_cell
+            validate_cell(self.cell)
+            return
         try:
             current = _model_source_fingerprint(self.tune_dir)
         except Exception as exc:
@@ -184,10 +192,9 @@ def _read_json_dict(path: Path) -> dict[str, Any]:
 
 
 def _infer_labels(tune_dir: Path) -> tuple[str, str]:
-    tune = Path(tune_dir).expanduser().resolve()
-    if tune.parent.name == "tunes" and tune.parent.parent.name:
-        return tune.parent.parent.name, tune.name
-    return tune.parent.name or "cell", tune.name
+    from scp_pipeline.workspaces import infer_workspace
+    workspace = infer_workspace(tune_dir)
+    return workspace.cell_name, workspace.tune_name
 
 
 def _resolve_tune_path(
@@ -196,18 +203,11 @@ def _resolve_tune_path(
     cell_name: Optional[str],
     tune_name: Optional[str],
     tune_dir_override: Optional[str | Path],
+    project_name: Optional[str] = None,
 ) -> Path:
-    if tune_dir_override not in (None, ""):
-        tune_dir = Path(str(tune_dir_override)).expanduser()
-        if not tune_dir.is_absolute():
-            tune_dir = repo_root / tune_dir
-        return tune_dir.resolve()
-    if not cell_name or not tune_name:
-        raise ValueError(
-            "Provide tune_dir_override or both cell_name and tune_name in the "
-            "pipeline settings cell."
-        )
-    return (repo_root / "cells" / str(cell_name) / "tunes" / str(tune_name)).resolve()
+    from scp_pipeline.workspaces import resolve_workspace
+    return resolve_workspace(repo_root=repo_root, project_name=project_name,
+        cell_name=cell_name, tune_name=tune_name, tune_dir_override=tune_dir_override).tune_dir
 
 
 def _select_setup_source(
@@ -218,7 +218,7 @@ def _select_setup_source(
     cell_config_path = tune_dir / "cell_configs" / "cell_config.json"
     existing = _read_json_dict(cell_config_path) if cell_config_path.is_file() else {}
 
-    from modules.loaders import get_cell_loader_name
+    from scp_pipeline.loaders import get_cell_loader_name
 
     if existing:
         has_explicit_loader = any(
@@ -245,8 +245,8 @@ def _select_setup_source(
         return "existing", "allen_manifest", {}
     raise FileNotFoundError(
         f"No configured cell or Allen manifest was found in {tune_dir}. "
-        "Use 1_setup.ipynb to register/stage this custom model first, then return "
-        "to 0_pipeline.ipynb."
+        "Register/stage this model using Step 1's Cell setup in 0_pipeline.ipynb "
+        "or the detailed 1_setup.ipynb before preparing it."
     )
 
 
@@ -257,28 +257,63 @@ def prepare_pipeline_notebook(
     tune_name: Optional[str] = "tuned",
     tune_dir_override: Optional[str | Path] = None,
     recompile_modfiles: bool = False,
+    cell_override: Any = None,
+    runtime_sim_config: Optional[dict[str, Any]] = None,
+    project_name: Optional[str] = None,
+    project_root: Optional[str | Path] = None,
+    workspace_root: Optional[str | Path] = None,
+    output_dir: Optional[str | Path] = None,
 ) -> PipelineNotebookState:
     """Fill, validate, and build the single cell shared by Steps 2--4.
 
-    Existing config values always win. New model acquisition and loader setup
-    belong in ``1_setup.ipynb``; this compact workflow only loads prepared tunes.
+    Existing config values always win. Register/acquire a model with the shared
+    setup APIs (compact Cell setup or ``1_setup.ipynb``) before calling this loader.
     """
 
-    from modules.notebooks.helpers import ensure_scp_repo_on_syspath
+    from scp_pipeline.notebooks.helpers import ensure_scp_repo_on_syspath
 
-    root = ensure_scp_repo_on_syspath(
+    from scp_pipeline.runtime import code_root
+    root = code_root() if project_root is not None else ensure_scp_repo_on_syspath(
         Path(repo_root).expanduser() if repo_root is not None else None
     )
-    tune_dir = _resolve_tune_path(
+    from scp_pipeline.workspaces import resolve_workspace
+    tune_dir = resolve_workspace(
         repo_root=root,
         cell_name=cell_name,
         tune_name=tune_name,
         tune_dir_override=tune_dir_override,
-    )
+        project_name=project_name,
+        project_root=project_root, workspace_root=workspace_root,
+    ).tune_dir
+    owner = Path(project_root).expanduser().resolve() if project_root is not None else None
+    from scp_pipeline.projects import resolve_project_path
+    destination = resolve_project_path(owner or tune_dir, output_dir) if output_dir else None
+    if cell_override is not None:
+        had_recipe = (tune_dir / 'cell_configs/cell_config.json').exists()
+        if recompile_modfiles:
+            raise ValueError('A live cell is already constructed. Compile mechanisms before creating it, then restart/recreate the cell.')
+        from scp_pipeline.tuning import build_tuning_cell, prepare_tuning_notebook_context
+        context = prepare_tuning_notebook_context(
+            cell_name=cell_name, tune_name=tune_name, tune_dir_override=tune_dir, repo_root=root,
+            project_name=project_name, cell_override=cell_override, runtime_sim_config=runtime_sim_config)
+        cell = build_tuning_cell(context, cell_override=cell_override)
+        if owner is not None and not had_recipe:
+            from scp_pipeline.projects import load_project_settings
+            path = tune_dir / 'cell_configs/cell_config.json'
+            config = _read_json_dict(path)
+            config.update(project_name=load_project_settings(owner)['project_name'],
+                          workspace_layout='project_owned', workspace_project_root=os.path.relpath(owner, tune_dir))
+            path.write_text(json.dumps(config, indent=2) + '\n', encoding='utf-8')
+            context.cell_config.update(config)
+        skipped = {'status': 'skipped', 'reason': 'using supplied in-memory cell'}
+        return PipelineNotebookState(root, tune_dir, context, cell,
+                                     {'runtime_cell': True}, skipped, {}, runtime_only=True,
+                                     runtime_sim_config=runtime_sim_config,
+                                     project_root=owner, output_dir=destination)
     source_type, loader_name, existing_config = _select_setup_source(tune_dir)
-    inferred_cell, inferred_tune = _infer_labels(tune_dir)
-    resolved_cell = str(cell_name or existing_config.get("cell_name") or inferred_cell)
-    resolved_tune = str(tune_name or existing_config.get("tune") or inferred_tune)
+    from scp_pipeline.workspaces import infer_workspace
+    workspace = infer_workspace(tune_dir, cell_config=existing_config, cell_name=cell_name, project_name=project_name)
+    resolved_cell, resolved_tune = workspace.cell_name, workspace.tune_name
 
     existing_tuning = existing_config.get("tuning", {}) or {}
     soma_multiplier = (
@@ -288,12 +323,13 @@ def prepare_pipeline_notebook(
     )
     existing_color = existing_config.get("color")
 
-    from modules.setup.step1_prepare import prepare_tune
+    from scp_pipeline.setup.step1_prepare import prepare_tune
 
     setup_summary = prepare_tune(
         tune_dir=tune_dir,
         cell_name=resolved_cell,
         tune_name=resolved_tune,
+        project_name=workspace.project_name,
         source_type=source_type,
         cell_loader=loader_name,
         soma_diam_multiplier=soma_multiplier,
@@ -304,17 +340,17 @@ def prepare_pipeline_notebook(
         recompile_modfiles=bool(recompile_modfiles),
         load_compiled_dll=True,
         allow_missing_modfiles=True,
-        do_base_configs=True,
-        do_target_config=True,
-        do_synapse_configs=True,
+        do_base_configs=False,
+        do_target_config=False,
+        do_synapse_configs=False,
         config_mode="fill",
-        sync_cell_metadata=True,
+        sync_cell_metadata=False,
         do_validate=False,  # validation below deliberately does not build a second cell
         validate_inputs_cfg=True,
         create_tuned_copy=False,
     )
 
-    from modules.setup.validation import validate_tune
+    from scp_pipeline.setup.validation import validate_tune
 
     validation = validate_tune(
         tune_dir=tune_dir,
@@ -322,7 +358,7 @@ def prepare_pipeline_notebook(
         validate_modfiles=True,
         validate_load_cell=False,
         validate_inputs=True,
-        validate_synapses=True,
+        validate_synapses=(tune_dir / 'cell_configs/syn_config.json').is_file(),
         allow_missing_modfiles=True,
     )
     setup_summary.setdefault("actions", {})["validate"] = {
@@ -331,13 +367,14 @@ def prepare_pipeline_notebook(
         "load_cell": "deferred to the single shared pipeline build",
     }
 
-    from modules.tuning import build_tuning_cell, prepare_tuning_notebook_context
+    from scp_pipeline.tuning import build_tuning_cell, prepare_tuning_notebook_context
 
     context = prepare_tuning_notebook_context(
         cell_name=resolved_cell,
         tune_name=resolved_tune,
         tune_dir_override=tune_dir,
         repo_root=root,
+        project_name=workspace.project_name,
         require_compiled_modfiles=True,
         require_synapse_config=False,
         print_summary=True,
@@ -362,6 +399,8 @@ def prepare_pipeline_notebook(
         setup_summary=setup_summary,
         mechanism_summary=dict(mechanism_summary or {}),
         source_fingerprint=fingerprint,
+        project_root=owner,
+        output_dir=destination,
     )
 
 
@@ -380,8 +419,8 @@ def _model_source_paths(tune_dir: Path) -> list[Path]:
         raise FileNotFoundError(f"Missing cell config: {cell_config_path}")
     cell_config = _read_json_dict(cell_config_path)
 
-    from modules.loaders import discover_cell_source_artifacts
-    from modules.setup.mechanisms import resolve_modfiles_dir
+    from scp_pipeline.loaders import discover_cell_source_artifacts
+    from scp_pipeline.setup.mechanisms import resolve_modfiles_dir
 
     paths = [cell_config_path]
     paths.extend(
@@ -413,12 +452,16 @@ def _model_source_fingerprint(tune_dir: Path) -> dict[str, str]:
 
 def _refreshed_context(state: PipelineNotebookState) -> Any:
     state.assert_sources_unchanged()
-    from modules.tuning import load_tune_configs
+    from scp_pipeline.tuning import load_tune_configs
 
     cell_config, sim_config = load_tune_configs(
         state.tune_dir,
         cell_name=state.context.cell_name,
     )
+    if state.runtime_only:
+        from scp_pipeline.simulation.session import _merge_overrides
+        cell_config = dict(state.cell.config)
+        sim_config = _merge_overrides(sim_config, state.runtime_sim_config)
     return replace(
         state.context,
         cell_config=cell_config,
@@ -441,7 +484,7 @@ def _protocol_params(
 
 
 def _display_rows(title: str, rows: Sequence[Mapping[str, Any]]) -> None:
-    from modules.tuning import display_tuning_rows
+    from scp_pipeline.tuning import display_tuning_rows
 
     display_tuning_rows(title, rows)
 
@@ -460,7 +503,7 @@ def compute_passive_proposal(
     """
 
     context = _refreshed_context(state)
-    from modules.tuning import (
+    from scp_pipeline.tuning import (
         passive_proposal_changes,
         resolve_passive_tuning_inputs,
     )
@@ -528,7 +571,7 @@ def run_passive_stage(
     if not amp_values:
         raise ValueError("amps_pA must contain at least one passive current step.")
 
-    from modules.tuning import (
+    from scp_pipeline.tuning import (
         compare_passive_targets,
         display_passive_analysis,
         passive_amplitude_colors,
@@ -676,7 +719,7 @@ def run_active_protocol_stage(
         overrides=protocol_overrides,
     )
 
-    from modules.tuning import (
+    from scp_pipeline.tuning import (
         active_amplitude_colors,
         active_metric_rows,
         display_active_analysis,
@@ -747,7 +790,7 @@ def run_fi_curve_stage(
         overrides=protocol_overrides,
     )
 
-    from modules.tuning import (
+    from scp_pipeline.tuning import (
         active_metric_rows,
         compare_fi_targets,
         display_fi_analysis,
@@ -864,7 +907,7 @@ def prepare_interactive_synapse_tuner(
     """Create the optional BMTool tuner while reusing the shared pipeline cell."""
 
     context = _refreshed_context(state)
-    from modules.tuning import (
+    from scp_pipeline.tuning import (
         SynapseTuningSession,
         connection_option,
         connection_settings_for_bmtool,
@@ -938,13 +981,25 @@ def preview_pipeline_inputs(
     trial = int(trial_idx)
     if trial < 0:
         raise ValueError("trial_idx must be non-negative.")
+    if getattr(state, 'runtime_only', False):
+        from scp_pipeline.simulation import SimulationSession, SimulationOptions
+        from scp_pipeline.analysis import analysis
+        session = SimulationSession.from_cell(state.cell, tune_dir=state.tune_dir,
+            sim_config=_refreshed_context(state).sim_config,
+            options=SimulationOptions(seed=seed, sim_overrides={'iclamp': {'enabled': False}})).prepare()
+        syn_state = session.preview_synapses(trial_idx=trial)
+        records = syn_state.get('records', {}) or {}
+        summary = analysis.summarize_synapse_records(records, geom=session.geom)
+        return PipelineInputPreviewResult({'records': records, 'preview_only': True, 'summary': summary},
+            summary, session.summary(), trial, ('in-process',),
+            'Session-only live cell: preview executed in this kernel; no subprocess was started.')
 
     with tempfile.TemporaryDirectory(prefix="scp_pipeline_preview_") as temp_dir:
         artifact = Path(temp_dir) / "input_preview.pkl"
         command = [
             sys.executable,
             "-m",
-            "modules.notebooks.pipeline_preview_worker",
+            "scp_pipeline.notebooks.pipeline_preview_worker",
             "--tune-dir",
             str(state.tune_dir),
             "--trial-idx",
@@ -963,7 +1018,7 @@ def preview_pipeline_inputs(
             print(" ", " ".join(command))
         process = subprocess.Popen(
             command,
-            cwd=str(state.repo_root),
+            cwd=str(state.project_root or state.tune_dir),
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -1015,6 +1070,7 @@ def run_fresh_simulation(
     output_stem: Optional[str] = None,
     stream_output: bool = True,
     sim_overrides: Optional[Mapping[str, Any]] = None,
+    output_dir: Optional[str | Path] = None,
 ) -> PipelineSimulationResult:
     """Run Step 5 in a fresh interpreter, force-save it, and load the result."""
 
@@ -1027,11 +1083,25 @@ def run_fresh_simulation(
         raise ValueError("n_trials must be at least 1.")
 
     run_overrides = deepcopy(dict(sim_overrides or {}))
+    from scp_pipeline.projects import resolve_project_path
+    destination = resolve_project_path(state.project_root or state.tune_dir, output_dir or state.output_dir) if (output_dir or state.output_dir) else state.tune_dir / 'output_data'
     iclamp_overrides = run_overrides.get("iclamp")
     if not isinstance(iclamp_overrides, dict):
         iclamp_overrides = {}
     iclamp_overrides["enabled"] = bool(iclamp)
     run_overrides["iclamp"] = iclamp_overrides
+    if getattr(state, 'runtime_only', False):
+        from scp_pipeline.simulation import SimulationSession, SimulationOptions
+        session = SimulationSession.from_cell(state.cell, tune_dir=state.tune_dir,
+            sim_config=_refreshed_context(state).sim_config, options=SimulationOptions(
+                n_trials=trials, seed=seed, iclamp=iclamp, force_save=True,
+                output_stem=stem, output_dir=destination, sim_overrides=run_overrides))
+        result = session.run()
+        saved = session.save()
+        manifest = saved if saved.name == 'run_manifest.json' else saved.parent / 'run_manifest.json'
+        return PipelineSimulationResult(stem, manifest, result, ('in-process',),
+            'Session-only live cell: simulation executed in this kernel; no subprocess was started. '
+            'Results do not contain a reconstruction recipe or a complete checkpoint.')
     try:
         serialized_overrides = json.dumps(
             run_overrides,
@@ -1043,7 +1113,7 @@ def run_fresh_simulation(
 
     command = [
         sys.executable,
-        str(state.repo_root / "run_pipeline.py"),
+        "-m", "scp_pipeline", "run",
         "--tune-dir",
         str(state.tune_dir),
         "--n-trials",
@@ -1053,6 +1123,7 @@ def run_fresh_simulation(
         stem,
         "--sim-overrides-json",
         serialized_overrides,
+        "--output-dir", str(destination),
     ]
     if seed is not None:
         command.extend(("--seed", str(int(seed))))
@@ -1067,7 +1138,7 @@ def run_fresh_simulation(
         print(" ", " ".join(command))
     process = subprocess.Popen(
         command,
-        cwd=str(state.repo_root),
+        cwd=str(state.project_root or state.tune_dir),
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -1091,21 +1162,21 @@ def run_fresh_simulation(
             f"Fresh Step 5 process failed with exit code {return_code}.\n{tail}"
         )
 
-    manifest_path = state.tune_dir / "output_data" / stem / "run_manifest.json"
+    manifest_path = destination / stem / "run_manifest.json"
     if not manifest_path.is_file():
         candidates = sorted(
-            (state.tune_dir / "output_data").glob(f"{stem}*/run_manifest.json"),
+            destination.glob(f"{stem}*/run_manifest.json"),
             key=lambda path: path.stat().st_mtime,
             reverse=True,
         )
         if not candidates:
             raise FileNotFoundError(
                 "Step 5 completed but its saved manifest could not be found under "
-                f"{state.tune_dir / 'output_data'} for stem {stem!r}."
+                f"{destination} for stem {stem!r}."
             )
         manifest_path = candidates[0]
 
-    from modules import run_sim
+    from scp_pipeline import run_sim
 
     results = run_sim.load_results(manifest_path)
     if stream_output:

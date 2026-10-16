@@ -1,0 +1,17 @@
+{
+  "cell_name": "ACT_L5",
+  "tune": "tuned",
+  "color": "k",
+  "cell_loader": "allen_manifest",
+  "paths": {
+    "manifest": "manifest.json",
+    "modfiles": "modfiles"
+  },
+  "tuning": {
+    "soma_diam_multiplier": 1.0
+  },
+  "allen": {
+    "utils": "auto",
+    "axon_type": "stub"
+  }
+}

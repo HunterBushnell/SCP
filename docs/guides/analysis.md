@@ -23,7 +23,7 @@ Use Step 6 to:
 ## What It Reads
 
 - Saved run folders under `cells/<CELL>/<tunes_dir>/<model_dir>/output_data/<run_name>/`
-- Optional external CSV curves, usually from `external_data/`
+- Optional external CSV curves, such as the bundled `cells/<cell>/data/` curves
 - `modules/analysis/analysis_defaults.json`
 - `modules/analysis/analysis_presets/single_plot.json`
 - `modules/analysis/analysis_presets/output_plotting.json`
@@ -31,6 +31,10 @@ Use Step 6 to:
 - `modules/analysis/analysis_presets/output_metrics.json`
 - `modules/analysis/analysis_presets/extra_analysis.json`
 - Optional compare presets configured through `compare_preset_path`
+
+Bundled curves are cell-scoped. Historical snapshots retain their original
+`external_data/...` paths and use compatibility aliases without rewriting
+recorded inputs. See [cell-scoped data](cell_data.md) for the mapping.
 
 ## Typical Workflow
 

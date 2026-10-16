@@ -6,6 +6,7 @@ import json
 import unittest
 from pathlib import Path
 from typing import Iterable
+from copy import deepcopy
 
 from modules.notebooks.bootstrap import finish_step5_notebook_setup
 
@@ -204,9 +205,14 @@ class NotebookContractTests(unittest.TestCase):
                 self.assertEqual(_calls("0_pipeline.ipynb", direct_call), [])
 
         _, settings = _assigned_dict("0_pipeline.ipynb", "pipeline_settings")
+        from modules.notebooks.pipeline_ui import PIPELINE_UI_DEFAULTS
+        effective_settings = deepcopy(PIPELINE_UI_DEFAULTS)
+        effective_settings.update({ast.literal_eval(key): ast.literal_eval(value)
+                                   for key, value in zip(settings.keys, settings.values)})
         expected_literals = {
-            "cell_name": "PV",
-            "tune_name": "tuned",
+            "project_name": None,
+            "cell_name": None,
+            "tune_name": None,
             "quiet_step1_output": True,
             "passive_amps_pA": [-50, -100],
             "passive_target_overrides": {},
@@ -260,14 +266,14 @@ class NotebookContractTests(unittest.TestCase):
         }
         for key, expected in expected_literals.items():
             with self.subTest(setting=key):
-                self.assertEqual(ast.literal_eval(_dict_value(settings, key)), expected)
+                self.assertEqual(effective_settings[key], expected)
         setting_names = {ast.literal_eval(key) for key in settings.keys}
         self.assertNotIn("adb_specimen_id", setting_names)
         self.assertNotIn("adb_model_type", setting_names)
         self.assertNotIn("compute_act_passive_proposal", setting_names)
         self.assertEqual(
-            ast.unparse(_dict_value(settings, "fi_amps_pA")),
-            "list(range(0, 301, 50))",
+            effective_settings['fi_amps_pA'],
+            list(range(0, 301, 50)),
         )
 
         notebook = json.loads(
@@ -411,6 +417,7 @@ class NotebookContractTests(unittest.TestCase):
         self.assertIn('"specimen_id": "484635029"', setup_source)
         self.assertIn('"model_type": "perisomatic"', setup_source)
         self.assertEqual(len(_calls("1_setup.ipynb", "resolve_step1_model_setup")), 1)
+        self.assertIn("# print(json.dumps(discover_hoc_templates(tune_dir), indent=2))", setup_source)
         for removed_cell_specific_setting in (
             "HOC_TEMPLATE_FILE",
             "HOC_TEMPLATE_NAME",

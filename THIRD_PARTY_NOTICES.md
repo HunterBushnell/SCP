@@ -55,11 +55,37 @@ The same terms apply to any archived copies produced under
 `output_data/**/model_artifacts/`. These mechanisms are not covered by SCP's
 MIT license.
 
+## ACT-sourced native examples
+
+The public `cells/ACT_Spiker/`, `cells/ACT_BursterCa/`, `cells/ACT_LAA/`,
+`cells/ACT_L5/`, and `cells/ACT_SST/` families copy native sources from
+[ACT](https://github.com/V-Marco/ACT), pinned to commit
+`2b3fdc190107b8242e3496329cfdf240abd09694`. Each tune records source-relative
+paths, source/current SHA-256 hashes, and its variant relationship in
+`SOURCE_PROVENANCE.json`. ACT itself is not a runtime dependency for these
+native examples.
+
+ACT's MIT license notice, copyright Vladimir Omelyusik (2025), is retained as
+`LICENSE.ACT` in each family. Native file headers and upstream credits remain
+unchanged; this notice does not assert that every inherited model, mechanism,
+or Allen dataset has been relicensed by ACT or SCP. In particular, Spiker
+credits Tyler B and a NEURON tutorial; its Hodgkin–Huxley mechanism retains
+its original attributions. BursterCa/LAA mechanisms retain their source-model
+and contributor credits, including Migliore where identified in the headers.
+The Allen L5/SST bundles retain their native fit, morphology, and mechanism
+sources and are subject to the source records/terms applicable to those assets.
+SCP's root MIT license does not relicense these native assets.
+
+The ACT SST model is `476686112`; ACT L5 is `497232429`. They are distinct
+from SCP's legacy Allen models listed above. Staging and numerical smoke
+checks are not independent biological-validation claims. See the
+[ACT example catalog](docs/guides/act_examples.md).
+
 ## LUT-derived HOC and MOD sources
 
-The HOC and MOD model sources under the following paths are derived from the
-[LUT repository](https://github.com/HunterBushnell/LUT) and are redistributed
-with permission:
+Earlier SCP versions included HOC and MOD model sources under the following
+paths, derived from the [LUT repository](https://github.com/HunterBushnell/LUT).
+Those sources were redistributed with permission at the time of inclusion:
 
 - `cells/EUSmn/tunes/*/model/`
 - `cells/EUSmn/tunes/*/modfiles/`
@@ -68,7 +94,10 @@ with permission:
 - `cells/PGN/tunes/*/model/`
 - `cells/PGN/tunes/*/modfiles/`
 
-The source lineage is pinned to LUT commit
+Those live examples are now maintained in a locally excluded LUT project,
+not bundled in the current public tree. This relocation does not erase
+earlier commits/releases or change their original notices. The historical
+source lineage is pinned to LUT commit
 `f9739d8aa7f94eac67fcaa67e8e04e26787dee0f`. EUSmn begins from the LUT PUD
 template; the tuned EUSmn, HYPO, and PGN HOC templates are manually derived
 tunes. Exact source and current-artifact hashes are recorded in each tune's

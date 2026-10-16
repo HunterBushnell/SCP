@@ -77,17 +77,9 @@ def _in_distance_band(
 
 
 def _unique_sections(*section_groups: Iterable[Any]) -> List[Any]:
-    """Return sections in first-seen order, avoiding duplicate section names."""
-    seen_names = set()
-    unique_sections = []
-    for section_group in section_groups:
-        for section in section_group:
-            name = section.name()
-            if name in seen_names:
-                continue
-            seen_names.add(name)
-            unique_sections.append(section)
-    return unique_sections
+    """Return distinct cell sections in first-seen order."""
+    from scp_pipeline.loaders.base import unique_sections
+    return list(unique_sections(*section_groups))
 
 
 def _section_list(value: Any) -> List[Any]:

@@ -76,9 +76,11 @@ def inspect_act_active_stage(
     """Resolve and validate a compact ACT workspace without writing it."""
 
     state.assert_sources_unchanged()
-    from modules.loaders import get_cell_loader_name
-    from modules.setup.mechanisms import resolve_modfiles_dir
-    from modules.tuning import (
+    if getattr(state, 'runtime_only', False):
+        raise ValueError('ACT optimization cannot rebuild a runtime-only cell. Register a saved Python builder first.')
+    from scp_pipeline.loaders import get_cell_loader_name
+    from scp_pipeline.setup.mechanisms import resolve_modfiles_dir
+    from scp_pipeline.tuning import (
         act_config_fingerprint,
         act_output_status,
         default_act_active_config,
@@ -87,7 +89,7 @@ def inspect_act_active_stage(
         resolve_active_tuning_targets,
         validate_act_module_specs,
     )
-    from modules.tuning.act_active import CONFIG_NAME
+    from scp_pipeline.tuning.act_active import CONFIG_NAME
 
     tune_dir = Path(state.tune_dir).resolve()
     workspace_path = _resolve_workspace(tune_dir, workspace)
@@ -130,6 +132,8 @@ def inspect_act_active_stage(
         }
     )
     loader_name = get_cell_loader_name(state.context.cell_config)
+    if loader_name == 'runtime_cell':
+        raise ValueError('ACT optimization requires a saved Python builder or HOC/Allen recipe; a runtime-only cell cannot be rebuilt in an ACT worker.')
     cfg["cell_loader"] = loader_name
     cfg["act_loader_status"] = (
         "supported" if loader_name == "allen_manifest" else "experimental"
@@ -259,7 +263,7 @@ def prepare_act_active_stage(
     cfg = inspection.resolved_config
     target = cfg["target"]
     nwb = target.get("nwb_options", {}) or {}
-    from modules.tuning import prepare_act_active_workspace
+    from scp_pipeline.tuning import prepare_act_active_workspace
 
     prepare_act_active_workspace(
         repo_root=state.repo_root,
@@ -293,13 +297,13 @@ def prepare_act_active_stage(
         state, workspace=inspection.workspace, overrides=overrides
     )
     prepared.config_source = inspection.config_source
-    from modules.tuning import (
+    from scp_pipeline.tuning import (
         act_config_fingerprint,
         act_output_status,
         estimate_act_workload,
         load_act_active_config,
     )
-    from modules.tuning.act_active import resolve_workspace_path
+    from scp_pipeline.tuning.act_active import resolve_workspace_path
 
     actual_cfg = load_act_active_config(prepared.config_path)
     prepared.resolved_config = actual_cfg
@@ -405,7 +409,7 @@ def display_act_evaluation(
 ) -> Any:
     """Render ACT evaluation using the standard compact Step 3 FI styling."""
 
-    from modules.tuning import display_fi_analysis, fi_series_colors, plot_fi_curve
+    from scp_pipeline.tuning import display_fi_analysis, fi_series_colors, plot_fi_curve
 
     colors = fi_series_colors(model_color=state.context.cell_config.get("color"))
     result.figure = plot_fi_curve(
@@ -436,7 +440,7 @@ def _evaluation_result_from_payload(
     command: tuple[str, ...],
     stdout: str,
 ) -> PipelineACTEvaluationResult:
-    from modules.tuning import compare_fi_targets, load_act_active_config
+    from scp_pipeline.tuning import compare_fi_targets, load_act_active_config
 
     cfg = load_act_active_config(payload.get("config_path") or _evaluation_config_path(payload))
     target = cfg.get("target", {}) or {}
@@ -488,7 +492,7 @@ def _run_worker_action(
             sys.executable,
             "-u",
             "-m",
-            "modules.notebooks.pipeline_act_worker",
+            "scp_pipeline.notebooks.pipeline_act_worker",
             "--request",
             str(request_path),
             "--result",
@@ -496,7 +500,7 @@ def _run_worker_action(
         )
         process = subprocess.Popen(
             command,
-            cwd=str(Path(repo_root).resolve()),
+            cwd=str(Path(request['config_path']).resolve().parent),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -525,7 +529,7 @@ def _run_worker_action(
 
 
 def _resolve_workspace(tune_dir: Path, value: Optional[str | Path]) -> Path:
-    from modules.tuning import default_act_workspace
+    from scp_pipeline.tuning import default_act_workspace
 
     if value in (None, ""):
         return default_act_workspace(tune_dir)
@@ -554,9 +558,10 @@ def _friendly_act_probe_error(exc: Exception) -> str:
     ):
         return (
             message
-            + " SCP attempts this installation when an ACT action is requested. "
-            "Check Git/network access, move an invalid target aside, or set "
-            "SCP_ACT_PATH to a valid checkout."
+            + " Install the pinned ACT package once using requirements-act.txt "
+            "and restart the kernel, or correct/unset SCP_ACT_PATH/SCP_ACT_DIR. "
+            "Legacy cloning requires explicit SCP_AUTO_CLONE_ACT=1; check "
+            "Git/network access and the selected destination if you opted in."
         )
     return message
 
@@ -578,7 +583,7 @@ def _assert_workspace_prepared(
     state: PipelineNotebookState,
     result: PipelineACTWorkspaceResult,
 ) -> None:
-    from modules.tuning import act_config_fingerprint
+    from scp_pipeline.tuning import act_config_fingerprint
 
     current_target = _target_config_fingerprint(Path(state.tune_dir).resolve())
     if current_target != result.target_config_fingerprint:
@@ -624,7 +629,7 @@ def _target_config_from_resolution(resolution: Any) -> dict[str, Any]:
 
 
 def _read_target_csv_points(path: Path) -> list[tuple[float, float]]:
-    from modules.tuning import fi_reference_points_from_csv
+    from scp_pipeline.tuning import fi_reference_points_from_csv
 
     return fi_reference_points_from_csv(path)
 

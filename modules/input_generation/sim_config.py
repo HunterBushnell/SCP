@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from modules.core import randomness
+from scp_pipeline.core import randomness
 
 from .recording_config import (
     _normalize_cell_recording_config,
     _sync_trace_limit_with_cell_recording,
+    normalize_syn_recording_config,
 )
 
 
@@ -144,6 +145,7 @@ def _normalize_sim_config(sim_cfg_raw: Dict[str, Any]) -> Dict[str, Any]:
 
     # Optional cell-level recording config (sites + variable toggles)
     _normalize_cell_recording_config(sim_cfg_raw, sim_cfg)
+    sim_cfg["syn_recording"] = normalize_syn_recording_config(sim_cfg)
 
     # n_traces_to_save: optional, default 1
     n_traces_raw = sim_cfg.get("n_traces_to_save", 1)

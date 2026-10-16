@@ -5,15 +5,15 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from modules.core import randomness
-from modules.input_generation import inputs
-from modules.input_generation.config import (
+from scp_pipeline.core import randomness
+from scp_pipeline.input_generation import inputs
+from scp_pipeline.input_generation.config import (
     _inject_path_metadata,
     _normalize_sim_config,
     _resolve_config_root,
 )
-from modules.model import geometry, synapses
-from modules.model.load_cell import load_cell
+from scp_pipeline.model import geometry, synapses
+from scp_pipeline.model.load_cell import load_cell
 
 from .current_injection import apply_sim_conditions, run_iclamp_test
 from .multi_run import run_multi
@@ -66,6 +66,8 @@ class SimulationOptions:
 class SimulationSession:
     tune_dir: Path
     options: SimulationOptions = field(default_factory=SimulationOptions)
+    cell_override: Any = field(default=None, repr=False)
+    runtime_sim_config: Optional[Dict[str, Any]] = field(default=None, repr=False)
     config_root: Path = field(init=False)
     sim_path: Path = field(init=False)
     syn_path: Path = field(init=False)
@@ -87,22 +89,38 @@ class SimulationSession:
     iclamp_enabled: bool = field(default=False, init=False)
     snapshot_enabled: bool = field(default=False, init=False)
     prepared: bool = field(default=False, init=False)
+    prepared_inputs: list[Dict[str, Any]] = field(default_factory=list, init=False)
+    workspace: Any = field(default=None, init=False)
+    append_lineage: list[Dict[str, Any]] = field(default_factory=list, init=False)
+    append_warnings: list[str] = field(default_factory=list, init=False)
 
     def __post_init__(self) -> None:
-        self.tune_dir = Path(self.tune_dir).resolve()
+        from scp_pipeline.workspaces import infer_workspace
+        self.tune_dir = infer_workspace(self.tune_dir).tune_dir
 
     @classmethod
     def from_tune(
         cls,
         tune_dir: Union[str, Path],
         options: Optional[SimulationOptions] = None,
+        cell_override: Any = None,
+        runtime_sim_config: Optional[Dict[str, Any]] = None,
         **option_overrides: Any,
     ) -> "SimulationSession":
         if options is None:
             options = SimulationOptions(**option_overrides)
         elif option_overrides:
             options = replace(options, **option_overrides)
-        return cls(Path(tune_dir), options=options).load_configs()
+        return cls(Path(tune_dir), options=options, cell_override=cell_override,
+                   runtime_sim_config=runtime_sim_config).load_configs()
+
+    @classmethod
+    def from_cell(cls, cell, *, tune_dir, sim_config=None, geometry_config=None, options=None):
+        from scp_pipeline.model.runtime_cell import wrap_cell, prepare_runtime_workspace
+        adopted = wrap_cell(cell)
+        prepare_runtime_workspace(tune_dir, adopted, sim_config, geometry_config)
+        return cls.from_tune(tune_dir, options=options, cell_override=adopted,
+                             runtime_sim_config=sim_config)
 
     @property
     def cell_name(self) -> str:
@@ -110,15 +128,23 @@ class SimulationSession:
 
     @property
     def tune_name(self) -> str:
-        return self.tune_dir.name
+        return self.workspace.tune_name if self.workspace is not None else self.tune_dir.name
 
     @property
     def output_dir(self) -> Path:
         if self.options.output_dir:
-            return Path(self.options.output_dir)
+            output = Path(self.options.output_dir).expanduser().resolve()
+            if self.cell_config.get('model_source'):
+                from scp_pipeline.loaders.source_context import guard_source_destinations
+                guard_source_destinations(self.cell_config, self.tune_dir, [output])
+            return output
         return self.tune_dir / "output_data"
 
     def load_configs(self) -> "SimulationSession":
+        if self.cell_override is not None:
+            from scp_pipeline.model.runtime_cell import wrap_cell, prepare_runtime_workspace
+            self.cell_override = wrap_cell(self.cell_override)
+            prepare_runtime_workspace(self.tune_dir, self.cell_override, self.runtime_sim_config)
         self.config_root = _resolve_config_root(self.tune_dir)
         self.sim_path = self.config_root / "sim_config.json"
         self.syn_path = self.config_root / "syn_config.json"
@@ -132,13 +158,24 @@ class SimulationSession:
         self.sim_cfg_preview = _load_json_dict(self.sim_path)
         self.cell_config = _load_json_dict(self.cell_config_path)
         self.geom_config = _load_json_dict(self.geom_config_path)
+        from scp_pipeline.workspaces import infer_workspace
+        self.workspace = infer_workspace(self.tune_dir, cell_config=self.cell_config)
+        if self.cell_override is not None:
+            from scp_pipeline.model.runtime_cell import adopt_cell
+            _merge_overrides(self.sim_cfg_preview, self.runtime_sim_config)
+            effective = dict(self.cell_config)
+            effective['cell_name'] = self.cell_override.config.get('cell_name') or effective.get('cell_name')
+            self.cell_override = adopt_cell(self.cell_override, effective)
+            self.cell_config = dict(self.cell_override.config)
 
         self.cell_config.setdefault("cell_name", infer_cell_name(self.tune_dir, self.cell_config))
         paths = self.cell_config.setdefault("paths", {})
         if not isinstance(paths, dict):
             paths = {}
             self.cell_config["paths"] = paths
-        paths.setdefault("tune_dir", str(self.tune_dir))
+        paths["tune_dir"] = str(self.tune_dir)
+        if "tune_dir" in self.cell_config:
+            self.cell_config["tune_dir"] = str(self.tune_dir)
 
         return self
 
@@ -156,16 +193,12 @@ class SimulationSession:
 
         base_results = load_results(append_target)
         base_sim_cfg = base_results.get("sim_cfg", {}) or {}
-        base_cell = base_sim_cfg.get("cell")
-        base_tune = base_sim_cfg.get("tune")
-        if base_cell and base_cell != self.cell_name:
-            raise ValueError(
-                f"append_to points to cell {base_cell!r} but tune_dir is {self.cell_name!r}"
-            )
-        if base_tune and base_tune != self.tune_name:
-            raise ValueError(
-                f"append_to points to tune {base_tune!r} but tune_dir is {self.tune_name!r}"
-            )
+        from scp_pipeline.workspaces import assert_same_workspace, result_workspace_identity
+        self.append_warnings = assert_same_workspace(
+            {'workspace_identity': self.workspace.identity}, base_results, context='append_to')
+        self.append_lineage = list((base_results.get('meta') or {}).get('append_lineage') or [])
+        self.append_lineage.append({'run_path': str(append_target),
+            'tune_dir': base_sim_cfg.get('tune_dir'), 'workspace_identity': result_workspace_identity(base_results)})
 
         self.sim_cfg_override = copy.deepcopy(base_sim_cfg)
         self.sim_cfg_override["append"] = (
@@ -204,6 +237,8 @@ class SimulationSession:
     def _apply_run_overrides(self, sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
         """Apply options that affect input generation and simulation behavior."""
         _merge_overrides(sim_cfg, self.options.sim_overrides)
+        from scp_pipeline.workspaces import apply_workspace_metadata
+        apply_workspace_metadata(sim_cfg, self.workspace)
 
         if self.options.n_trials is not None:
             sim_cfg["n_trials"] = int(self.options.n_trials)
@@ -255,10 +290,10 @@ class SimulationSession:
         return sim_cfg
 
     def prepare(self, *, generate_inputs: bool = True) -> "SimulationSession":
-        if self.options.load_mechanisms:
+        self._resolve_append_override()
+        if self.options.load_mechanisms and self.cell_override is None:
             load_mechanisms(self.tune_dir, self.cell_config)
 
-        self._resolve_append_override()
         self._apply_snapshot_option()
         self._validate_cell_tuning()
 
@@ -268,7 +303,11 @@ class SimulationSession:
         self.iclamp_cfg = sim_cfg_for_mode.get("iclamp", {}) or {}
         self.iclamp_enabled = bool(self.iclamp_cfg.get("enabled", False)) or bool(self.options.iclamp)
 
-        self.cell = load_cell(self.cell_config, base_dir=self.tune_dir)
+        from .model_artifacts import construction_inputs
+        self.prepared_inputs = construction_inputs(self.cell_config, self.tune_dir)
+        self.cell = self.cell_override if self.cell_override is not None else load_cell(self.cell_config, base_dir=self.tune_dir)
+        if construction_inputs(self.cell_config, self.tune_dir) != self.prepared_inputs:
+            raise RuntimeError('Model inputs changed during construction. Restart and prepare again with stable sources.')
         apply_sim_conditions(self.cell, sim_cfg_for_mode)
         self.geom = geometry.define_geometry(self.cell, self.geom_config)
 
@@ -308,13 +347,37 @@ class SimulationSession:
         if self.sim_cfg is None:
             raise RuntimeError("SimulationSession.run called before simulation config was prepared.")
 
+        from scp_pipeline.loaders import get_cell_loader_name
+        from scp_pipeline.model.runtime_cell import describe_cell
+        construction = get_cell_loader_name(self.cell_config)
+        provenance = {'construction_kind': construction,
+                      'cell_name': self.cell_config.get('cell_name'),
+                      'source_mode': 'session_only' if construction == 'runtime_cell' else (self.cell_config.get('model_source') or {}).get('mode', 'tune_local'),
+                      'construction_recipe_available': construction != 'runtime_cell',
+                      'session_only': construction == 'runtime_cell', 'complete_checkpoint': False,
+                      'inputs': copy.deepcopy(self.prepared_inputs)}
+        state = describe_cell(self.cell) if construction == 'runtime_cell' else None
+        def annotate(result):
+            meta = result.setdefault('meta', {})
+            meta['model_provenance'] = provenance
+            meta['workspace_identity'] = self.workspace.identity
+            if self.append_lineage:
+                meta['append_lineage'] = copy.deepcopy(self.append_lineage)
+            if self.append_warnings:
+                meta.setdefault('append_warnings', []).extend(self.append_warnings)
+            meta['cell_config'] = copy.deepcopy(self.cell_config)
+            meta['geometry_config'] = copy.deepcopy(self.geom_config)
+            if state is not None:
+                meta['model_state'] = state
+            return result
+
         if self.iclamp_enabled:
             self.result = run_iclamp_test(
                 self.cell,
                 self.sim_cfg,
                 iclamp_cfg=self.iclamp_cfg,
             )
-            return self.result
+            return annotate(self.result)
 
         if self.groups_cfg is None or self.inputs_by_group is None:
             raise RuntimeError("Synapse-driven run requires groups_cfg and inputs_by_group.")
@@ -353,7 +416,7 @@ class SimulationSession:
             meta["cell_config"] = copy.deepcopy(self.cell_config)
             meta["geometry_config"] = copy.deepcopy(self.geom_config)
 
-        return self.result
+        return annotate(self.result)
 
     def save(self) -> Optional[Path]:
         if self.result is None:
@@ -391,6 +454,11 @@ class SimulationSession:
             "config_root": str(self.config_root),
             "cell": self.cell_name,
             "tune": self.tune_name,
+            "project_name": self.workspace.project_name,
+            "workspace_identity": self.workspace.identity,
+            "construction_kind": self.cell_config.get('cell_loader', 'allen_manifest'),
+            "execution": 'in-process adopted cell' if self.cell_override is not None else 'configured recipe',
+            "construction_recipe_available": self.cell_override is None,
             "iclamp_enabled": self.iclamp_enabled,
             "snapshot_enabled": self.snapshot_enabled,
             "mode": self.options.mode,

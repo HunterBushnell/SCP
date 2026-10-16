@@ -7,7 +7,7 @@ from typing import Any, Dict, Mapping, Optional
 
 import copy
 
-from modules.loaders import get_cell_loader_name
+from scp_pipeline.loaders import get_cell_loader_name
 
 from .defaults import (
     default_cell_config,
@@ -49,8 +49,16 @@ def scaffold_base_configs(
     loader_config: Optional[Mapping[str, Any]] = None,
     v_init_mV: Optional[float] = None,
     celsius_C: Optional[float] = None,
+    project_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Ensure first-level config files exist under cell_configs/."""
+    if str(config_mode).strip().lower() == "skip":
+        return {"status": "skipped"}
+    from scp_pipeline.workspaces import infer_workspace
+
+    workspace = infer_workspace(tune_dir, project_name=project_name,
+                                cell_name=cell_name, tune_name=tune_name)
+    cell_name, tune_name = workspace.cell_name, workspace.tune_name
     paths = resolve_step1_paths(tune_dir)
     paths.config_dir.mkdir(parents=True, exist_ok=True)
 
@@ -66,8 +74,13 @@ def scaffold_base_configs(
         cell_loader=cell_loader or "allen_manifest",
         loader_paths=loader_paths,
         loader_config=loader_config,
+        project_name=workspace.project_name,
     )
     cell_cfg_path = paths.config_dir / "cell_config.json"
+    if cell_cfg_path.exists() and config_mode != "overwrite":
+        # Path inference is enough for older configs: do not add an optional
+        # declaration just because a workspace now supports projects.
+        cell_cfg_defaults.pop("project_name", None)
     status, cell_cfg_data = _write_scaffold_json(cell_cfg_path, cell_cfg_defaults, config_mode)
 
     if sync_cell_metadata:
@@ -75,6 +88,9 @@ def scaffold_base_configs(
         cell_cfg_data.setdefault("paths", {})
         cell_cfg_data["cell_name"] = cell_name
         cell_cfg_data["tune"] = tune_name
+        # Existing project-less configs are not rewritten merely to add metadata.
+        if workspace.project_name is not None and (status == "created" or "project_name" in cell_cfg_data):
+            cell_cfg_data["project_name"] = workspace.project_name
         resolved_loader = (
             get_cell_loader_name({"cell_loader": cell_loader})
             if cell_loader not in (None, "")
@@ -94,7 +110,7 @@ def scaffold_base_configs(
             cell_cfg_data["paths"].update(dict(loader_paths))
         if loader_config:
             for key, value in loader_config.items():
-                if key in {"cell_name", "tune", "color", "cell_loader", "paths", "tuning"}:
+                if key in {"cell_name", "tune", "project_name", "workspace_identity", "color", "cell_loader", "paths", "tuning"}:
                     raise ValueError(
                         f"loader_config cannot replace reserved cell-config key {key!r}"
                     )
@@ -179,6 +195,8 @@ def scaffold_synapse_configs(
     weight_style: str = "distributed",
 ) -> Dict[str, Any]:
     """Ensure optional synapse config files exist under cell_configs/."""
+    if str(config_mode).strip().lower() == "skip":
+        return {"status": "skipped"}
     paths = resolve_step1_paths(tune_dir)
     paths.config_dir.mkdir(parents=True, exist_ok=True)
     paths.syn_groups_dir.mkdir(parents=True, exist_ok=True)

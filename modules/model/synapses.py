@@ -6,8 +6,8 @@ from typing import Any, Dict, List
 
 import numpy as np
 
-from modules.core import randomness
-from modules.input_generation.density import _compile_density_from_spec
+from scp_pipeline.core import randomness
+from scp_pipeline.input_generation.density import _compile_density_from_spec
 
 from .synapse_helpers import (
     _draw_syn_weight,

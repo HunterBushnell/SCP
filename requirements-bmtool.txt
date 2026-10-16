@@ -1,0 +1,4 @@
+# Suggested once-per-environment install for the optional Step 4 integration.
+# Preserve the supported SCP scientific pins while resolving BMTool dependencies.
+-c requirements.txt
+bmtool==0.8.6

@@ -67,14 +67,19 @@ def _load_from_manifest(manifest_path: Path) -> Dict[str, Any]:
     traces: Dict[str, Any] = {}
     if files.get("traces"):
         tr = np.load(run_dir / files["traces"], allow_pickle=True)
-        if "T" in tr.files:
-            traces["T"] = tr["T"]
-        if mode == "multi":
-            if "V_trials" in tr.files:
-                traces["V"] = list(tr["V_trials"])
+        if "traces_payload" in tr.files:
+            traces = tr["traces_payload"].item()
         else:
-            if "V" in tr.files:
+            if "T" in tr.files:
+                traces["T"] = tr["T"]
+            if mode == "multi":
+                if "V_trials" in tr.files:
+                    traces["V"] = list(tr["V_trials"])
+            elif "V" in tr.files:
                 traces["V"] = tr["V"]
+            for key in ("I", "G"):
+                if key in tr.files:
+                    traces[key] = list(tr[key]) if mode == "multi" else tr[key]
 
     cell_recordings = None
     if files.get("cell_recordings"):
@@ -119,6 +124,10 @@ def _load_from_manifest(manifest_path: Path) -> Dict[str, Any]:
         results["cell_recordings"] = cell_recordings
     if cell_recordings_by_trial is not None:
         results["cell_recordings_by_trial"] = cell_recordings_by_trial
+    for key in ("syn_recordings", "syn_recordings_by_trial"):
+        if files.get(key):
+            with (run_dir / files[key]).open("rb") as f:
+                results[key] = pickle.load(f)
 
     return results
 
@@ -151,8 +160,6 @@ def load_results(path: Union[str, Path]) -> Dict[str, Any]:
 
         traces: Dict[str, Any] = {}
         spikes = None
-        cell_recordings = None
-        cell_recordings_by_trial = None
 
         if "T" in data.files:
             traces["T"] = data["T"]
@@ -162,18 +169,18 @@ def load_results(path: Union[str, Path]) -> Dict[str, Any]:
                 traces["V"] = data["V"]
             if "spikes" in data.files:
                 spikes = data["spikes"]
-            if "cell_recordings" in data.files:
-                try:
-                    cell_recordings = data["cell_recordings"].item()
-                except Exception:
-                    cell_recordings = data["cell_recordings"]
         elif mode == "multi":
             if "V_trials" in data.files:
                 traces["V"] = list(data["V_trials"])
             if "spikes" in data.files:
                 spikes = list(data["spikes"])
-            if "cell_recordings_by_trial" in data.files:
-                cell_recordings_by_trial = list(data["cell_recordings_by_trial"])
+
+        if "traces_payload" in data.files:
+            traces = data["traces_payload"].item()
+        else:
+            for key in ("I", "G"):
+                if key in data.files:
+                    traces[key] = list(data[key]) if mode == "multi" else data[key]
 
         out = {
             "mode": mode,
@@ -182,10 +189,19 @@ def load_results(path: Union[str, Path]) -> Dict[str, Any]:
             "spikes": spikes,
             "meta": meta,
         }
-        if cell_recordings is not None:
-            out["cell_recordings"] = cell_recordings
-        if cell_recordings_by_trial is not None:
-            out["cell_recordings_by_trial"] = cell_recordings_by_trial
+        for key in (
+            "cell_recordings", "cell_recordings_by_trial", "inputs", "inputs_by_trial",
+            "syn_records", "syn_records_by_trial", "syn_recordings", "syn_recordings_by_trial",
+        ):
+            if key not in data.files:
+                continue
+            value = data[key]
+            if value.shape == ():
+                out[key] = value.item()
+            elif key.endswith("_by_trial"):
+                out[key] = list(value)
+            else:
+                out[key] = value
         return out
 
     with p.open("rb") as f:

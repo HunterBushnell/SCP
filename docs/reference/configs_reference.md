@@ -1,13 +1,42 @@
 # Configs Reference
 
+The compact notebook can also remember panel choices in the project-local
+`.scp_pipeline_settings.json`. This versioned notebook-preferences file is
+separate from `.scp_project.json` navigation and the tune's scientific configs.
+It restores automatically only for the opted-in compact UI; CLI/SLURM do not
+consume it. **Save notebook defaults** never rewrites native/model configs.
+See [remembered notebook defaults](../guides/dependency_workflow.md#remembered-notebook-defaults)
+for precedence, explicit saving, reset, and Colab import/export.
+
+Project-owned navigation lives in optional `.scp_project.json`; scientific
+settings remain in the tune configs. See the
+[dependency workflow](../guides/dependency_workflow.md) for path bases and
+installed APIs. New project-owned cell configs use `workspace_layout: "project_owned"`,
+a declared `project_name`, and tune-relative
+`workspace_project_root` to preserve identity and routing outside SCP.
+
+The compact notebook's optional model-selection defaults may be Python `None`.
+Saved `.scp_project.json` navigation fills them when available; otherwise the
+UI requires Cell/Tune selection rather than implicitly choosing PV/tuned.
+For SCP-hosted work, the root navigation file can also contain an optional
+`selected_project` namespace. This remembers the project selector independently
+of `project_name` (the owning directory's label) and the bundled `selected_tune`.
+Reading settings never adds or rewrites these fields; saving is explicit.
+
 All tune-specific runtime configs live under:
 
 ```text
 cells/<CELL>/tunes/<TUNE>/cell_configs/
+projects/<PROJECT>/cells/<CELL>/tunes/<TUNE>/cell_configs/
 ```
 
 Step 1 scaffolds the default files. Step 5 reads the same files from notebooks,
 CLI runs, and SLURM jobs.
+
+The second layout is optional and additive. `project_name = None` or an omitted
+`--project` retains the original layout; an explicit tune path takes precedence.
+See [Project workspaces](../guides/project_workspaces.md). Native loader paths
+and `model_source` semantics do not change with workspace organization.
 
 ## Directory Layout
 
@@ -33,9 +62,14 @@ Generated fields:
 
 - `cell_name`: display/selection label, such as `PV` or `SST`.
 - `tune`: tune directory name, such as `tuned`.
+- `project_name`: optional project namespace for project workspaces. Legacy
+  configs can omit it. Normal readers do not add it to existing files; stored
+  metadata must not contradict a recognized project path.
 - `color`: plotting color for the cell.
 - `cell_loader`: registered adapter name. Supported values are
-  `allen_manifest` (default, with legacy Allen aliases) and `hoc_template`.
+  `allen_manifest` (default, with legacy Allen aliases), `hoc_template`, and
+  explicitly configured `python_factory`. `runtime_cell` marks a workspace
+  that requires an in-process cell override, not a reconstructible loader.
 - `paths.manifest`: Allen manifest path, relative to the tune directory.
 - `paths.hoc_template`: HOC entry source for the HOC-template loader.
 - `paths.modfiles`: optional mechanism-source directory; `null` means built-in
@@ -284,7 +318,8 @@ Cell-only current injection mode:
 - `iclamp.dur_ms`: current duration; `null` falls back to `stim_duration_ms`.
 - `iclamp.tstop_ms`: optional IClamp-specific `tstop`.
 - `iclamp.dt_ms`: optional IClamp-specific `dt`.
-- `iclamp.record_currents`: record current traces when supported.
+- `iclamp.record_currents`: collect mechanism current traces; defaults to
+  `false`. Disabled runs bypass current discovery and omit saved `I` traces.
 
 ### Cell Recording
 
@@ -316,7 +351,17 @@ Supported variable toggles:
 - `mech_conductances`
 - `mech_states`
 
+`mech_currents` and IClamp current recording retain `<mechanism>.<variable>`
+names, including `pas.i` and `extracellular.i_membrane`. The built-in
+`extracellular.i_membrane` is total membrane current density rather than a
+channel-specific contribution. Requested mechanism currents must expose a
+valid recording reference; errors identify the section and variable and retain
+native-pointer failures. Conductance/state recording behavior is unchanged.
+
 ### Synapse Recording
+
+Work in progress: implementation is paused and not release-approved; capture
+is disabled by default. See the [resume plan](../project/synaptic_recording_update.md).
 
 Optional synapse variable recording:
 
@@ -337,8 +382,14 @@ Common variable toggles:
 - `record_use`
 - `record_Pr`
 
-The config schema is present now; detailed synapse-recording machinery remains
-a planned Step 5 extension.
+Measured recording supports `group` (exact sums/means), `sample` (individual
+synapses), and `both`. Optional `n_trials` controls capture independently of Vm;
+`null` inherits `n_traces_to_save`. `sample_seed` is independent of simulation
+randomness; `record_dt_ms` defaults to simulation dt; `max_memory_mb` defaults
+to 256 and is checked before allocating recorder vectors. Per-group overrides
+use `enabled`, `mode`, `sample_per_group`, and partial `vars` toggles.
+Missing variables have explicit coverage; incomplete group aggregates are
+omitted, never silently zero-filled. See [Synaptic recording](../guides/synaptic_recording.md).
 
 ### Snapshot
 
@@ -469,7 +520,7 @@ Inhomogeneous block:
   "stop_ms": 800.0,
   "mode": "inhomogeneous_poisson",
   "source": {
-    "path": "external_data/pyrFiringRateAvg.csv",
+    "path": "cells/PN/data/pyrFiringRateAvg.csv",
     "time_col": "Time",
     "rate_col": "AvgFiringRate",
     "bin_ms": 5.0,
@@ -550,3 +601,21 @@ Common optional params:
 - `multi`: multiplier applied to the density.
 - `clip_min`: lower clip value; default `0.0`.
 - `clip_max`: optional upper clip value.
+
+## Custom construction and source roots
+
+See [Custom models](../guides/custom_models.md). In addition to Allen/HOC,
+`cell_loader` accepts `python_factory` and the metadata-only `runtime_cell`.
+Python configuration uses `paths.python_factory` plus `python_factory.callable`,
+JSON `args`/`kwargs`, and optional owner `section_map`. All non-Allen runs
+require explicit `conditions.v_init_mV` and `conditions.celsius_C`.
+
+An optional `model_source` block contains `source_root`, a nonempty list of
+root-relative `folders`, `mode` (default `copy`, or `reference`), and optional
+root-relative `working_directory`. With this block, loader and MOD paths are
+source-root-relative; copy mode resolves them inside `model_sources/`.
+Without it, existing absolute/tune-relative semantics remain unchanged.
+
+Notebook `CELL_OVERRIDE` and `RUNTIME_SIM_CONFIG` are explicit in-process
+inputs, not serialized simulation settings. Existing persisted recipes are
+preserved when an override is used. Live results are marked session-only.

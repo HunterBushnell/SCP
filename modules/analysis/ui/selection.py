@@ -56,19 +56,28 @@ def build_selection_ui(g: Dict[str, Any]) -> None:
     def _pick_value(options: list[Any], preferred: Any) -> Any:
         return preferred if preferred in options else options[0]
 
-    cells = _sanitize_options(analysis.list_cells(base_dir), g.get("cell_name"))
+    projects = analysis.list_projects(base_dir)
+    project_value = str(g.get("project_name") or "")
+    if project_value and project_value not in projects:
+        projects = [project_value, *projects]
+    project_dd = widgets.Dropdown(
+        options=[("Bundled cells", ""), *((name, name) for name in projects)],
+        value=project_value,
+        description="Project",
+    )
+    cells = _sanitize_options(analysis.list_cells(base_dir, project_name=project_value or None), g.get("cell_name"))
     cell_dd = widgets.Dropdown(
         options=cells,
         value=_pick_value(cells, g.get("cell_name")),
         description="Cell",
     )
-    tunes = _sanitize_options(analysis.list_tunes(base_dir, cell_dd.value), g.get("tunes_dir"))
+    tunes = _sanitize_options(analysis.list_tunes(base_dir, cell_dd.value, project_name=project_value or None), g.get("tunes_dir"))
     tunes_dd = widgets.Dropdown(
         options=tunes,
         value=_pick_value(tunes, g.get("tunes_dir")),
         description="Tunes",
     )
-    models = _sanitize_options(analysis.list_models(base_dir, cell_dd.value, tunes_dd.value), g.get("model_dir"))
+    models = _sanitize_options(analysis.list_models(base_dir, cell_dd.value, tunes_dd.value, project_name=project_value or None), g.get("model_dir"))
     model_dd = widgets.Dropdown(
         options=models,
         value=_pick_value(models, g.get("model_dir")),
@@ -96,7 +105,11 @@ def build_selection_ui(g: Dict[str, Any]) -> None:
     selection_help_btn.layout = widgets.Layout(width="80px", flex="0 0 auto")
 
     def _refresh_runs(*_):
-        base = Path(g.get("CELLS_DIR")) / cell_dd.value / tunes_dd.value / model_dd.value / "output_data"
+        if not g.get("tune_dir_override") and not all((cell_dd.value, tunes_dd.value, model_dd.value)):
+            compare_list_sel.options = []
+            compare_list_sel.value = ()
+            return
+        base = get_selection_from_globals(g)["base"]
         names = [analysis.run_label(p) for p in analysis.collect_run_candidates(base)]
         options: list[tuple[str, str]] = [(n, n) for n in names]
         options.extend(_compare_list_dir_options(g, base_dir))
@@ -105,16 +118,34 @@ def build_selection_ui(g: Dict[str, Any]) -> None:
         compare_list_sel.value = tuple([n for n in compare_list_sel.value if n in valid_vals])
 
     def _refresh_models(*_):
+        previous = model_dd.value
         models = _sanitize_options(
-            analysis.list_models(base_dir, cell_dd.value, tunes_dd.value),
+            analysis.list_models(base_dir, cell_dd.value, tunes_dd.value, project_name=project_dd.value or None),
             g.get("model_dir"),
         )
         model_dd.options = models
-        if model_dd.value not in model_dd.options:
-            model_dd.value = _pick_value(models, g.get("model_dir"))
+        model_dd.value = _pick_value(models, previous if previous in models else g.get("model_dir"))
         _refresh_runs()
 
-    cell_dd.observe(_refresh_models, names="value")
+    def _refresh_tunes(*_):
+        previous = tunes_dd.value
+        tunes = _sanitize_options(
+            analysis.list_tunes(base_dir, cell_dd.value, project_name=project_dd.value or None),
+            g.get("tunes_dir"),
+        )
+        tunes_dd.options = tunes
+        tunes_dd.value = _pick_value(tunes, previous if previous in tunes else g.get("tunes_dir"))
+        _refresh_models()
+
+    def _refresh_cells(*_):
+        previous = cell_dd.value
+        cells = _sanitize_options(analysis.list_cells(base_dir, project_name=project_dd.value or None), g.get("cell_name"))
+        cell_dd.options = cells
+        cell_dd.value = _pick_value(cells, previous if previous in cells else g.get("cell_name"))
+        _refresh_tunes()
+
+    project_dd.observe(_refresh_cells, names="value")
+    cell_dd.observe(_refresh_tunes, names="value")
     tunes_dd.observe(_refresh_models, names="value")
     model_dd.observe(_refresh_runs, names="value")
 
@@ -124,11 +155,10 @@ def build_selection_ui(g: Dict[str, Any]) -> None:
 
     compare_list_clear_btn.on_click(_clear_compare_list)
 
-    _refresh_runs()
-
     save_plots_cb = widgets.Checkbox(value=bool(g.get("save_plots")), description="Save plots")
     save_analysis_cb = widgets.Checkbox(value=bool(g.get("save_analysis")), description="Save analysis JSON")
 
+    g["project_dd"] = project_dd
     g["cell_dd"] = cell_dd
     g["tunes_dd"] = tunes_dd
     g["model_dd"] = model_dd
@@ -138,11 +168,13 @@ def build_selection_ui(g: Dict[str, Any]) -> None:
     g["compare_list_paths_txt"] = compare_list_paths_txt
     g["compare_paths_cb"] = compare_paths_cb
 
+    _refresh_runs()
+
     selection_help_btn.on_click(lambda *_: _print_help(out_selection, HELP_SELECTION))
     compare_list_paths_txt.disabled = not compare_paths_cb.value
     compare_paths_cb.observe(lambda *_: setattr(compare_list_paths_txt, "disabled", not compare_paths_cb.value), names="value")
 
-    display(widgets.HBox([cell_dd, tunes_dd, model_dd]))
+    display(widgets.HBox([project_dd, cell_dd, tunes_dd, model_dd]))
     display(widgets.HBox([compare_list_sel, compare_list_clear_btn]))
     display(compare_list_paths_txt)
     display(widgets.HBox([save_plots_cb, save_analysis_cb, compare_paths_cb, selection_help_btn]))

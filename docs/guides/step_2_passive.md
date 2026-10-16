@@ -45,15 +45,18 @@ use the fit JSON referenced by its manifest.
 use. The notebook can:
 
 - add the SCP checkout to `sys.path`,
-- locate or automatically clone a fresh ACT checkout only when ACT-dependent
+- resolve the environment-installed ACT package only when ACT-dependent
   work is selected (locally or in Colab),
 - compile mechanisms through `nrnivmodl`,
 - load the selected tune,
 - run the passive protocol.
 
-The normal passive protocol does not need ACT. **Compute ACT proposal** is the
-action that triggers ACT resolution/installation when the selected target mode
-does not already require ACT-based extraction.
+The normal passive protocol does not need ACT. Install ACT once with the
+suggested `.[act]` extra or `python -m pip install -r requirements-act.txt` and
+restart the kernel. **Compute ACT proposal** triggers its import/API validation
+when the selected target mode does not already require ACT-based extraction.
+Only passive helpers are imported here, not the optimizer. No fixed checkout
+path or automatic download is required; see [installation](../installation.md).
 
 The root `2_passive.ipynb` is the workflow to use for local and Colab runs.
 
@@ -232,3 +235,11 @@ Step 2 does not create a pipeline run under `output_data/`.
   passive check.
 - **Benign NEURON warnings**: some ADB loaders print mechanism/ion warnings
   during build. Treat them as non-blocking unless the cell fails to build or run.
+
+## Adopted cells
+
+The optional `CELL_OVERRIDE`/`RUNTIME_SIM_CONFIG` block adopts a cell created
+in this kernel, without Step 1 reconstruction or implicit targets. Select its
+own workspace and provide explicit conditions. Recreate it in a new kernel;
+manual in-memory changes are not a saved construction recipe. See
+[Custom models](custom_models.md).

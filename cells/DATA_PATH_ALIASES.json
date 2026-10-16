@@ -1,0 +1,18 @@
+{
+  "format_version": 1,
+  "description": "Byte-identical relocations for historical saved configs; existing files take precedence.",
+  "aliases": {
+    "external_data/pyrFiringRateAvg.csv": {
+      "path": "cells/PN/data/pyrFiringRateAvg.csv",
+      "sha256": "fe8f98657a38fe810dc84ddef980b1c8a218e6680a5c3e9ff243967361961d1d"
+    },
+    "external_data/PVFiringRateAvg.csv": {
+      "path": "cells/PV/data/PVFiringRateAvg.csv",
+      "sha256": "090d3d23e7a7f497543a87313428017f16d2c6182a5f14747c1465b56c116fa0"
+    },
+    "external_data/SSTFiringRateAvg.csv": {
+      "path": "cells/SST/data/SSTFiringRateAvg.csv",
+      "sha256": "6dfcd646feeead94ce75b4ee5e923ccf2bf6de7e6db476fc85ebf9c15b828206"
+    }
+  }
+}

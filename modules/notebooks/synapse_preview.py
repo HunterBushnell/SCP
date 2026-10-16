@@ -271,7 +271,7 @@ def show_synapse_preview(
         print(f"  {group}: {len(records.get(group, []) or [])} synapses")
 
     if show_table:
-        from modules.analysis import analysis
+        from scp_pipeline.analysis import analysis
 
         summary = syn_state.get("summary")
         if not isinstance(summary, dict):
@@ -311,7 +311,7 @@ def show_synapse_preview(
             subplot_size=figsize,
         )
         if plot_density and cell is not None:
-            from modules.analysis import plotting
+            from scp_pipeline.analysis import plotting
 
             plotting.plot_syn_records(
                 cell,

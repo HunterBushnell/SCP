@@ -13,15 +13,15 @@ from matplotlib.collections import LineCollection, PathCollection, PolyCollectio
 from pathlib import Path
 import textwrap
 
-from modules import run_sim
-from modules.input_generation import inputs
-from modules.input_generation import sampling as input_sampling
+from scp_pipeline import run_sim
+from scp_pipeline.input_generation import inputs
+from scp_pipeline.input_generation import sampling as input_sampling
 from .. import analysis, output_metrics as output_metrics_core, plotting
 
 HELP_SELECTION = textwrap.dedent(
     """
     Selection UI
-    - Cell/Tune/Model: choose which output_data tree to browse.
+    - Project/Cell/Tune/Model: choose which output_data tree to browse. Bundled cells preserve the original cells/ scope.
     - Compare list: multi-select run folders to plot/compare.
     - Compare paths: comma-separated curve files. Syntax: path@shift:scale;key=val
       Keys: color, label, linestyle, shift, scale (shift in ms, scale is multiplicative).
@@ -129,7 +129,7 @@ HELP_EXTRA = textwrap.dedent(
     - Input sampling: synthesize input curves from synapse configs.
     - Synapse plots: summarize and plot saved synapse weights/distances from Step 5 outputs.
     - Snapshot compare: compare notebook vs slurm outputs.
-    - Recording tables: summarize cell-recorded traces and total synaptic I/G.
+    - Recording tables: summarize measured cell/synaptic traces with explicit aggregation scope.
     """
 ).strip()
 
@@ -164,8 +164,9 @@ def _coerce_run_path(path_val: Any, base_dir: Path) -> Optional[Path]:
     p = Path(str(path_val)).expanduser()
     if not p.is_absolute():
         repo_root = analysis.find_scp_root(base_dir)
-        if p.parts and p.parts[0] in ("external_data", "cells"):
-            p = (repo_root / p).resolve()
+        if p.parts and p.parts[0] in ("external_data", "cells", "projects"):
+            from scp_pipeline.data_paths import resolve_data_alias
+            p = resolve_data_alias(p, repo_root)
         else:
             p = (base_dir / p).resolve()
     return p
@@ -2253,7 +2254,7 @@ def run_output_plots(
                     linestyle_override = linestyles_override[idx] if idx < len(linestyles_override) else None
                     curves.append(curve)
                     isi_curves.append(isi_curve)
-                    labels.append(label_override or analysis.run_label(path))
+                    labels.append(label_override or analysis.comparison_run_label(path))
                     colors.append(color_override or (res.get("sim_cfg", {}) or {}).get("color", None))
                     linestyles.append(linestyle_override)
                     sim_cfgs.append(_sim_cfg_with_shifted_stim(res.get("sim_cfg", {}) or {}, shift_ms))
@@ -2533,8 +2534,8 @@ def run_output_plots(
         if curve_only_a and curve_only_b and (run_a is None or run_b is None):
             print("Comparison disabled (set Compare A/B to a run name or curve path).")
             return _payload()
-        label_a = analysis.run_label(run_a) if not curve_only_a else Path(run_a).stem
-        label_b = analysis.run_label(run_b) if not curve_only_b else Path(run_b).stem
+        label_a = analysis.comparison_run_label(run_a) if not curve_only_a else Path(run_a).stem
+        label_b = analysis.comparison_run_label(run_b) if not curve_only_b else Path(run_b).stem
         export_run_label = f"{label_a}_vs_{label_b}"
         if res_a is not None:
             smooth_mode = (res_a.get("sim_cfg", {}) or {}).get("avg_rate_curve_smooth_mode", "center")
@@ -3298,8 +3299,8 @@ def run_input_plots(
             print("Comparison disabled (missing input data in one or more runs).")
             return _payload()
 
-        label_a = analysis.run_label(run_a)
-        label_b = analysis.run_label(run_b)
+        label_a = analysis.comparison_run_label(run_a)
+        label_b = analysis.comparison_run_label(run_b)
         export_run_label = f"{label_a}_vs_{label_b}"
         group_colors = analysis.merge_group_colors(res_a, res_b)
         plot_window_input_compare, plot_window_warn = _resolve_plot_window_for_opts(
@@ -3523,7 +3524,7 @@ def run_output_metrics(
                     if not curve:
                         continue
                     label_override = labels_override[idx] if idx < len(labels_override) else None
-                    label = label_override or analysis.run_label(path)
+                    label = label_override or analysis.comparison_run_label(path)
                     sim_cfg = res.get("sim_cfg", {}) or {}
 
                 metrics_map[label] = _compute_output_metrics_with_spread(
@@ -3568,14 +3569,14 @@ def run_output_metrics(
         sim_cfg_a = res_a.get("sim_cfg", {}) if res_a else _default_sim_cfg_for_curve(curve_a)
         sim_cfg_b = res_b.get("sim_cfg", {}) if res_b else _default_sim_cfg_for_curve(curve_b)
         metrics_map = {
-            analysis.run_label(run_a) if not curve_only_a else Path(run_a).stem: _compute_output_metrics_with_spread(
+            analysis.comparison_run_label(run_a) if not curve_only_a else Path(run_a).stem: _compute_output_metrics_with_spread(
                 curve_a,
                 sim_cfg_a or {},
                 opts,
                 results=None if curve_only_a else res_a,
                 **metric_overrides,
             ),
-            analysis.run_label(run_b) if not curve_only_b else Path(run_b).stem: _compute_output_metrics_with_spread(
+            analysis.comparison_run_label(run_b) if not curve_only_b else Path(run_b).stem: _compute_output_metrics_with_spread(
                 curve_b,
                 sim_cfg_b or {},
                 opts,
@@ -3712,7 +3713,7 @@ def _collect_output_metric_distributions(
                     sim_cfg = res.get("sim_cfg", {}) or {}
                     source = "run"
                     label = labels_override[idx] if idx < len(labels_override) else None
-                    label = label or analysis.run_label(path)
+                    label = label or analysis.comparison_run_label(path)
                     color_val = _extract_output_color_from_results(res) or color_override
                 sim_cfg_metrics = _sim_cfg_with_shifted_stim(sim_cfg, shift_ms)
                 summary = _compute_output_metrics(curve, sim_cfg_metrics, opts, **metric_overrides)
@@ -3762,8 +3763,8 @@ def _collect_output_metric_distributions(
             return payload
         sim_cfg_a = res_a.get("sim_cfg", {}) if res_a else _default_sim_cfg_for_curve(curve_a)
         sim_cfg_b = res_b.get("sim_cfg", {}) if res_b else _default_sim_cfg_for_curve(curve_b)
-        label_a = analysis.run_label(run_a) if not curve_only_a else Path(run_a).stem
-        label_b = analysis.run_label(run_b) if not curve_only_b else Path(run_b).stem
+        label_a = analysis.comparison_run_label(run_a) if not curve_only_a else Path(run_a).stem
+        label_b = analysis.comparison_run_label(run_b) if not curve_only_b else Path(run_b).stem
         payload["by_label"] = {
             str(label_a): {
                 "summary": _compute_output_metrics(curve_a, sim_cfg_a or {}, opts, **metric_overrides),

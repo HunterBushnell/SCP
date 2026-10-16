@@ -18,19 +18,21 @@ def _sha256_file(path: Path) -> str:
 
 
 def _resolve_tune_path(sim_cfg: Dict[str, Any]) -> Optional[Path]:
-    tune_dir = sim_cfg.get("tune_dir")
-    if tune_dir:
-        try:
-            return Path(str(tune_dir)).expanduser().resolve()
-        except Exception:
-            return None
+    from scp_pipeline.workspaces import saved_namespace_tune_dir
 
-    cell = sim_cfg.get("cell")
-    tune = sim_cfg.get("tune")
-    if cell and tune:
-        base = Path(__file__).resolve().parents[2]
-        return base / "cells" / str(cell) / "tunes" / str(tune)
-    return None
+    return saved_namespace_tune_dir(sim_cfg)
+
+
+def _result_filename(sim_cfg: Dict[str, Any], run_stem: str, suffix: str) -> str:
+    """Label namespaced results while retaining historical global filenames."""
+    from scp_pipeline.workspaces import result_workspace_identity
+
+    identity = result_workspace_identity({"sim_cfg": sim_cfg})
+    cell = identity.get("cell_name") or sim_cfg.get("cell", "cell")
+    tune = identity.get("tune_name") or sim_cfg.get("tune", "tune")
+    project = identity.get("project_name")
+    prefix = f"{project}_" if project is not None else ""
+    return f"{prefix}{cell}_{tune}_{run_stem}{suffix}"
 
 
 def _find_fit_json_path(sim_cfg: Dict[str, Any]) -> Optional[Path]:
@@ -39,7 +41,7 @@ def _find_fit_json_path(sim_cfg: Dict[str, Any]) -> Optional[Path]:
         return None
 
     try:
-        from modules.setup.fit_json import find_fit_json
+        from scp_pipeline.setup.fit_json import find_fit_json
 
         return find_fit_json(tune_path)
     except Exception:
@@ -81,7 +83,7 @@ def _build_output_path(
     Build a unique output path based on sim_cfg and base_dir.
     Returns None if sim_cfg['output'] is None/empty.
     1) base_dir / {output_stem}/
-    2) filename: {cell}_{tune}_{output_stem}.{suffix}
+    2) filename: {project_}{cell}_{tune}_{output_stem}.{suffix}
     3) If run folder exists, append _1, _2, ... to output_stem.
     4) suffix based on sim_cfg['output_format']: 'pickle' -> .pkl
     """
@@ -95,9 +97,10 @@ def _build_output_path(
     if not output_stem:
         return None
 
-    cell = sim_cfg.get("cell", "cell")
-    tune = sim_cfg.get("tune", "tune")
     fmt = sim_cfg.get("output_format", "pickle")
+
+    from scp_pipeline.workspaces import _name
+    _name(str(output_stem), 'output_stem (use output_dir to select a directory)')
 
     base = Path(base_dir)
     base.mkdir(parents=True, exist_ok=True)
@@ -117,8 +120,7 @@ def _build_output_path(
 
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    stem = f"{cell}_{tune}_{run_stem}"
-    return run_dir / (stem + suffix)
+    return run_dir / _result_filename(sim_cfg, run_stem, suffix)
 
 
 def _json_default(obj: Any):

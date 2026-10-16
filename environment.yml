@@ -1,4 +1,7 @@
 name: scp-py311
+# Suggested Step 4 add-on after activation:
+# python -m pip install -r requirements-bmtool.txt
+# Suggested ACT add-on: python -m pip install -r requirements-act.txt
 channels:
   - conda-forge
 dependencies:

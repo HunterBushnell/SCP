@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "cell_name": "ACT_Spiker",
+  "tune": "reference",
+  "source_repository": {
+    "name": "ACT",
+    "remote": "https://github.com/V-Marco/ACT.git",
+    "commit": "2b3fdc190107b8242e3496329cfdf240abd09694"
+  },
+  "model_relationship": "ACT known-reference target model; not an exported optimization result",
+  "runtime_conditions": {
+    "celsius_C": 6.3,
+    "v_init_mV": -50.0
+  },
+  "selection_policy": "Pinned native source bytes and declared/intrinsic dependencies only; no compiled outputs, drivers, checkpoints, or network execution.",
+  "compiled_outputs_included": false,
+  "files": [
+    {
+      "source_path": "data/Spiker/orig/target_template.hoc",
+      "source_sha256": "a032ff3ce9c30b2c0ad9465bbba91a0901fb3c07c0316e9d9bdada684b728ab0",
+      "destination_path": "model/target_template.hoc",
+      "current_sha256": "a032ff3ce9c30b2c0ad9465bbba91a0901fb3c07c0316e9d9bdada684b728ab0",
+      "relationship": "exact_copy"
+    },
+    {
+      "source_path": "data/Spiker/orig/modfiles/hh_spiker.mod",
+      "source_sha256": "e5f9765bb565870a62ba788ee9fe195ffd59f3d8b3ae380d874c9d8162fd3386",
+      "destination_path": "modfiles/hh_spiker.mod",
+      "current_sha256": "e5f9765bb565870a62ba788ee9fe195ffd59f3d8b3ae380d874c9d8162fd3386",
+      "relationship": "exact_copy"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+// Deliberately invalid, non-biological fixture. Never instantiate a partial load.
+begintemplate SCPMissingMechanism
+public soma
+create soma
+proc init() {
+    soma {
+        insert scp_deliberately_missing_channel
+    }
+}
+endtemplate SCPMissingMechanism

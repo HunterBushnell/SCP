@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 import math
 import os
 
-from modules import loaders as cell_loaders
+from scp_pipeline import loaders as cell_loaders
 
 from .mechanisms import find_compiled_mechanism_dll, resolve_modfiles_dir
 from .paths import resolve_step1_paths
@@ -42,6 +42,8 @@ def validate_tune(
     validate_inputs: bool = True,
     validate_synapses: bool = True,
     allow_missing_modfiles: bool = False,
+    cell_override: Any = None,
+    runtime_sim_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Run lightweight validation checks for Step-1 output layout."""
     # Retained as an optional argument for callers using the pre-registry API.
@@ -72,22 +74,27 @@ def validate_tune(
     if isinstance(tuning, dict) and "soma_diam_multiplier" in tuning:
         tuning["soma_diam_multiplier"] = float(tuning["soma_diam_multiplier"])
 
+    sim_config = _read_json(paths.sim_config) if paths.sim_config.is_file() else {}
+    if cell_override is not None:
+        from scp_pipeline.model.runtime_cell import adopt_cell
+        from scp_pipeline.simulation.session import _merge_overrides
+        cell_config = dict(adopt_cell(cell_override, cell_config).config)
+        sim_config = _merge_overrides(dict(sim_config), runtime_sim_config)
     loader_name = cell_loaders.get_cell_loader_name(cell_config)
     checks["cell_loader"] = loader_name
-    if loader_name == "hoc_template":
+    if loader_name != "allen_manifest":
         if not paths.sim_config.is_file():
             raise FileNotFoundError(
-                "hoc_template setup requires cell_configs/sim_config.json with explicit "
+                f"{loader_name} setup requires cell_configs/sim_config.json with explicit "
                 "conditions.v_init_mV and conditions.celsius_C values."
             )
-        sim_config = _read_json(paths.sim_config)
         conditions = sim_config.get("conditions")
         if not isinstance(conditions, dict):
             raise KeyError(
-                "hoc_template sim_config.json must define a conditions object with "
+                f"{loader_name} sim_config.json must define a conditions object with "
                 "numeric v_init_mV and celsius_C values."
             )
-        from modules.simulation.current_injection import validate_required_sim_conditions
+        from scp_pipeline.simulation.current_injection import validate_required_sim_conditions
 
         validate_required_sim_conditions(cell_config, sim_config)
         checks["conditions"] = {
@@ -127,17 +134,21 @@ def validate_tune(
                 )
 
     if validate_load_cell:
-        from modules.model.load_cell import load_cell
+        from scp_pipeline.model.load_cell import load_cell
 
         with _pushd(tune_dir):
-            cell = load_cell(cell_config, base_dir=tune_dir)
+            if cell_override is not None:
+                from scp_pipeline.model import wrap_cell
+                cell = wrap_cell(cell_override)
+            else:
+                cell = load_cell(cell_config, base_dir=tune_dir)
         checks["load_cell"] = {
             "ok": True,
             "Vinit": getattr(cell, "Vinit", None),
         }
 
     if validate_inputs and validate_synapses:
-        from modules.input_generation import inputs
+        from scp_pipeline.input_generation import inputs
 
         if not paths.syn_config.is_file():
             raise FileNotFoundError(f"Missing syn_config.json at {paths.syn_config}")

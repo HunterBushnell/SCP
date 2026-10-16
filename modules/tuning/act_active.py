@@ -23,7 +23,7 @@ import warnings
 
 import numpy as np
 
-from .act_integration import ensure_act_on_syspath
+from .act_integration import import_act_active_api
 from .active import DEFAULT_BIO_FI_REFERENCE
 from .allen_nwb import DEFAULT_FI_STIMULUS_NAMES, write_allen_nwb_fi_target_csv
 from .notebook_setup import resolve_repo_root, resolve_tune_dir
@@ -54,7 +54,7 @@ DEFAULT_ACTIVE_CHANNELS = [
 
 
 def _configured_loader_name(tune_dir: Path) -> str:
-    from modules.loaders import get_cell_loader_name
+    from scp_pipeline.loaders import get_cell_loader_name
 
     for candidate in (
         tune_dir / "cell_configs" / "cell_config.json",
@@ -70,6 +70,8 @@ def _configured_loader_name(tune_dir: Path) -> str:
 
 def _warn_for_experimental_act_loader(cfg: Mapping[str, Any]) -> None:
     loader_name = str(cfg.get("cell_loader", "allen_manifest"))
+    if loader_name == 'runtime_cell':
+        raise ValueError('ACT optimization requires a saved python_factory or HOC/Allen construction recipe, not a runtime-only cell.')
     if loader_name != "allen_manifest":
         warnings.warn(
             f"ACT execution with SCP loader {loader_name!r} is experimental; "
@@ -405,7 +407,9 @@ def load_act_active_config(config_or_workspace: str | Path) -> dict[str, Any]:
     if not workspace.is_absolute():
         workspace = (path.parent / workspace).resolve()
     data["workspace"] = str(workspace)
-    data.setdefault("repo_root", str(resolve_repo_root(Path.cwd())))
+    if "repo_root" not in data:
+        from scp_pipeline.runtime import code_root
+        data["repo_root"] = str(code_root())
     data.setdefault("tune_dir", str(workspace.parent))
     return data
 
@@ -1095,8 +1099,7 @@ import json
 import os
 import sys
 
-REPO_ROOT = Path({str(repo_root)!r})
-TUNE_DIR = Path({str(tune_dir)!r})
+TUNE_DIR = (Path(__file__).resolve().parent / {os.path.relpath(tune_dir, workspace)!r}).resolve()
 CELL_NAME = {str(cell_name)!r}
 FIXED_PREDICTIONS = Path(__file__).resolve().parent / {FIXED_PREDICTIONS_NAME!r}
 
@@ -1127,10 +1130,7 @@ def _apply_fixed_predictions(cell):
 
 
 def build_cell():
-    if str(REPO_ROOT) not in sys.path:
-        sys.path.insert(0, str(REPO_ROOT))
-
-    from modules.model.load_cell import load_cell
+    from scp_pipeline.model.load_cell import load_cell
 
     cfg_path = TUNE_DIR / "cell_configs" / "cell_config.json"
     cell_config = json.loads(cfg_path.read_text(encoding="utf-8"))
@@ -1149,30 +1149,8 @@ def build_cell():
 
 
 def _import_act_api(cfg: Mapping[str, Any]) -> dict[str, Any]:
-    ensure_act_on_syspath(repo_root=Path(cfg["repo_root"]))
-    from act.cell_model import ACTCellModel
-    from act.data_processing import get_summary_features
-    from act.module import ACTModule
-    from act.simulator import ACTSimulator
-    from act.types import (
-        ConductanceOptions,
-        ConstantCurrentInjection,
-        FilterParameters,
-        OptimizationParameters,
-        SimulationParameters,
-    )
-
-    return {
-        "ACTCellModel": ACTCellModel,
-        "ACTModule": ACTModule,
-        "ACTSimulator": ACTSimulator,
-        "ConductanceOptions": ConductanceOptions,
-        "ConstantCurrentInjection": ConstantCurrentInjection,
-        "FilterParameters": FilterParameters,
-        "OptimizationParameters": OptimizationParameters,
-        "SimulationParameters": SimulationParameters,
-        "get_summary_features": get_summary_features,
-    }
+    root = cfg.get("repo_root")
+    return import_act_active_api(repo_root=Path(root) if root else None)
 
 
 def _import_workspace_builder(cfg: Mapping[str, Any]):
@@ -1195,7 +1173,7 @@ def _build_act_cell(
     module_spec: Optional[Mapping[str, Any]] = None,
     active_channels: Optional[Sequence[str]] = None,
 ) -> Any:
-    from modules.setup.mechanisms import resolve_modfiles_dir
+    from scp_pipeline.setup.mechanisms import resolve_modfiles_dir, mechanism_build_directory, compile_modfiles
 
     if active_channels is None:
         if module_spec is not None:
@@ -1206,6 +1184,12 @@ def _build_act_cell(
         else:
             active_channels = cfg.get("act_cell", {}).get("active_channels", [])
     modfiles_dir = resolve_modfiles_dir(Path(cfg["tune_dir"]).resolve())
+    if modfiles_dir is not None:
+        from scp_pipeline.loaders.source_context import within
+        tune_root = Path(cfg['tune_dir']).resolve()
+        if not within(modfiles_dir, tune_root) and modfiles_dir.is_dir():
+            compile_modfiles(tune_root, load_dll=False, allow_missing=True)
+            modfiles_dir = mechanism_build_directory(tune_root)
     cell = act_api["ACTCellModel"](
         cell_name=None,
         path_to_hoc_file=None,

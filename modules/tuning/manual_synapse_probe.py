@@ -324,9 +324,9 @@ def run_manual_synapse_probe(
 
     from neuron import h
 
-    from modules.model.geometry import cell_sections
-    from modules.notebooks.helpers import add_single_synapse_for_notebook
-    from modules.simulation.cell_runtime import run_cell
+    from scp_pipeline.model.geometry import cell_sections
+    from scp_pipeline.notebooks.helpers import add_single_synapse_for_notebook
+    from scp_pipeline.simulation.cell_runtime import run_cell
 
     spikes = _normalize_spike_times(spike_times_ms)
     existing = _nonempty_synapse_state(cell)
@@ -406,6 +406,11 @@ def run_manual_synapse_probe(
             for name in spec_params
             if isinstance(getattr(synapse, name), (int, float))
         }
+        recording = {
+            'enabled': True, 'default_mode': 'group', 'n_trials': 1,
+            'default_vars': {'i': True, 'g': False},
+        }
+        probe_synapses = {'synapses': {'probe': [synapse]}}
         single_event_traces = run_cell(
             cell,
             {
@@ -413,7 +418,9 @@ def run_manual_synapse_probe(
                 "tstart": 0.0,
                 "tstop": float(spikes[0]) + single_duration_ms,
                 "conditions": conditions,
+                'syn_recording': recording,
             },
+            syn_state=probe_synapses,
         )
 
         train_vector = h.Vector(spikes.tolist())
@@ -425,8 +432,17 @@ def run_manual_synapse_probe(
                 "tstart": 0.0,
                 "tstop": resolved_tstop_ms,
                 "conditions": conditions,
+                'syn_recording': recording,
             },
+            syn_state=probe_synapses,
         )
+        # This probe deliberately measures one identified synapse, not a
+        # cell-wide total. Keep its established metric input contract explicit.
+        for traces in (single_event_traces, train_traces):
+            payload = traces.get('syn_recordings') or {}
+            current = payload.get('groups', {}).get('probe', {}).get('aggregate', {}).get('i')
+            if current is not None:
+                traces['I'] = np.asarray(current)
         metrics = calculate_manual_synapse_metrics(
             single_event_traces=single_event_traces,
             train_traces=train_traces,

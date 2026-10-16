@@ -13,8 +13,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Sequence
 
-from modules.model.geometry import cell_sections
-from modules.model.load_cell import load_cell
+from scp_pipeline.model.geometry import cell_sections
+from scp_pipeline.model.load_cell import load_cell
 
 
 def is_scp_repo_root(path: Path) -> bool:
@@ -31,6 +31,11 @@ def find_scp_repo_root(start: Path | None = None) -> Path:
     2. Current working directory and its parents
     3. Direct child directories of cwd and cwd.parent (for parent-launched kernels)
     """
+    from scp_pipeline.runtime import code_root
+    if start is not None and (is_scp_repo_root(Path(start)) or Path(start).resolve() == code_root()):
+        return Path(start).resolve()
+    if start is None:
+        return code_root()
     env_root = os.environ.get("SCP_ROOT")
     if env_root:
         env_path = Path(env_root).expanduser().resolve()
@@ -61,12 +66,8 @@ def find_scp_repo_root(start: Path | None = None) -> Path:
 
 
 def ensure_scp_repo_on_syspath(start: Path | None = None) -> Path:
-    """Find SCP repo root and prepend it to `sys.path` if missing."""
-    repo_root = find_scp_repo_root(start=start)
-    repo_str = str(repo_root)
-    if repo_str not in sys.path:
-        sys.path.insert(0, repo_str)
-    return repo_root
+    """Compatibility resolver; named imports need no global path injection."""
+    return find_scp_repo_root(start=start)
 
 
 def resolve_external_repo(

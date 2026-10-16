@@ -28,7 +28,7 @@ def fixture_config() -> dict:
 
 class HocTemplateLoaderTests(unittest.TestCase):
     def test_registry_and_artifact_discovery(self) -> None:
-        self.assertEqual(available_cell_loaders(), ("allen_manifest", "hoc_template"))
+        self.assertEqual(available_cell_loaders(), ("allen_manifest", "hoc_template", "python_factory", "runtime_cell"))
         config = fixture_config()
         validated = validate_cell_loader_config(config, base_dir=FIXTURE_TUNE)
         discovered = discover_cell_source_artifacts(config, base_dir=FIXTURE_TUNE)
@@ -160,14 +160,13 @@ class HocTemplateLoaderTests(unittest.TestCase):
             first = load_cell(config, base_dir=tune)
             self.assertAlmostEqual(float(first.soma[0].L), 11.0)
 
-            # The second template was defined by the first load. Replacing the
-            # source with invalid HOC proves SCP does not execute that absolute
-            # path a second time in the same process.
-            hoc.write_text("this is intentionally invalid HOC\n", encoding="utf-8")
             second_config = copy.deepcopy(config)
             second_config["hoc_template"]["template_name"] = "ScpMultiTwo"
             second = load_cell(second_config, base_dir=tune)
             self.assertAlmostEqual(float(second.soma[0].L), 22.0)
+            hoc.write_text("this is intentionally invalid HOC\n", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, 'changed.*Restart'):
+                load_cell(second_config, base_dir=tune)
 
 
 if __name__ == "__main__":

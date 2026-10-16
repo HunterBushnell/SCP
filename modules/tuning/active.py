@@ -86,7 +86,7 @@ def run_active_protocol(
     sim_amps: Sequence[float],
 ) -> dict[str, Any]:
     """Run positive current-injection traces with the existing SCP helper."""
-    from modules import run_sim
+    from scp_pipeline import run_sim
 
     return run_sim.looped_current_injection(cell, dict(sim_params), list(sim_amps))
 

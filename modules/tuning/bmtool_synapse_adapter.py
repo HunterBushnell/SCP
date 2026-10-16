@@ -14,44 +14,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Sequence
 
-from modules.model.geometry import cell_sections
-from modules.notebooks.helpers import (
+from scp_pipeline.model.geometry import cell_sections
+from scp_pipeline.notebooks.helpers import (
     build_synapse_test_cell,
     ensure_scp_repo_on_syspath,
     resolve_cell_config_for_notebook,
 )
-from modules.setup.mechanisms import compile_modfiles, resolve_modfiles_dir
-from modules.tuning.external_repos import (
-    ExternalRepoSpec,
-    ensure_external_repo_checkout,
-)
-
-
-BMTOOL_REPO_URL = "https://github.com/cyneuro/bmtool.git"
-BMTOOL_ENV_VARS = (
-    "SCP_BMTOOL_PATH",
-    "SCP_BMTOOL_DIR",
-    "BMTOOL_PATH",
-    "BMTOOL_ROOT",
-)
-_BMTOOL_SPEC = ExternalRepoSpec(
-    display_name="BMTool",
-    directory_name="bmtool",
-    package_name="bmtool",
-    marker_rel=Path("bmtool") / "synapses.py",
-    repo_url=BMTOOL_REPO_URL,
-    path_env_vars=BMTOOL_ENV_VARS,
-    target_dir_env="SCP_BMTOOL_DIR",
-    repo_url_env="SCP_BMTOOL_REPO_URL",
-    repo_branch_env="SCP_BMTOOL_REPO_BRANCH",
-    auto_clone_env="SCP_AUTO_CLONE_BMTOOL",
-    canonical_path_env="SCP_BMTOOL_PATH",
-    token_env_vars=(
-        "SCP_BMTOOL_GIT_TOKEN",
-        "SCP_GIT_TOKEN",
-        "SCP_GITHUB_TOKEN",
-        "GITHUB_TOKEN",
-    ),
+from scp_pipeline.setup.mechanisms import compile_modfiles, resolve_modfiles_dir, mechanism_build_directory
+from scp_pipeline.tuning.bmtool_dependency import (
+    BMTOOL_ENV_VARS,
+    BMTOOL_REPO_URL,
+    ensure_bmtool_available,
+    import_bmtool_synapse_api,
 )
 
 
@@ -67,6 +41,15 @@ class SynapseTuningSession:
     cell: Any
     mechanism_summary: Dict[str, Any]
     bmtool_path: Optional[Path] = None
+
+    @property
+    def workspace_identity(self):
+        from scp_pipeline.workspaces import infer_workspace
+        return infer_workspace(self.tune_dir, cell_config=self.cell_config).identity
+
+    @property
+    def project_name(self):
+        return self.workspace_identity['project_name']
 
 
 @dataclass
@@ -99,26 +82,14 @@ def ensure_bmtool_on_syspath(
     target_dir: Optional[Path] = None,
     prepend: bool = True,
 ) -> Path:
-    """Resolve or action-install BMTool and add it to ``sys.path``."""
-
-    root = ensure_scp_repo_on_syspath(repo_root)
-    return ensure_external_repo_checkout(
-        _BMTOOL_SPEC,
-        repo_root=root,
+    """Compatibility wrapper; installed BMTool needs no ``sys.path`` changes."""
+    return ensure_bmtool_available(
+        repo_root=repo_root,
         auto_clone=auto_clone,
         prepend=prepend,
         target_dir=target_dir,
         repo_url=repo_url,
     )
-
-
-def import_bmtool_synapse_api(*, repo_root: Optional[Path] = None):
-    """Import and return BMTool's ``SynapseTuner`` and ``SynapseOptimizer``."""
-
-    ensure_bmtool_on_syspath(repo_root=repo_root)
-    from bmtool.synapses import SynapseOptimizer, SynapseTuner
-
-    return SynapseTuner, SynapseOptimizer
 
 
 def resolve_tune_dir(
@@ -128,16 +99,16 @@ def resolve_tune_dir(
     tune_name: str,
     tunes_parent: str = "tunes",
     tune_dir_override: Optional[str | Path] = None,
+    project_name: Optional[str] = None,
+    project_root: Optional[str | Path] = None,
+    workspace_root: Optional[str | Path] = None,
 ) -> Path:
     """Resolve a Step 4 target tune directory."""
 
-    if tune_dir_override:
-        tune_dir = Path(tune_dir_override).expanduser()
-        if not tune_dir.is_absolute():
-            tune_dir = repo_root / tune_dir
-    else:
-        tune_dir = repo_root / "cells" / cell_name / tunes_parent / tune_name
-    tune_dir = tune_dir.resolve()
+    from scp_pipeline.workspaces import resolve_workspace
+    tune_dir = resolve_workspace(repo_root=repo_root, project_name=project_name,
+        cell_name=cell_name, tune_name=tune_name, tunes_parent=tunes_parent,
+        tune_dir_override=tune_dir_override, project_root=project_root, workspace_root=workspace_root).tune_dir
     if not tune_dir.is_dir():
         raise FileNotFoundError(f"Tune directory not found: {tune_dir}")
     return tune_dir
@@ -153,6 +124,11 @@ def prepare_scp_synapse_tuning(
     recompile_modfiles: bool = False,
     load_compiled_dll: bool = True,
     resolve_bmtool: bool = False,
+    cell_override: Any = None,
+    runtime_sim_config: Optional[Dict[str, Any]] = None,
+    project_name: Optional[str] = None,
+    project_root: Optional[str | Path] = None,
+    workspace_root: Optional[str | Path] = None,
 ) -> SynapseTuningSession:
     """Compile/load mechanisms and build an SCP cell for BMTool tuning.
 
@@ -163,26 +139,36 @@ def prepare_scp_synapse_tuning(
     """
 
     root = ensure_scp_repo_on_syspath(repo_root)
-    if not cell_name and not tune_dir_override:
+    if not cell_name and not tune_dir_override and project_root is None:
         raise ValueError(
             "prepare_scp_synapse_tuning requires cell_name or tune_dir_override; "
             "SCP does not choose a model default for Step 4."
         )
     requested_cell_name = str(cell_name or "")
+    if cell_override is not None:
+        if recompile_modfiles:
+            raise ValueError('Compile before constructing a live cell; restart/recreate it instead of recompiling a loaded model.')
+        from scp_pipeline.model.runtime_cell import wrap_cell, prepare_runtime_workspace
+        from scp_pipeline.workspaces import resolve_workspace
+        workspace = resolve_workspace(repo_root=root, project_name=project_name, cell_name=cell_name,
+            tune_name=tune_name, tunes_parent=tunes_parent, tune_dir_override=tune_dir_override,
+            project_root=project_root, workspace_root=workspace_root).tune_dir
+        prepare_runtime_workspace(workspace, wrap_cell(cell_override), runtime_sim_config)
     tune_dir = resolve_tune_dir(
         repo_root=root,
         cell_name=requested_cell_name,
         tune_name=tune_name,
         tunes_parent=tunes_parent,
+        project_name=project_name,
         tune_dir_override=tune_dir_override,
+        project_root=project_root, workspace_root=workspace_root,
     )
     cell_config = resolve_cell_config_for_notebook(requested_cell_name, tune_dir=tune_dir)
-    resolved_cell_name = str(
-        cell_config.get("cell_name")
-        or requested_cell_name
-        or tune_dir.parent.parent.name
-    )
-    mechanism_summary = compile_modfiles(
+    from scp_pipeline.workspaces import infer_workspace
+    workspace = infer_workspace(tune_dir, cell_config=cell_config,
+                                cell_name=cell_name, project_name=project_name)
+    resolved_cell_name = workspace.cell_name
+    mechanism_summary = {'status': 'skipped', 'reason': 'supplied cell already constructed'} if cell_override is not None else compile_modfiles(
         tune_dir,
         recompile=recompile_modfiles,
         load_dll=load_compiled_dll,
@@ -191,10 +177,14 @@ def prepare_scp_synapse_tuning(
     )
 
     cell_config.setdefault("paths", {})
-    cell_config["paths"].setdefault("tune_dir", str(tune_dir))
-    cell_config.setdefault("tune_dir", str(tune_dir))
+    cell_config["paths"]["tune_dir"] = str(tune_dir)
+    cell_config["tune_dir"] = str(tune_dir)
 
-    cell = build_synapse_test_cell(cell_config, base_dir=tune_dir)
+    if cell_override is not None:
+        from scp_pipeline.model.runtime_cell import adopt_cell
+        cell = adopt_cell(cell_override, cell_config)
+    else:
+        cell = build_synapse_test_cell(cell_config, base_dir=tune_dir)
 
     if resolve_bmtool:
         warnings.warn(
@@ -208,7 +198,7 @@ def prepare_scp_synapse_tuning(
     return SynapseTuningSession(
         repo_root=root,
         cell_name=resolved_cell_name,
-        tune_name=tune_name,
+        tune_name=workspace.tune_name,
         tune_dir=tune_dir,
         cell_config=cell_config,
         cell=cell,
@@ -289,7 +279,7 @@ def create_scp_synapse_tuner(
 
     SynapseTuner, _ = import_bmtool_synapse_api(repo_root=session.repo_root)
     modfiles_dir = resolve_modfiles_dir(session.tune_dir, session.cell_config)
-    mechanisms_dir = modfiles_dir if modfiles_dir is not None else session.tune_dir
+    mechanisms_dir = mechanism_build_directory(session.tune_dir, session.cell_config) if modfiles_dir is not None else session.tune_dir
 
     return SynapseTuner(
         mechanisms_dir=str(mechanisms_dir),

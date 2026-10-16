@@ -10,6 +10,11 @@ Entry points:
 - CLI: [`run_pipeline.py`](../../run_pipeline.py)
 - SLURM: [`run_slurm.sh`](../../run_slurm.sh)
 
+Select `project_name` in notebooks, `--project` with CLI cell/tune shorthand, or
+`PROJECT` with SLURM `CELL`/`TUNE` to use a project workspace. An explicit tune
+path wins. All layouts use this same backend, and public PV notebook defaults
+remain unchanged. See [Project workspaces](project_workspaces.md).
+
 ## Scope
 
 Use Step 5 after the selected tune has been prepared by Step 1 and reviewed or
@@ -74,6 +79,7 @@ When saving is enabled, runs are written under:
 
 ```text
 cells/<CELL>/tunes/<TUNE>/output_data/<output_stem>/
+projects/<PROJECT>/cells/<CELL>/tunes/<TUNE>/output_data/<output_stem>/
 ```
 
 Typical files include:
@@ -241,7 +247,8 @@ Common user-facing fields include:
 - `plots_profile`: auto-plot profile.
 - `iclamp`: current-injection mode.
 - `cell_recording`: optional extra cell-variable recording.
-- `syn_recording`: optional synapse-recording config scaffold.
+- `syn_recording`: paused work-in-progress measured synaptic capture, disabled
+  by default; see [Synaptic recording](synaptic_recording.md) before enabling it.
 - `snapshot`: richer reproducibility/debug sidecars.
 
 See `../reference/configs_reference.md` for the full config reference.
@@ -429,3 +436,14 @@ See `../advanced/cli_slurm.md`.
 - Check notebook override values from **5.1**.
 - Check `seed`, `randomness_mode`, `trial_randomness`, and `trial_offset`.
 - Enable `snapshot.enabled` for deeper debugging.
+
+## Live cells and external builders
+
+The optional hooks use the supplied object in-process and create only missing
+workspace configs. Enable IClamp explicitly for cell-only runs. Runtime-only
+saves are labeled nonreconstructible and include a descriptive pre-run cell
+summary; an unused workspace loader is not attributed to the run.
+
+Configured Python/HOC/Allen models still reconstruct through the common loader;
+compact configured runs remain fresh-process. External MOD preparation never
+builds in the upstream source directory. See [Custom models](custom_models.md).

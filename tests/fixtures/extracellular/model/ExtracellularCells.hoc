@@ -1,0 +1,56 @@
+// Synthetic, non-biological cells exercising built-in current recording.
+begintemplate ScpExtracellularCell
+
+public soma, branch, somatic, basal, apical, axonal, all
+create soma[1], branch[1]
+objref somatic, basal, apical, axonal, all
+
+proc init() {
+    somatic = new SectionList()
+    basal = new SectionList()
+    all = new SectionList()
+    // Optional apical and axonal lists deliberately remain null.
+    soma[0] {
+        L = 20
+        diam = 20
+        nseg = 1
+        insert pas
+        g_pas = 0.0001
+        e_pas = -68
+        insert extracellular
+        somatic.append()
+        all.append()
+    }
+    branch[0] {
+        L = 100
+        diam = 2
+        nseg = 3
+        insert pas
+        g_pas = 0.0001
+        e_pas = -68
+        insert extracellular
+        basal.append()
+        all.append()
+    }
+    connect branch[0](0), soma[0](1)
+}
+
+endtemplate ScpExtracellularCell
+
+begintemplate ScpExtracellularAlternative
+public soma, somatic, all
+create soma[1]
+objref somatic, all
+proc init() {
+    somatic = new SectionList()
+    all = new SectionList()
+    soma[0] {
+        L = 40
+        diam = 40
+        insert pas
+        insert extracellular
+        somatic.append()
+        all.append()
+    }
+}
+endtemplate ScpExtracellularAlternative

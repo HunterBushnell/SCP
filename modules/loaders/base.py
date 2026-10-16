@@ -45,6 +45,14 @@ def coerce_section_collection(value: Any) -> tuple[Any, ...]:
 
 
 def _section_identity(section: Any) -> tuple[str, Any]:
+    # Distinct Python-created Sections may have identical names. NEURON's
+    # native hash remains stable even when a SectionList returns a new wrapper.
+    try:
+        from neuron import nrn
+        if isinstance(section, nrn.Section):
+            return ("section", hash(section))
+    except ImportError:
+        pass
     try:
         return ("name", str(section.name()))
     except Exception:

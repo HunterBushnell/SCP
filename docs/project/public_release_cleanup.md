@@ -4,6 +4,31 @@ Use this checklist after a research cycle and before publishing a new SCP
 snapshot. The cleanup commands are dry-run by default so the archive inventory
 can be reviewed before any files move or are deleted.
 
+## Lightweight lab-use commit checkpoint
+
+A code/documentation update does not require archiving research runs or deleting
+compiled caches. Leave ignored project data and production sources in place.
+Before committing:
+
+- Back up locally edited notebooks, then clear saved outputs/execution counts,
+  use the `scp-py311` kernelspec, and remove local research selections from the
+  public copies. Compact selection may remain blank; detailed notebooks use PV.
+- Keep checkout-local `.scp_project.json` and `.scp_pipeline_settings.json`
+  private. Project-owned repositories can track their own settings separately.
+- Include new package modules, resources, tests, docs, and intended example/data
+  changes, not just files already tracked by Git. Review intentional removals
+  from earlier project migrations; do not force-add ignored private destinations.
+- Run the checks in section 4, the installed CLI help paths, and the copied
+  notebook/package tests. The optional ACT/BMTool integrations need validation
+  only when used; core single-cell characterization must remain independent.
+- Read the [roadmap](roadmap.md) for known limitations. In particular, the live
+  Preview copy feedback issue remains open, ACT active optimization is
+  experimental with a known upstream defect, and detailed synaptic recording
+  remains paused/default-off. Passing unit tests do not close those reviews.
+
+Do not run the archive cleanup below solely to make `git status` shorter.
+This checkpoint does not commit, tag, push, or create a release.
+
 ## 1. Review the worktree
 
 ```bash

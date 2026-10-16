@@ -56,8 +56,9 @@ def default_cell_config(
     cell_loader: str = "allen_manifest",
     loader_paths: Optional[Mapping[str, Any]] = None,
     loader_config: Optional[Mapping[str, Any]] = None,
+    project_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    from modules.loaders import get_cell_loader_name
+    from scp_pipeline.loaders import get_cell_loader_name
 
     loader_name = get_cell_loader_name({"cell_loader": cell_loader or "allen_manifest"})
     paths: Dict[str, Any] = {}
@@ -73,6 +74,8 @@ def default_cell_config(
         "cell_loader": loader_name,
         "paths": paths,
     }
+    if project_name is not None:
+        config["project_name"] = project_name
     # Soma rescaling is an Allen-adapter compatibility option, not part of the
     # model-neutral cell contract. Object-owned loaders preserve native geometry.
     if loader_name == "allen_manifest":
@@ -80,7 +83,7 @@ def default_cell_config(
         config["tuning"] = {"soma_diam_multiplier": multiplier}
     if loader_config:
         for key, value in loader_config.items():
-            if key in {"cell_name", "tune", "color", "cell_loader", "paths", "tuning"}:
+            if key in {"cell_name", "tune", "project_name", "workspace_identity", "color", "cell_loader", "paths", "tuning"}:
                 raise ValueError(f"loader_config cannot replace reserved cell-config key {key!r}")
             config[str(key)] = value
     return config
@@ -169,6 +172,10 @@ def default_sim_config(
         },
         "syn_recording": {
             "enabled": False,
+            "n_trials": None,
+            "sample_seed": 0,
+            "record_dt_ms": None,
+            "max_memory_mb": 256.0,
             "default_mode": "group",
             "default_sample_per_group": 10,
             "default_vars": {
@@ -342,7 +349,7 @@ def _default_input_blocks_template() -> list[Dict[str, Any]]:
             "stop_ms": 800.0,
             "mode": "inhomogeneous_poisson",
             "source": {
-                "path": "external_data/pyrFiringRateAvg.csv",
+                "path": "data/input_rates.csv",
                 "time_col": "Time",
                 "rate_col": "AvgFiringRate",
                 "bin_ms": 5.0,

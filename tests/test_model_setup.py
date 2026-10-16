@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from modules.setup import discover_hoc_templates
 from modules.setup.model_setup import resolve_step1_model_setup
 from modules.setup.step1_prepare import prepare_base_configs
 
@@ -24,6 +25,71 @@ endtemplate AutoCell
 
 
 class Step1ModelSetupTests(unittest.TestCase):
+    def test_discovery_lists_templates_and_files_without_executing_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tune = Path(tmp)
+            model = tune / "model"
+            model.mkdir()
+            shared = model / "Shared.HOC"
+            # This is deliberately not executable HOC; discovery only reads it.
+            shared.write_text(
+                "this is not executable HOC\n"
+                "begintemplate Zebra\nendtemplate Zebra\n"
+                "begintemplate Alpha\nendtemplate Alpha\n",
+                encoding="utf-8",
+            )
+            (model / "Other.hoc").write_text(HOC_SOURCE, encoding="utf-8")
+            for ignored_dir in ("output_data", "model_artifacts", "x86_64", "cell_configs"):
+                archived = tune / ignored_dir / "nested"
+                archived.mkdir(parents=True)
+                (archived / "Ignored.hoc").write_text(HOC_SOURCE, encoding="utf-8")
+            before = {path: path.read_bytes() for path in tune.rglob("*.hoc")}
+            before[shared] = shared.read_bytes()
+
+            expected = [
+                {"path": "model/Other.hoc", "template_name": "AutoCell"},
+                {"path": "model/Shared.HOC", "template_name": "Alpha"},
+                {"path": "model/Shared.HOC", "template_name": "Zebra"},
+            ]
+            self.assertEqual(discover_hoc_templates(tune), expected)
+            self.assertEqual(discover_hoc_templates(str(tune)), expected)
+            with self.assertRaises(ValueError) as caught:
+                resolve_step1_model_setup(tune)
+            for candidate in expected:
+                self.assertIn(f"{candidate['path']}:{candidate['template_name']}", str(caught.exception))
+            self.assertEqual(before, {path: path.read_bytes() for path in before})
+
+    def test_discovery_handles_empty_and_absent_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tune = Path(tmp)
+            self.assertEqual(discover_hoc_templates(tune), [])
+            self.assertEqual(discover_hoc_templates(tune / "absent"), [])
+            self.assertFalse((tune / "absent").exists())
+
+    def test_explicit_multitemplate_selection_is_saved_and_reused(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tune = Path(tmp)
+            model = tune / "model"
+            model.mkdir()
+            hoc = model / "Shared.hoc"
+            source = HOC_SOURCE + HOC_SOURCE.replace("AutoCell", "OtherCell")
+            hoc.write_text(source, encoding="utf-8")
+            setup = resolve_step1_model_setup(tune, overrides={
+                "cell_loader": "hoc_template",
+                "paths": {"hoc_template": "model/Shared.hoc", "modfiles": None},
+                "hoc_template": {"template_name": "OtherCell", "constructor_args": []},
+            })
+            prepare_base_configs(
+                tune_dir=tune, cell_name="Synthetic", tune_name="orig", specimen_id=None,
+                cell_loader=setup["cell_loader"], loader_paths=setup["loader_paths"],
+                loader_config=setup["loader_config"],
+            )
+            rerun = resolve_step1_model_setup(tune)
+            self.assertEqual(rerun["discovery"], "cell_config")
+            self.assertEqual(rerun["loader_paths"]["hoc_template"], "model/Shared.hoc")
+            self.assertEqual(rerun["loader_config"]["hoc_template"]["template_name"], "OtherCell")
+            self.assertEqual(hoc.read_text(encoding="utf-8"), source)
+
     def test_fresh_staged_hoc_model_is_discovered(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tune = Path(tmp)

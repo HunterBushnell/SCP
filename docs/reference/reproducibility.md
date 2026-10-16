@@ -1,5 +1,10 @@
 # Reproducibility
 
+Project-owned workflows can retain all scientific inputs and outputs outside
+the code checkout. New results record SCP's installed version and available Git
+revision, while `.scp_project.json` stores relocatable navigation separately
+from tune configs. See the [dependency workflow](../guides/dependency_workflow.md).
+
 ## Randomness Controls
 
 Public configs should use:
@@ -85,3 +90,31 @@ Append mode can add results to an existing run:
 
 When comparing runs, prefer saved sidecars over the current working configs,
 because the working configs may have changed after the run was created.
+
+## Project identity
+
+Project tunes use the same saving and randomness controls as legacy tunes.
+Saved `workspace_identity` records `project_name`, `cell_name`, and `tune_name`;
+the absolute `tune_dir` remains a runtime location, not a portable namespace.
+Appends and compatible-result merges guard against mixing different identities.
+Step 6 can still compare explicit run paths across projects, and an explicit
+Step 7 destination retains its own identity during restoration.
+
+Matching workspace identity does not prove biological equivalence or matching
+parameters, source hashes, conditions, or protocols. Older saved runs remain
+readable without new fields. See [Project workspaces](../guides/project_workspaces.md).
+
+## Construction recipes are not complete checkpoints
+
+[Custom models](../guides/custom_models.md) distinguishes live cells from
+saved builders and copy/reference source registration. Saved runs record
+`model_provenance` and native source hashes. Runtime-only results have no
+reconstruction recipe; their `model_state.json` is a descriptive pre-run
+inventory, not a complete checkpoint of POINTERs, GLOBALs, random objects,
+or callbacks. Unsaved in-memory parameter edits are not replayed by CLI/SLURM.
+
+Reference mode keeps a registration snapshot but loads the current originals.
+That baseline is not silently refreshed. Declare all native dependencies for
+archiving, prefer copy mode for independent tuning, and materialize archived
+external bundles only into a destination tune. Compiler caches are local build
+products, not archived model sources.

@@ -2,6 +2,7 @@
 
 from .geometry import SegmentRef, define_geometry
 from .load_cell import load_cell
+from .runtime_cell import wrap_cell, validate_cell
 from .synapse_records import SynapseRecord
 from .synapses import add_synapses, preview_synapses
 
@@ -12,4 +13,6 @@ __all__ = [
     "define_geometry",
     "load_cell",
     "preview_synapses",
+    "wrap_cell",
+    "validate_cell",
 ]

@@ -6,9 +6,12 @@ from typing import Any, Dict, Tuple
 import numpy as np
 from neuron import h
 
-from modules.model.geometry import cell_sections, cell_soma_segment
+from scp_pipeline.model.geometry import cell_sections, cell_soma_segment
 
 from .current_injection import apply_sim_conditions
+from scp_pipeline.loaders.source_context import cell_execution
+from .recording import _record_mechanism_current
+from .synaptic_recording import prepare_synaptic_recording, finish_synaptic_recording
 
 
 _SITE_SPEC_RE = re.compile(
@@ -179,18 +182,19 @@ def _build_cell_recorders_for_site(seg: Any, vars_cfg: Dict[str, bool]) -> Dict[
     if vars_cfg.get("mech_currents", False) or vars_cfg.get("mech_conductances", False) or vars_cfg.get("mech_states", False):
         density_mechs = seg.sec.psection().get("density_mechs", {})
         for mech in sorted(density_mechs.keys()):
-            attr = getattr(seg, mech, None)
-            if attr is None:
-                continue
             for param in sorted(density_mechs[mech].keys()):
                 want = False
                 if vars_cfg.get("mech_currents", False) and param.startswith("i"):
-                    want = True
+                    recorders[f"{mech}.{param}"] = _record_mechanism_current(seg, mech, param)
+                    continue
                 elif vars_cfg.get("mech_conductances", False) and param.startswith("g"):
                     want = True
                 elif vars_cfg.get("mech_states", False) and not param.startswith("i") and not param.startswith("g"):
                     want = True
                 if not want:
+                    continue
+                attr = getattr(seg, mech, None)
+                if attr is None:
                     continue
                 ref_name = f"_ref_{param}"
                 if hasattr(attr, ref_name):
@@ -199,22 +203,28 @@ def _build_cell_recorders_for_site(seg: Any, vars_cfg: Dict[str, bool]) -> Dict[
     return recorders
 
 
-def run_cell(cell, sim_cfg):
+@cell_execution
+def run_cell(
+    cell,
+    sim_cfg,
+    *,
+    syn_state=None,
+    trial_idx=0,
+    syn_recording_retained_bytes=0,
+):
     sim_traces = {}
+
+    # Opt-in recorder discovery and memory preflight happen before any Vector
+    # allocation. Disabled/exhausted trial capture does not inspect synapses.
+    syn_recorders = prepare_synaptic_recording(
+        cell, sim_cfg, syn_state=syn_state, trial_idx=trial_idx,
+        retained_bytes=syn_recording_retained_bytes,
+    )
 
     # Recorders
     tvec = h.Vector().record(h._ref_t)
     vseg = _get_soma_segment(cell)
     vvec = h.Vector().record(vseg._ref_v)  # somatic Vm
-
-    isynvec = None
-    gsynvec = None
-    if hasattr(cell, "synapses") and len(cell.synapses) > 0:
-        first_synapse = cell.synapses[0]
-        if hasattr(first_synapse, "_ref_i"):
-            isynvec = h.Vector().record(first_synapse._ref_i)
-        if hasattr(first_synapse, "_ref_g"):
-            gsynvec = h.Vector().record(first_synapse._ref_g)
 
     cell_recording_cfg = _get_cell_recording_cfg(sim_cfg)
     cell_recorders: Dict[str, Dict[str, Any]] = {}
@@ -236,6 +246,9 @@ def run_cell(cell, sim_cfg):
     tstop  = float(sim_cfg["tstop"])
 
     h.dt = dt
+    if hasattr(h, "steps_per_ms"):
+        # stdrun.hoc's run() otherwise silently recomputes dt from this value.
+        h.steps_per_ms = 1.0 / dt
     h.tstop = tstop
     conditions = apply_sim_conditions(cell, sim_cfg)
     h.finitialize(conditions["v_init_mV"])
@@ -245,10 +258,9 @@ def run_cell(cell, sim_cfg):
 
     sim_traces["T"] = np.array(tvec)
     sim_traces["V"] = np.array(vvec)
-    if isynvec is not None:
-        sim_traces["I"] = np.array(isynvec)
-    if gsynvec is not None:
-        sim_traces["G"] = np.array(gsynvec)
+    syn_recordings = finish_synaptic_recording(syn_recorders)
+    if syn_recordings is not None:
+        sim_traces["syn_recordings"] = syn_recordings
     if cell_recorders:
         sim_traces["cell_recordings"] = {
             site: {name: np.array(vec) for name, vec in recs.items()}

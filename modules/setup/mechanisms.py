@@ -10,6 +10,12 @@ import json
 import shutil
 import subprocess
 import sys
+import importlib.metadata
+import os
+import platform
+
+from scp_pipeline.loaders.source_context import (EXCLUDED_PARTS, declared_source_files,
+    effective_source_root, sha256_file, source_relative_path, within)
 
 
 _LOADED_MECHANISM_DLLS: Dict[Path, str] = {}
@@ -80,12 +86,59 @@ def resolve_modfiles_dir(
             raise TypeError("cell_config['paths'] must be an object/dict.")
         if isinstance(paths, dict) and "modfiles" in paths:
             raw = paths["modfiles"]
+        elif cell_config.get('model_source') is not None:
+            raw = None
     if raw in (None, ""):
         return None
     path = Path(str(raw)).expanduser()
+    model_root = effective_source_root(cell_config or {}, tune_root)
+    if model_root is not None:
+        path = model_root / source_relative_path(cell_config, path, tune_root)
+        if not within(path.resolve(), model_root.resolve()):
+            raise ValueError('paths.modfiles escapes the selected model root.')
     if not path.is_absolute():
         path = tune_root / path
     return path.resolve()
+
+
+def _mechanism_build_context(tune_dir, cell_config=None):
+    tune = Path(tune_dir).expanduser().resolve()
+    config = merge_tune_cell_config(tune, cell_config) or {}
+    source = resolve_modfiles_dir(tune, config)
+    if source is None or within(source, tune) or not source.is_dir():
+        return source, None
+    root = effective_source_root(config, tune) or source
+    if config.get('model_source'):
+        from scp_pipeline.loaders.source_context import guard_source_destinations
+        guard_source_destinations(config, tune)
+    elif within(tune, source):
+        raise ValueError('The managed build workspace must be outside the external MOD source tree.')
+    files = declared_source_files(config, tune)
+    if not files:
+        files = sorted(p for p in source.rglob('*') if p.is_file() and
+                       not any(part in EXCLUDED_PARTS for part in p.relative_to(source).parts) and
+                       p.suffix not in {'.so', '.dll', '.dylib', '.o', '.pyc', '.pyo'})
+    for path in files:
+        if not within(path.resolve(), root.resolve()):
+            raise ValueError(f'Mechanism dependency escapes its source root: {path}')
+    compiler = shutil.which('c++') or shutil.which('cc')
+    tool = find_nrnivmodl()
+    try:
+        neuron_version = importlib.metadata.version('neuron')
+    except importlib.metadata.PackageNotFoundError:
+        neuron_version = 'unavailable'
+    identity = {'neuron': neuron_version, 'platform': platform.machine(), 'python': sys.version,
+                'compiler': str(Path(compiler).resolve()) if compiler else None,
+                'compiler_stat': [Path(compiler).stat().st_size, Path(compiler).stat().st_mtime_ns] if compiler else None,
+                'nrnivmodl': tool, 'nrnivmodl_sha256': sha256_file(Path(tool)) if tool else None,
+                'flags': {name: os.environ.get(name) for name in ('CC', 'CXX', 'CFLAGS', 'CXXFLAGS', 'LDFLAGS')},
+                'sources': [(p.relative_to(root).as_posix(), sha256_file(p)) for p in files]}
+    digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    cache = tune / '.scp_build' / digest
+    if not within(cache.resolve(), tune):
+        raise ValueError('Managed mechanism cache escapes the selected tune.')
+    build_dir = cache / 'sources' / source.relative_to(root)
+    return build_dir, {'root': root, 'files': files, 'cache': cache, 'identity': identity}
 
 
 def find_compiled_mechanism_dll(
@@ -93,7 +146,7 @@ def find_compiled_mechanism_dll(
     *,
     cell_config: Optional[Dict[str, Any]] = None,
 ) -> Optional[Path]:
-    mod_dir = resolve_modfiles_dir(tune_dir, cell_config)
+    mod_dir, _ = _mechanism_build_context(tune_dir, cell_config)
     if mod_dir is None:
         return None
     candidates = [
@@ -105,6 +158,11 @@ def find_compiled_mechanism_dll(
         if dll.is_file():
             return dll
     return None
+
+
+def mechanism_build_directory(tune_dir, cell_config=None):
+    """Return the safe build directory without compiling or creating it."""
+    return _mechanism_build_context(tune_dir, cell_config)[0]
 
 
 def find_nrnivmodl() -> Optional[str]:
@@ -178,7 +236,7 @@ def load_compiled_mechanism_library(dll_path: str | Path) -> Dict[str, Any]:
     }
 
 
-def compile_modfiles(
+def _compile_modfiles_unlocked(
     tune_dir: Path,
     *,
     recompile: bool = False,
@@ -209,7 +267,8 @@ def compile_modfiles(
             return _skipped_mechanism_summary(mod_dir, "no .mod source files are present")
         raise FileNotFoundError(f"No .mod source files found in {mod_dir}")
 
-    compiled_dir = mod_dir / "x86_64"
+    build_dir, external = _mechanism_build_context(tune_dir, cell_config)
+    compiled_dir = build_dir / "x86_64"
     if recompile:
         existing_dll = find_compiled_mechanism_dll(
             tune_dir,
@@ -244,7 +303,17 @@ def compile_modfiles(
                 "nrnivmodl not found on PATH or next to the active Python "
                 f"executable: {sys.executable}"
             )
-        subprocess.check_call([nrnivmodl], cwd=str(mod_dir))
+        if external is not None:
+            hashes = dict(external['identity']['sources'])
+            for source in external['files']:
+                target = external['cache'] / 'sources' / source.relative_to(external['root'])
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target, follow_symlinks=True)
+                if sha256_file(target) != hashes[source.relative_to(external['root']).as_posix()]:
+                    raise RuntimeError(f'Mechanism sources changed during build staging: {source}. Retry preparation.')
+            (external['cache'] / 'build_manifest.json').write_text(
+                json.dumps(external['identity'], indent=2) + '\n', encoding='utf-8')
+        subprocess.check_call([nrnivmodl], cwd=str(build_dir))
         compiled_now = True
         dll = find_compiled_mechanism_dll(tune_dir, cell_config=cell_config)
 
@@ -274,6 +343,41 @@ def compile_modfiles(
         "loaded": bool(loaded),
         "dll_preloaded": bool(dll_preloaded),
     }
+
+
+def compile_modfiles(tune_dir, *, recompile=False, load_dll=True, allow_missing=False,
+                     compile_missing=True, cell_config=None):
+    """Prepare mechanisms, serializing shared external builds across workers."""
+    tune = Path(tune_dir).expanduser().resolve()
+    source = resolve_modfiles_dir(tune, cell_config)
+    options = dict(recompile=recompile, load_dll=load_dll, allow_missing=allow_missing,
+                   compile_missing=compile_missing, cell_config=cell_config)
+    if (source is None or within(source, tune) or not source.is_dir()
+            or not any(source.glob('*.mod')) or not compile_missing):
+        return _compile_modfiles_unlocked(tune, **options)
+    locks = tune / '.scp_build' / '.locks'
+    if not within(locks.resolve(), tune):
+        raise ValueError('Mechanism build lock escapes the selected tune.')
+    locks.mkdir(parents=True, exist_ok=True)
+    name = hashlib.sha256(str(source).encode()).hexdigest() + '.lock'
+    with (locks / name).open('a+b') as lock:
+        if os.name == 'nt':
+            import msvcrt
+            lock.write(b'0')
+            lock.flush()
+            lock.seek(0)
+            msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            return _compile_modfiles_unlocked(tune, **options)
+        finally:
+            if os.name == 'nt':
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def _skipped_mechanism_summary(mod_dir: Optional[Path], reason: str) -> Dict[str, Any]:

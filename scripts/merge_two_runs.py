@@ -30,6 +30,8 @@ if str(ROOT) not in sys.path:
 
 from modules.core import randomness as randomness_mod
 from modules import run_sim
+from modules.simulation.result_appending import _ensure_multi_results
+from modules.workspaces import WorkspaceMismatchError, assert_same_workspace, result_workspace_identity, saved_namespace_tune_dir
 
 
 SIM_CFG_IGNORE_KEYS = {
@@ -302,13 +304,7 @@ def _infer_run_label(run_dir: Path, files: Dict[str, str], manifest: Dict[str, A
 def _resolve_tune_path_from_sim(sim_cfg: Optional[Dict[str, Any]]) -> Optional[Path]:
     if not isinstance(sim_cfg, dict):
         return None
-    tune_dir = sim_cfg.get("tune_dir")
-    if not tune_dir:
-        return None
-    try:
-        return Path(str(tune_dir)).expanduser().resolve()
-    except Exception:
-        return None
+    return saved_namespace_tune_dir(sim_cfg)
 
 
 def _load_manifest_json_sidecar(run_dir: Path, files: Dict[str, Any], key: str) -> Optional[Any]:
@@ -573,34 +569,7 @@ def _diff_values(
 
 
 def _ensure_multi(res: Dict[str, Any]) -> Dict[str, Any]:
-    mode = res.get("mode", "single")
-    if mode == "multi":
-        return res
-    if mode != "single":
-        raise ValueError(f"Unsupported results mode: {mode!r}")
-
-    sim_cfg = copy.deepcopy(res.get("sim_cfg", {}))
-    traces = res.get("traces", {}) or {}
-    inputs = res.get("inputs", None)
-    spikes = np.asarray(res.get("spikes", []), dtype=float)
-
-    multi = {
-        "mode": "multi",
-        "sim_cfg": sim_cfg,
-        "spikes": [spikes],
-        "traces": {},
-        "inputs_by_trial": None,
-        "meta": copy.deepcopy(res.get("meta", {})),
-    }
-    if "T" in traces and "V" in traces:
-        multi["traces"] = {"T": traces["T"], "V": [traces["V"]]}
-    if inputs:
-        multi["inputs_by_trial"] = [{"trial_idx": 0, "inputs": inputs}]
-
-    meta = multi.setdefault("meta", {})
-    meta["n_trials"] = 1
-    meta["trial_ids"] = [0]
-    return multi
+    return _ensure_multi_results(res)
 
 
 def _compare_payloads(a: Any, b: Any, *, root: str, max_diffs: int) -> List[str]:
@@ -737,6 +706,12 @@ def _apply_config_checks(
     max_diffs: int,
     ignore_stochastic_jitter_diffs: bool,
 ) -> None:
+    try:
+        report.warnings.extend(assert_same_workspace(
+            bundle_a.results, bundle_b.results, context="merge_two_runs"))
+    except WorkspaceMismatchError as exc:
+        # Namespace mismatches are never scientific/configuration overrides.
+        report.errors.append(str(exc))
     report.warnings.extend([f"[run_a] {msg}" for msg in bundle_a.load_warnings])
     report.warnings.extend([f"[run_b] {msg}" for msg in bundle_b.load_warnings])
 
@@ -906,6 +881,12 @@ def merge_two_runs(
         return report
 
     merged = run_sim.append_multi_results(res_a_multi, res_b_multi)
+    merged.setdefault("meta", {})["merge_sources"] = [
+        {"run_path": str(bundle.manifest_path.parent),
+         "workspace_identity": result_workspace_identity(bundle.results),
+         "tune_dir": (bundle.results.get("sim_cfg") or {}).get("tune_dir")}
+        for bundle in (bundle_a, bundle_b)
+    ]
     sim_cfg = merged.setdefault("sim_cfg", {})
     sim_cfg["output"] = "results"
     sim_cfg["save_output"] = True

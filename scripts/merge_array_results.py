@@ -25,6 +25,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from modules import run_sim
+from modules.simulation.result_appending import _ensure_multi_results, _merge_syn_recordings_by_trial
+from modules.workspaces import assert_same_workspace, result_workspace_identity
 
 
 def parse_args() -> argparse.Namespace:
@@ -87,53 +89,31 @@ def _find_results(output_dir: Path, pattern: Optional[str], job_id: Optional[str
 
 
 def _ensure_multi(res: Dict[str, Any]) -> Dict[str, Any]:
-    mode = res.get("mode", "single")
-    if mode == "multi":
-        return res
-    if mode != "single":
-        raise ValueError(f"Unsupported results mode: {mode}")
-
-    sim_cfg = copy.deepcopy(res.get("sim_cfg", {}))
-    traces = res.get("traces", {}) or {}
-    inputs = res.get("inputs", None)
-
-    multi = {
-        "mode": "multi",
-        "sim_cfg": sim_cfg,
-        "spikes": [np.asarray(res.get("spikes", []), dtype=float)],
-        "traces": {},
-        "inputs_by_trial": None,
-        "meta": copy.deepcopy(res.get("meta", {})),
-    }
-
-    if "T" in traces and "V" in traces:
-        multi["traces"] = {"T": traces["T"], "V": [traces["V"]]}
-
-    if inputs:
-        multi["inputs_by_trial"] = [{"trial_idx": 0, "inputs": inputs}]
-
-    meta = multi.setdefault("meta", {})
-    meta["n_trials"] = 1
-    meta["trial_ids"] = [0]
-    return multi
+    return _ensure_multi_results(res)
 
 
 def _append_traces(dst: Dict[str, Any], src: Dict[str, Any], max_traces: int) -> bool:
     if max_traces <= 0:
         dst["traces"] = {}
         return False
-    if not dst.get("traces") or not src.get("traces"):
+    if not src.get("traces"):
         return False
+    if not dst.get("traces"):
+        dst["traces"] = copy.deepcopy(src["traces"])
+        for key in dst["traces"]:
+            if key != "T":
+                dst["traces"][key] = list(dst["traces"][key])[:max_traces]
+        return True
     if "T" not in dst["traces"] or "T" not in src["traces"]:
         return False
-    if not np.allclose(np.asarray(dst["traces"]["T"]), np.asarray(src["traces"]["T"])):
+    if (np.shape(dst["traces"]["T"]) != np.shape(src["traces"]["T"])
+            or not np.allclose(np.asarray(dst["traces"]["T"]), np.asarray(src["traces"]["T"]))):
         return False
-    dst_v = list(dst["traces"].get("V", []))
-    for v in src["traces"].get("V", []) or []:
-        if len(dst_v) >= max_traces:
-            break
-        dst_v.append(v)
-    dst["traces"]["V"] = dst_v
+    for key in set(dst["traces"]) | set(src["traces"]):
+        if key == "T":
+            continue
+        values = list(dst["traces"].get(key, [])) + copy.deepcopy(list(src["traces"].get(key, [])))
+        dst["traces"][key] = values[:max_traces]
     return True
 
 
@@ -270,21 +250,39 @@ def main() -> None:
     if not paths:
         raise FileNotFoundError(f"No results found in {output_dir}")
 
-    results_list = [_ensure_multi(run_sim.load_results(p)) for p in paths]
+    raw_results_list = [run_sim.load_results(p) for p in paths]
 
+    identity = result_workspace_identity(raw_results_list[0])
+    identity_warnings = []
+    for path, result in zip(paths[1:], raw_results_list[1:]):
+        identity_warnings.extend(assert_same_workspace(
+            {"workspace_identity": identity}, result,
+            context=f"SLURM array merge input {path}"))
+        incoming_identity = result_workspace_identity(result)
+        identity = {key: value if value is not None else incoming_identity[key]
+                    for key, value in identity.items()}
+    results_list = [_ensure_multi(result) for result in raw_results_list]
     base = results_list[0]
     sim_cfg = copy.deepcopy(base.get("sim_cfg", {}))
-    max_traces = int(sim_cfg.get("n_traces_to_save", 1))
+    sim_cfg["workspace_identity"] = copy.deepcopy(identity)
+    sim_cfg["project_name"] = identity["project_name"]
+    if not sim_cfg.get("cell"):
+        sim_cfg["cell"] = identity["cell_name"]
+    if not sim_cfg.get("tune"):
+        sim_cfg["tune"] = identity["tune_name"]
+    max_traces = run_sim._resolve_trace_trials_to_save(sim_cfg, fallback=1)
     total_trials = sum(len(res.get("spikes", []) or []) for res in results_list)
     max_inputs = run_sim._resolve_inputs_to_save(sim_cfg, total_trials, max_traces)
 
     base_meta = copy.deepcopy(base.get("meta", {}) or {})
+    base_meta["workspace_identity"] = copy.deepcopy(identity)
     for k in ("n_trials", "trial_ids", "avg_rate_curve", "input_summaries", "input_stats"):
         base_meta.pop(k, None)
 
     traces = copy.deepcopy(base.get("traces", {}) or {})
-    if "V" in traces:
-        traces["V"] = []
+    for key in traces:
+        if key != "T":
+            traces[key] = []
 
     merged = {
         "mode": "multi",
@@ -294,8 +292,16 @@ def main() -> None:
         "inputs_by_trial": [] if max_inputs > 0 else None,
         "meta": base_meta,
     }
+    if "syn_records" in base:
+        merged["syn_records"] = copy.deepcopy(base["syn_records"])
 
     warnings = merged["meta"].setdefault("merge_warnings", [])
+    warnings.extend(identity_warnings)
+    merged["meta"]["merge_sources"] = [
+        {"run_path": str(path), "workspace_identity": result_workspace_identity(result),
+         "tune_dir": (result.get("sim_cfg") or {}).get("tune_dir")}
+        for path, result in zip(paths, results_list)
+    ]
     merged_spikes: List[np.ndarray] = []
     input_summaries: List[Dict[str, Any]] = []
     input_stats_trials: List[Dict[str, Any]] = []
@@ -312,6 +318,16 @@ def main() -> None:
         res_spikes = list(res.get("spikes", []) or [])
         n_res_trials = len(res_spikes)
         merged_spikes.extend(res_spikes)
+
+        _merge_syn_recordings_by_trial(merged, res, trial_offset=trial_offset, n_trials=total_trials)
+        for key, cap in (("cell_recordings_by_trial", max_traces), ("syn_records_by_trial", None)):
+            for idx, entry in enumerate(res.get(key) or []):
+                entries = merged.setdefault(key, [])
+                if cap is not None and len(entries) >= cap:
+                    break
+                new_entry = copy.deepcopy(entry)
+                new_entry["trial_idx"] = trial_offset + int(new_entry.get("trial_idx", idx))
+                entries.append(new_entry)
 
         appended = _append_traces(merged, res, max_traces)
         if not appended and max_traces > 0:

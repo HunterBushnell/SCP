@@ -1,0 +1,13 @@
+// Synthetic, non-biological constructor-time relative asset fixture.
+begintemplate ScpRelativeAssetCell
+public soma
+create soma[1]
+objref source
+proc init() { local length
+    source = new File()
+    if (source.ropen("length.txt") == 0) { execerror("Missing relative length.txt asset") }
+    length = source.scanvar()
+    source.close()
+    soma[0] { L=length diam=20 nseg=1 insert pas g_pas=0.0001 e_pas=-70 }
+}
+endtemplate ScpRelativeAssetCell

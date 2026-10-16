@@ -12,7 +12,7 @@ import hashlib
 import json
 import numpy as np
 
-from modules.core import randomness
+from scp_pipeline.core import randomness
 
 from . import modes_core as input_modes_core
 from .density import _lognormal_mu_sigma, _resolve_n_syn

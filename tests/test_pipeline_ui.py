@@ -50,12 +50,12 @@ class PipelineNotebookUICoreTests(unittest.TestCase):
                     for name, component in ui._components.items()
                 },
                 {
-                    "step1": "modules.notebooks._pipeline_ui.step1",
-                    "step2": "modules.notebooks._pipeline_ui.step2",
-                    "step3": "modules.notebooks._pipeline_ui.step3",
-                    "step3_act": "modules.notebooks._pipeline_ui.step3_act",
-                    "step4": "modules.notebooks._pipeline_ui.step4",
-                    "step5": "modules.notebooks._pipeline_ui.step5",
+                    "step1": "scp_pipeline.notebooks._pipeline_ui.step1",
+                    "step2": "scp_pipeline.notebooks._pipeline_ui.step2",
+                    "step3": "scp_pipeline.notebooks._pipeline_ui.step3",
+                    "step3_act": "scp_pipeline.notebooks._pipeline_ui.step3_act",
+                    "step4": "scp_pipeline.notebooks._pipeline_ui.step4",
+                    "step5": "scp_pipeline.notebooks._pipeline_ui.step5",
                 },
             )
             forbidden = (ui.widgets.Accordion, ui.widgets.Tab)

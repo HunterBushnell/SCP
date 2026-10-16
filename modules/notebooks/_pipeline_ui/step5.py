@@ -958,7 +958,8 @@ class Step5UI(PipelineUIComponent):
                 w.HTML("<b>Run Simulation</b>"),
                 w.HTML(
                     "<span style='font-size:90%; color:#555'>"
-                    "Run Step 5 in a fresh process, reload the current JSON "
+                    "Configured models use a fresh process; a supplied live cell "
+                    "runs in this kernel (not in parallel). Reload the current JSON "
                     "configuration, and save a uniquely named result."
                     "</span>"
                 ),
@@ -1056,7 +1057,7 @@ class Step5UI(PipelineUIComponent):
             "conditions": {"v_init_mV": None, "celsius_C": None},
         }
         try:
-            from modules.input_generation.config import _resolve_config_root
+            from scp_pipeline.input_generation.config import _resolve_config_root
 
             path = _resolve_config_root(self._selected_tune_dir()) / "sim_config.json"
             with path.open("r", encoding="utf-8") as handle:
@@ -1402,7 +1403,7 @@ class Step5UI(PipelineUIComponent):
 
     def _configured_input_preview_groups(self) -> list[tuple[str, bool]]:
         try:
-            from modules.input_generation.inputs import check_inputs
+            from scp_pipeline.input_generation.inputs import check_inputs
 
             _sim_config, groups_config = check_inputs(
                 path=self._selected_tune_dir(),
@@ -1949,7 +1950,7 @@ class Step5UI(PipelineUIComponent):
         self.simulation_log = ""
         self._run_stage(
             "step5",
-            "Running the fresh-process simulation…",
+            "Running with the adopted cell in this kernel…" if getattr(self.pipeline_state, 'runtime_only', False) else "Running the fresh-process simulation…",
             lambda: self._run_simulation(
                 trials,
                 seed,
@@ -1978,6 +1979,7 @@ class Step5UI(PipelineUIComponent):
             output_stem=stem,
             stream_output=not quiet_output,
             sim_overrides=sim_overrides,
+            output_dir=self.settings.get('output_dir'),
         )
         self.simulation_log = self._fresh_process_log(self.simulation_result)
         print("Simulation complete")

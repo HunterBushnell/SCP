@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+import math
 import re
 
 
@@ -14,6 +15,144 @@ import re
 _SITE_SPEC_RE = re.compile(
     r"^(?P<sec>[A-Za-z_]\w*)(?:\[(?P<idx>\d+)\])?(?:\((?P<x>[-+]?(?:\d+(?:\.\d*)?|\.\d+))\))?$"
 )
+
+
+SYNAPTIC_RECORDING_VARS = {
+    "i": True,
+    "g": True,
+    "i_AMPA": False,
+    "i_NMDA": False,
+    "g_AMPA": False,
+    "g_NMDA": False,
+    "record_use": False,
+    "record_Pr": False,
+}
+
+
+def _recording_integer(value: Any, *, key: str, minimum: int | None = 0) -> int:
+    try:
+        number = int(value)
+        if isinstance(value, bool) or float(value) != number:
+            raise ValueError
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{key} must be an integer") from exc
+    if minimum is not None and number < minimum:
+        raise ValueError(f"{key} must be >= {minimum}")
+    return number
+
+
+def _synaptic_vars(value: Any, *, key: str, defaults: Dict[str, bool]) -> Dict[str, bool]:
+    if value is None:
+        value = {}
+    if not isinstance(value, dict):
+        raise TypeError(f"{key} must be a dict of variable toggles")
+    out = dict(defaults)
+    for name, enabled in value.items():
+        if name not in SYNAPTIC_RECORDING_VARS:
+            raise ValueError(f"{key} has unknown variable {name!r}")
+        out[name] = _parse_bool_like(enabled)
+    return out
+
+
+def normalize_syn_recording_config(sim_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize the opt-in synapse recorder without importing NEURON.
+
+    Group mode captures exact population aggregates, sample mode captures a
+    bounded deterministic subset, and both combines them. The sample limit
+    never reduces the population used for group aggregates.
+    """
+    key = "sim['syn_recording']"
+    raw = sim_cfg.get("syn_recording")
+    if raw is None:
+        raw = {}
+    elif isinstance(raw, (bool, str)):
+        raw = {"enabled": raw}
+    if not isinstance(raw, dict):
+        raise TypeError(f"{key} must be a dict, bool, string, or null")
+
+    def mode(value: Any, path: str) -> str:
+        result = str(value).strip().lower()
+        if result not in {"group", "sample", "both"}:
+            raise ValueError(f"{path} must be 'group', 'sample', or 'both'")
+        return result
+
+    default_mode = mode(raw.get("default_mode", "group"), f"{key}['default_mode']")
+    sample = _recording_integer(
+        raw.get("default_sample_per_group", 10), key=f"{key}['default_sample_per_group']"
+    )
+    variables = _synaptic_vars(
+        raw.get("default_vars"), key=f"{key}['default_vars']", defaults=SYNAPTIC_RECORDING_VARS
+    )
+    n_trials = raw.get("n_trials")
+    if n_trials is not None:
+        n_trials = _recording_integer(n_trials, key=f"{key}['n_trials']")
+    seed = _recording_integer(raw.get("sample_seed", 0), key=f"{key}['sample_seed']", minimum=None)
+
+    record_dt = raw.get("record_dt_ms")
+    if record_dt is not None:
+        try:
+            record_dt = float(record_dt)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{key}['record_dt_ms'] must be finite and positive or null") from exc
+        if not math.isfinite(record_dt) or record_dt <= 0:
+            raise ValueError(f"{key}['record_dt_ms'] must be finite and positive or null")
+        if record_dt < float(sim_cfg.get("dt", 0.025)):
+            raise ValueError(f"{key}['record_dt_ms'] must be >= sim['dt']")
+    try:
+        memory = float(raw.get("max_memory_mb", 256))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{key}['max_memory_mb'] must be finite and > 0") from exc
+    if not math.isfinite(memory) or memory <= 0:
+        raise ValueError(f"{key}['max_memory_mb'] must be finite and > 0")
+
+    groups_raw = raw.get("groups")
+    if groups_raw is None:
+        groups_raw = {}
+    if not isinstance(groups_raw, dict):
+        raise TypeError(f"{key}['groups'] must be a dict")
+    groups: Dict[str, Any] = {}
+    for name, override in groups_raw.items():
+        path = f"{key}['groups'][{name!r}]"
+        if not isinstance(name, str) or not name:
+            raise ValueError(f"{key}['groups'] keys must be nonempty strings")
+        if isinstance(override, bool):
+            override = {"enabled": override}
+        if not isinstance(override, dict):
+            raise TypeError(f"{path} must be a dict or bool")
+        groups[name] = {
+            "enabled": _parse_bool_like(override.get("enabled", True)),
+            "mode": mode(override.get("mode", default_mode), f"{path}['mode']"),
+            "sample_per_group": _recording_integer(
+                override.get("sample_per_group", sample), key=f"{path}['sample_per_group']"
+            ),
+            "vars": _synaptic_vars(override.get("vars"), key=f"{path}['vars']", defaults=variables),
+        }
+    return {
+        "enabled": _parse_bool_like(raw.get("enabled", False)),
+        "default_mode": default_mode,
+        "default_sample_per_group": sample,
+        "default_vars": variables,
+        "groups": groups,
+        "n_trials": n_trials,
+        "sample_seed": seed,
+        "record_dt_ms": record_dt,
+        "max_memory_mb": memory,
+    }
+
+
+def resolve_n_syn_recording_trials(sim_cfg: Dict[str, Any], n_trials: int | None = None) -> int:
+    """Return the independent synaptic capture cap (null inherits Vm cap).
+
+    ``n_trials=None`` leaves the requested cap unclamped for result merging.
+    This dependency-light helper is also used by persistence-only code.
+    """
+    cfg = normalize_syn_recording_config(sim_cfg)
+    if not cfg["enabled"]:
+        return 0
+    requested = cfg["n_trials"]
+    if requested is None:
+        requested = _recording_integer(sim_cfg.get("n_traces_to_save", 1), key="sim['n_traces_to_save']")
+    return requested if n_trials is None else min(requested, max(0, int(n_trials)))
 
 
 def _parse_bool_like(value: Any, *, default: bool = False) -> bool:

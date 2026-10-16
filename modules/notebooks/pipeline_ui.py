@@ -9,6 +9,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, MutableMapping, Optional
 
+from scp_pipeline.workspaces import resolve_workspace
+
 from ._pipeline_ui.common import (
     MODEL_SETTING_KEYS,
     PIPELINE_UI_DEFAULTS,
@@ -47,13 +49,64 @@ class PipelineNotebookUI:
 
     def __init__(
         self,
-        repo_root: str | Path,
-        settings: MutableMapping[str, Any],
+        repo_root: str | Path | None = None,
+        settings: MutableMapping[str, Any] | None = None,
+        *, cell_override: Any = None, runtime_sim_config: Optional[dict[str, Any]] = None,
+        project_root: str | Path | None = None, workspace_root: str | Path | None = None,
+        restore_notebook_settings: bool = False,
+        notebook_settings_path: str | Path | None = None,
     ) -> None:
+        settings = {} if settings is None else settings
         if not isinstance(settings, MutableMapping):
             raise TypeError("settings must be a mutable mapping/dict.")
-        self.repo_root = Path(repo_root).expanduser().resolve()
+        from scp_pipeline.runtime import code_root
+        self.repo_root = Path(repo_root).expanduser().resolve() if repo_root is not None else code_root()
+        self.project_root = Path(project_root).expanduser().resolve() if project_root is not None else None
+        self.workspace_root = workspace_root
+        # Automatically restored navigation is not a user-entered explicit path.
+        # Release it when the user chooses another cell, tune, or namespace.
+        self._remembered_tune_override = None
+        self._syncing_model_selection = False
+        if self.project_root is not None:
+            from scp_pipeline.projects import PROJECT_FILE, load_project_settings
+            saved = load_project_settings(self.project_root)
+            settings.setdefault('cell_name', '')
+            settings.setdefault('tune_name', 'orig')
+            settings['project_name'] = None  # Namespace dropdown is only for SCP-owned workspaces.
+            if (self.project_root / PROJECT_FILE).is_file():
+                settings['tune_dir_override'] = saved.get('selected_tune')
+                self._remembered_tune_override = settings['tune_dir_override']
+                settings['output_dir'] = saved.get('output_dir')
+                self.workspace_root = workspace_root or saved.get('workspace_root')
+                if saved.get('selected_tune'):
+                    from scp_pipeline.projects import resolve_project_path
+                    from scp_pipeline.workspaces import infer_workspace
+                    selected = infer_workspace(resolve_project_path(self.project_root, saved['selected_tune']))
+                    settings.update(cell_name=selected.cell_name, tune_name=selected.tune_name)
+        elif restore_notebook_settings:
+            from .notebook_settings import settings_root
+            from scp_pipeline.projects import PROJECT_FILE, load_project_settings, resolve_project_path
+            root = settings_root(self.repo_root, project_name=settings.get('project_name'))
+            if (root / PROJECT_FILE).is_file():
+                saved = load_project_settings(root)
+                if settings.get('project_name') is None and saved.get('selected_project'):
+                    # Navigation remembers the SCP namespace separately from
+                    # the bundled namespace's own selected tune.
+                    settings['project_name'] = saved['selected_project']
+                    root = settings_root(self.repo_root, project_name=saved['selected_project'])
+                    saved = load_project_settings(root)
+                if saved.get('selected_tune'):
+                    selected_path = resolve_project_path(root, saved['selected_tune'])
+                    from scp_pipeline.workspaces import infer_workspace
+                    selected = infer_workspace(selected_path)
+                    settings['tune_dir_override'] = str(selected_path)
+                    self._remembered_tune_override = settings['tune_dir_override']
+                    settings.update(cell_name=selected.cell_name, tune_name=selected.tune_name)
+                if saved.get('output_dir'):
+                    settings['output_dir'] = str(resolve_project_path(root, saved['output_dir']))
         self.settings = settings
+        self.cell_override = cell_override
+        self.runtime_sim_config = runtime_sim_config
         self._fill_defaults(self.settings)
         self.widgets = _import_widgets()
 
@@ -119,6 +172,10 @@ class PipelineNotebookUI:
             "step4": Step4UI(self),
             "step5": Step5UI(self),
         }
+        from ._pipeline_ui.notebook_defaults import NotebookDefaultsUI
+        self._notebook_defaults = NotebookDefaultsUI(
+            self, enabled=restore_notebook_settings, path=notebook_settings_path)
+        self._notebook_defaults.initialize()
 
     def __getattr__(self, name: str) -> Any:
         """Keep private callback access compatible while components stay private."""
@@ -168,6 +225,10 @@ class PipelineNotebookUI:
         self._sync_controls_from_settings(
             act_settings_changed=act_settings_changed
         )
+        defaults = self.__dict__.get('_notebook_defaults')
+        if defaults is not None:
+            defaults.changed()
+            defaults.watch()
         if ignored:
             self._set_status(
                 "step1",
@@ -177,19 +238,37 @@ class PipelineNotebookUI:
             )
 
     def step1_panel(self) -> Any:
-        return self._components["step1"].build_panel()
+        panel = self._components["step1"].build_panel()
+        self._notebook_defaults.watch()
+        return panel
 
     def step2_panel(self) -> Any:
-        return self._components["step2"].build_panel()
+        panel = self._components["step2"].build_panel()
+        self._notebook_defaults.watch()
+        return panel
 
     def step3_panel(self) -> Any:
-        return self._components["step3"].build_panel()
+        panel = self._components["step3"].build_panel()
+        self._notebook_defaults.watch()
+        return panel
 
     def step4_panel(self) -> Any:
-        return self._components["step4"].build_panel()
+        panel = self._components["step4"].build_panel()
+        self._notebook_defaults.watch()
+        return panel
 
     def step5_panel(self) -> Any:
-        return self._components["step5"].build_panel()
+        panel = self._components["step5"].build_panel()
+        self._notebook_defaults.watch()
+        return panel
+
+    def save_notebook_settings(self, path=None):
+        """Explicitly persist notebook choices, never model/scientific configs."""
+        return self._notebook_defaults.save(path)
+
+    def load_notebook_settings(self, path=None, *, discard=False):
+        """Restore validated notebook choices without constructing a model."""
+        return self._notebook_defaults.load(path, discard=discard)
 
     def _run_button(self, description: str, *, icon: str = "play") -> Any:
         return self.widgets.Button(
@@ -202,19 +281,19 @@ class PipelineNotebookUI:
     def _selected_tune_dir(self) -> Path:
         if self.pipeline_state is not None:
             return Path(self.pipeline_state.tune_dir).resolve()
-        override = self.settings.get("tune_dir_override")
-        if override not in (None, ""):
-            path = Path(str(override)).expanduser()
-            if not path.is_absolute():
-                path = self.repo_root / path
-            return path.resolve()
-        return (
-            self.repo_root
-            / "cells"
-            / str(self.settings.get("cell_name") or "PV")
-            / "tunes"
-            / str(self.settings.get("tune_name") or "tuned")
-        ).resolve()
+        cell_name = self.settings.get('cell_name')
+        tune_name = self.settings.get('tune_name')
+        override = self.settings.get('tune_dir_override')
+        if not override and not (cell_name and tune_name):
+            raise ValueError('Select a Cell and Tune in Step 1, or supply an explicit Tune path.')
+        return resolve_workspace(
+            repo_root=self.repo_root,
+            project_name=self.settings.get("project_name"),
+            cell_name=cell_name,
+            tune_name=tune_name,
+            tune_dir_override=override,
+            project_root=self.project_root, workspace_root=self.workspace_root,
+        ).tune_dir
 
     @staticmethod
     def _include_preferred(
@@ -230,7 +309,9 @@ class PipelineNotebookUI:
     def _observe_value(self, widget: Any, key: str, parser: Any) -> None:
         def _sync(change: dict[str, Any]) -> None:
             try:
-                self.settings[key] = parser(change["new"])
+                # A navigation guard may have restored the old value earlier in
+                # this notification; never persist the rejected event's value.
+                self.settings[key] = parser(widget.value)
             except (TypeError, ValueError):
                 return
 
@@ -343,9 +424,10 @@ class PipelineNotebookUI:
         self._set_status(step, "error", str(exc))
         output = self.outputs.get(output_key or step)
         if output is not None:
-            with output:
-                _clear_output()
-                print(f"{type(exc).__name__}: {exc}")
+            # Validation needs plain text, not a parent-message capture. Setup
+            # logs use HTML; rich protocol outputs support the same stream API.
+            output.outputs = ({'output_type': 'stream', 'name': 'stdout',
+                               'text': f"{type(exc).__name__}: {exc}\n"},)
 
     def _mark_restart_required(self, message: str) -> None:
         self._restart_required = True
@@ -354,11 +436,16 @@ class PipelineNotebookUI:
         self._refresh_button_states()
 
     def _lock_model_controls(self) -> None:
+        for key, control in self.controls.items():
+            if key.startswith('setup_') or key in {'workspace_mode', 'project_root', 'workspace_root', 'project_label', 'output_dir'}:
+                control.disabled = True
         for key in (
+            "project_name",
             "cell_name",
             "tune_name",
             "tune_dir_override",
             "quiet_step1_output",
+            'recompile_modfiles',
             "step1_run",
         ):
             control = self.controls.get(key)

@@ -1,0 +1,16 @@
+{
+  "cell_name": "ACT_SST",
+  "tune": "orig",
+  "color": "k",
+  "cell_loader": "allen_manifest",
+  "paths": {
+    "manifest": "manifest.json",
+    "modfiles": "modfiles"
+  },
+  "tuning": {
+    "soma_diam_multiplier": 1.0
+  },
+  "allen": {
+    "utils": "standard"
+  }
+}

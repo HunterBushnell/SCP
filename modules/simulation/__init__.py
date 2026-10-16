@@ -5,11 +5,11 @@ The public entry point is `SimulationSession`, which prepares and runs a
 tune directory from notebooks, CLI scripts, or SLURM wrappers.
 """
 
-from modules.simulation.session import (
+from scp_pipeline.simulation.session import (
     SimulationOptions,
     SimulationSession,
 )
-from modules.simulation.session_setup import (
+from scp_pipeline.simulation.session_setup import (
     infer_cell_name,
     load_mechanisms,
     normalize_tune_dir,

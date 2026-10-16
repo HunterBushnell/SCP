@@ -10,6 +10,7 @@ from ..core import randomness
 from ..input_generation.processing import _build_default_mode_registry, _process_all_groups
 from ..model import synapses
 from .cell_runtime import run_cell
+from .synaptic_recording import synaptic_recording_nbytes
 from .result_helpers import (
     _aggregate_input_stats,
     _resolve_inputs_to_save,
@@ -87,7 +88,7 @@ def run_multi(
     if mode_registry is None:
         mode_registry = _build_default_mode_registry()
         try:
-            from modules.input_generation import modes_user as input_modes_user
+            from scp_pipeline.input_generation import modes_user as input_modes_user
 
             user_reg = input_modes_user.get_user_mode_registry()
             # user registry wins on name collisions
@@ -98,6 +99,8 @@ def run_multi(
     spikes_by_trial: List[np.ndarray] = []
     trace_V_store: List[np.ndarray] = []
     cell_recordings_store: List[Dict[str, Any]] = []
+    syn_recordings_store: List[Dict[str, Any]] = []
+    syn_recordings_retained_bytes = 0
     T_ref: Optional[np.ndarray] = None
     input_summaries: List[Dict[str, Any]] = []
     inputs_store: List[Dict[str, Any]] = []
@@ -185,7 +188,14 @@ def run_multi(
             syn_param_snapshot = _snapshot_synapse_params(syn_state, groups_cfg_for_trial)
             netcon_snapshot = _snapshot_netcon_state(syn_state)
 
-        sim_traces = run_cell(cell, sim_cfg_local)
+        sim_traces = run_cell(
+            cell, sim_cfg_local, syn_state=syn_state, trial_idx=trial_idx,
+            syn_recording_retained_bytes=syn_recordings_retained_bytes,
+        )
+        syn_recordings = sim_traces.get("syn_recordings")
+        if syn_recordings is not None:
+            syn_recordings_store.append({"trial_idx": trial_idx, "recordings": syn_recordings})
+            syn_recordings_retained_bytes += synaptic_recording_nbytes(syn_recordings)
 
         T = np.asarray(sim_traces.get("T", []), dtype=float)
         V = np.asarray(sim_traces.get("V", []), dtype=float)
@@ -288,12 +298,14 @@ def run_multi(
         "spikes": spikes_by_trial,
         "traces": traces_out,
         "cell_recordings_by_trial": cell_recordings_store if cell_recordings_store else None,
+        "syn_recordings_by_trial": syn_recordings_store if syn_recordings_store else None,
         "inputs_by_trial": inputs_store if inputs_store else None,
         "syn_records_by_trial": syn_records_by_trial if syn_records_by_trial else None,
         "meta": {
             "cell": sim_cfg_local.get("cell"),
             "tune": sim_cfg_local.get("tune"),
             "n_trials": n_trials,
+            "n_syn_recording_trials": len(syn_recordings_store),
             "trial_ids": list(range(n_trials)),
             "avg_rate_curve": avg_rate_curve,
             "input_summaries": input_summaries,

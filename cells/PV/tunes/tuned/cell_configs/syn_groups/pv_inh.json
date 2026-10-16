@@ -1,6 +1,6 @@
 {
   "pv_inh": {
-    "state": true,
+    "state": false,
     "color": "#8c564b",
     "syns": {
       "type": "GABA_A",
@@ -15,7 +15,7 @@
         }
       },
       "params": {
-        "wt_mean": 0.4,
+        "wt_mean": 0.1,
         "wt_std": 0.33,
         "initW": 1.0,
         "gmax": 0.001,

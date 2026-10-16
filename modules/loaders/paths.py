@@ -73,7 +73,15 @@ def resolve_loader_path(
 
     source = Path(str(raw)).expanduser()
     candidates: Iterable[Path]
-    if source.is_absolute():
+    from .source_context import effective_source_root, source_relative_path, within
+    model_root = effective_source_root(cell_config, base_dir)
+    if model_root is not None:
+        relative = source_relative_path(cell_config, source, base_dir)
+        candidate = model_root / relative
+        if not within(candidate.resolve(), model_root.resolve()):
+            raise ValueError(f"paths.{path_key} escapes the selected model root.")
+        candidates = (candidate,)
+    elif source.is_absolute():
         candidates = (source,)
     else:
         candidates = tuple(base / source for base in candidate_base_dirs(cell_config, base_dir=base_dir))

@@ -256,11 +256,11 @@ def resolve_passive_tuning_inputs(
 
 def _fit_json_candidates_for_context(context: Any) -> list[Path]:
     """Return the configured Allen fit JSON, if this tune has one."""
-    from modules.loaders import get_cell_loader_name
+    from scp_pipeline.loaders import get_cell_loader_name
 
     if get_cell_loader_name(context.cell_config) != "allen_manifest":
         return []
-    from modules.setup.fit_json import find_fit_json
+    from scp_pipeline.setup.fit_json import find_fit_json
 
     fit_json = find_fit_json(
         context.tune_dir,

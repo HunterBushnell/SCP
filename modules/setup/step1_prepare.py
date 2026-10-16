@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
@@ -25,7 +26,7 @@ from .mechanisms import (
 from .scaffold import scaffold_base_configs, scaffold_synapse_configs
 from .target_config import prepare_target_config as _prepare_target_config
 
-from modules.loaders import get_cell_loader_name
+from scp_pipeline.loaders import get_cell_loader_name
 
 
 def resolve_soma_multiplier(
@@ -50,6 +51,8 @@ def prepare_cell_source(
     download_match: str = "contains",
 ) -> Dict[str, Any]:
     """Phase 1: stage or acknowledge model source files."""
+    from scp_pipeline.workspaces import infer_workspace
+    tune_dir = infer_workspace(tune_dir).tune_dir
     return setup_cell_source(
         tune_dir=tune_dir,
         source_type=source_type,
@@ -138,6 +141,7 @@ def prepare_base_configs(
     loader_config: Optional[Mapping[str, Any]] = None,
     v_init_mV: Optional[float] = None,
     celsius_C: Optional[float] = None,
+    project_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Phase 3: scaffold first-level cell, geometry, and simulation configs."""
     loader_name = get_cell_loader_name({"cell_loader": cell_loader or "allen_manifest"})
@@ -156,6 +160,7 @@ def prepare_base_configs(
         loader_config=loader_config,
         v_init_mV=v_init_mV,
         celsius_C=celsius_C,
+        project_name=project_name,
     )
 
 
@@ -215,6 +220,8 @@ def validate_setup(
     validate_inputs_cfg: bool = True,
     validate_synapses: bool = True,
     allow_missing_modfiles: bool = True,
+    cell_override: Any = None,
+    runtime_sim_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Phase 5: validate files, loader, optional mechanisms, and inputs."""
     from .validation import validate_tune
@@ -228,6 +235,8 @@ def validate_setup(
         validate_inputs=validate_inputs_cfg,
         validate_synapses=validate_synapses,
         allow_missing_modfiles=allow_missing_modfiles,
+        cell_override=cell_override,
+        runtime_sim_config=runtime_sim_config,
     )
 
 
@@ -236,17 +245,32 @@ def create_working_copy(
     source_tune_dir: Path,
     target_tune_name: str = "tuned",
     overwrite: bool = False,
+    dry_run: bool = False,
+    content_policy: str = "legacy",
+    source_mode: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Copy a validated setup tune to a sibling working tune directory."""
-    source = Path(source_tune_dir).expanduser().resolve()
+    if content_policy not in {"legacy", "model"}:
+        raise ValueError("content_policy must be legacy or model")
+    if content_policy == "model" or source_mode is not None:
+        if overwrite:
+            raise ValueError("Preview/model-only copies never overwrite existing destinations.")
+        from .working_copy import copy_model_workspace
+        return copy_model_workspace(source_tune_dir, target_tune_name, dry_run=dry_run,
+                                    source_mode=source_mode)
+    from scp_pipeline.workspaces import infer_workspace, apply_workspace_metadata
+    source_workspace = infer_workspace(source_tune_dir)
+    source = source_workspace.tune_dir
     if not source.is_dir():
         raise FileNotFoundError(f"Source tune directory not found: {source}")
     if not target_tune_name:
         raise ValueError("target_tune_name must be non-empty")
-    if Path(target_tune_name).name != target_tune_name or target_tune_name in {".", ".."}:
+    if Path(target_tune_name).name != target_tune_name or target_tune_name in {".", ".."} or "\\" in target_tune_name:
         raise ValueError("target_tune_name must be a single sibling directory name")
 
     target = source.parent / target_tune_name
+    if target.resolve().parent != source.parent:
+        raise ValueError("Working copy must remain inside the source tune's sibling directory.")
     if target == source:
         return {
             "status": "skipped",
@@ -262,9 +286,20 @@ def create_working_copy(
                 "target": str(target),
                 "overwritten": False,
             }
+    if dry_run:
+        files = []
+        for current, directories, names in os.walk(source):
+            directories[:] = sorted(name for name in directories if name != '.scp_build')
+            files.extend((Path(current) / name).relative_to(source).as_posix() for name in sorted(names))
+        return {'status': 'preview', 'source': str(source), 'target': str(target),
+                'target_tune_name': target_tune_name, 'content_policy': 'legacy',
+                'files': files, 'file_count': len(files), 'overwritten': False,
+                'would_overwrite': bool(target.exists()),
+                'constructs_cell': False}
+    if target.exists():
         shutil.rmtree(target)
 
-    shutil.copytree(source, target)
+    shutil.copytree(source, target, ignore=shutil.ignore_patterns('.scp_build'))
 
     cell_config_path = target / "cell_configs" / "cell_config.json"
     cell_config_updated = False
@@ -274,10 +309,28 @@ def create_working_copy(
         if not isinstance(cell_config, dict):
             raise ValueError(f"Expected JSON object in {cell_config_path}")
         cell_config["tune"] = target_tune_name
+        cell_config["cell_name"] = source_workspace.cell_name
+        if source_workspace.project_name is not None:
+            cell_config["project_name"] = source_workspace.project_name
+        target_workspace = infer_workspace(target, cell_config=cell_config,
+                                           project_name=source_workspace.project_name,
+                                           cell_name=source_workspace.cell_name)
+        if "workspace_identity" in cell_config:
+            cell_config["workspace_identity"] = target_workspace.identity
+        if "tune_dir" in cell_config:
+            cell_config["tune_dir"] = str(target)
+        if "tune_dir" in (cell_config.get("paths") or {}):
+            cell_config["paths"]["tune_dir"] = str(target)
         with cell_config_path.open("w", encoding="utf-8") as handle:
             json.dump(cell_config, handle, indent=2)
             handle.write("\n")
         cell_config_updated = True
+        sim_path = target / "cell_configs" / "sim_config.json"
+        if sim_path.is_file():
+            sim_config = json.loads(sim_path.read_text(encoding="utf-8"))
+            if any(key in sim_config for key in ("workspace_identity", "project_name", "tune_dir", "cell", "tune")):
+                apply_workspace_metadata(sim_config, target_workspace)
+                sim_path.write_text(json.dumps(sim_config, indent=2) + "\n", encoding="utf-8")
 
     return {
         "status": "created",
@@ -329,6 +382,7 @@ def prepare_tune(
     create_tuned_copy: bool = False,
     tuned_tune_name: str = "tuned",
     overwrite_tuned_copy: bool = False,
+    project_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     End-to-end Step 1 entrypoint.
@@ -336,7 +390,11 @@ def prepare_tune(
     The notebook uses the phase functions directly. The CLI keeps this combined
     function for one-command setup.
     """
-    tune_dir = Path(tune_dir).expanduser().resolve()
+    from scp_pipeline.workspaces import infer_workspace
+    workspace = infer_workspace(tune_dir, project_name=project_name,
+                                cell_name=cell_name, tune_name=tune_name)
+    tune_dir = workspace.tune_dir
+    cell_name, tune_name = workspace.cell_name, workspace.tune_name
     tune_dir.mkdir(parents=True, exist_ok=True)
 
     loader_name = get_cell_loader_name({"cell_loader": cell_loader})
@@ -361,6 +419,8 @@ def prepare_tune(
         "tune_dir": str(tune_dir),
         "cell_name": cell_name,
         "tune_name": tune_name,
+        "project_name": workspace.project_name,
+        "workspace_identity": workspace.identity,
         "source_type": source_type,
         "cell_loader": loader_name,
         "specimen_id": None if specimen_id is None else int(specimen_id),
@@ -382,6 +442,24 @@ def prepare_tune(
     )
 
     stored_cell_config = load_tune_cell_config(tune_dir)
+    if stored_cell_config and loader_config and loader_config.get('model_source'):
+        old_source = stored_cell_config.get('model_source') or {}
+        new_source = loader_config['model_source']
+        from scp_pipeline.loaders.source_context import same_source_selection
+        if not same_source_selection(new_source, old_source, tune_dir):
+            raise ValueError('Registered source root/folders differ from the stored recipe. Preview and explicitly refresh with register_model_sources(refresh=True); existing snapshots were not replaced.')
+    if loader_config and loader_config.get('model_source') and not (tune_dir / 'MODEL_SOURCE_PROVENANCE.json').exists():
+        from .model_sources import register_model_sources
+        prospective = {'cell_name': cell_name, 'tune': tune_name, 'cell_loader': loader_name,
+                       'paths': dict(loader_paths or {}), **dict(loader_config)}
+        if workspace.project_name is not None:
+            prospective['project_name'] = workspace.project_name
+        preview = register_model_sources(tune_dir, prospective, dry_run=True)
+        print(__import__('json').dumps({'model_source_preview': preview['preview']}, indent=2))
+        registered = register_model_sources(tune_dir, prospective, dry_run=False)
+        loader_paths = registered['config']['paths']
+        summary['actions']['model_sources'] = registered
+        stored_cell_config = load_tune_cell_config(tune_dir)
     mechanism_cell_config = (
         stored_cell_config
         if stored_cell_config is not None and loader_paths is None
@@ -390,6 +468,8 @@ def prepare_tune(
             "paths": dict(loader_paths or {}),
         }
     )
+    mechanism_cell_config = dict(mechanism_cell_config or {})
+    mechanism_cell_config.update(dict(loader_config or {}))
     summary["actions"]["mechanisms"] = prepare_mechanisms(
         tune_dir=tune_dir,
         do_compile_modfiles=do_compile_modfiles,
@@ -434,6 +514,7 @@ def prepare_tune(
                 loader_config=loader_config,
                 v_init_mV=v_init_mV,
                 celsius_C=celsius_C,
+                project_name=workspace.project_name,
             ),
         }
     else:

@@ -1,0 +1,4 @@
+# Suggested once-per-environment install for optional ACT proposals/optimization.
+# Source-only Automatic Cell Tuner; do not substitute an unrelated PyPI 'act'.
+-c requirements.txt
+act @ git+https://github.com/V-Marco/ACT.git@2b3fdc190107b8242e3496329cfdf240abd09694

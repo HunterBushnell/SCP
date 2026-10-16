@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,9 +17,16 @@ from tests.pipeline_ui_test_support import (
 
 
 class PipelineNotebookUIStep5Tests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        shutil.copytree(REPO_ROOT / 'cells/PV/tunes/tuned/cell_configs',
+                        self.root / 'cells/PV/tunes/tuned/cell_configs')
+
     def test_input_preview_groups_are_loaded_from_expanded_synapse_config(self) -> None:
         settings = {"cell_name": "PV", "tune_name": "tuned"}
-        ui = PipelineNotebookUI(REPO_ROOT, settings)
+        ui = PipelineNotebookUI(self.root, settings)
         ui.step5_panel()
 
         options = [
@@ -27,18 +35,18 @@ class PipelineNotebookUIStep5Tests(unittest.TestCase):
         self.assertEqual(options, ["pn_exc", "bg_exc", "bg_inh", "pv_inh", "sst_inh"])
         self.assertEqual(
             tuple(ui.controls["input_preview_groups"].value),
-            ("pn_exc", "bg_exc", "bg_inh", "pv_inh", "sst_inh"),
+            ("pn_exc", "bg_exc", "bg_inh"),
         )
         ui.controls["input_preview_groups"].value = ("pn_exc", "bg_inh")
         self.assertEqual(settings["input_preview_groups"], ["pn_exc", "bg_inh"])
 
     def test_simulation_options_load_config_and_sync_session_overrides(self) -> None:
         settings = {"cell_name": "PV", "tune_name": "tuned"}
-        ui = PipelineNotebookUI(REPO_ROOT, settings)
+        ui = PipelineNotebookUI(self.root, settings)
         ui.step5_panel()
 
         sim_path = (
-            REPO_ROOT
+            self.root
             / "cells"
             / "PV"
             / "tunes"

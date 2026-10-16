@@ -299,8 +299,11 @@ def _mode_precomputed(
             resolved = _resolve_source_path(str(source["path"]), sim_cfg)
             pool = _load_trains_from_path(resolved)
         except FileNotFoundError:
-            print(f"precomputed: missing source path {source.get('path')!r}; using empty trains")
-            return [np.array([], dtype=float) for _ in range(n_syn)]
+            raise FileNotFoundError(
+                f"precomputed: required source path {source.get('path')!r} is missing. "
+                "Supply the intended spike dataset, correct its path, or explicitly disable "
+                "this input group. Missing inputs are not replaced with empty trains."
+            )
     else:
         raise ValueError("precomputed mode requires source['trains'] or source['path']")
 

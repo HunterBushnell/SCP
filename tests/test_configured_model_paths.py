@@ -217,8 +217,13 @@ class ConfiguredModPathTests(unittest.TestCase):
                     "modules.setup.mechanisms.find_nrnivmodl",
                     return_value="/synthetic/nrnivmodl",
                 ),
-                mock.patch("modules.notebooks.bootstrap.subprocess.check_call") as check_call,
+                mock.patch("modules.setup.mechanisms.subprocess.check_call") as check_call,
             ):
+                def finish_compile(*args, **kwargs):
+                    dll = configured / 'x86_64' / 'libnrnmech.so'
+                    dll.parent.mkdir(parents=True)
+                    dll.write_bytes(b'synthetic compiled library')
+                check_call.side_effect = finish_compile
                 ensure_modfiles(tune, compile_modfiles=True)
 
             check_call.assert_called_once_with(

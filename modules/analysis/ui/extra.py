@@ -8,9 +8,9 @@ from typing import Any, Dict, Optional
 import json
 import matplotlib.pyplot as plt
 
-from modules import run_sim
-from modules.input_generation import inputs
-from modules.input_generation import sampling as input_sampling
+from scp_pipeline import run_sim
+from scp_pipeline.input_generation import inputs
+from scp_pipeline.input_generation import sampling as input_sampling
 from .. import analysis, plotting
 from ._engine import (
     HELP_EXTRA,
@@ -176,7 +176,7 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
             path = _coerce_run_path(path_raw, sel.get("base"))
             if path is None or not path.exists():
                 continue
-            label = Path(path).stem if _is_curve_path(Path(path)) else analysis.run_label(path)
+            label = Path(path).stem if _is_curve_path(Path(path)) else analysis.comparison_run_label(path)
             if label not in labels:
                 labels.append(label)
         return ["(none)"] + labels
@@ -402,7 +402,7 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         if sample_source_value == "path":
             raw = sample_path_value.strip()
             return Path(raw).expanduser() if raw else None
-        return (g.get("CELLS_DIR") / sel["cell"] / sel["tunes"] / sel["model"]).resolve()
+        return sel["tune_dir"]
 
     sample_groups_options = _list_groups_for_sampling(_initial_sampling_path())
     prev_groups = list(g.get("input_sample_groups") or [])
@@ -536,7 +536,7 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
         if source == "path":
             raw = sample_path_txt.value.strip()
             return Path(raw).expanduser() if raw else None
-        return (g.get("CELLS_DIR") / sel["cell"] / sel["tunes"] / sel["model"]).resolve()
+        return sel["tune_dir"]
 
     def _refresh_sample_runs():
         sel = get_selection_from_globals(g)
@@ -574,7 +574,7 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
                 continue
             if not path.exists():
                 continue
-            label = Path(path).stem if _is_curve_path(Path(path)) else analysis.run_label(path)
+            label = Path(path).stem if _is_curve_path(Path(path)) else analysis.comparison_run_label(path)
             if label not in labels:
                 labels.append(label)
         options = ["(none)"] + labels
@@ -588,6 +588,9 @@ def build_extra_ui(g: Dict[str, Any]) -> None:
     sample_source_dd.observe(lambda *_: _refresh_sample_groups(), names="value")
     sample_run_dd.observe(lambda *_: _refresh_sample_groups(), names="value")
     sample_path_txt.observe(lambda *_: _refresh_sample_groups(), names="value")
+    if g.get("project_dd") is not None:
+        g["project_dd"].observe(lambda *_: _refresh_sample_runs(), names="value")
+        g["project_dd"].observe(lambda *_: _refresh_sample_groups(), names="value")
     if g.get("cell_dd") is not None:
         g["cell_dd"].observe(lambda *_: _refresh_sample_runs(), names="value")
         g["cell_dd"].observe(lambda *_: _refresh_sample_groups(), names="value")
@@ -802,7 +805,7 @@ def run_input_sampling_from_globals(g: Dict[str, Any]) -> None:
             print(f"Input sampling: could not resolve run {run_label!r}")
             return
     elif source == "selection" or not path_raw:
-        path_raw = (g.get("CELLS_DIR") / sel["cell"] / sel["tunes"] / sel["model"]).resolve()
+        path_raw = sel["tune_dir"]
     groups = g.get("input_sample_groups") or []
     group = g.get("input_sample_group")
     runs = int(g.get("input_sample_runs", 200))
@@ -1053,9 +1056,9 @@ def run_synapse_plots_from_globals(g: Dict[str, Any]) -> None:
         )
 
     if bool(g.get("extra_synapse_density", False)):
-        tune_dir = (g.get("CELLS_DIR") / sel["cell"] / sel["tunes"] / sel["model"]).resolve()
+        tune_dir = sel["tune_dir"]
         try:
-            cell, _, _ = analysis.load_cell_and_geometry(tune_dir)
+            cell, _, _ = analysis.load_cell_and_geometry(tune_dir, cell_override=g.get('CELL_OVERRIDE'))
         except Exception as exc:
             print(f"Synapse density plot skipped: cell/geometry load failed: {exc}")
             return
@@ -1077,9 +1080,9 @@ def run_extra_tables_from_globals(g: Dict[str, Any]) -> None:
     geom_cfg = None
 
     if load_cell and need_cell:
-        tune_dir = (g.get("CELLS_DIR") / sel["cell"] / sel["tunes"] / sel["model"]).resolve()
+        tune_dir = sel["tune_dir"]
         try:
-            cell, geom, geom_cfg = analysis.load_cell_and_geometry(tune_dir)
+            cell, geom, geom_cfg = analysis.load_cell_and_geometry(tune_dir, cell_override=g.get('CELL_OVERRIDE'))
         except Exception as exc:
             print("Cell/geometry load failed:", exc)
     elif need_cell and not load_cell:
@@ -1121,6 +1124,7 @@ def run_extra_tables_from_globals(g: Dict[str, Any]) -> None:
 
     if g.get("extra_recording_tables", True):
         cell_rec_summary = analysis.summarize_cell_recordings(res)
+        measured_syn_summary = analysis.summarize_synaptic_recordings(res)
         syn_trace_summary = analysis.summarize_total_synaptic_traces(res)
         any_recordings = False
         if cell_rec_summary.get("available"):
@@ -1131,21 +1135,26 @@ def run_extra_tables_from_globals(g: Dict[str, Any]) -> None:
                 analysis.analysis_dir_for_run(run_dir) / "cell_recording_summary.json",
                 enabled=bool(g.get("save_analysis", False)),
             )
+        if measured_syn_summary.get('available'):
+            any_recordings = True
+            show_md(analysis.format_synaptic_recording_table(measured_syn_summary))
+            analysis.save_json(measured_syn_summary, analysis.analysis_dir_for_run(run_dir) / 'synaptic_recording_summary.json',
+                               enabled=bool(g.get('save_analysis', False)))
         if syn_trace_summary.get("available"):
             any_recordings = True
-            show_md(analysis.format_total_synaptic_trace_table(syn_trace_summary, title="Total synaptic trace summary"))
+            show_md(analysis.format_total_synaptic_trace_table(syn_trace_summary, title="Recorded synaptic I/G summary"))
             analysis.save_json(
                 syn_trace_summary,
                 analysis.analysis_dir_for_run(run_dir) / "syn_trace_summary.json",
                 enabled=bool(g.get("save_analysis", False)),
             )
         if not any_recordings:
-            print("No cell_recordings or total synaptic I/G traces found for this run.")
+            print("No measured cell or synaptic recordings found for this run.")
 
 
 def run_extra_compare_from_globals(g: Dict[str, Any]) -> None:
     sel = get_selection_from_globals(g)
-    tune_dir = (g.get("CELLS_DIR") / sel["cell"] / sel["tunes"] / sel["model"]).resolve()
+    tune_dir = sel["tune_dir"]
     if not tune_dir.is_dir():
         print(f"Compare configs failed: target tune directory not found: {tune_dir}")
         return
@@ -1214,8 +1223,8 @@ def run_snapshot_compare_from_globals(g: Dict[str, Any]) -> None:
         print("Snapshot compare disabled (set Compare B to a run name).")
         return
 
-    label_a = analysis.run_label(run_a)
-    label_b = analysis.run_label(run_b)
+    label_a = analysis.comparison_run_label(run_a)
+    label_b = analysis.comparison_run_label(run_b)
     out_dir = analysis.analysis_dir_for_compare(sel["base"], run_a, run_b)
 
     report = analysis.snapshot_compare_report(
@@ -1309,8 +1318,8 @@ def run_iclamp_analysis_from_globals(g: Dict[str, Any]) -> None:
                 if stats_a is None or stats_b is None:
                     print("IClamp compare skipped: missing traces.")
                 else:
-                    label_a = analysis.run_label(run_a)
-                    label_b = analysis.run_label(run_b)
+                    label_a = analysis.comparison_run_label(run_a)
+                    label_b = analysis.comparison_run_label(run_b)
                     print(f"Compare A: {label_a}")
                     print(f"  Baseline {stats_a['baseline']:.2f} mV, Peak {stats_a['peak']:.2f} mV, Min {stats_a['vmin']:.2f} mV")
                     if stats_a["spike_count"] is not None:

@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
 
 import numpy as np
 
-from modules.model.geometry import cell_sections
+from scp_pipeline.model.geometry import cell_sections
 
 
 def _cell_h(cell: Any) -> Any:
@@ -139,7 +139,7 @@ def run_passive_protocol(
     sim_amps: Sequence[float],
 ) -> Dict[str, Any]:
     """Run current-injection traces with the existing SCP run_sim helper."""
-    from modules import run_sim
+    from scp_pipeline import run_sim
 
     return run_sim.looped_current_injection(cell, dict(sim_params), list(sim_amps))
 

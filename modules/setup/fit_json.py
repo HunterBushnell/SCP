@@ -10,6 +10,12 @@ from .json_utils import _read_json, _write_json
 DEFAULT_GENOME_SECTION_ORDER = ("glob", "soma", "axon", "apic", "dend")
 
 
+def _require_tune_owned_fit(path, tune_dir):
+    from scp_pipeline.loaders.source_context import within
+    if not within(path.resolve(), Path(tune_dir).resolve()):
+        raise ValueError('SCP will not normalize an external production fit JSON. Select copy mode and edit the tune-owned source instead.')
+
+
 def _stored_cell_config(tune_dir: Path) -> Optional[Dict[str, Any]]:
     for candidate in (
         tune_dir / "cell_configs" / "cell_config.json",
@@ -31,6 +37,10 @@ def _manifest_paths(
 ) -> tuple[Path, ...]:
     candidates: list[Path] = []
     if cell_config is not None:
+        if cell_config.get('model_source') is not None:
+            from scp_pipeline.loaders.paths import resolve_loader_path
+            return (resolve_loader_path(cell_config, 'manifest', default='manifest.json',
+                                        base_dir=tune_dir, loader_name='allen_manifest'),)
         paths = cell_config.get("paths", {})
         if paths is not None and not isinstance(paths, dict):
             raise TypeError("cell_config['paths'] must be an object/dict.")
@@ -82,7 +92,7 @@ def find_fit_json(
         merged_paths.update(supplied_paths or {})
         effective_config["paths"] = merged_paths
     if effective_config is not None:
-        from modules.loaders import get_cell_loader_name
+        from scp_pipeline.loaders import get_cell_loader_name
 
         if get_cell_loader_name(effective_config) != "allen_manifest":
             return None
@@ -168,6 +178,7 @@ def sort_genome_by_section(
 
     if changed:
         fit_data["genome"] = sorted_genome
+        _require_tune_owned_fit(fit_json, tune_dir)
         _write_json(fit_json, fit_data)
 
     return {
@@ -232,6 +243,7 @@ def coerce_fit_genome_values_to_numeric(
 
     if converted > 0:
         fit_data["genome"] = genome
+        _require_tune_owned_fit(fit_json, tune_dir)
         _write_json(fit_json, fit_data)
 
     return {

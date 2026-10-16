@@ -16,8 +16,27 @@ def make_repo(parent: Path) -> Path:
     root = parent / "repo"
     for cell, tunes in {"A": ("orig", "tuned"), "B": ("custom",)}.items():
         for tune in tunes:
-            (root / "cells" / cell / "tunes" / tune).mkdir(parents=True)
+            directory = root / "cells" / cell / "tunes" / tune
+            write_test_tune(directory, cell=cell, tune=tune)
     return root
+
+
+def write_test_tune(directory: Path, *, cell: str, tune: str) -> None:
+    """A file-valid synthetic workspace, without constructing its model."""
+    configs = directory / 'cell_configs'
+    configs.mkdir(parents=True)
+    (directory / 'Cell.hoc').write_text(
+        'begintemplate SCPUITestCell\npublic soma\ncreate soma\n'
+        'proc init() { soma { insert pas } }\nendtemplate SCPUITestCell\n')
+    (configs / 'cell_config.json').write_text(json.dumps({
+        'cell_name': cell, 'tune': tune, 'cell_loader': 'hoc_template',
+        'paths': {'hoc_template': 'Cell.hoc', 'modfiles': None},
+        'hoc_template': {'template_name': 'SCPUITestCell', 'constructor_args': []},
+    }))
+    (configs / 'sim_config.json').write_text(json.dumps({
+        'conditions': {'v_init_mV': -65, 'celsius_C': 30},
+    }))
+    (configs / 'geometry.json').write_text('{}\n')
 
 
 def fake_state(
@@ -68,4 +87,5 @@ __all__ = [
     "fake_state",
     "make_repo",
     "write_manual_passive_targets",
+    "write_test_tune",
 ]

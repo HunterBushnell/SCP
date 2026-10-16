@@ -187,7 +187,7 @@ def _sample_group_rates_from_configs(
         if tune_dir is None:
             raise ValueError(f"Geometry required for group {group!r}, but tune_dir could not be inferred.")
         try:
-            from modules.analysis import analysis as analysis_mod
+            from scp_pipeline.analysis import analysis as analysis_mod
 
             _, geometry, _ = analysis_mod.load_cell_and_geometry(tune_dir)
         except Exception as exc:

@@ -107,7 +107,7 @@ def run_single(
         netcon_snapshot = _snapshot_netcon_state(syn_state)
 
     # run the actual simulation (existing 3.1 primitive)
-    sim_traces = run_cell(cell, sim_cfg_local)  # assumes this is defined below / in this module
+    sim_traces = run_cell(cell, sim_cfg_local, syn_state=syn_state, trial_idx=0)
 
     T = np.asarray(sim_traces.get("T", []), dtype=float)
     V = np.asarray(sim_traces.get("V", []), dtype=float)
@@ -134,6 +134,7 @@ def run_single(
         "spikes": spikes,
         "traces": traces_out,
         "cell_recordings": cell_recordings,
+        "syn_recordings": sim_traces.get("syn_recordings"),
         "syn_records": syn_records,
         "syn_records_by_trial": syn_records_by_trial,
         "inputs": inputs_out,
@@ -141,6 +142,7 @@ def run_single(
             "cell": sim_cfg_local.get("cell"),
             "tune": sim_cfg_local.get("tune"),
             "n_trials": 1,
+            "n_syn_recording_trials": int(sim_traces.get("syn_recordings") is not None),
             "syn_config": copy.deepcopy(groups_cfg),
         },
     }

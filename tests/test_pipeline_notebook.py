@@ -137,8 +137,8 @@ class PipelineNotebookWorkflowTests(unittest.TestCase):
             self.assertEqual(after["cell_loader"], before["cell_loader"])
             self.assertEqual(after["paths"], before["paths"])
             self.assertEqual(after["hoc_template"], before["hoc_template"])
-            self.assertTrue((tune / "cell_configs" / "target_config.json").is_file())
-            self.assertTrue((tune / "cell_configs" / "syn_config.json").is_file())
+            self.assertFalse((tune / "cell_configs" / "target_config.json").is_file())
+            self.assertFalse((tune / "cell_configs" / "syn_config.json").is_file())
             self.assertIsNotNone(state.cell)
             self.assertEqual(
                 state.setup_summary["actions"]["validate"]["load_cell"],
@@ -228,7 +228,7 @@ class PipelineNotebookWorkflowTests(unittest.TestCase):
 
             for filename in ("target_config.json", "sim_config.json", "syn_config.json"):
                 path = tune / "cell_configs" / filename
-                config = _read_json(path)
+                config = _read_json(path) if path.exists() else {}
                 config["pipeline_test_runtime_edit"] = filename
                 _write_json(path, config)
             state.assert_sources_unchanged()

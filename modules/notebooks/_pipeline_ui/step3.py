@@ -267,15 +267,18 @@ class Step3UI(PipelineUIComponent):
         }
 
     def _configured_active_target_label(self) -> str:
-        from modules.tuning import (
+        from scp_pipeline.tuning import (
             fi_curve_from_config,
             load_target_config,
             manual_fi_csv_from_config,
             target_source_mode_from_config,
         )
 
-        tune_dir = self._selected_tune_dir()
-        config = load_target_config(tune_dir)
+        try:
+            tune_dir = self._selected_tune_dir()
+        except ValueError:
+            tune_dir = None
+        config = load_target_config(tune_dir) if tune_dir is not None else None
         source_mode = target_source_mode_from_config(config, default="none")
         detail = "no configured FI target"
         if source_mode == "manual":

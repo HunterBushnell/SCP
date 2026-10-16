@@ -74,6 +74,8 @@ class TuningNotebookContext:
             "tune_name": self.tune_name,
             "cell_loader": self.cell_config.get("cell_loader"),
             "validation_ok": self.validation.ok,
+            "project_name": self.project_name,
+            "workspace_identity": self.workspace_identity,
         }
         multiplier = (self.cell_config.get("tuning", {}) or {}).get(
             "soma_diam_multiplier"
@@ -82,6 +84,16 @@ class TuningNotebookContext:
             summary["soma_diam_multiplier"] = multiplier
         return summary
 
+    @property
+    def workspace_identity(self):
+        from scp_pipeline.workspaces import infer_workspace
+        return infer_workspace(self.tune_dir, cell_config=self.cell_config,
+                               cell_name=self.cell_name, tune_name=self.tune_name).identity
+
+    @property
+    def project_name(self):
+        return self.workspace_identity['project_name']
+
 
 def _looks_like_repo_root(path: Path) -> bool:
     return (path / "modules").is_dir() and (path / "run_pipeline.py").is_file()
@@ -89,6 +101,11 @@ def _looks_like_repo_root(path: Path) -> bool:
 
 def resolve_repo_root(start: Optional[Path] = None) -> Path:
     """Locate the SCP repository root from a notebook or script context."""
+    from scp_pipeline.runtime import code_root
+    if start is not None and (Path(start).resolve() == code_root() or _looks_like_repo_root(Path(start))):
+        return Path(start).resolve()
+    if start is None:
+        return code_root()
     env_root = os.environ.get("SCP_ROOT")
     if env_root:
         candidate = Path(env_root).expanduser().resolve()
@@ -123,13 +140,8 @@ def resolve_repo_root(start: Optional[Path] = None) -> Path:
 
 
 def ensure_repo_on_syspath(repo_root: Optional[Path] = None) -> Path:
-    """Resolve SCP repo root and prepend it to `sys.path` if needed."""
-    root = resolve_repo_root(repo_root)
-    root_str = str(root)
-    if root_str not in sys.path:
-        sys.path.insert(0, root_str)
-    os.environ["SCP_ROOT"] = root_str
-    return root
+    """Resolve code location without shadowing a host project's imports."""
+    return resolve_repo_root(repo_root)
 
 
 def resolve_tune_dir(
@@ -139,18 +151,15 @@ def resolve_tune_dir(
     tune_name: Optional[str] = None,
     tunes_parent: str = "tunes",
     tune_dir_override: Optional[str | Path] = None,
+    project_name: Optional[str] = None,
+    project_root: Optional[str | Path] = None,
+    workspace_root: Optional[str | Path] = None,
 ) -> Path:
     """Resolve a tune directory from explicit path or cell/tune labels."""
-    if tune_dir_override:
-        path = Path(tune_dir_override).expanduser()
-        if not path.is_absolute():
-            path = (resolve_repo_root(repo_root) / path).resolve()
-        return path.resolve()
-
-    if not cell_name or not tune_name:
-        raise ValueError("Provide tune_dir_override or both cell_name and tune_name.")
-    root = resolve_repo_root(repo_root)
-    return (root / "cells" / str(cell_name) / tunes_parent / str(tune_name)).resolve()
+    from scp_pipeline.workspaces import resolve_workspace
+    return resolve_workspace(repo_root=resolve_repo_root(repo_root), project_name=project_name,
+        cell_name=cell_name, tune_name=tune_name, tunes_parent=tunes_parent,
+        tune_dir_override=tune_dir_override, project_root=project_root, workspace_root=workspace_root).tune_dir
 
 
 def _read_json(path: Path) -> Dict[str, Any]:
@@ -162,11 +171,17 @@ def _read_json(path: Path) -> Dict[str, Any]:
 
 
 def _compiled_mechanism_exists(tune_dir: Path, cell_config: Dict[str, Any]) -> bool:
-    from modules.setup.mechanisms import resolve_modfiles_dir
+    from scp_pipeline.setup.mechanisms import find_compiled_mechanism_dll
+    if find_compiled_mechanism_dll(tune_dir, cell_config=cell_config) is not None:
+        return True
+    from scp_pipeline.setup.mechanisms import resolve_modfiles_dir
 
     mod_dir = resolve_modfiles_dir(tune_dir, cell_config)
     if mod_dir is None:
         return False
+    from scp_pipeline.loaders.source_context import within
+    if not within(mod_dir, Path(tune_dir).resolve()):
+        return False  # Upstream compiled outputs are never SCP's managed build.
     candidates = (
         mod_dir / "x86_64" / ".libs" / "libnrnmech.so",
         mod_dir / "x86_64" / "libnrnmech.so",
@@ -206,7 +221,7 @@ def validate_step1_outputs(
     errors: Dict[str, str] = {}
     cell_config: Dict[str, Any] = {}
     if paths["cell_config"].is_file():
-        from modules.loaders import validate_cell_loader_config
+        from scp_pipeline.loaders import validate_cell_loader_config
 
         try:
             cell_config = _read_json(paths["cell_config"])
@@ -224,7 +239,7 @@ def validate_step1_outputs(
             checks["loader_config"] = False
             errors["loader_config"] = f"{type(exc).__name__}: {exc}"
 
-    from modules.setup.mechanisms import resolve_modfiles_dir
+    from scp_pipeline.setup.mechanisms import resolve_modfiles_dir
 
     mod_dir = resolve_modfiles_dir(tune_path, cell_config)
     mod_sources = (
@@ -279,17 +294,9 @@ def load_tune_configs(
 
 
 def _infer_cell_tune_from_path(tune_dir: Path) -> tuple[str, str]:
-    parts = tune_dir.resolve().parts
-    cell_name = tune_dir.parent.parent.name if tune_dir.parent.name == "tunes" else "cell"
-    tune_name = tune_dir.name
-    if "cells" in parts and "tunes" in parts:
-        i_cells = parts.index("cells")
-        i_tunes = parts.index("tunes")
-        if i_cells + 1 < len(parts):
-            cell_name = parts[i_cells + 1]
-        if i_tunes + 1 < len(parts):
-            tune_name = parts[i_tunes + 1]
-    return cell_name, tune_name
+    from scp_pipeline.workspaces import infer_workspace
+    workspace = infer_workspace(tune_dir)
+    return workspace.cell_name, workspace.tune_name
 
 
 def prepare_tuning_notebook_context(
@@ -302,6 +309,11 @@ def prepare_tuning_notebook_context(
     require_compiled_modfiles: bool = True,
     require_synapse_config: bool = False,
     print_summary: bool = True,
+    cell_override: Any = None,
+    runtime_sim_config: Optional[Dict[str, Any]] = None,
+    project_name: Optional[str] = None,
+    project_root: Optional[str | Path] = None,
+    workspace_root: Optional[str | Path] = None,
 ) -> TuningNotebookContext:
     """Resolve, validate, and load common Step 2/3 notebook state."""
     root = ensure_repo_on_syspath(repo_root)
@@ -311,11 +323,24 @@ def prepare_tuning_notebook_context(
         tune_name=tune_name,
         tunes_parent=tunes_parent,
         tune_dir_override=tune_dir_override,
+        project_name=project_name,
+        project_root=project_root, workspace_root=workspace_root,
     )
-    inferred_cell, inferred_tune = _infer_cell_tune_from_path(tune_dir)
-    resolved_cell = str(cell_name or inferred_cell)
-    resolved_tune = str(tune_name or inferred_tune)
+    from scp_pipeline.workspaces import infer_workspace
+    workspace = infer_workspace(tune_dir, cell_name=cell_name, tune_name=tune_name, project_name=project_name)
+    resolved_cell, resolved_tune = workspace.cell_name, workspace.tune_name
 
+    if cell_override is not None:
+        from scp_pipeline.model.runtime_cell import wrap_cell, prepare_runtime_workspace, adopt_cell
+        adopted = wrap_cell(cell_override)
+        sim_config = prepare_runtime_workspace(tune_dir, adopted, runtime_sim_config)
+        cell_config, _ = load_tune_configs(tune_dir, cell_name=resolved_cell)
+        cell_config = dict(adopt_cell(adopted, cell_config).config)
+        context = TuningNotebookContext(root, tune_dir, resolved_cell, resolved_tune, cell_config,
+                                       sim_config, Step1ValidationReport(tune_dir, {'runtime_cell': True}, {}))
+        if print_summary:
+            print_tuning_context_summary(context)
+        return context
     validation = validate_step1_outputs(
         tune_dir,
         require_synapse_config=require_synapse_config,
@@ -342,6 +367,8 @@ def print_tuning_context_summary(context: TuningNotebookContext) -> None:
     print("SCP repo:", context.repo_root)
     print("Tune dir:", context.tune_dir)
     print("Cell:", context.cell_name, "| Tune:", context.tune_name)
+    if context.project_name is not None:
+        print('Project:', context.project_name)
     print("Cell loader:", context.cell_config.get("cell_loader"))
     multiplier = (context.cell_config.get("tuning", {}) or {}).get(
         "soma_diam_multiplier"
@@ -351,7 +378,7 @@ def print_tuning_context_summary(context: TuningNotebookContext) -> None:
     print("Step 1 validation:", "ok" if context.validation.ok else "missing files")
 
 
-def build_tuning_cell(context: TuningNotebookContext | Dict[str, Any], tune_dir: Optional[Path] = None):
+def build_tuning_cell(context: TuningNotebookContext | Dict[str, Any], tune_dir: Optional[Path] = None, *, cell_override=None):
     """Build a NEURON cell for Step 2/3 tuning notebooks."""
     if isinstance(context, TuningNotebookContext):
         cell_config = dict(context.cell_config)
@@ -362,11 +389,15 @@ def build_tuning_cell(context: TuningNotebookContext | Dict[str, Any], tune_dir:
             raise ValueError("tune_dir is required when context is a cell_config dict.")
         base_dir = Path(tune_dir).expanduser().resolve()
 
-    from modules.notebooks.helpers import build_cell_for_notebook
+    from scp_pipeline.notebooks.helpers import build_cell_for_notebook
 
-    cell = build_cell_for_notebook(cell_config, base_dir=base_dir)
+    if cell_override is not None:
+        from scp_pipeline.model.runtime_cell import adopt_cell
+        cell = adopt_cell(cell_override, cell_config)
+    else:
+        cell = build_cell_for_notebook(cell_config, base_dir=base_dir)
     if isinstance(context, TuningNotebookContext):
-        from modules.simulation.current_injection import apply_sim_conditions
+        from scp_pipeline.simulation.current_injection import apply_sim_conditions
 
         apply_sim_conditions(cell, context.sim_config)
     return cell

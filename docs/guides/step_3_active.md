@@ -26,9 +26,14 @@ Step 3 is manual-first for model edits:
 ACT active tuning is integrated as an optional helper, not a mandatory path. The
 notebook can prepare ACT inputs, run ACT modules, collect predictions, and
 evaluate temporary predictions without overwriting model files.
-The first ACT preparation/run action resolves a configured checkout or
-automatically clones a fresh one to `../mods/ACT`, both locally and in Colab.
-Set `SCP_AUTO_CLONE_ACT=0` when manual provisioning is required.
+Install ACT once in the environment using SCP's suggested `.[act]` extra or
+`python -m pip install -r requirements-act.txt`, then restart the kernel.
+Preparation/run actions prefer the installed package and validate its active
+API; no fixed checkout location is required. Explicit checkout overrides and
+legacy locations remain supported, but cloning now requires opt-in with
+`SCP_AUTO_CLONE_ACT=1`. See [installation](../installation.md) for the pinned
+source revision and Colab instructions. Generated ACT work remains tune/project
+owned. Installing the package does not change the experimental support boundary.
 
 The compact `0_pipeline.ipynb` counterpart presents Step 3 as three bordered
 cards: active protocol, FI curve, and ACT active tuning. The first two actions
@@ -390,3 +395,11 @@ conductance bounds, multiprocessing, and target data quality.
 
 After active behavior is acceptable, continue to Step 4 for synapse setup/tuning
 or Step 5 for current-injection/simulation checks on the prepared tune.
+
+## Adopted cells and saved builders
+
+Use the optional `CELL_OVERRIDE`/`RUNTIME_SIM_CONFIG` block for in-kernel
+active/FI checks. Use a configured `python_factory` or HOC template for
+fresh-process reconstruction. Runtime-only cells cannot enter worker-based
+ACT optimization; configured non-Allen ACT use remains experimental. See
+[Custom models](custom_models.md).
